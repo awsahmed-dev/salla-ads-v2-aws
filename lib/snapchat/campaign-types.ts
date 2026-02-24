@@ -1,0 +1,892 @@
+/* ================================================================
+   Campaign Types -- aligned to Snapchat Marketing API (Ad Squads)
+   ================================================================ */
+
+/* ---- Shared enums ---- */
+
+/** Maps to API objective_v2_properties.objective */
+export type CampaignObjective =
+  | "SALES"
+  | "WEBSITE_VISITS"
+  | "APP_PROMOTION"
+  | "ENGAGEMENT"
+  | "SPONSORED_CHAT"
+  | "LEADS";
+
+/** Maps to API optimization_goal -- per-objective valid goals */
+export type OptimizationGoal =
+  | "PIXEL_PURCHASE"
+  | "PIXEL_ADD_TO_CART"
+  | "PIXEL_PAGE_VIEW"
+  | "PIXEL_SIGNUP"
+  | "SWIPES"
+  | "LANDING_PAGE_VIEW"
+  | "IMPRESSIONS"
+  | "STORY_OPENS"
+  | "VIDEO_VIEWS"
+  | "VIDEO_VIEWS_15_SEC"
+  | "USES"
+  | "LEAD_FORM_SUBMISSIONS"
+  | "APP_INSTALLS"
+  | "APP_PURCHASE"        // Snap API uses singular form
+  | "APP_SIGNUP"
+  | "APP_ADD_TO_CART"
+  | "APP_REENGAGE_OPEN";  // Snap API: re-engagement goal (open app)
+
+/* ---- Objective-to-config mapping ---- */
+
+export interface ObjectiveConfig {
+  /** Snap API objective_v2_type */
+  snapObjectiveV2: string;
+  /** Snap API conversion_location */
+  conversionLocation: string;
+  /** Human-readable label */
+  label: string;
+  /** Allowed optimization goals for this objective */
+  allowedGoals: OptimizationGoal[];
+  /** Default optimization goal */
+  defaultGoal: OptimizationGoal;
+  /** Whether pixel is required, optional, or not needed */
+  pixelRequirement: "required" | "optional" | "none";
+  /** Whether catalog is available */
+  catalogAvailable: boolean;
+  /** Whether conversion window applies */
+  hasConversionWindow: boolean;
+  /** Allowed bid strategies */
+  allowedBidStrategies: BidStrategy[];
+  /** Allowed creative ad types (maps to SnapCreativeType | "INFLUENCER") */
+  allowedAdFormats: string[];
+  /** Default CTA */
+  defaultCTA: string;
+}
+
+export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
+  SALES: {
+    snapObjectiveV2: "SALES",
+    conversionLocation: "WEB",
+    label: "Sales",
+    allowedGoals: ["PIXEL_PURCHASE", "PIXEL_ADD_TO_CART", "PIXEL_PAGE_VIEW", "PIXEL_SIGNUP"],
+    defaultGoal: "PIXEL_PURCHASE",
+    pixelRequirement: "required",
+    catalogAvailable: true,
+    hasConversionWindow: true,
+    allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID", "TARGET_COST"],
+    allowedAdFormats: ["WEB_VIEW", "DEEP_LINK", "COLLECTION", "COMPOSITE", "DYNAMIC", "INFLUENCER"],
+    defaultCTA: "SHOP_NOW",
+  },
+  WEBSITE_VISITS: {
+    snapObjectiveV2: "TRAFFIC",
+    conversionLocation: "WEB",
+    label: "Website Visits",
+    allowedGoals: ["SWIPES", "PIXEL_PAGE_VIEW", "LANDING_PAGE_VIEW"],
+    defaultGoal: "SWIPES",
+    pixelRequirement: "optional",
+    catalogAvailable: false,
+    hasConversionWindow: false,
+    allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID"],
+    allowedAdFormats: ["WEB_VIEW", "DEEP_LINK", "COLLECTION", "COMPOSITE", "INFLUENCER"],
+    defaultCTA: "VIEW",
+  },
+  ENGAGEMENT: {
+    snapObjectiveV2: "AWARENESS_AND_ENGAGEMENT",
+    conversionLocation: "NONE",
+    label: "Interaction",
+    allowedGoals: ["IMPRESSIONS", "SWIPES", "STORY_OPENS", "VIDEO_VIEWS", "VIDEO_VIEWS_15_SEC", "USES"],
+    defaultGoal: "IMPRESSIONS",
+    pixelRequirement: "none",
+    catalogAvailable: false,
+    hasConversionWindow: false,
+    allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID"],
+    allowedAdFormats: ["WEB_VIEW", "SNAP_AD", "COLLECTION", "COMPOSITE", "INFLUENCER"],
+    defaultCTA: "VIEW",
+  },
+  SPONSORED_CHAT: {
+    snapObjectiveV2: "AWARENESS_AND_ENGAGEMENT",
+    conversionLocation: "NONE",
+    label: "Sponsored Ads",
+    allowedGoals: ["IMPRESSIONS", "SWIPES"],
+    defaultGoal: "IMPRESSIONS",
+    pixelRequirement: "none",
+    catalogAvailable: false,
+    hasConversionWindow: false,
+    allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID"],
+    allowedAdFormats: ["WEB_VIEW", "APP_INSTALL", "COMPOSITE", "INFLUENCER"],
+    defaultCTA: "VIEW",
+  },
+  APP_PROMOTION: {
+    snapObjectiveV2: "APP_PROMOTION",
+    conversionLocation: "APP",
+    label: "App Promotion",
+    allowedGoals: ["APP_INSTALLS", "APP_PURCHASE", "APP_SIGNUP", "APP_ADD_TO_CART", "SWIPES"],
+    defaultGoal: "APP_INSTALLS",
+    pixelRequirement: "none",
+    catalogAvailable: false,
+    hasConversionWindow: true,
+    allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID", "TARGET_COST"],
+    allowedAdFormats: ["APP_INSTALL", "DEEP_LINK", "COLLECTION", "COMPOSITE", "INFLUENCER"],
+    defaultCTA: "INSTALL_NOW",
+  },
+  LEADS: {
+    snapObjectiveV2: "LEADS",           // Snap API objective_v2_type for lead generation
+    conversionLocation: "LEAD_FORM",
+    label: "Lead Generation",
+    allowedGoals: ["LEAD_FORM_SUBMISSIONS", "SWIPES", "IMPRESSIONS"],
+    defaultGoal: "LEAD_FORM_SUBMISSIONS",
+    pixelRequirement: "none",
+    catalogAvailable: false,
+    hasConversionWindow: false,
+    allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID", "TARGET_COST"],
+    allowedAdFormats: ["LEAD_GENERATION"],
+    defaultCTA: "SIGN_UP",
+  },
+};
+
+/**
+ * Maps to API conversion_window.
+ * Snap API supports exactly 2 values for both SALES and APP_PROMOTION objectives.
+ * SWIPE_1DAY and SWIPE_7DAY_VIEW_1DAY are NOT valid Snap API values and have been removed.
+ */
+export type ConversionWindow =
+  | "SWIPE_28DAY_VIEW_1DAY"  // 28-day click + 1-day view (recommended)
+  | "SWIPE_7DAY";             // 7-day click only (stricter measurement)
+
+/** Maps to API bid_strategy */
+export type BidStrategy =
+  | "AUTO_BID"
+  | "TARGET_COST"
+  | "LOWEST_COST_WITH_MAX_BID";
+
+/** Maps to API pacing_type */
+export type PacingType = "STANDARD" | "ACCELERATED";
+
+/** Maps to API placement_v2.config */
+export type PlacementConfig = "AUTOMATIC" | "CUSTOM";
+
+/** Budget type: how the budget is consumed over the campaign lifetime */
+export type PaymentMethod = "prepaid" | "pay_as_you_go";
+
+/* ---- Step: Objective ---- */
+
+/** Pixel connection mode: use an existing Snap Pixel or let Salla create one */
+export type PixelMode = "existing" | "salla_managed" | "none";
+
+export interface ObjectiveSettings {
+  campaignName: string;
+  objective: CampaignObjective;
+  catalogEnabled: boolean;
+  catalogSource: string;
+  /** Snap API: ad_squad.pixel_id -- required for PIXEL_* optimization goals */
+  pixelMode: PixelMode;
+  /** The selected pixel ID (either existing or Salla-created) */
+  pixelId: string;
+  /** Display name for selected pixel */
+  pixelName: string;
+  /** App settings for APP_PROMOTION objective */
+  appSettings?: AppSettings;
+}
+
+/* ---- Step: Audience ---- */
+
+export interface LocationCircle {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  radius: number;
+}
+
+export interface SallaAudienceSegment {
+  id: string;
+  name: string;
+  category: string;
+  size: number;
+}
+
+export interface AudienceSettings {
+  countries: string[];
+  cities: LocationCircle[];
+  genders: string[];
+  ageMin: number;
+  ageMax: number;
+  languages: string[];
+  deviceOS: string[];
+  interests: string[];
+  customAudiencesInclude: string[];
+  customAudiencesExclude: string[];
+  regulatedContent: boolean;
+  interestExpansion: boolean;
+  customAudienceExpansion: boolean;
+  excludeRecentPurchasers: boolean;
+  excludeRecentPurchasersDays: number;
+  sallaAudienceEnabled: boolean;
+  sallaAudienceCategory: string;
+}
+
+/* ---- Step: Budget ---- */
+
+export interface BudgetSettings {
+  /** Maps to API daily_budget_micro or lifetime_budget_micro */
+  type: "daily" | "lifetime";
+  amount: number;
+  /** Maps to API optimization_goal */
+  optimizationGoal: OptimizationGoal;
+  /** Maps to API conversion_window */
+  conversionWindow: ConversionWindow;
+  /** Maps to API bid_strategy */
+  bidStrategy: BidStrategy;
+  /** Maps to API bid_micro (SAR, converted to micro on send) */
+  bidAmount: number;
+  /** Maps to API pacing_type */
+  pacingType: PacingType;
+  /** Schedule dates */
+  startDate: string;
+  endDate: string;
+  /** When true, end date is not required (pay-as-you-go continuous running) */
+  endDateOptional: boolean;
+  /** All day vs custom hours */
+  schedule: "all_day" | "custom";
+  /**
+   * Snap API: ad_squad.cap_and_exclusion_config.frequency_cap_config
+   * Controls how many times a single user sees the ad within a time window.
+   * Note: frequency cap + multi-format delivery in the same ad squad is not supported.
+   */
+  frequencyCapEnabled: boolean;
+  /** Max impressions per user within the interval (Snap default: 4). frequency_cap_type is always IMPRESSIONS for SALES objective. */
+  frequencyCapCount: number;
+  /** Time window in hours. API field: time_interval + frequency_cap_interval (HOURS|DAYS). Max 720 hours (30 days). */
+  frequencyCapInterval: number;
+  /** Salla billing method */
+  paymentMethod: PaymentMethod;
+  /** Salla performance boost upsell */
+  performanceBoost: boolean;
+  /** Salla auto-increase: gradually scale daily budget over the campaign lifetime */
+  autoIncrease: {
+    enabled: boolean;
+    /** Percentage to increase by at each interval (5-100) */
+    pct: number;
+    /** Interval in days between increases (3, 5, 7, 14) */
+    intervalDays: number;
+    /** Maximum daily budget cap (SAR). Auto-increase stops at this amount. */
+    maxDailyBudget: number;
+  };
+}
+
+/* ---- Step: Creative (Ad Design) ---- */
+
+/**
+ * Maps to Snapchat API creative types valid for SALES objective:
+ *  - WEB_VIEW (single image/video with swipe-up URL)
+ *  - COLLECTION (top snap + 4+ product tiles via interaction_zone)
+ *  - COMPOSITE (story ad: 1-20 snap ads in sequence)
+ *  - Dynamic (COLLECTION with dynamic_render_properties and catalog)
+ */
+export type SnapCreativeType =
+  | "WEB_VIEW"
+  | "COLLECTION"
+  | "COMPOSITE"
+  | "DYNAMIC"
+  | "LEAD_GENERATION"
+  | "APP_INSTALL"
+  | "SNAP_AD"
+  | "DEEP_LINK";
+
+/** Snap API media type */
+export type SnapMediaType = "IMAGE" | "VIDEO";
+
+/**
+ * Call-to-action values valid for WEB_VIEW (Sales/web conversion).
+ * Sourced from Snap API creative-type-to-CTA mapping table.
+ */
+export type WebViewCTA =
+  | "SHOP_NOW"
+  | "ORDER_NOW"
+  | "BUY_TICKETS"
+  | "GET_NOW"
+  | "BOOK_NOW"
+  | "MORE"
+  | "VIEW"
+  | "SIGN_UP"
+  | "APPLY_NOW"
+  | "DOWNLOAD"
+  | "WATCH"
+  | "LISTEN"
+  | "READ"
+  | "PLAY"
+  | "TRY"
+  | "DONATE"
+  | "RESPOND"
+  | "SHOWTIMES"
+  | "VIEW_MENU"
+  | "SHOW"
+  | "VOTE"
+  | "PRE_REGISTER"
+  | "PLAY_GAME";
+
+/**
+ * Call-to-action values valid for LEAD_GENERATION creatives.
+ * Sourced from Snap API creative-type-to-CTA mapping table for LEAD_GENERATION.
+ */
+export type LeadGenCTA =
+  | "APPLY_NOW"
+  | "MORE"
+  | "BOOK_NOW"
+  | "GET_NOW"
+  | "SIGN_UP"
+  | "TEST_DRIVE"
+  | "REQUEST_APPOINTMENT"
+  | "REQUEST_QUOTE"
+  | "FREE_TRIAL"
+  | "CLAIM_SAMPLE"
+  | "GET_COUPON";
+
+/**
+ * Call-to-action values valid for APP_INSTALL creatives.
+ * Snap API creative-type-to-CTA mapping for APP_INSTALL.
+ * Note: MORE is NOT valid for APP_INSTALL per the Snap API.
+ */
+export type AppInstallCTA =
+  | "INSTALL_NOW"
+  | "DOWNLOAD"
+  | "GET_NOW"
+  | "TRY"
+  | "PLAY"
+  | "USE_APP"
+  | "ORDER_NOW"
+  | "SHOP_NOW"
+  | "BOOK_NOW"
+  | "DONATE"
+  | "SIGN_UP"
+  | "WATCH"
+  | "VOTE"
+  | "DIRECTIONS"
+  | "PLAY_GAME";
+
+/** App platform for APP_PROMOTION objective */
+export type AppPlatform = "IOS" | "ANDROID" | "BOTH";
+
+/**
+ * App configuration for APP_PROMOTION objective.
+ * Maps to ad_squad.app_install_properties (Snap API).
+ */
+export interface AppSettings {
+  /** iOS App Store ID (numeric, e.g. "447188370") */
+  iosAppId: string;
+  /** Android package name (e.g. "com.example.app") */
+  androidAppUrl: string;
+  /** Which platform(s) to target */
+  appPlatform: AppPlatform;
+  /** App name for display purposes */
+  appName: string;
+  /** Optional icon URL for preview */
+  appIconUrl: string;
+  /**
+   * Deep link URI for app re-engagement (not used for APP_INSTALL).
+   * Maps to deep_link_properties.deep_link_uri
+   */
+  deepLinkUri: string;
+  /**
+   * Fallback URL if app is not installed.
+   * Maps to deep_link_properties.fallback_type = WEB_VIEW_FALLBACK
+   */
+  fallbackUrl: string;
+}
+
+/**
+ * Snap API: deep_link_properties on Creative.
+ * Used with DEEP_LINK creative type to open an app or fallback to web.
+ */
+export interface DeepLinkProperties {
+  /** Deep link URI scheme (e.g. "myapp://product/123") */
+  deepLinkUri: string;
+  /** iOS App ID for Universal Links fallback */
+  iosAppId?: string;
+  /** Android package name for App Links fallback */
+  androidAppUrl?: string;
+  /** Fallback URL when app is not installed */
+  fallbackUrl: string;
+  /** Snap API: fallback_type -- WEB_VIEW_FALLBACK or APP_STORE_FALLBACK */
+  fallbackType: "WEB_VIEW_FALLBACK" | "APP_STORE_FALLBACK";
+}
+
+/**
+ * Snap API: web_view_properties on Creative (advanced options).
+ * Controls in-app browser behavior for WEB_VIEW creatives.
+ */
+export interface WebViewProperties {
+  /** Target URL for the swipe-up action */
+  url: string;
+  /** Open in Snapchat's in-app browser vs external browser */
+  useSnapBrowser: boolean;
+  /** Preload the web page for faster load times */
+  preloadEnabled: boolean;
+  /** Deep link URL to open app if installed (optional) */
+  deepLinkUrl?: string;
+  /**
+   * Snap API: block_preload -- blocks preloading of the landing page.
+   * Use for pages that track impressions (prevents inflated metrics).
+   */
+  blockPreload: boolean;
+}
+
+/* ---- Lead Generation Form Types (Snap API: lead_generation_form) ---- */
+
+/** Standard form field types from Snap API */
+export type LeadFormFieldType =
+  | "FIRST_NAME"
+  | "LAST_NAME"
+  | "EMAIL"
+  | "PHONE_NUMBER"
+  | "ADDRESS"
+  | "POSTAL_CODE"
+  | "BIRTHDAY_DATE"
+  | "JOB_TITLE"
+  | "COMPANY_NAME"
+  | "CUSTOM";
+
+/** Custom form field question types */
+export type CustomFieldType =
+  | "TEXT"
+  | "DATE"
+  | "MULTIPLE_CHOICE_SINGLE_SELECTION"
+  | "MULTIPLE_CHOICE_MULTI_SELECTION";
+
+export interface MultipleChoiceOption {
+  choice_description: string;
+  option_preferred_status?: "PREFERRED" | "NOT_PREFERRED";
+}
+
+export interface CustomFormFieldProperties {
+  type: CustomFieldType;
+  description: string;
+  multiple_choice_options?: MultipleChoiceOption[];
+}
+
+export interface LeadFormField {
+  id: string;
+  type: LeadFormFieldType;
+  custom_form_field_properties?: CustomFormFieldProperties;
+}
+
+export interface LeadFormConsentField {
+  consent_description: string;
+  required: boolean;
+}
+
+export interface LeadFormLegalDisclosure {
+  title: string;
+  description: string;
+  consent_form_fields: LeadFormConsentField[];
+}
+
+/** CTA options for the end page shown after form submission */
+export type LeadFormEndPageCTA =
+  | "VIEW_WEBSITE"
+  | "BOOK_NOW"
+  | "LEARN_MORE"
+  | "DONATE"
+  | "SPECIAL_OFFER"
+  | "SCHEDULE_NOW"
+  | "BUY_TICKETS"
+  | "TEST_DRIVE"
+  | "APPLY_NOW"
+  | "GET_COUPON"
+  | "CLAIM_SAMPLE"
+  | "FREE_TRIAL";
+
+export interface LeadFormEndPageProperties {
+  call_to_action: LeadFormEndPageCTA;
+  url: string;
+}
+
+/**
+ * Full lead generation form entity -- maps to Snap API lead_generation_form.
+ * Requirements:
+ *   - FIRST_NAME and LAST_NAME must be included
+ *   - At least one of EMAIL or PHONE_NUMBER must be included
+ *   - ADDRESS and POSTAL_CODE cannot both be included
+ *   - Form title max 25 chars, description max 180 chars
+ */
+export interface LeadGenerationForm {
+  /** Form name (internal label) */
+  name: string;
+  /** Displayed title on the form (max 25 chars) */
+  title: string;
+  /** Displayed description on the form (max 180 chars) */
+  description: string;
+  /** Form fields */
+  form_fields: LeadFormField[];
+  /** Privacy policy URL */
+  privacy_policy_url: string;
+  /** Optional legal disclosures */
+  legal_disclosures?: LeadFormLegalDisclosure;
+  /** Optional banner image media ID (750x230 min, 1875x575 max, 75:23 ratio) */
+  banner_media_id?: string;
+  /** Local preview for banner */
+  bannerPreviewUrl?: string;
+  /** Optional end page shown after submission */
+  end_page_properties?: LeadFormEndPageProperties;
+}
+
+export function makeDefaultAppSettings(): AppSettings {
+  return {
+    iosAppId: "",
+    androidAppUrl: "",
+    appPlatform: "BOTH",
+    appName: "",
+    appIconUrl: "",
+    deepLinkUri: "",
+    fallbackUrl: "",
+  };
+}
+
+export function makeDefaultLeadForm(): LeadGenerationForm {
+  return {
+    name: "",
+    title: "",
+    description: "",
+    form_fields: [
+      { id: `lf_${Date.now()}_1`, type: "FIRST_NAME" },
+      { id: `lf_${Date.now()}_2`, type: "LAST_NAME" },
+      { id: `lf_${Date.now()}_3`, type: "EMAIL" },
+    ],
+    privacy_policy_url: "",
+  };
+}
+
+/**
+ * Top Snap crop position -- Snap API top_snap_crop_position.
+ * OPTIMIZED lets Snap auto-crop for each placement.
+ */
+export type CropPosition = "OPTIMIZED" | "MIDDLE" | "TOP" | "BOTTOM";
+
+/**
+ * Snap API: creator_partnership_type.
+ * Controls the paid partnership label on the ad.
+ */
+export type CreatorPartnershipType = "NONE" | "AD_PARTNERSHIP" | "BRAND_PARTNERSHIP";
+
+/**
+ * A single creative asset (maps to one Snap Creative entity).
+ * Supports image (1080x1920, PNG/JPG, <=5MB) and video (1080x1920, mp4/mov, 3-180s, <=32MB).
+ */
+/**
+ * Media source: upload local file, or claim influencer content via Ad Code.
+ * claim_media_by_ad_code returns a media_entity_id used as top_snap_media_id.
+ */
+export type MediaSource = "upload" | "ad_code";
+
+export interface CreativeAsset {
+  id: string;
+  /** Snap API: name -- auto-generated internal label (max 375 chars). Not shown to users. */
+  name: string;
+  /** Where the media comes from */
+  mediaSource: MediaSource;
+  /** Media type: IMAGE or VIDEO */
+  mediaType: SnapMediaType;
+  /** Local preview URL (blob or uploaded) */
+  url: string;
+  /** File reference for upload */
+  file?: File;
+  /** Snap API claim_media: ad_code shared by influencer */
+  adCode?: string;
+  /** Snap API claim_media: media_entity_id once claimed */
+  claimedMediaId?: string;
+  /** Snap API claim_media: status (PENDING_UPLOAD | READY) */
+  claimStatus?: "PENDING" | "READY" | "ERROR";
+  /** Snap API: creator_profile_properties.profile_id -- show creator's profile on ad */
+  creatorProfileId?: string;
+  /** Snap API: creator_partnership_type -- paid partnership label */
+  creatorPartnershipType?: CreatorPartnershipType;
+  /** Snap API: brand_name -- max 32 chars */
+  brandName: string;
+  /** Snap API: headline -- max 34 chars */
+  headline: string;
+  /** Snap API: call_to_action */
+  cta: WebViewCTA;
+  /** Snap API: top_snap_crop_position */
+  cropPosition: CropPosition;
+  /** Snap API: web_view_properties.url */
+  websiteUrl: string;
+  /** Snap API: shareable */
+  shareable: boolean;
+  /** Snap API: deep_link_properties -- for DEEP_LINK creative type */
+  deepLinkProperties?: DeepLinkProperties;
+  /** Snap API: web_view_properties (advanced) -- for WEB_VIEW creative type */
+  webViewProperties?: WebViewProperties;
+  /** Snap API: cta_color_display_mode -- Auto or Default CTA button color */
+  ctaColorDisplayMode?: "AUTO" | "DEFAULT";
+  /** Snap API: third_party_impression_urls -- third-party tracking */
+  thirdPartyImpressionUrls?: string[];
+  /** Snap API: third_party_swipe_urls -- third-party swipe tracking */
+  thirdPartySwipeUrls?: string[];
+}
+
+/**
+ * Collection Ad tile (maps to a Creative Element BUTTON in an Interaction Zone).
+ * Per Snap API: each tile is a Creative Element with a media_id.
+ * The tile's tap action uses the collection-level web_view_properties.url (from the Top Snap),
+ * NOT a per-tile URL. Title is optional.
+ * Min 2 tiles, max 4 tiles.
+ */
+export interface CollectionTile {
+  id: string;
+  /** Tile image (160x160 min, square, PNG/JPG, max 2MB). Uploaded as a Media entity. */
+  imageUrl: string;
+  file?: File;
+  /** Optional product title shown below the tile */
+  title: string;
+  /** Product URL (swipe-up destination for this tile) */
+  url?: string;
+}
+
+/**
+ * Snap API: Offer Disclaimer (STATIC type for non-DPA ads).
+ * Shown as "See Offer Details" pill on the ad.
+ * Compatible with WEB_VIEW, COMPOSITE, and COLLECTION for Sales.
+ * Max 5,000 chars for disclaimer_text.
+ */
+export interface OfferDisclaimer {
+  enabled: boolean;
+  /** Snap API: name -- internal label for the disclaimer */
+  name: string;
+  /** Snap API: disclaimer_text -- displayed to the user (max 5,000 chars) */
+  disclaimerText: string;
+}
+
+/**
+ * Snap API: dynamic_render_properties for Dynamic Product Ads (DPA).
+ * Controls how catalog products are rendered in the ad template.
+ */
+export interface DynamicTemplateConfig {
+  /**
+   * Snap API: product_set_id -- a subset of the catalog.
+   * Product sets are defined in Snap Ads Manager or via Product Feed.
+   */
+  productSetId: string;
+  productSetName: string;
+  /** Whether to show product price on the template */
+  showPrice: boolean;
+  /** Whether to show sale/discount badge */
+  showSaleBadge: boolean;
+  /** Caption text overlay mode */
+  captionMode: "product_name" | "product_name_price" | "custom";
+  /** Custom caption (used when captionMode === "custom") */
+  customCaption: string;
+}
+
+export function makeDefaultDynamicTemplate(): DynamicTemplateConfig {
+  return {
+    productSetId: "",
+    productSetName: "",
+    showPrice: true,
+    showSaleBadge: true,
+    captionMode: "product_name_price",
+    customCaption: "",
+  };
+}
+
+/**
+ * Snap API: forced_view_eligibility on Creative.
+ * Controls non-skippable behavior for Commercials.
+ *  - FULL_DURATION: entire video is non-skippable (video must be 3-6 seconds)
+ *  - SIX_SECONDS: first 6 seconds non-skippable, rest skippable (video must be 7+ seconds)
+ */
+export type ForcedViewEligibility = "FULL_DURATION" | "SIX_SECONDS";
+
+/**
+ * Snap API: premium_content_bundle_ids on AdSquad.
+ * Target specific Snap Discover premium content bundles.
+ */
+export const PREMIUM_CONTENT_BUNDLES = {
+  LIFESTYLE_SPORTS: { id: "c7e251af-3606-4f03-91f1-98456161655d", label: "Lifestyle & Sports Shows" },
+  ALL_SHOWS: { id: "1856c724-7cec-4139-a8a8-b87fc609f13e", label: "All Shows (including News)" },
+} as const;
+
+/**
+ * Commercial configuration per ad.
+ * Commercials are non-skippable video ads shown in Snap's premium content (Discover Shows).
+ * Only eligible for WEB_VIEW / SNAP_AD formats with VIDEO media (3s+).
+ */
+export interface CommercialConfig {
+  enabled: boolean;
+  /**
+   * Snap API: forced_view_eligibility.
+   * FULL_DURATION for 3-6s videos, SIX_SECONDS for 7s+ videos.
+   */
+  forcedViewEligibility: ForcedViewEligibility;
+  /**
+   * Snap API: forced_view_setting on AdSquad.
+   * Must match the Creative's forced_view_eligibility.
+   */
+  premiumContentBundle: "LIFESTYLE_SPORTS" | "ALL_SHOWS";
+}
+
+/**
+ * Discover Tile / Preview Creative for Story Ads.
+ * Maps to Snap API Creative type: PREVIEW.
+ * This is the thumbnail shown in the Discover Feed / Stories Tab.
+ * Required for Story Ads (COMPOSITE) to run in the Discover placement.
+ */
+export interface DiscoverTile {
+  /** Whether the Discover Tile is enabled for this Story Ad */
+  enabled: boolean;
+  /** Preview headline shown on the tile in the Discover Feed (max 55 chars) */
+  headline: string;
+  /** Background image for the tile. Spec: 360x600 px min, 3:5 ratio, PNG only, max 2MB */
+  backgroundImageUrl: string;
+  backgroundImageFile?: File;
+  /** Optional brand logo on the tile. Spec: 993x284 px, PNG only, max 2MB */
+  logoImageUrl: string;
+  logoImageFile?: File;
+}
+
+/**
+ * A single Ad within the campaign.
+ * Maps to one Snap Ad entity with its own Creative.
+ * Advertisers can create multiple ads of different formats.
+ */
+export interface AdGroup {
+  id: string;
+  name: string;
+  /** Snap creative type for this ad */
+  adType: SnapCreativeType;
+  /** Main creative assets */
+  assets: CreativeAsset[];
+  /** Collection tiles (only for COLLECTION type, min 2) */
+  collectionTiles: CollectionTile[];
+  /** Optional offer disclaimer per ad */
+  offerDisclaimer: OfferDisclaimer;
+  /**
+   * Dynamic Product Ads config (only for DYNAMIC type, or COLLECTION with dynamicCollectionEnabled).
+   * Maps to Snap API dynamic_render_properties.
+   */
+  dynamicTemplateConfig?: DynamicTemplateConfig;
+  /** When true, COLLECTION tiles are auto-populated from catalog product set */
+  dynamicCollectionEnabled?: boolean;
+  /**
+   * Commercial config -- non-skippable video ads in premium content.
+   * Only for WEB_VIEW with VIDEO media. Maps to Snap API forced_view_eligibility + forced_view_setting.
+   */
+  commercialConfig?: CommercialConfig;
+  /**
+   * Discover Tile / Preview Creative -- only for COMPOSITE (Story Ads).
+   * Enables the ad to appear in the Discover Feed / Stories Tab.
+   * Maps to Snap API Creative type: PREVIEW with preview_creative_id on the COMPOSITE.
+   */
+  discoverTile?: DiscoverTile;
+  /** True when this ad group uses influencer content (ad code claiming) */
+  isInfluencer?: boolean;
+  /** Third-party tracking URLs */
+  trackingUrls?: { impressionUrl: string; swipeUpUrl: string };
+}
+
+export interface CreativeSettings {
+  /**
+   * Snap API: profile_properties.profile_id (required on every creative).
+   * Campaign-level: one brand profile for all ads in this campaign.
+   */
+  publicProfileId: string;
+  /** All ads in this campaign -- each can have a different format */
+  ads: AdGroup[];
+  /** Snap API: placement_v2.config (shared across all ads) */
+  placement: PlacementConfig;
+  /** Snap API: brand_content_safety (shared across all ads) */
+  brandSafety: "FULL_INVENTORY" | "LIMITED_INVENTORY";
+  /** Snap API: snapchat_positions (only when placement === CUSTOM) */
+  customPositions: string[];
+  /** Campaign-level product set for catalog-powered ads (DYNAMIC / dynamic COLLECTION) */
+  catalogProductSetId: string;
+  catalogProductSetName: string;
+  /** Sponsored Ads (Chat Feed) specific settings -- maps to Snap API `chat_properties` */
+  sponsoredAdConfig: {
+    /** chat_properties.additional_messages[0].text -- initial message shown in chat pane (max 500) */
+    chatMessage: string;
+    /** chat_properties.default_responses[0].text -- auto-reply when user sends a message (max 500) */
+    autoResponseMessage: string;
+    /** Whether auto-response is enabled -- maps to response_interaction_setting */
+    autoResponseEnabled: boolean;
+    /** chat_properties.wallpaper_media_id -- branded chat background image 1080x1920 */
+    wallpaperUrl: string;
+  };
+  /** Lead Generation form -- maps to Snap API lead_generation_form entity */
+  leadForm?: LeadGenerationForm;
+}
+
+/* ---- Full Campaign ---- */
+
+export interface CampaignData {
+  objective: ObjectiveSettings;
+  audience: AudienceSettings;
+  budget: BudgetSettings;
+  creative: CreativeSettings;
+}
+
+export const defaultCampaign: CampaignData = {
+  objective: {
+    campaignName: "",
+    objective: "SALES",
+    catalogEnabled: false,
+    catalogSource: "",
+    pixelMode: "none",
+    pixelId: "",
+    pixelName: "",
+  },
+  audience: {
+    countries: ["SA"],
+    cities: [],
+    genders: ["MALE", "FEMALE"],
+    ageMin: 18,
+    ageMax: 45,
+    languages: ["ar"],
+    deviceOS: ["iOS", "ANDROID"],
+    interests: [],
+    customAudiencesInclude: [],
+    customAudiencesExclude: [],
+    regulatedContent: false,
+    interestExpansion: true,
+    customAudienceExpansion: false,
+    excludeRecentPurchasers: false,
+    excludeRecentPurchasersDays: 30,
+    sallaAudienceEnabled: false,
+    sallaAudienceCategory: "",
+  },
+  budget: {
+    type: "daily",
+    amount: 400,
+    optimizationGoal: "PIXEL_PURCHASE" as OptimizationGoal,
+    conversionWindow: "SWIPE_28DAY_VIEW_1DAY",
+    bidStrategy: "AUTO_BID",
+    bidAmount: 0,
+    pacingType: "STANDARD",
+    startDate: "",
+    endDate: "",
+    endDateOptional: false,
+    schedule: "all_day",
+    frequencyCapEnabled: false,
+    frequencyCapCount: 4,
+    frequencyCapInterval: 48,
+    paymentMethod: "prepaid",
+    performanceBoost: true,
+    autoIncrease: {
+      enabled: false,
+      pct: 20,
+      intervalDays: 7,
+      maxDailyBudget: 1200,
+    },
+  },
+  creative: {
+    publicProfileId: "",
+    ads: [],
+    placement: "AUTOMATIC",
+    brandSafety: "FULL_INVENTORY",
+    customPositions: ["INTERSTITIAL_USER", "INTERSTITIAL_CONTENT", "INTERSTITIAL_SPOTLIGHT", "FEED", "INSTREAM", "PUBLIC_STORIES_INSTREAM", "CAMERA"],
+    catalogProductSetId: "",
+    catalogProductSetName: "",
+    sponsoredAdConfig: {
+      chatMessage: "",
+      autoResponseMessage: "",
+      autoResponseEnabled: false,
+      wallpaperUrl: "",
+    },
+  },
+};

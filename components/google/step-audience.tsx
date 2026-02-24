@@ -1,0 +1,1821 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { useGoogleCampaign } from "@/lib/google/campaign-context";
+import { OBJECTIVE_CONFIGS, type SearchKeyword, type KeywordMatchType, type AudienceTargetingMode, type SearchDeviceType } from "@/lib/google/campaign-types";
+import { cn } from "@/lib/utils";
+import { getCountryByCode, getCityById } from "@/lib/locations";
+import { LocationSelector } from "@/components/shared/location-selector";
+import { LocationReachCard } from "@/components/shared/location-reach-card";
+import { DeliveryCheckCard } from "@/components/shared/delivery-check-card";
+import { DemographicsCard } from "@/components/shared/demographics-card";
+import { SallaSmartFeaturesCard } from "@/components/shared/salla-smart-features-card";
+import { DeviceTargetingCard } from "@/components/shared/device-targeting-card";
+import { TargetingSummaryCard, type TargetingSummaryRow } from "@/components/shared/targeting-summary-card";
+import { AudienceReadinessChecklist } from "@/components/shared/audience-readiness-checklist";
+import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
+import { InterestTargetingCard } from "@/components/shared/interest-targeting-card";
+import { SectionCard } from "@/components/shared/section-card";
+import { InfoTip } from "@/components/shared/info-tip";
+import { minMaxToAgeBands, ageBandsToMinMax, SUPPORTED_LANGUAGES } from "@/lib/demographics";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  MapPin,
+  Users,
+  Target,
+  Globe,
+  ShieldCheck,
+  Clock,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  Search,
+  ChevronRight,
+  ChevronDown,
+  Plus,
+  Tag,
+  Link2,
+  ShoppingBag,
+  Heart,
+  Eye,
+  UserPlus,
+  Store,
+  Smartphone,
+  TrendingUp,
+  Monitor,
+  Tablet,
+  Radio,
+  DollarSign,
+} from "lucide-react";
+
+/* ================================================================== */
+/*  Static data                                                       */
+/* ================================================================== */
+
+const IN_MARKET_SEGMENTS = [
+  { id: "IM_1", label: "Apparel & Accessories" },
+  { id: "IM_2", label: "Beauty & Personal Care" },
+  { id: "IM_3", label: "Consumer Electronics" },
+  { id: "IM_4", label: "Home & Garden" },
+  { id: "IM_5", label: "Food & Groceries" },
+  { id: "IM_6", label: "Sports & Fitness" },
+  { id: "IM_7", label: "Baby & Children Products" },
+  { id: "IM_8", label: "Jewelry & Watches" },
+  { id: "IM_9", label: "Health & Wellness" },
+  { id: "IM_10", label: "Automotive" },
+];
+
+const AFFINITY_SEGMENTS = [
+  { id: "AF_1", label: "Shoppers / Value Shoppers" },
+  { id: "AF_2", label: "Fashionistas" },
+  { id: "AF_3", label: "Beauty Mavens" },
+  { id: "AF_4", label: "Tech Enthusiasts" },
+  { id: "AF_5", label: "Cooking Enthusiasts" },
+  { id: "AF_6", label: "Health & Fitness Buffs" },
+  { id: "AF_7", label: "Home Decor Enthusiasts" },
+  { id: "AF_8", label: "Social Media Enthusiasts" },
+  { id: "AF_9", label: "Luxury Shoppers" },
+  { id: "AF_10", label: "Family-Focused" },
+];
+
+const REMARKETING_AUDIENCES = [
+  { id: "rm_1", name: "All Website Visitors (30d)" },
+  { id: "rm_2", name: "Purchasers (90d)" },
+  { id: "rm_3", name: "Cart Abandoners" },
+  { id: "rm_4", name: "Email Subscribers" },
+  { id: "rm_5", name: "High-Value Customers (Top 20%)" },
+  { id: "rm_6", name: "Product Page Viewers" },
+];
+
+/** Google Display Network topic categories.
+ *  Maps to AdGroupCriterion.topic (TopicInfo). */
+const DISPLAY_TOPICS = [
+  { id: "/Arts & Entertainment", label: "Arts & Entertainment" },
+  { id: "/Autos & Vehicles", label: "Autos & Vehicles" },
+  { id: "/Beauty & Fitness", label: "Beauty & Fitness" },
+  { id: "/Books & Literature", label: "Books & Literature" },
+  { id: "/Business & Industrial", label: "Business & Industrial" },
+  { id: "/Computers & Electronics", label: "Computers & Electronics" },
+  { id: "/Finance", label: "Finance" },
+  { id: "/Food & Drink", label: "Food & Drink" },
+  { id: "/Games", label: "Games" },
+  { id: "/Health", label: "Health" },
+  { id: "/Hobbies & Leisure", label: "Hobbies & Leisure" },
+  { id: "/Home & Garden", label: "Home & Garden" },
+  { id: "/Internet & Telecom", label: "Internet & Telecom" },
+  { id: "/Jobs & Education", label: "Jobs & Education" },
+  { id: "/News", label: "News" },
+  { id: "/Online Communities", label: "Online Communities" },
+  { id: "/People & Society", label: "People & Society" },
+  { id: "/Pets & Animals", label: "Pets & Animals" },
+  { id: "/Real Estate", label: "Real Estate" },
+  { id: "/Shopping", label: "Shopping" },
+  { id: "/Sports", label: "Sports" },
+  { id: "/Travel", label: "Travel" },
+];
+
+const HOUSEHOLD_INCOME_TIERS = [
+  { id: "TOP_10", label: "Top 10%" },
+  { id: "11_20", label: "11-20%" },
+  { id: "21_30", label: "21-30%" },
+  { id: "31_40", label: "31-40%" },
+  { id: "41_50", label: "41-50%" },
+  { id: "LOWER_50", label: "Lower 50%" },
+];
+
+const PARENTAL_STATUS_OPTIONS = [
+  { id: "PARENT", label: "Parent" },
+  { id: "NOT_A_PARENT", label: "Not a parent" },
+  { id: "UNDETERMINED", label: "Unknown" },
+];
+
+/* ================================================================== */
+/*  Helpers                                                           */
+/* ================================================================== */
+
+function TagPill({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary">
+      {label}
+      <button type="button" onClick={onRemove} className="rounded-full p-0.5 hover:bg-primary/10">
+        <X className="size-3" />
+      </button>
+    </span>
+  );
+}
+
+/* ================================================================== */
+/*  Component                                                         */
+/* ================================================================== */
+
+export function GoogleStepAudience() {
+  const { campaign, setStep, updateNested } = useGoogleCampaign();
+  const aud = campaign.audience;
+  const objConfig = OBJECTIVE_CONFIGS[campaign.objective.objective] ?? OBJECTIVE_CONFIGS.PERFORMANCE_MAX;
+  const isPMax = campaign.objective.objective === "PERFORMANCE_MAX";
+  const isShopping = campaign.objective.objective === "SHOPPING";
+  const isDemandGen = campaign.objective.objective === "DEMAND_GEN";
+  const isSearch = campaign.objective.objective === "SEARCH";
+  const isDisplay = campaign.objective.objective === "DISPLAY";
+  const isApp = campaign.objective.objective === "APP";
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [negKeywordInput, setNegKeywordInput] = useState("");
+  const [searchKeywordInput, setSearchKeywordInput] = useState("");
+  const [searchKeywordMatchType, setSearchKeywordMatchType] = useState<"BROAD" | "PHRASE" | "EXACT">("BROAD");
+  const [searchNegKeywordInput, setSearchNegKeywordInput] = useState("");
+  const [displayContentKeywordInput, setDisplayContentKeywordInput] = useState("");
+  const [displayPlacementInput, setDisplayPlacementInput] = useState("");
+  const [displayExcludedPlacementInput, setDisplayExcludedPlacementInput] = useState("");
+  const [lookalikeInput, setLookalikeInput] = useState("");
+  const [customerMatchInput, setCustomerMatchInput] = useState("");
+  const [themeInput, setThemeInput] = useState("");
+  const [customKeywordInput, setCustomKeywordInput] = useState("");
+  const [customUrlInput, setCustomUrlInput] = useState("");
+
+  const toggleInArray = (arr: string[], val: string) =>
+    arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val];
+
+  /* --- Display content targeting (operates on first ad group for audience step) --- */
+  const activeDisplayAdGroup = isDisplay ? campaign.creative.displayAdGroups[0] : null;
+  const displayContentKeywords = activeDisplayAdGroup?.contentKeywords ?? [];
+  const displayTopics = activeDisplayAdGroup?.topics ?? [];
+  const displayPlacements = activeDisplayAdGroup?.placements ?? [];
+  const displayExcludedPlacements = activeDisplayAdGroup?.excludedPlacements ?? [];
+
+  const updateDisplayAdGroup = (patch: Partial<{ contentKeywords: string[]; topics: string[]; placements: string[]; excludedPlacements: string[] }>) => {
+    if (!isDisplay) return;
+    const groups = [...campaign.creative.displayAdGroups];
+    groups[0] = { ...groups[0], ...patch };
+    updateNested("creative", { displayAdGroups: groups });
+  };
+
+  const addDisplayContentKeyword = () => {
+    const val = displayContentKeywordInput.trim();
+    if (!val || displayContentKeywords.includes(val)) return;
+    updateDisplayAdGroup({ contentKeywords: [...displayContentKeywords, val] });
+    setDisplayContentKeywordInput("");
+  };
+  const addDisplayPlacement = () => {
+    const val = displayPlacementInput.trim();
+    if (!val || displayPlacements.includes(val)) return;
+    updateDisplayAdGroup({ placements: [...displayPlacements, val] });
+    setDisplayPlacementInput("");
+  };
+  const addDisplayExcludedPlacement = () => {
+    const val = displayExcludedPlacementInput.trim();
+    if (!val || displayExcludedPlacements.includes(val)) return;
+    updateDisplayAdGroup({ excludedPlacements: [...displayExcludedPlacements, val] });
+    setDisplayExcludedPlacementInput("");
+  };
+
+  /* --- Search keyword handling --- */
+  const activeSearchAdGroup = isSearch ? campaign.creative.searchAdGroups[0] : null;
+  const searchKeywords = activeSearchAdGroup?.keywords ?? [];
+  const searchNegKeywords = activeSearchAdGroup?.negativeKeywords ?? [];
+
+  const updateSearchAdGroupKeywords = (keywords: SearchKeyword[]) => {
+    if (!isSearch) return;
+    const groups = [...campaign.creative.searchAdGroups];
+    groups[0] = { ...groups[0], keywords };
+    updateNested("creative", { searchAdGroups: groups });
+  };
+  const updateSearchAdGroupNegKeywords = (negativeKeywords: SearchKeyword[]) => {
+    if (!isSearch) return;
+    const groups = [...campaign.creative.searchAdGroups];
+    groups[0] = { ...groups[0], negativeKeywords };
+    updateNested("creative", { searchAdGroups: groups });
+  };
+
+  const addSearchKeyword = () => {
+    const val = searchKeywordInput.trim();
+    if (!val || searchKeywords.some((k) => k.text === val && k.matchType === searchKeywordMatchType)) return;
+    const newKw: SearchKeyword = { id: `kw-${Date.now()}`, text: val, matchType: searchKeywordMatchType };
+    updateSearchAdGroupKeywords([...searchKeywords, newKw]);
+    setSearchKeywordInput("");
+  };
+  const addSearchNegKeyword = () => {
+    const val = searchNegKeywordInput.trim();
+    if (!val || searchNegKeywords.some((k) => k.text === val)) return;
+    const newKw: SearchKeyword = { id: `nkw-${Date.now()}`, text: val, matchType: "BROAD" };
+    updateSearchAdGroupNegKeywords([...searchNegKeywords, newKw]);
+    setSearchNegKeywordInput("");
+  };
+
+  const formatKeywordDisplay = (kw: SearchKeyword) => {
+    switch (kw.matchType) {
+      case "EXACT": return `[${kw.text}]`;
+      case "PHRASE": return `"${kw.text}"`;
+      default: return kw.text;
+    }
+  };
+  const matchTypeColor = (mt: KeywordMatchType) => {
+    switch (mt) {
+      case "EXACT": return "bg-emerald-100 text-emerald-700 border-emerald-200";
+      case "PHRASE": return "bg-blue-100 text-blue-700 border-blue-200";
+      default: return "bg-amber-100 text-amber-700 border-amber-200";
+    }
+  };
+
+  /* Search theme handling */
+  const addSearchTheme = () => {
+    const val = themeInput.trim();
+    if (!val || aud.searchThemes.length >= 25 || aud.searchThemes.includes(val)) return;
+    updateNested("audience", { searchThemes: [...aud.searchThemes, val] });
+    setThemeInput("");
+  };
+  const addCustomKeyword = () => {
+    const val = customKeywordInput.trim();
+    if (!val || aud.customSegmentKeywords.includes(val)) return;
+    updateNested("audience", { customSegmentKeywords: [...aud.customSegmentKeywords, val] });
+    setCustomKeywordInput("");
+  };
+  const addNegativeKeyword = () => {
+    const val = negKeywordInput.trim();
+    if (!val || aud.negativeKeywords.includes(val)) return;
+    updateNested("audience", { negativeKeywords: [...aud.negativeKeywords, val] });
+    setNegKeywordInput("");
+  };
+  const addCustomUrl = () => {
+    const val = customUrlInput.trim();
+    if (!val || aud.customSegmentUrls.includes(val)) return;
+    updateNested("audience", { customSegmentUrls: [...aud.customSegmentUrls, val] });
+    setCustomUrlInput("");
+  };
+
+  /* Signal strength */
+  const signalCount =
+    aud.searchThemes.length +
+    aud.customSegmentKeywords.length +
+    aud.customSegmentUrls.length +
+    aud.inMarketSegments.length +
+    aud.affinitySegments.length +
+    aud.audienceSignals.length;
+  const signalStrength =
+    signalCount >= 10 ? "Excellent" :
+    signalCount >= 5 ? "Good" :
+    signalCount >= 1 ? "Fair" : "None";
+  const signalColor =
+    signalStrength === "Excellent" ? "text-emerald-600" :
+    signalStrength === "Good" ? "text-primary" :
+    signalStrength === "Fair" ? "text-amber-600" : "text-muted-foreground";
+  const signalBarColor =
+    signalStrength === "Excellent" ? "bg-emerald-500" :
+    signalStrength === "Good" ? "bg-primary" :
+    signalStrength === "Fair" ? "bg-amber-500" : "bg-muted";
+  const signalBarWidth =
+    signalCount >= 10 ? 100 :
+    signalCount >= 5 ? 70 :
+    signalCount >= 1 ? 35 : 5;
+
+  const hasLocation = (aud.locationIds?.length ?? 0) > 0 || (aud.cityIds?.length ?? 0) > 0;
+  const canProceed = hasLocation && aud.languages.length > 0 && (!isSearch || searchKeywords.length > 0) && (!isApp || !!campaign.objective.appSettings.appId.trim());
+
+  const readinessChecks = useMemo(() => {
+    const base: { label: string; done: boolean }[] = [
+      { label: "At least 1 location selected", done: hasLocation },
+      { label: "Language set", done: aud.languages.length > 0 },
+      { label: "Age range configured", done: aud.ageMin < aud.ageMax },
+    ];
+    if (isSearch) {
+      base.push({ label: "Keywords added", done: searchKeywords.length > 0 });
+      base.push({ label: "5+ keywords (recommended)", done: searchKeywords.length >= 5 });
+    }
+    if (isDisplay) {
+      const hasContentTargeting =
+        displayContentKeywords.length > 0 ||
+        displayTopics.length > 0 ||
+        displayPlacements.length > 0 ||
+        aud.inMarketSegments.length > 0 ||
+        aud.affinitySegments.length > 0;
+      base.push({ label: "Content targeting or audience segments", done: hasContentTargeting });
+      if (displayContentKeywords.length > 0 || displayTopics.length > 0 || displayPlacements.length > 0) {
+        base.push({ label: "10+ content keywords (recommended)", done: displayContentKeywords.length >= 10 });
+      }
+    }
+    if (isApp) {
+      base.push({ label: "App ID set", done: !!campaign.objective.appSettings.appId.trim() });
+    }
+    return base;
+  }, [
+    hasLocation,
+    aud.languages.length,
+    aud.ageMin,
+    aud.ageMax,
+    aud.inMarketSegments.length,
+    aud.affinitySegments.length,
+    isSearch,
+    isDisplay,
+    isApp,
+    searchKeywords.length,
+    displayContentKeywords.length,
+    displayTopics.length,
+    displayPlacements.length,
+    campaign.objective.appSettings.appId,
+  ]);
+
+  const targetingSummaryRows: TargetingSummaryRow[] = useMemo(() => {
+    const base: TargetingSummaryRow[] = [
+      {
+        label: "Location",
+        value: (
+          <>
+            {aud.locationIds.length > 0 ? aud.locationIds.map((c) => getCountryByCode(c)?.name ?? c).join(", ") : "None"}
+            {(aud.cityIds ?? []).length > 0 && <span className="text-muted-foreground"> + {(aud.cityIds ?? []).length} cities</span>}
+          </>
+        ),
+      },
+      { label: "Gender", value: aud.genders.length === 0 || aud.genders.includes("UNDETERMINED") ? "All" : aud.genders.join(", ") },
+      { label: "Age", value: `${aud.ageMin} - ${aud.ageMax === 65 ? "65+" : aud.ageMax}` },
+      { label: "Languages", value: aud.languages.length > 0 ? aud.languages.map((l) => SUPPORTED_LANGUAGES.find((x) => x.code === l)?.label || l).join(", ") : "None" },
+    ];
+    if (isApp) {
+      return [
+        ...base,
+        { label: "App Store", value: campaign.objective.appSettings.appStore === "GOOGLE_APP_STORE" ? "Google Play" : "Apple" },
+        { label: "App ID", value: campaign.objective.appSettings.appId || "Not set" },
+        { label: "Goal", value: campaign.objective.appSettings.biddingStrategyGoalType === "OPTIMIZE_INSTALLS_TARGET_INSTALL_COST" ? "Installs" : campaign.objective.appSettings.biddingStrategyGoalType === "OPTIMIZE_RETURN_ON_ADVERTISING_SPEND" ? "ROAS" : "In-App Actions" },
+        { label: "Targeting", value: "Automated (AI)" },
+      ];
+    }
+    if (isPMax) {
+      return [
+        ...base,
+        { label: "Search themes", value: String(aud.searchThemes.length) },
+        { label: "Custom segments", value: String(aud.customSegmentKeywords.length + aud.customSegmentUrls.length) },
+      ];
+    }
+    if (isSearch) {
+      return [
+        ...base,
+        { label: "Keywords", value: String(searchKeywords.length) },
+        { label: "Negative keywords", value: String(searchNegKeywords.length) },
+        { label: "Audience mode", value: aud.audienceTargetingMode === "OBSERVATION" ? "Observation" : "Targeting" },
+        { label: "RLSA lists", value: String(aud.audienceSignals.length) },
+        { label: "Audience segments", value: String(aud.inMarketSegments.length + aud.affinitySegments.length) },
+        { label: "Search Partners", value: aud.searchPartners ? "On" : "Off" },
+        { label: "Ad schedule", value: aud.adScheduleEntries.length > 0 ? `${aud.adScheduleEntries.length} entries` : "24/7" },
+      ];
+    }
+    if (isDisplay) {
+      return [
+        ...base,
+        { label: "Content keywords", value: String(displayContentKeywords.length) },
+        { label: "Topics", value: String(displayTopics.length) },
+        { label: "Placements", value: String(displayPlacements.length) },
+        { label: "Excluded", value: String(displayExcludedPlacements.length) },
+        { label: "Optimized targeting", value: aud.optimizedTargeting ? "On" : "Off" },
+        { label: "Audience segments", value: String(aud.inMarketSegments.length + aud.affinitySegments.length) },
+        { label: "Remarketing", value: String(aud.audienceSignals.length) },
+      ];
+    }
+    return [
+      ...base,
+      { label: "Interests", value: String(aud.inMarketSegments.length + aud.affinitySegments.length) },
+      { label: "Remarketing", value: String(aud.audienceSignals.length) },
+    ];
+  }, [aud, campaign.objective.appSettings, isApp, isPMax, isSearch, isDisplay, searchKeywords.length, searchNegKeywords.length, displayContentKeywords.length, displayTopics.length, displayPlacements.length, displayExcludedPlacements.length]);
+
+  return (
+    <TooltipProvider delayDuration={200}>
+      <div className={cn("flex flex-col gap-6 lg:flex-row", WIZARD_FOOTER_PADDING_BOTTOM)}>
+
+        {/* ============================================================ */}
+        {/* LEFT COLUMN                                                   */}
+        {/* ============================================================ */}
+        <div className="flex flex-1 flex-col gap-5">
+          {/* Step header: title + description (align with other platforms) */}
+          <div className="mb-1">
+            <h2 className="text-xl font-bold tracking-tight text-foreground">Audience & targeting</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Define who sees your ads. Add locations, demographics, and audience signals to reach the right people.
+            </p>
+          </div>
+
+          {/* ---- 1. Location (shared component — same UX as all platforms; maps to locationIds + cityIds) ---- */}
+          <SectionCard>
+            <LocationSelector
+              value={{
+                countryCodes: aud.locationIds,
+                cities: (aud.cityIds ?? [])
+                  .map((id) => getCityById(id))
+                  .filter((c): c is NonNullable<typeof c> => c != null)
+                  .map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    countryCode: c.countryCode,
+                    lat: c.lat,
+                    lng: c.lng,
+                    radiusKm: aud.cityRadii?.[c.id] ?? c.radiusKm,
+                  })),
+              }}
+              onChange={(next) =>
+                updateNested("audience", {
+                  locationIds: next.countryCodes,
+                  cityIds: next.cities.map((c) => c.id),
+                  cityRadii: Object.fromEntries(next.cities.map((c) => [c.id, c.radiusKm])),
+                })
+              }
+              enableCityTargeting
+              enableRadiusPerCity
+              accent="primary"
+              label="Location"
+              tooltipText="Choose countries and/or cities where your ads will be shown. Maps to CampaignCriterion geo_target_constant."
+            />
+
+            {/* Location method (Google-specific) */}
+            <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
+              <Label className="mb-1.5 block text-xs font-medium text-foreground">Location targeting method</Label>
+              <div className="flex gap-2">
+                {(["PRESENCE", "PRESENCE_OR_INTEREST"] as const).map((method) => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => updateNested("audience", { locationTargetingMethod: method })}
+                    className={cn(
+                      "rounded-lg border px-3 py-1.5 text-xs transition-all",
+                      aud.locationTargetingMethod === method
+                        ? "border-primary bg-primary/5 font-medium text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                    )}
+                  >
+                    {method === "PRESENCE" ? "People in this location" : "People in or interested in"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* ---- 2. Demographics (shared: English/Arabic, Male/Female, age bands) ---- */}
+          <DemographicsCard
+            languageCodes={aud.languages}
+            onLanguagesChange={(codes) => updateNested("audience", { languages: codes })}
+            genderIds={aud.genders.length === 0 || (aud.genders.includes("MALE") && aud.genders.includes("FEMALE")) ? ["MALE", "FEMALE"] : aud.genders.includes("MALE") ? ["MALE"] : ["FEMALE"]}
+            onGendersChange={(ids) => {
+              const genders = ids.length === 2 ? [] : ids as ("MALE" | "FEMALE")[];
+              updateNested("audience", { genders });
+            }}
+            ageBandValues={minMaxToAgeBands(aud.ageMin, aud.ageMax)}
+            onAgeBandsChange={(bands) => {
+              const { ageMin, ageMax } = ageBandsToMinMax(bands);
+              updateNested("audience", { ageMin, ageMax });
+            }}
+            accent="primary"
+            languageRequired={aud.locationIds.length > 1}
+            headerTooltip={isPMax
+              ? "Demographic signals help Google focus on your most likely customers. The AI may still serve ads outside these groups."
+              : "Define who sees your ads by gender, age, and language."
+            }
+          />
+
+          {/* ---- 2b. Keywords (Search only) ---- */}
+          {isSearch && (
+            <SectionCard>
+              <div className="mb-1 flex items-center gap-2">
+                <Search className="size-4 text-primary" />
+                <Label className="text-sm font-semibold text-foreground">Keywords</Label>
+                <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">Search</Badge>
+                <InfoTip text="Keywords trigger your ads when people search for these terms on Google. Each keyword has a match type that controls how broadly it matches. Maps to AdGroupCriterion." />
+              </div>
+              <p className="mb-3 mt-2 text-xs text-muted-foreground">
+                Add the search terms your customers use when looking for your products. Google recommends 10-20 keywords per ad group.
+              </p>
+
+              {/* Keyword input with match type */}
+              <div className="mb-3 flex gap-2">
+                <div className="flex flex-1 gap-1.5">
+                  <Select value={searchKeywordMatchType} onValueChange={(v) => setSearchKeywordMatchType(v as KeywordMatchType)}>
+                    <SelectTrigger className="h-9 w-28 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BROAD">Broad</SelectItem>
+                      <SelectItem value="PHRASE">Phrase</SelectItem>
+                      <SelectItem value="EXACT">Exact</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder='e.g. buy perfume online, "oud fragrance", [mens watches]'
+                    value={searchKeywordInput}
+                    onChange={(e) => setSearchKeywordInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSearchKeyword())}
+                    className="h-9 flex-1 text-sm"
+                  />
+                </div>
+                <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!searchKeywordInput.trim()} onClick={addSearchKeyword}>
+                  <Plus className="size-3" /> Add
+                </Button>
+              </div>
+
+              {/* Keyword pills */}
+              {searchKeywords.length > 0 && (
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                  {searchKeywords.map((kw) => (
+                    <span key={kw.id} className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium", matchTypeColor(kw.matchType))}>
+                      <span className="font-mono text-[10px]">{formatKeywordDisplay(kw)}</span>
+                      <button type="button" onClick={() => updateSearchAdGroupKeywords(searchKeywords.filter((k) => k.id !== kw.id))} className="rounded-full p-0.5 hover:bg-black/10">
+                        <X className="size-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{searchKeywords.length} keyword{searchKeywords.length !== 1 ? "s" : ""} added</span>
+                <span>Press Enter to add</span>
+              </div>
+
+              {/* Match type legend */}
+              <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
+                <p className="mb-2 text-xs font-semibold text-foreground">Match Type Guide</p>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-start gap-2">
+                    <Badge className="mt-0.5 shrink-0 rounded bg-amber-100 px-1.5 py-0 text-[9px] font-bold text-amber-700 hover:bg-amber-100">Broad</Badge>
+                    <p className="text-[11px] text-muted-foreground">Widest reach. Shows for related searches, synonyms, and variations. <span className="font-medium text-foreground">Example: shoes</span> matches "buy sneakers online"</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Badge className="mt-0.5 shrink-0 rounded bg-blue-100 px-1.5 py-0 text-[9px] font-bold text-blue-700 hover:bg-blue-100">Phrase</Badge>
+                    <p className="text-[11px] text-muted-foreground">Medium reach. Shows when the meaning of your keyword is included. <span className="font-medium text-foreground">Example: "running shoes"</span> matches "best running shoes for men"</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Badge className="mt-0.5 shrink-0 rounded bg-emerald-100 px-1.5 py-0 text-[9px] font-bold text-emerald-700 hover:bg-emerald-100">Exact</Badge>
+                    <p className="text-[11px] text-muted-foreground">Narrowest reach. Shows only for the exact term or close variants. <span className="font-medium text-foreground">Example: [red shoes]</span> matches "red shoes" and "shoes red"</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Suggested keywords */}
+              <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
+                <p className="mb-2 text-xs font-semibold text-foreground">Suggested Keywords:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {["buy online", "best price", "free shipping", "shop now", "discount", "new arrival", "original", "sale"].map((kw) => {
+                    const alreadyAdded = searchKeywords.some((k) => k.text === kw);
+                    return (
+                      <button
+                        key={kw}
+                        type="button"
+                        disabled={alreadyAdded}
+                        onClick={() => {
+                          const newKw: SearchKeyword = { id: `kw-${Date.now()}-${kw}`, text: kw, matchType: "BROAD" };
+                          updateSearchAdGroupKeywords([...searchKeywords, newKw]);
+                        }}
+                        className={cn(
+                          "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                          alreadyAdded ? "border-primary/20 bg-primary/5 text-primary/50" : "border-border bg-background text-foreground hover:border-primary/40"
+                        )}
+                      >
+                        {alreadyAdded ? <CheckCircle2 className="mr-1 inline size-3" /> : <Plus className="mr-1 inline size-3" />}
+                        {kw}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Negative Keywords for Search */}
+              <div className="mt-5 border-t border-border pt-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <Label className="text-xs font-semibold text-foreground">Negative Keywords</Label>
+                  <InfoTip text="Prevent your ads from showing for these search terms. Helps reduce wasted spend. Maps to CampaignCriterion with negative=true." />
+                </div>
+                <div className="mb-2 flex gap-2">
+                  <Input
+                    placeholder="e.g. free, used, cheap"
+                    value={searchNegKeywordInput}
+                    onChange={(e) => setSearchNegKeywordInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSearchNegKeyword())}
+                    className="h-8 flex-1 text-xs"
+                  />
+                  <Button size="sm" variant="outline" className="h-8 gap-1 text-[10px]" disabled={!searchNegKeywordInput.trim()} onClick={addSearchNegKeyword}>
+                    <Plus className="size-3" /> Add
+                  </Button>
+                </div>
+                {searchNegKeywords.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {searchNegKeywords.map((kw) => (
+                      <span key={kw.id} className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                        {kw.text}
+                        <button type="button" onClick={() => updateSearchAdGroupNegKeywords(searchNegKeywords.filter((k) => k.id !== kw.id))} className="rounded-full p-0.5 hover:bg-red-100">
+                          <X className="size-2.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-1 text-[10px] text-muted-foreground">{searchNegKeywords.length} negative keyword{searchNegKeywords.length !== 1 ? "s" : ""}</p>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ---- 3. Interests (In-Market & Affinity) -- hidden for Shopping and App ---- */}
+          {!isShopping && !isApp && <SectionCard>
+            <div className="mb-3 flex items-center gap-2">
+              <Target className="size-4 text-primary" />
+              <Label className="text-sm font-semibold text-foreground">Interests & Audience Segments</Label>
+              {isSearch && <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Observation</Badge>}
+              <InfoTip text={isPMax
+                ? "Audience signals help Google's AI find the right people faster. Maps to AssetGroupSignal audience segments."
+                : isSearch
+                  ? "Add audience segments in Observation mode to monitor performance and apply bid adjustments without restricting who sees your ads. Maps to AdGroupCriterion with bid_modifier."
+                  : "Target users based on their interests and purchase intent."
+              } />
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">
+              {isPMax
+                ? "Optional -- select segments to signal which audiences are most relevant. Google will expand beyond these automatically."
+                : isSearch
+                  ? "Optional -- add audience segments to layer on top of your keywords. In Observation mode, ads still show to all searchers but you can bid higher for selected segments."
+                  : "Optional -- leave empty to reach all interests."
+              }
+            </p>
+
+            {/* Audience mode selector (Search only) */}
+            {isSearch && (
+              <div className="mb-4 rounded-lg border border-border bg-muted/20 p-3">
+                <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <Radio className="size-3 text-primary" />
+                  Audience Mode
+                  <InfoTip text="Observation = monitor + bid adjust (recommended). Targeting = restrict delivery to this audience only. Maps to AdGroupTargetingSetting.target_restrictions." />
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    { value: "OBSERVATION" as AudienceTargetingMode, label: "Observation", desc: "Recommended -- bid adjust only" },
+                    { value: "TARGETING" as AudienceTargetingMode, label: "Targeting", desc: "Restrict to audience only" },
+                  ]).map((mode) => {
+                    const isSelected = aud.audienceTargetingMode === mode.value;
+                    return (
+                      <button
+                        key={mode.value}
+                        type="button"
+                        onClick={() => updateNested("audience", { audienceTargetingMode: mode.value })}
+                        className={cn(
+                          "rounded-lg border-2 p-3 text-left transition-all",
+                          isSelected ? "border-primary bg-primary/[0.04] shadow-sm" : "border-border bg-background hover:border-primary/40"
+                        )}
+                      >
+                        <p className={cn("text-xs font-semibold", isSelected ? "text-primary" : "text-foreground")}>{mode.label}</p>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">{mode.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                {aud.audienceTargetingMode === "TARGETING" && (
+                  <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5">
+                    <AlertCircle className="size-3 shrink-0 text-amber-600" />
+                    <p className="text-[11px] text-amber-700">Targeting mode will only show ads to users in your selected audience segments. This significantly reduces reach for Search campaigns.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* In-Market (unified section) */}
+            <div className="mb-4">
+              <InterestTargetingCard
+                options={IN_MARKET_SEGMENTS}
+                value={aud.inMarketSegments}
+                onChange={(ids) =>
+                  updateNested("audience", { inMarketSegments: ids })
+                }
+                sectionLabel="In-Market Segments"
+                accent="primary"
+                searchPlaceholder="Search in-market segments..."
+                showClearAll={false}
+              />
+            </div>
+
+            {/* Affinity (unified section) */}
+            <div>
+              <InterestTargetingCard
+                options={AFFINITY_SEGMENTS}
+                value={aud.affinitySegments}
+                onChange={(ids) =>
+                  updateNested("audience", { affinitySegments: ids })
+                }
+                sectionLabel="Affinity Segments"
+                accent="primary"
+                searchPlaceholder="Search affinity segments..."
+                showClearAll={false}
+              />
+            </div>
+
+            {(aud.inMarketSegments.length > 0 || aud.affinitySegments.length > 0) && (
+              <div className="mt-3">
+                <p className="text-xs text-muted-foreground">
+                  {aud.inMarketSegments.length + aud.affinitySegments.length} segment{(aud.inMarketSegments.length + aud.affinitySegments.length) !== 1 ? "s" : ""} selected.{" "}
+                  <button type="button" onClick={() => updateNested("audience", { inMarketSegments: [], affinitySegments: [] })} className="text-primary underline">Clear all</button>
+                </p>
+
+                {/* Bid adjustment for Search (Observation mode) */}
+                {isSearch && aud.audienceTargetingMode === "OBSERVATION" && (
+                  <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+                    <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                      <DollarSign className="size-3 text-primary" />
+                      Audience Bid Adjustments
+                      <InfoTip text="Increase or decrease bids for users in these audience segments. Maps to AdGroupCriterion.bid_modifier. Example: +20% means you bid 20% more when a user in this segment searches your keyword." />
+                    </Label>
+                    <div className="flex flex-col gap-2">
+                      {[...aud.inMarketSegments, ...aud.affinitySegments].map((segId) => {
+                        const seg = IN_MARKET_SEGMENTS.find((s) => s.id === segId) || AFFINITY_SEGMENTS.find((s) => s.id === segId);
+                        if (!seg) return null;
+                        const adj = aud.audienceBidAdjustments[segId] ?? 0;
+                        return (
+                          <div key={segId} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2">
+                            <span className="text-xs text-foreground truncate">{seg.label}</span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => updateNested("audience", { audienceBidAdjustments: { ...aud.audienceBidAdjustments, [segId]: Math.max(-90, adj - 10) } })}
+                                className="flex size-6 items-center justify-center rounded border border-border text-xs hover:bg-muted"
+                              >-</button>
+                              <span className={cn("w-12 text-center text-xs font-bold", adj > 0 ? "text-emerald-600" : adj < 0 ? "text-red-600" : "text-muted-foreground")}>
+                                {adj > 0 ? `+${adj}%` : `${adj}%`}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => updateNested("audience", { audienceBidAdjustments: { ...aud.audienceBidAdjustments, [segId]: Math.min(900, adj + 10) } })}
+                                className="flex size-6 items-center justify-center rounded border border-border text-xs hover:bg-muted"
+                              >+</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-[10px] text-muted-foreground">Range: -90% to +900%. 0% means no adjustment.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </SectionCard>}
+
+          {/* ---- 3b. Negative Keywords (Shopping only) ---- */}
+          {isShopping && (
+            <SectionCard>
+              <div className="mb-3 flex items-center gap-2">
+                <Search className="size-4 text-primary" />
+                <Label className="text-sm font-semibold text-foreground">Negative Keywords</Label>
+                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Shopping</Badge>
+                <InfoTip text="Prevent your Shopping ads from showing for specific search queries. Maps to CampaignCriterion with negative=true." />
+              </div>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Add search terms where you do not want your product ads to appear. This helps reduce wasted spend on irrelevant clicks.
+              </p>
+              <div className="mb-3 flex gap-2">
+                <Input
+                  placeholder="e.g. free, used, cheap, wholesale"
+                  value={negKeywordInput}
+                  onChange={(e) => setNegKeywordInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addNegativeKeyword())}
+                  className="h-9 flex-1 text-sm"
+                />
+                <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!negKeywordInput.trim()} onClick={addNegativeKeyword}>
+                  <Plus className="size-3" /> Add
+                </Button>
+              </div>
+              {aud.negativeKeywords.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {aud.negativeKeywords.map((k) => (
+                    <TagPill key={k} label={k} onRemove={() => updateNested("audience", { negativeKeywords: aud.negativeKeywords.filter((s) => s !== k) })} />
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                {aud.negativeKeywords.length} negative keyword{aud.negativeKeywords.length !== 1 ? "s" : ""} added. Press Enter to add.
+              </p>
+
+              {/* Suggested negatives */}
+              <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
+                <p className="mb-2 text-xs font-medium text-foreground">Suggested negatives for Shopping:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {["free", "used", "cheap", "wholesale", "DIY", "repair", "tutorial", "how to"].map((kw) => {
+                    const alreadyAdded = aud.negativeKeywords.includes(kw);
+                    return (
+                      <button
+                        key={kw}
+                        type="button"
+                        disabled={alreadyAdded}
+                        onClick={() => updateNested("audience", { negativeKeywords: [...aud.negativeKeywords, kw] })}
+                        className={cn(
+                          "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                          alreadyAdded
+                            ? "border-primary/20 bg-primary/5 text-primary/50"
+                            : "border-border bg-background text-foreground hover:border-primary/40"
+                        )}
+                      >
+                        {alreadyAdded ? <CheckCircle2 className="mr-1 inline size-3" /> : <Plus className="mr-1 inline size-3" />}
+                        {kw}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ---- 3c. Lookalike Segments (Demand Gen) ---- */}
+          {isDemandGen && (
+            <SectionCard>
+              <div className="mb-3 flex items-center gap-2">
+                <Users className="size-4 text-primary" />
+                <Label className="text-sm font-semibold text-foreground">Lookalike Segments</Label>
+                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Demand Gen</Badge>
+                <InfoTip text="Reach new users who share characteristics with your existing customers. Maps to SimilarUserListInfo in the Google Ads API." />
+              </div>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Build lookalike audiences from your first-party data. Google finds users who behave similarly to your existing customers.
+              </p>
+
+              {/* Lookalike source segments */}
+              <div className="mb-3">
+                <Label className="mb-1.5 text-xs font-semibold text-foreground">Source Segments</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g. All purchasers, High-value customers"
+                    value={lookalikeInput}
+                    onChange={(e) => setLookalikeInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && lookalikeInput.trim()) {
+                        e.preventDefault();
+                        updateNested("audience", { lookalikeSegments: [...aud.lookalikeSegments, lookalikeInput.trim()] });
+                        setLookalikeInput("");
+                      }
+                    }}
+                    className="h-9 flex-1 text-sm"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9 gap-1 text-xs"
+                    disabled={!lookalikeInput.trim()}
+                    onClick={() => {
+                      updateNested("audience", { lookalikeSegments: [...aud.lookalikeSegments, lookalikeInput.trim()] });
+                      setLookalikeInput("");
+                    }}
+                  >
+                    <Plus className="size-3" /> Add
+                  </Button>
+                </div>
+                {aud.lookalikeSegments.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {aud.lookalikeSegments.map((s) => (
+                      <TagPill key={s} label={s} onRemove={() => updateNested("audience", { lookalikeSegments: aud.lookalikeSegments.filter((x) => x !== s) })} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Suggested sources from Salla */}
+              <div className="mb-4 rounded-lg border border-border bg-muted/20 p-3">
+                <p className="mb-2 text-xs font-medium text-foreground">Salla Suggested Sources:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {["All Purchasers (90 days)", "Repeat Buyers", "Cart Abandoners", "High-Value Customers (Top 20%)"].map((seg) => {
+                    const added = aud.lookalikeSegments.includes(seg);
+                    return (
+                      <button
+                        key={seg}
+                        type="button"
+                        disabled={added}
+                        onClick={() => updateNested("audience", { lookalikeSegments: [...aud.lookalikeSegments, seg] })}
+                        className={cn(
+                          "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                          added ? "border-primary/20 bg-primary/5 text-primary/50" : "border-border bg-background text-foreground hover:border-primary/40"
+                        )}
+                      >
+                        {added ? <CheckCircle2 className="mr-1 inline size-3" /> : <Plus className="mr-1 inline size-3" />}
+                        {seg}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Expansion level */}
+              <div>
+                <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  Expansion Level
+                  <InfoTip text="Controls how similar the lookalike audience is to your source. Narrow = most similar but smaller reach. Broad = less similar but larger reach." />
+                </Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: "NARROW" as const, label: "Narrow", desc: "Most similar, smaller reach" },
+                    { value: "BALANCED" as const, label: "Balanced", desc: "Recommended balance" },
+                    { value: "BROAD" as const, label: "Broad", desc: "Wider reach, less precise" },
+                  ]).map((lvl) => {
+                    const isSelected = aud.lookalikeExpansion === lvl.value;
+                    return (
+                      <button
+                        key={lvl.value}
+                        type="button"
+                        onClick={() => updateNested("audience", { lookalikeExpansion: lvl.value })}
+                        className={cn(
+                          "rounded-xl border-2 p-3 text-left transition-all",
+                          isSelected ? "border-primary bg-primary/[0.04] shadow-sm" : "border-border bg-background hover:border-primary/40"
+                        )}
+                      >
+                        <p className={cn("text-xs font-semibold", isSelected ? "text-primary" : "text-foreground")}>{lvl.label}</p>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">{lvl.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ---- 3d. Customer Match (Demand Gen) ---- */}
+          {isDemandGen && (
+            <SectionCard>
+              <div className="mb-3 flex items-center gap-2">
+                <UserPlus className="size-4 text-primary" />
+                <Label className="text-sm font-semibold text-foreground">Customer Match Lists</Label>
+                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Demand Gen</Badge>
+                <InfoTip text="Upload first-party customer data (emails, phone numbers) to target or create lookalikes. Maps to CustomerMatchUserListInfo." />
+              </div>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Use your Salla customer data to reach existing customers or build lookalike audiences. Customer Match works across YouTube, Discover, and Gmail.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. Newsletter subscribers, VIP customers"
+                  value={customerMatchInput}
+                  onChange={(e) => setCustomerMatchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && customerMatchInput.trim()) {
+                      e.preventDefault();
+                      updateNested("audience", { customerMatchLists: [...aud.customerMatchLists, customerMatchInput.trim()] });
+                      setCustomerMatchInput("");
+                    }
+                  }}
+                  className="h-9 flex-1 text-sm"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 gap-1 text-xs"
+                  disabled={!customerMatchInput.trim()}
+                  onClick={() => {
+                    updateNested("audience", { customerMatchLists: [...aud.customerMatchLists, customerMatchInput.trim()] });
+                    setCustomerMatchInput("");
+                  }}
+                >
+                  <Plus className="size-3" /> Add
+                </Button>
+              </div>
+              {aud.customerMatchLists.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {aud.customerMatchLists.map((s) => (
+                    <TagPill key={s} label={s} onRemove={() => updateNested("audience", { customerMatchLists: aud.customerMatchLists.filter((x) => x !== s) })} />
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2">
+                <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  <span className="font-semibold text-primary">Salla Tip:</span>{" "}
+                  Customer Match combined with Lookalike Segments is the most powerful targeting combination for Demand Gen. Upload your top 20% buyers to find similar high-value shoppers.
+                </p>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ---- 3e. Remarketing / RLSA (Search -- promoted to main) ---- */}
+          {isSearch && (
+            <SectionCard>
+              <div className="mb-3 flex items-center gap-2">
+                <UserPlus className="size-4 text-primary" />
+                <Label className="text-sm font-semibold text-foreground">Remarketing Lists (RLSA)</Label>
+                <Badge className="rounded-full bg-primary/10 px-1.5 py-0 text-[10px] text-primary">Recommended</Badge>
+                <InfoTip text="Remarketing Lists for Search Ads (RLSA) let you bid higher on past visitors who are also searching your keywords. This is one of the most impactful targeting features for Search. Maps to CampaignCriterion user_list." />
+              </div>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Layer your remarketing lists on top of keywords. In Observation mode, your ads still show to everyone, but you can bid higher when past visitors search for your keywords.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {REMARKETING_AUDIENCES.map((rm) => {
+                  const selected = aud.audienceSignals.includes(rm.id);
+                  return (
+                    <label
+                      key={rm.id}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-all",
+                        selected ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/40"
+                      )}
+                    >
+                      <Checkbox checked={selected} onCheckedChange={() => updateNested("audience", { audienceSignals: toggleInArray(aud.audienceSignals, rm.id) })} />
+                      <span className={cn("text-xs font-medium", selected ? "text-primary" : "text-foreground")}>{rm.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {aud.audienceSignals.length > 0 && aud.audienceTargetingMode === "OBSERVATION" && (
+                <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+                  <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                    <DollarSign className="size-3 text-primary" />
+                    RLSA Bid Adjustments
+                    <InfoTip text="Increase bids for past visitors who search your keywords. Example: +50% for Cart Abandoners means you bid 50% more when they search." />
+                  </Label>
+                  <div className="flex flex-col gap-2">
+                    {aud.audienceSignals.map((sigId) => {
+                      const rm = REMARKETING_AUDIENCES.find((r) => r.id === sigId);
+                      if (!rm) return null;
+                      const adj = aud.audienceBidAdjustments[sigId] ?? 0;
+                      return (
+                        <div key={sigId} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2">
+                          <span className="text-xs text-foreground truncate">{rm.name}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => updateNested("audience", { audienceBidAdjustments: { ...aud.audienceBidAdjustments, [sigId]: Math.max(-90, adj - 10) } })}
+                              className="flex size-6 items-center justify-center rounded border border-border text-xs hover:bg-muted"
+                            >-</button>
+                            <span className={cn("w-12 text-center text-xs font-bold", adj > 0 ? "text-emerald-600" : adj < 0 ? "text-red-600" : "text-muted-foreground")}>
+                              {adj > 0 ? `+${adj}%` : `${adj}%`}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => updateNested("audience", { audienceBidAdjustments: { ...aud.audienceBidAdjustments, [sigId]: Math.min(900, adj + 10) } })}
+                              className="flex size-6 items-center justify-center rounded border border-border text-xs hover:bg-muted"
+                            >+</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2">
+                <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  <span className="font-semibold text-primary">Best Practice:</span>{" "}
+                  Add "Cart Abandoners" and "Product Page Viewers" with +30-50% bid adjustment. Past visitors convert 2-3x better when they re-search your keywords.
+                </p>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ---- 3f. Display content & placements ---- */}
+          {isDisplay && (
+            <SectionCard>
+              <div className="mb-3 flex items-center gap-2">
+                <Target className="size-4 text-primary" />
+                <Label className="text-sm font-semibold text-foreground">Display content & placements</Label>
+                <Badge className="rounded-full bg-primary/10 px-1.5 py-0 text-[10px] text-primary">Display</Badge>
+                <InfoTip text="Content targeting controls which websites and pages on the Google Display Network show your ads. Combines contextual keywords, topic targeting, and managed placements. Maps to AdGroupCriterion." />
+              </div>
+              <p className="mb-4 text-xs text-muted-foreground">
+                Define where your Display ads should appear on the Google Display Network (3M+ websites and apps). Use contextual keywords, topics, or specific placements.
+              </p>
+
+              {/* Contextual Keywords */}
+              <div className="mb-5">
+                <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <Search className="size-3 text-primary" />
+                  Contextual Keywords
+                  <InfoTip text="Your ads appear on pages whose content matches these keywords. Unlike Search keywords, Display contextual keywords use broad content matching. Maps to AdGroupCriterion.keyword." />
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={displayContentKeywordInput}
+                    onChange={(e) => setDisplayContentKeywordInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDisplayContentKeyword(); }}}
+                    placeholder="e.g. women's fashion, smartphone accessories..."
+                    className="h-9 flex-1 text-sm"
+                  />
+                  <Button size="sm" variant="outline" onClick={addDisplayContentKeyword} className="h-9 shrink-0">
+                    <Plus className="mr-1 size-3" /> Add
+                  </Button>
+                </div>
+                {displayContentKeywords.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {displayContentKeywords.map((kw) => (
+                      <TagPill
+                        key={kw}
+                        label={kw}
+                        onRemove={() => updateDisplayAdGroup({ contentKeywords: displayContentKeywords.filter((k) => k !== kw) })}
+                      />
+                    ))}
+                  </div>
+                )}
+                {displayContentKeywords.length === 0 && (
+                  <p className="mt-1.5 text-[10px] text-muted-foreground">No keywords -- ads will rely on topic and audience targeting only.</p>
+                )}
+              </div>
+
+              {/* Topic Targeting */}
+              <div className="mb-5">
+                <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <Tag className="size-3 text-primary" />
+                  Topic Targeting
+                  <InfoTip text="Show ads on pages about specific topics. Google categorizes every page on the Display Network by topic. Maps to AdGroupCriterion.topic (TopicInfo)." />
+                </Label>
+                <p className="mb-2 text-[11px] text-muted-foreground">Select topics relevant to your products. Your ads appear on pages about these topics.</p>
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                  {DISPLAY_TOPICS.map((topic) => {
+                    const selected = displayTopics.includes(topic.id);
+                    return (
+                      <label
+                        key={topic.id}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 transition-all",
+                          selected ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/40"
+                        )}
+                      >
+                        <Checkbox checked={selected} onCheckedChange={() => updateDisplayAdGroup({ topics: selected ? displayTopics.filter((t) => t !== topic.id) : [...displayTopics, topic.id] })} />
+                        <span className={cn("text-xs font-medium", selected ? "text-primary" : "text-foreground")}>{topic.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {displayTopics.length > 0 && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-[11px] text-muted-foreground">{displayTopics.length} topic{displayTopics.length !== 1 ? "s" : ""} selected</span>
+                    <button type="button" onClick={() => updateDisplayAdGroup({ topics: [] })} className="text-[11px] text-primary underline">Clear all</button>
+                  </div>
+                )}
+              </div>
+
+              {/* Managed Placements */}
+              <div className="mb-5">
+                <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <Link2 className="size-3 text-primary" />
+                  Managed Placements
+                  <InfoTip text="Choose specific websites, apps, or YouTube channels where your ads should appear. Maps to AdGroupCriterion.placement." />
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={displayPlacementInput}
+                    onChange={(e) => setDisplayPlacementInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDisplayPlacement(); }}}
+                    placeholder="e.g. example.com, youtube.com/channel/..."
+                    className="h-9 flex-1 text-sm"
+                  />
+                  <Button size="sm" variant="outline" onClick={addDisplayPlacement} className="h-9 shrink-0">
+                    <Plus className="mr-1 size-3" /> Add
+                  </Button>
+                </div>
+                {displayPlacements.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {displayPlacements.map((p) => (
+                      <span key={p} className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                        <Globe className="size-3" />
+                        {p}
+                        <button type="button" onClick={() => updateDisplayAdGroup({ placements: displayPlacements.filter((x) => x !== p) })} className="rounded-full p-0.5 hover:bg-blue-100">
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Excluded Placements */}
+              <div className="mb-4">
+                <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <ShieldCheck className="size-3 text-red-500" />
+                  Excluded Placements
+                  <InfoTip text="Block specific websites or apps where you don't want your ads to appear. Maps to AdGroupCriterion with negative=true." />
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={displayExcludedPlacementInput}
+                    onChange={(e) => setDisplayExcludedPlacementInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDisplayExcludedPlacement(); }}}
+                    placeholder="e.g. competitor-site.com..."
+                    className="h-9 flex-1 text-sm"
+                  />
+                  <Button size="sm" variant="outline" onClick={addDisplayExcludedPlacement} className="h-9 shrink-0">
+                    <Plus className="mr-1 size-3" /> Add
+                  </Button>
+                </div>
+                {displayExcludedPlacements.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {displayExcludedPlacements.map((p) => (
+                      <span key={p} className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-600">
+                        {p}
+                        <button type="button" onClick={() => updateDisplayAdGroup({ excludedPlacements: displayExcludedPlacements.filter((x) => x !== p) })} className="rounded-full p-0.5 hover:bg-red-100">
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Optimized Targeting */}
+              <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-2.5">
+                    <Sparkles className="mt-0.5 size-4 text-primary" />
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">Optimized Targeting</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Let Google expand beyond your targeting to find users who are likely to convert. Recommended for Display campaigns.
+                        Maps to AdGroup.targeting_setting.target_restrictions.
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={aud.optimizedTargeting}
+                    onCheckedChange={(v) => updateNested("audience", { optimizedTargeting: v })}
+                    className="mt-0.5"
+                  />
+                </div>
+              </div>
+
+              {/* Content Targeting Summary */}
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2">
+                <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  <span className="font-semibold text-primary">Best Practice:</span>{" "}
+                  Combine contextual keywords with topic targeting for best results. Add 15-20 keywords related to your products and select 3-5 relevant topics to maximize reach while maintaining relevance.
+                </p>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ---- 4. Salla Smart Features (shared; hidden for App) ---- */}
+          {!isApp && (
+          <>
+          <SallaSmartFeaturesCard
+            excludeRecentPurchasers={aud.excludeRecentConverters}
+            onExcludeRecentPurchasersChange={(v) =>
+              updateNested("audience", { excludeRecentConverters: v })
+            }
+            excludeRecentPurchasersDays={aud.excludeRecentConvertersDays}
+            onExcludeRecentPurchasersDaysChange={(days) =>
+              updateNested("audience", { excludeRecentConvertersDays: days })
+            }
+            lookalikeEnabled={aud.optimizedTargeting}
+            onLookalikeEnabledChange={(v) =>
+              updateNested("audience", { optimizedTargeting: v })
+            }
+            sallaAudienceCategory={aud.sallaAudienceCategory ?? ""}
+            onSallaAudienceCategoryChange={(v) =>
+              updateNested("audience", { sallaAudienceCategory: v })
+            }
+            accent="primary"
+            showLookalike={!isSearch}
+          />
+
+            {/* Search Partners toggle (Search only) */}
+            {isSearch && (
+              <div className="rounded-lg border border-primary/10 bg-background p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-2.5">
+                    <Globe className="mt-0.5 size-4 text-primary" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Google Search Partners</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Extend your ads to search partner sites (non-Google search engines). Maps to Campaign.network_settings.target_search_network.
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={aud.searchPartners}
+                    onCheckedChange={(v) => updateNested("audience", { searchPartners: v })}
+                    className="mt-0.5"
+                  />
+                </div>
+              </div>
+            )}
+          </>)}
+
+          {/* ---- 5. Advanced Settings (collapsible) ---- */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-5 py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+            >
+              <ChevronDown className={cn("size-4 transition-transform", showAdvanced && "rotate-180")} />
+              Advanced Settings
+              <span className="ml-auto text-xs text-muted-foreground">{
+                isShopping ? "Remarketing, device targeting" :
+                isSearch ? "Device bid adjustments, demographics" :
+                "Search themes, custom segments, remarketing"
+              }</span>
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-3 flex flex-col gap-4">
+
+                {/* Search Themes (PMax) */}
+                {isPMax && (
+                  <SectionCard>
+                    <div className="mb-3 flex items-center gap-2">
+                      <Search className="size-4 text-primary" />
+                      <Label className="text-sm font-semibold text-foreground">Search Themes</Label>
+                      <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">PMax</Badge>
+                      <InfoTip text="Keywords describing what customers search for. Maps to AssetGroupSignal.search_theme. Up to 25 per asset group." />
+                    </div>
+                    <p className="mb-3 text-xs text-muted-foreground">
+                      Enter search terms your customers use when looking for your products.
+                    </p>
+                    <div className="mb-3 flex gap-2">
+                      <Input
+                        placeholder="e.g. buy perfume online, abaya fashion"
+                        value={themeInput}
+                        onChange={(e) => setThemeInput(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSearchTheme())}
+                        className="h-9 flex-1 text-sm"
+                      />
+                      <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!themeInput.trim() || aud.searchThemes.length >= 25} onClick={addSearchTheme}>
+                        <Plus className="size-3" /> Add
+                      </Button>
+                    </div>
+                    {aud.searchThemes.length > 0 && (
+                      <div className="mb-2 flex flex-wrap gap-1.5">
+                        {aud.searchThemes.map((t) => (
+                          <TagPill key={t} label={t} onRemove={() => updateNested("audience", { searchThemes: aud.searchThemes.filter((s) => s !== t) })} />
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{aud.searchThemes.length}/25 themes</span>
+                      <span>Press Enter to add</span>
+                    </div>
+                  </SectionCard>
+                )}
+
+                {/* Custom Segments (PMax) */}
+                {isPMax && (
+                  <SectionCard>
+                    <div className="mb-3 flex items-center gap-2">
+                      <Target className="size-4 text-primary" />
+                      <Label className="text-sm font-semibold text-foreground">Custom Segments</Label>
+                      <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">PMax</Badge>
+                      <InfoTip text="Define custom segments by keywords and websites. Maps to CustomAudienceInfo within AssetGroupSignal." />
+                    </div>
+
+                    {/* Keywords */}
+                    <div className="mb-4">
+                      <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
+                        <Tag className="size-3 text-muted-foreground" /> People who searched for these terms
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input placeholder="e.g. buy oud fragrance" value={customKeywordInput} onChange={(e) => setCustomKeywordInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomKeyword())} className="h-9 flex-1 text-sm" />
+                        <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!customKeywordInput.trim()} onClick={addCustomKeyword}><Plus className="size-3" /> Add</Button>
+                      </div>
+                      {aud.customSegmentKeywords.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {aud.customSegmentKeywords.map((k) => (
+                            <TagPill key={k} label={k} onRemove={() => updateNested("audience", { customSegmentKeywords: aud.customSegmentKeywords.filter((s) => s !== k) })} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* URLs */}
+                    <div>
+                      <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
+                        <Link2 className="size-3 text-muted-foreground" /> People who browse similar websites
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input placeholder="e.g. competitor.com" value={customUrlInput} onChange={(e) => setCustomUrlInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomUrl())} className="h-9 flex-1 text-sm" />
+                        <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!customUrlInput.trim()} onClick={addCustomUrl}><Plus className="size-3" /> Add</Button>
+                      </div>
+                      {aud.customSegmentUrls.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {aud.customSegmentUrls.map((u) => (
+                            <TagPill key={u} label={u} onRemove={() => updateNested("audience", { customSegmentUrls: aud.customSegmentUrls.filter((s) => s !== u) })} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </SectionCard>
+                )}
+
+                {/* Remarketing (hidden for Search -- promoted to main card above) */}
+                {!isSearch && <SectionCard>
+                  <div className="mb-3 flex items-center gap-2">
+                    <UserPlus className="size-4 text-primary" />
+                    <Label className="text-sm font-semibold text-foreground">Your Data (Remarketing)</Label>
+                    <InfoTip text={isPMax
+                      ? "Use your first-party data as signals. Maps to AssetGroupSignal.audience."
+                      : "Retarget people who have interacted with your store."
+                    } />
+                  </div>
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    {isPMax
+                      ? "Select audience lists to signal who your best customers are. Google will use these to find similar people."
+                      : "Select audiences to retarget with your ads."
+                    }
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {REMARKETING_AUDIENCES.map((rm) => {
+                      const selected = aud.audienceSignals.includes(rm.id);
+                      return (
+                        <label
+                          key={rm.id}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-all",
+                            selected ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/40"
+                          )}
+                        >
+                          <Checkbox checked={selected} onCheckedChange={() => updateNested("audience", { audienceSignals: toggleInArray(aud.audienceSignals, rm.id) })} />
+                          <span className={cn("text-xs font-medium", selected ? "text-primary" : "text-foreground")}>{rm.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </SectionCard>}
+
+                {/* Device Targeting (Search: Desktop/Mobile/Tablet with bid adjustments) */}
+                {isSearch ? (
+                  <SectionCard>
+                    <div className="mb-3 flex items-center gap-2">
+                      <Smartphone className="size-4 text-primary" />
+                      <Label className="text-sm font-semibold text-foreground">Device Bid Adjustments</Label>
+                      <InfoTip text="Adjust bids per device type. -100% disables that device. Maps to CampaignCriterion with device bid modifiers." />
+                    </div>
+                    <p className="mb-3 text-xs text-muted-foreground">
+                      Fine-tune how much you bid on each device type. Default 0% uses your base bid.
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {([
+                        { type: "DESKTOP" as SearchDeviceType, label: "Desktop", icon: Monitor },
+                        { type: "MOBILE" as SearchDeviceType, label: "Mobile", icon: Smartphone },
+                        { type: "TABLET" as SearchDeviceType, label: "Tablet", icon: Tablet },
+                      ]).map((device) => {
+                        const adj = aud.searchDeviceBidAdjustments[device.type] ?? 0;
+                        const DeviceIcon = device.icon;
+                        return (
+                          <div key={device.type} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <DeviceIcon className="size-4 text-muted-foreground" />
+                              <span className="text-xs font-medium text-foreground">{device.label}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => updateNested("audience", { searchDeviceBidAdjustments: { ...aud.searchDeviceBidAdjustments, [device.type]: Math.max(-100, adj - 10) } })}
+                                className="flex size-6 items-center justify-center rounded border border-border text-xs hover:bg-muted"
+                              >-</button>
+                              <span className={cn("w-14 text-center text-xs font-bold", adj > 0 ? "text-emerald-600" : adj < 0 ? "text-red-600" : "text-muted-foreground")}>
+                                {adj === -100 ? "OFF" : adj > 0 ? `+${adj}%` : `${adj}%`}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => updateNested("audience", { searchDeviceBidAdjustments: { ...aud.searchDeviceBidAdjustments, [device.type]: Math.min(900, adj + 10) } })}
+                                className="flex size-6 items-center justify-center rounded border border-border text-xs hover:bg-muted"
+                              >+</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-[10px] text-muted-foreground">-100% disables the device. Range: -100% to +900%.</p>
+                  </SectionCard>
+                ) : (
+                  /* Non-Search: OS-level Device Targeting (unified) */
+                  <DeviceTargetingCard
+                    value={aud.operatingSystems ?? []}
+                    onChange={(ids) =>
+                      updateNested("audience", { operatingSystems: ids })
+                    }
+                    accent="primary"
+                    infoTipText="Choose which devices to target. Both selected is recommended."
+                  />
+                )}
+
+                {/* Household Income & Parental Status (Search) */}
+                {isSearch && (
+                  <SectionCard>
+                    <div className="mb-3 flex items-center gap-2">
+                      <Users className="size-4 text-primary" />
+                      <Label className="text-sm font-semibold text-foreground">Advanced Demographics</Label>
+                      <InfoTip text="Additional demographic targeting for Search. Household income maps to CampaignCriterion.income_range. Parental status maps to CampaignCriterion.parental_status." />
+                    </div>
+
+                    {/* Household Income */}
+                    <div className="mb-4">
+                      <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <DollarSign className="size-3 text-primary" />
+                        Household Income
+                      </Label>
+                      <p className="mb-2 text-[11px] text-muted-foreground">Target by estimated household income tier. Useful for premium product targeting.</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {HOUSEHOLD_INCOME_TIERS.map((tier) => {
+                          const selected = aud.householdIncome.includes(tier.id);
+                          return (
+                            <button
+                              key={tier.id}
+                              type="button"
+                              onClick={() => updateNested("audience", { householdIncome: toggleInArray(aud.householdIncome, tier.id) })}
+                              className={cn(
+                                "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                                selected
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border bg-background text-foreground hover:border-primary/40"
+                              )}
+                            >
+                              {tier.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {aud.householdIncome.length === 0 && (
+                        <p className="mt-1 text-[10px] text-muted-foreground">None selected -- all income levels targeted.</p>
+                      )}
+                    </div>
+
+                    {/* Parental Status */}
+                    <div>
+                      <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        Parental Status
+                      </Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {PARENTAL_STATUS_OPTIONS.map((opt) => {
+                          const selected = aud.parentalStatus.includes(opt.id);
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => updateNested("audience", { parentalStatus: toggleInArray(aud.parentalStatus, opt.id) })}
+                              className={cn(
+                                "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                                selected
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border bg-background text-foreground hover:border-primary/40"
+                              )}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {aud.parentalStatus.length === 0 && (
+                        <p className="mt-1 text-[10px] text-muted-foreground">None selected -- all parental statuses targeted.</p>
+                      )}
+                    </div>
+                  </SectionCard>
+                )}
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* ============================================================ */}
+        {/* RIGHT COLUMN                                                  */}
+        {/* ============================================================ */}
+        <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
+          <div className="sticky top-20 flex flex-col gap-4">
+
+            {/* Reach in selected locations (shared, location-only) */}
+            <LocationReachCard
+              countryCount={aud.locationIds.length}
+              countries={aud.locationIds}
+              cityCount={(aud.cityIds ?? []).length}
+              accent="primary"
+            />
+
+            {/* Delivery Check (shared) */}
+            <DeliveryCheckCard
+              issues={(() => {
+                const issues: { message: string }[] = [];
+                if (!hasLocation) issues.push({ message: "No location selected" });
+                if (aud.languages.length === 0) issues.push({ message: "No language set" });
+                if (aud.ageMin >= aud.ageMax) issues.push({ message: "Invalid age range" });
+                if (isSearch && searchKeywords.length === 0) issues.push({ message: "Add at least one keyword for Search campaigns" });
+                if (isApp && !campaign.objective.appSettings.appId.trim()) issues.push({ message: "App ID is required for App campaigns" });
+                return issues;
+              })()}
+              cityCount={(aud.cityIds ?? []).length}
+              accent="primary"
+            />
+
+            <AudienceReadinessChecklist
+              checks={readinessChecks}
+              accent="primary"
+              successMessage="All checks passed. Ready to proceed."
+            />
+
+            {/* Targeting Summary (shared) */}
+            <TargetingSummaryCard
+              title="Targeting Summary"
+              accent="primary"
+              rows={targetingSummaryRows}
+            />
+
+            {/* ---- Campaign-type specific cards (after summary) ---- */}
+
+            {/* Product Inventory (Shopping) */}
+            {isShopping && (
+              <SectionCard className="p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <ShoppingBag className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">Product Inventory</Label>
+                  <Badge className="rounded-full bg-primary px-2 py-0 text-xs text-primary-foreground">Salla</Badge>
+                </div>
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-muted/30 px-3 py-2.5 text-center">
+                    <p className="text-lg font-bold text-foreground">1,247</p>
+                    <p className="text-[11px] text-muted-foreground">Active Products</p>
+                  </div>
+                  <div className="rounded-lg bg-muted/30 px-3 py-2.5 text-center">
+                    <p className="text-lg font-bold text-foreground">12</p>
+                    <p className="text-[11px] text-muted-foreground">Categories</p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
+                    <CheckCircle2 className="size-3 shrink-0 text-emerald-600" />
+                    <span className="text-xs text-emerald-700">Feed synced to Merchant Center</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
+                    <CheckCircle2 className="size-3 shrink-0 text-emerald-600" />
+                    <span className="text-xs text-emerald-700">1,198 products approved</span>
+                  </div>
+                  {aud.negativeKeywords.length > 0 && (
+                    <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5">
+                      <Search className="size-3 shrink-0 text-primary" />
+                      <span className="text-xs text-primary">{aud.negativeKeywords.length} negative keyword{aud.negativeKeywords.length !== 1 ? "s" : ""}</span>
+                    </div>
+                  )}
+                </div>
+              </SectionCard>
+            )}
+
+            {/* Audience Reach (Demand Gen) */}
+            {isDemandGen && (
+              <SectionCard className="p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Eye className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">Audience Reach</Label>
+                </div>
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-muted/30 px-3 py-2.5 text-center">
+                    <p className="text-lg font-bold text-foreground">2.4M</p>
+                    <p className="text-[11px] text-muted-foreground">Est. Weekly Reach</p>
+                  </div>
+                  <div className="rounded-lg bg-muted/30 px-3 py-2.5 text-center">
+                    <p className="text-lg font-bold text-foreground">6</p>
+                    <p className="text-[11px] text-muted-foreground">Channels Active</p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {aud.lookalikeSegments.length > 0 && (
+                    <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
+                      <CheckCircle2 className="size-3 shrink-0 text-emerald-600" />
+                      <span className="text-xs text-emerald-700">{aud.lookalikeSegments.length} lookalike segment{aud.lookalikeSegments.length !== 1 ? "s" : ""}</span>
+                    </div>
+                  )}
+                  {aud.customerMatchLists.length > 0 && (
+                    <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5">
+                      <CheckCircle2 className="size-3 shrink-0 text-emerald-600" />
+                      <span className="text-xs text-emerald-700">{aud.customerMatchLists.length} customer match list{aud.customerMatchLists.length !== 1 ? "s" : ""}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5">
+                    <Target className="size-3 shrink-0 text-primary" />
+                    <span className="text-xs text-primary">Optimized targeting: {aud.optimizedTargeting ? "ON" : "OFF"}</span>
+                  </div>
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Demand Gen reaches users across YouTube, Discover, and Gmail. Add lookalike segments for best results.
+                </p>
+              </SectionCard>
+            )}
+
+            {/* Keyword Summary (Search) */}
+            {isSearch && (
+              <SectionCard className="p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Search className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">Keyword Summary</Label>
+                </div>
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-lg bg-muted/30 px-3 py-2.5 text-center">
+                    <p className="text-lg font-bold text-foreground">{searchKeywords.length}</p>
+                    <p className="text-[11px] text-muted-foreground">Keywords</p>
+                  </div>
+                  <div className="rounded-lg bg-muted/30 px-3 py-2.5 text-center">
+                    <p className="text-lg font-bold text-foreground">{searchNegKeywords.length}</p>
+                    <p className="text-[11px] text-muted-foreground">Negatives</p>
+                  </div>
+                </div>
+                {searchKeywords.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    {(["BROAD", "PHRASE", "EXACT"] as const).map((mt) => {
+                      const count = searchKeywords.filter((k) => k.matchType === mt).length;
+                      if (count === 0) return null;
+                      const label = mt === "BROAD" ? "Broad" : mt === "PHRASE" ? "Phrase" : "Exact";
+                      return (
+                        <div key={mt} className="flex items-center justify-between rounded-lg border border-border bg-background px-2.5 py-1.5">
+                          <span className="text-xs text-muted-foreground">{label}</span>
+                          <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">{count}</Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {searchKeywords.length === 0 && (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5">
+                    <AlertCircle className="size-3 shrink-0 text-amber-600" />
+                    <p className="text-xs text-amber-700">Add keywords to start.</p>
+                  </div>
+                )}
+                {searchKeywords.length > 0 && searchKeywords.length < 10 && (
+                  <div className="mt-2 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-2.5 py-1.5">
+                    <TrendingUp className="mt-0.5 size-3 shrink-0 text-primary" />
+                    <p className="text-[10px] text-muted-foreground">
+                      <span className="font-medium text-primary">Tip:</span> Google recommends 10-20 keywords per ad group for optimal coverage.
+                    </p>
+                  </div>
+                )}
+              </SectionCard>
+            )}
+
+            {/* Signal Strength (PMax) */}
+            {isPMax && (
+              <SectionCard className="p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Sparkles className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">Signal Strength</Label>
+                  <Badge variant="secondary" className="rounded-full text-[10px]">PMax</Badge>
+                </div>
+                <div className="mb-2">
+                  <div className="mb-1 h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div className={cn("h-full rounded-full transition-all", signalBarColor)} style={{ width: `${signalBarWidth}%` }} />
+                  </div>
+                  <p className={cn("text-xs font-medium", signalColor)}>{signalStrength}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {signalCount} signal{signalCount !== 1 ? "s" : ""} added. More signals = faster AI optimization.
+                </p>
+              </SectionCard>
+            )}
+          </div>
+        </div>
+
+      </div>
+      <WizardStepFooter
+        onPrevious={() => setStep(0)}
+        onNext={() => setStep(2)}
+        nextLabel="Next: Budget & Bidding"
+        nextDisabled={!canProceed}
+        accent="primary"
+      />
+    </TooltipProvider>
+  );
+}

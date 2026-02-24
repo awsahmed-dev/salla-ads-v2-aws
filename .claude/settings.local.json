@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "mcp__Control_Chrome__open_url",
+      "mcp__Control_Chrome__get_current_tab",
+      "mcp__Control_Chrome__get_page_content",
+      "WebFetch(domain:developers.snap.com)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx next build:*)",
+      "Bash(lsof:*)"
+    ]
+  }
+}
