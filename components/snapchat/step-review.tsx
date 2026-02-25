@@ -51,7 +51,7 @@ const GOAL_LABELS: Record<string, string> = {
   PIXEL_SIGNUP: "Sign Ups", SWIPES: "Swipe Ups", LANDING_PAGE_VIEW: "Landing Page Views",
   IMPRESSIONS: "Impressions", STORY_OPENS: "Story Opens", VIDEO_VIEWS: "Video Views (2s)",
   VIDEO_VIEWS_15_SEC: "Video Views (15s)", LEAD_FORM_SUBMISSIONS: "Form Submissions",
-  USES: "Lens/Filter Uses", APP_INSTALLS: "App Installs", APP_PURCHASES: "In-App Purchases",
+  USES: "Lens/Filter Uses", APP_INSTALLS: "App Installs", APP_PURCHASE: "In-App Purchases",
   APP_SIGNUP: "In-App Sign Ups", APP_ADD_TO_CART: "In-App Add to Cart", APP_REENGAGE_PURCHASE: "Re-engage Purchases",
 };
 
@@ -63,6 +63,13 @@ const AD_TYPE_LABELS: Record<string, string> = {
   WEB_VIEW: "Single Image/Video", COLLECTION: "Collection Ad", COMPOSITE: "Story Ad",
   DYNAMIC: "Dynamic Product Ad", APP_INSTALL: "App Install Ad", LEAD_GENERATION: "Lead Generation",
   SNAP_AD: "Snap Ad", DEEP_LINK: "Deep Link Ad",
+};
+
+const FORMAT_LABELS: Record<string, string> = {
+  SINGLE: "Single Image/Video", COLLECTION: "Collection Ad", STORY: "Story Ad", DYNAMIC: "Dynamic Product Ad",
+};
+const DEST_LABELS: Record<string, string> = {
+  WEBSITE: "Website", DEEP_LINK: "Deep Link", APP_INSTALL: "App Install", NO_CTA: "No CTA", LEAD_FORM: "Lead Form",
 };
 
 /* ------------------------------------------------------------------ */
@@ -157,16 +164,28 @@ export function StepReview() {
       list.push({ id: "app_name", label: "App name", ok: !!app?.appName?.trim(), step: 0 });
     }
     list.push({ id: "ads", label: "At least one ad", ok: creative.ads.length > 0, step: 3 });
-    const missingMedia = creative.ads.filter((a) => a.adType !== "DYNAMIC" && !(a.adType === "COLLECTION" && a.dynamicCollectionEnabled) && a.assets.length === 0);
+    const missingMedia = creative.ads.filter((a) => (a.adFormat ?? "SINGLE") !== "DYNAMIC" && !((a.adFormat ?? "SINGLE") === "COLLECTION" && a.dynamicCollectionEnabled) && a.assets.length === 0);
     if (missingMedia.length > 0) list.push({ id: "ad_creative", label: "All ads have creatives", ok: false, step: 3 });
     else if (creative.ads.length > 0) list.push({ id: "ad_creative", label: "All ads have creatives", ok: true });
-    const missingPS = creative.ads.filter((a) => a.adType === "DYNAMIC" && !a.dynamicTemplateConfig?.productSetId);
+    const missingPS = creative.ads.filter((a) => (a.adFormat ?? "SINGLE") === "DYNAMIC" && !a.dynamicTemplateConfig?.productSetId);
     if (missingPS.length > 0) list.push({ id: "dynamic_ps", label: "Dynamic ads product set", ok: false, step: 3 });
     const budgetMinOk = budget.type === "daily" ? dailyAmount >= 20 : budget.amount >= 100;
     const budgetLabel = budget.type === "daily" ? "Budget ≥ 20 SAR/day" : "Budget ≥ 100 SAR (lifetime)";
     list.push({ id: "budget", label: budgetLabel, ok: budgetMinOk, step: 2 });
     list.push({ id: "dates", label: "Schedule dates", ok: !!budget.startDate, step: 2 });
     if (budget.bidStrategy !== "AUTO_BID") list.push({ id: "bid", label: "Bid amount", ok: budget.bidAmount > 0, step: 2 });
+    if (budget.frequencyCapEnabled && creative.ads.length > 1) {
+      const adFormats = new Set(creative.ads.map((a) => a.adFormat ?? "SINGLE"));
+      list.push({ id: "freq_cap_format", label: "Frequency cap: same ad format", ok: adFormats.size === 1, step: 3 });
+    }
+    if (objective.catalogEnabled) {
+      list.push({
+        id: "catalog_dynamic",
+        label: "Catalog: all ads are Dynamic",
+        ok: creative.ads.length === 0 || creative.ads.every((a) => (a.adFormat ?? "SINGLE") === "DYNAMIC"),
+        step: 3,
+      });
+    }
     return list;
   }, [objective, audience, budget, creative, dailyAmount, objConfig]);
 
@@ -279,7 +298,7 @@ export function StepReview() {
               <div className="flex-1 min-w-0">
                 <p className="truncate text-xs font-medium text-foreground">{ad.name}</p>
                 <p className="text-[10px] text-muted-foreground">
-                  {AD_TYPE_LABELS[ad.adType] || ad.adType} · {ad.adType === "DYNAMIC" ? (ad.dynamicTemplateConfig?.productSetName || "No product set") : `${ad.assets.length} creative${ad.assets.length !== 1 ? "s" : ""}`}
+                  {FORMAT_LABELS[ad.adFormat ?? "SINGLE"] || AD_TYPE_LABELS[ad.adType] || ad.adType}{ad.adFormat === "SINGLE" ? ` · ${DEST_LABELS[ad.adDestination ?? "WEBSITE"] || ""}` : ""} · {(ad.adFormat ?? "SINGLE") === "DYNAMIC" ? (ad.dynamicTemplateConfig?.productSetName || "No product set") : `${ad.assets.length} creative${ad.assets.length !== 1 ? "s" : ""}`}{ad.isInfluencer ? " · Influencer" : ""}
                 </p>
               </div>
             </div>

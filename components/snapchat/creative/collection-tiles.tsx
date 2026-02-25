@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { fetchProductSets } from "@/lib/salla/product-sets";
 import { type SallaProductSet } from "@/lib/salla/store-api";
@@ -16,7 +16,6 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Search,
   Store,
@@ -29,15 +28,11 @@ import {
   Plus,
   AlertCircle,
   Trash2,
-  ImagePlus,
   Star,
   Tag,
 } from "lucide-react";
 import { type SallaProduct, PREVIEW_PRODUCTS, formatSAR } from "@/lib/salla/store-api";
 import { type CollectionTile, type AdGroup, type DynamicTemplateConfig, makeDefaultDynamicTemplate } from "@/lib/snapchat/campaign-types";
-import { UploadZone } from "@/components/shared/upload-zone";
-import { MEDIA_SPECS } from "./constants";
-import { makeTile } from "./helpers";
 
 /* ------------------------------------------------------------------ */
 /*  Product Picker Sheet (right-side slider)                          */
@@ -253,25 +248,20 @@ export const ProductPickerDialog = ProductPickerSheet;
 /*  Collection Tile Card                                              */
 /* ------------------------------------------------------------------ */
 
-export function TileCard({ tile, index, onUpdate, onRemove }: { tile: CollectionTile; index: number; onUpdate: (p: Partial<CollectionTile>) => void; onRemove: () => void }) {
-  const handleFile = useCallback(
-    (file: File) => {
-      if (file.size > MEDIA_SPECS.TILE.maxSize) { alert("Tile image must be under 2MB."); return; }
-      onUpdate({ imageUrl: URL.createObjectURL(file), file });
-    },
-    [onUpdate]
-  );
-
-  const isFromStore = tile.imageUrl && !tile.imageUrl.startsWith("blob:") && tile.title;
-
+export function TileCard({
+  tile,
+  index,
+  onRemove,
+}: {
+  tile: CollectionTile;
+  index: number;
+  onRemove: () => void;
+}) {
   return (
-    <div className={cn(
-      "group relative flex gap-3 rounded-xl border p-3 transition-all",
-      isFromStore ? "border-primary/20 bg-primary/[0.02]" : "border-border bg-background hover:border-border"
-    )}>
+    <div className="group relative flex gap-3 rounded-xl border border-primary/20 bg-primary/[0.02] p-3 transition-all">
       {/* Image */}
       <div className="w-14 shrink-0">
-        {isFromStore && tile.imageUrl ? (
+        {tile.imageUrl ? (
           <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={tile.imageUrl} alt={tile.title} className="size-full object-cover" crossOrigin="anonymous" />
@@ -280,29 +270,22 @@ export function TileCard({ tile, index, onUpdate, onRemove }: { tile: Collection
             </div>
           </div>
         ) : (
-          <UploadZone compact enableLibrary={false} accept="image/png,image/jpeg" label="Tile" sublabel="160x160+" preview={tile.imageUrl || undefined} onFile={handleFile} onClear={() => onUpdate({ imageUrl: "", file: undefined })} />
+          <div className="flex aspect-square w-full items-center justify-center rounded-lg bg-muted/60">
+            <Store className="size-4 text-muted-foreground" />
+          </div>
         )}
       </div>
 
       {/* Info */}
-      <div className="flex flex-1 flex-col gap-1.5 min-w-0">
+      <div className="flex flex-1 flex-col gap-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] font-semibold text-muted-foreground">Tile {index + 1}</span>
-          {isFromStore && (
-            <span className="flex items-center gap-0.5 rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-600">
-              <CheckCircle2 className="size-2" /> From store
-            </span>
-          )}
+          <span className="flex items-center gap-0.5 rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-600">
+            <CheckCircle2 className="size-2" /> From store
+          </span>
         </div>
-        <Input
-          placeholder={isFromStore ? tile.title || "Product title" : "Product title"}
-          value={tile.title}
-          onChange={(e) => onUpdate({ title: e.target.value })}
-          className="h-7 text-xs"
-        />
-        {tile.url && (
-          <p className="truncate text-[10px] text-muted-foreground">{tile.url}</p>
-        )}
+        <p className="truncate text-xs font-medium text-foreground">{tile.title || "Untitled product"}</p>
+        {tile.url && <p className="truncate text-[10px] text-muted-foreground">{tile.url}</p>}
       </div>
 
       {/* Remove */}
@@ -320,17 +303,13 @@ export function TileCard({ tile, index, onUpdate, onRemove }: { tile: Collection
 export function CollectionTilesSection({
   ad,
   tileCount,
-  addTile,
   removeTile,
-  updateTile,
   onUpdate,
   catalogEnabled,
 }: {
   ad: AdGroup;
   tileCount: number;
-  addTile: () => void;
   removeTile: (id: string) => void;
-  updateTile: (id: string, partial: Partial<CollectionTile>) => void;
   onUpdate: (ad: AdGroup) => void;
   catalogEnabled: boolean;
 }) {
@@ -339,10 +318,19 @@ export function CollectionTilesSection({
   const [productSets, setProductSets] = useState<SallaProductSet[]>([]);
   const isDynamic = ad.dynamicCollectionEnabled === true;
   const dynamicConfig = ad.dynamicTemplateConfig ?? makeDefaultDynamicTemplate();
+  const hasAutoOpened = useRef(false);
 
   useEffect(() => {
     fetchProductSets("all").then(setProductSets);
   }, []);
+
+  useEffect(() => {
+    if (tileCount === 0 && !isDynamic && !hasAutoOpened.current) {
+      hasAutoOpened.current = true;
+      const timer = setTimeout(() => setPickerOpen(true), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [tileCount, isDynamic]);
 
   const handleAddProducts = (products: SallaProduct[]) => {
     const newTiles: CollectionTile[] = products.map((p) => ({
@@ -481,19 +469,24 @@ export function CollectionTilesSection({
                     <div className="flex flex-col gap-2">
                       {productSets.map((set) => {
                         const isSelected = dynamicConfig.productSetId === set.id;
+                        const isEmpty = set.productCount === 0;
                         return (
                           <button
                             key={set.id}
                             type="button"
+                            disabled={isEmpty}
                             onClick={() => {
+                              if (isEmpty) return;
                               updateDynamicConfig({ productSetId: set.id, productSetName: set.nameAr || set.name });
                               setDynamicSetPicker(false);
                             }}
                             className={cn(
                               "group flex flex-col overflow-hidden rounded-xl border text-left transition-all",
-                              isSelected
-                                ? "border-primary bg-primary/[0.04] ring-1 ring-primary/20"
-                                : "border-border hover:border-primary/30"
+                              isEmpty
+                                ? "cursor-not-allowed border-border opacity-50"
+                                : isSelected
+                                  ? "border-primary bg-primary/[0.04] ring-1 ring-primary/20"
+                                  : "border-border hover:border-primary/30"
                             )}
                           >
                             {set.previewImages && set.previewImages.length > 0 && (
@@ -515,7 +508,7 @@ export function CollectionTilesSection({
                                 <p className="mt-0.5 text-[11px] text-muted-foreground">{set.descriptionAr || set.description}</p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold tabular-nums text-foreground">{set.productCount}</span>
+                                <span className={cn("text-xs font-semibold tabular-nums", isEmpty ? "text-red-500" : "text-foreground")}>{set.productCount}{isEmpty ? " (empty)" : ""}</span>
                                 {isSelected && <CheckCircle2 className="size-4 text-primary" />}
                               </div>
                             </div>
@@ -544,65 +537,56 @@ export function CollectionTilesSection({
           <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Label className="text-xs font-semibold text-foreground">Product Tiles</Label>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">{tileCount}/4</span>
+              <span className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums",
+                tileCount < 2 ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"
+              )}>{tileCount}/4 {tileCount < 2 ? "(min 2)" : ""}</span>
             </div>
             {tileCount > 0 && canAddMore && (
-              <div className="flex items-center gap-1.5">
-                <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)} className="h-7 gap-1 rounded-lg text-xs">
-                  <Store className="size-3" />
-                  Store
-                </Button>
-                <Button size="sm" variant="ghost" onClick={addTile} className="h-7 gap-1 rounded-lg text-xs text-muted-foreground">
-                  <Plus className="size-3" />
-                  Manual
-                </Button>
-              </div>
+              <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)} className="h-7 gap-1 rounded-lg text-xs">
+                <Plus className="size-3" />
+                Add product
+              </Button>
             )}
           </div>
 
           {/* Empty state — store-first experience */}
           {tileCount === 0 && (
-            <div className="mb-3 overflow-hidden rounded-xl border-2 border-dashed border-border">
-              {/* Primary: Browse store */}
+            <div className="mb-3">
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
-                className="flex w-full items-center gap-3.5 px-4 py-4 text-left transition-colors hover:bg-primary/[0.02]"
+                className="group flex w-full flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border px-6 py-8 text-center transition-all hover:border-primary/40 hover:bg-primary/[0.02]"
               >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                  <Store className="size-5 text-primary" />
+                {/* Mini collection ad diagram */}
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="h-10 w-16 rounded-md bg-muted/60" />
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4].map((n) => (
+                      <div key={n} className="size-5 rounded bg-muted/40" />
+                    ))}
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-xs font-semibold text-foreground">Browse store products</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    Select from your Salla catalog — image, title, and URL auto-fill
+
+                <div>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <Store className="size-4 text-primary" />
+                    <p className="text-sm font-semibold text-foreground">Add products from your store</p>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Pick 2-4 products — image, title, and URL auto-fill from your catalog
                   </p>
                 </div>
-                <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-semibold text-primary">Recommended</span>
               </button>
 
-              {/* Secondary: Manual */}
-              <button
-                type="button"
-                onClick={addTile}
-                className="flex w-full items-center gap-3.5 border-t border-dashed border-border px-4 py-3 text-left transition-colors hover:bg-muted/30"
-              >
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
-                  <ImagePlus className="size-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-foreground">Add tile manually</p>
-                  <p className="text-[11px] text-muted-foreground">Upload your own image and enter details</p>
-                </div>
-              </button>
             </div>
           )}
 
           {/* Minimum tile warning */}
           {tileCount > 0 && tileCount < 2 && (
-            <div className="mb-2 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
+            <div className="mb-2 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 dark:border-amber-800/40 dark:bg-amber-950/30">
               <AlertCircle className="size-3 shrink-0 text-amber-500" />
-              <span className="text-xs text-amber-700">Snap requires at least 2 tiles — add {2 - tileCount} more</span>
+              <span className="text-xs text-amber-700 dark:text-amber-400">Snap requires at least 2 tiles — add {2 - tileCount} more</span>
             </div>
           )}
 
@@ -614,33 +598,21 @@ export function CollectionTilesSection({
                   key={tile.id}
                   tile={tile}
                   index={i}
-                  onUpdate={(p) => updateTile(tile.id, p)}
                   onRemove={() => removeTile(tile.id)}
                 />
               ))}
 
-              {/* Inline add-more row */}
+              {/* Simple add-more button */}
               {canAddMore && (
-                <div className="flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2">
-                  <button
-                    type="button"
-                    onClick={() => setPickerOpen(true)}
-                    className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/5"
-                  >
-                    <Store className="size-3" />
-                    From store
-                  </button>
-                  <span className="text-border">|</span>
-                  <button
-                    type="button"
-                    onClick={addTile}
-                    className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <Plus className="size-3" />
-                    Manual
-                  </button>
-                  <span className="ml-auto text-[10px] text-muted-foreground">{4 - tileCount} slot{4 - tileCount !== 1 ? "s" : ""} left</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(true)}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border py-2.5 text-xs font-medium text-muted-foreground transition-all hover:border-primary/30 hover:bg-primary/[0.02] hover:text-primary"
+                >
+                  <Plus className="size-3.5" />
+                  Add tile
+                  <span className="ml-1 text-[10px] font-normal text-muted-foreground/70">({4 - tileCount} left)</span>
+                </button>
               )}
             </div>
           )}

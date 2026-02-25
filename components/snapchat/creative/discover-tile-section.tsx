@@ -5,14 +5,12 @@ import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import {
   Compass,
   ChevronUp,
   ChevronDown,
   AlertCircle,
   CheckCircle2,
-  Info,
   ImageIcon,
   Type,
 } from "lucide-react";
@@ -32,7 +30,6 @@ export function DiscoverTileSection({
     backgroundImageUrl: "",
     logoImageUrl: "",
   };
-  const isEnabled = tile.enabled;
   const isComplete = !!(tile.headline && tile.backgroundImageUrl);
 
   const updateTile = (patch: Partial<DiscoverTile>) => {
@@ -52,7 +49,7 @@ export function DiscoverTileSection({
     updateTile({ logoImageUrl: url, logoImageFile: file });
   };
 
-  const [expanded, setExpanded] = useState(isEnabled);
+  const [expanded, setExpanded] = useState(true);
 
   const headlineLength = tile.headline.length;
   const headlineNearLimit = headlineLength > 45;
@@ -68,9 +65,9 @@ export function DiscoverTileSection({
         >
           <div className={cn(
             "flex size-8 items-center justify-center rounded-lg transition-colors",
-            isEnabled && isComplete ? "bg-emerald-100" : "bg-blue-100"
+            isComplete ? "bg-emerald-100" : "bg-blue-100"
           )}>
-            {isEnabled && isComplete ? (
+            {isComplete ? (
               <CheckCircle2 className="size-4 text-emerald-600" />
             ) : (
               <Compass className="size-4 text-blue-600" />
@@ -79,51 +76,36 @@ export function DiscoverTileSection({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-foreground">Discover Tile</span>
-              <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">
-                Recommended
-              </Badge>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-semibold text-primary">
+                Required
+              </span>
+              {isComplete && (
+                <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">
+                  Ready
+                </Badge>
+              )}
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Show your Story Ad in the Discover Feed for more reach
+              Required for Story Ads — this tile appears in the Discover Feed and must be completed
             </p>
           </div>
         </button>
-        <div className="flex items-center gap-2">
-          <Switch
-            checked={isEnabled}
-            onCheckedChange={(checked) => {
-              updateTile({ enabled: checked });
-              if (checked) setExpanded(true);
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-            className="text-muted-foreground"
-          >
-            {expanded ? (
-              <ChevronUp className="size-4" />
-            ) : (
-              <ChevronDown className="size-4" />
-            )}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="text-muted-foreground"
+        >
+          {expanded ? (
+            <ChevronUp className="size-4" />
+          ) : (
+            <ChevronDown className="size-4" />
+          )}
+        </button>
       </div>
 
       {/* ── Expanded Content ── */}
       {expanded && (
         <div className="border-t border-border">
-          {!isEnabled ? (
-            <div className="px-4 py-4">
-              <div className="flex items-start gap-2.5 rounded-lg bg-muted/50 px-3 py-2.5">
-                <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Enable this to show your Story Ad as a tile in the Discover Feed.
-                  Without it, your ad only plays between user stories which limits reach.
-                </p>
-              </div>
-            </div>
-          ) : (
             <div className="flex flex-col gap-0">
 
               {/* ── Headline Section ── */}
@@ -304,7 +286,6 @@ export function DiscoverTileSection({
                 )}
               </div>
             </div>
-          )}
         </div>
       )}
     </div>

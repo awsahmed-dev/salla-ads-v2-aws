@@ -11,9 +11,12 @@ export { LeadFormBuilder, LEAD_FIELD_ICONS } from "./lead-form-builder";
 
 export {
   AD_FORMAT_OPTIONS,
+  FORMAT_OPTIONS,
+  DESTINATION_OPTIONS,
   CTA_OPTIONS,
   LEAD_CTA_OPTIONS,
   APP_INSTALL_CTA_OPTIONS,
+  DEEP_LINK_CTA_OPTIONS,
   LEAD_FIELD_LABELS,
   STANDARD_FIELD_OPTIONS,
   CROP_OPTIONS,
@@ -28,8 +31,10 @@ export {
   makeAsset,
   makeTile,
   makeAdGroup,
+  makeAdGroupLegacy,
   getMaxAssets,
   getFormatLabel,
+  getDestinationLabel,
   isInfluencerAd,
   getDefaultCTA,
 } from "./helpers";

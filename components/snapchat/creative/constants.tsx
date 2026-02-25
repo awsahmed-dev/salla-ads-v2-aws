@@ -3,94 +3,90 @@ import {
   LayoutGrid,
   Layers,
   Zap,
-  Users,
-  FileText,
+  Globe,
+  Link2,
   Download,
   Eye,
-  Link2,
+  FileText,
 } from "lucide-react";
 import type {
   SnapCreativeType,
+  AdFormat,
+  AdDestination,
+  CampaignObjective,
   WebViewCTA,
   LeadGenCTA,
   AppInstallCTA,
+  DeepLinkCTA,
   LeadFormFieldType,
   CropPosition,
 } from "@/lib/snapchat/campaign-types";
 
+/* ---------- Legacy key (kept for any remaining references) ---------- */
 export type AdFormatKey = SnapCreativeType | "INFLUENCER";
 
-export const AD_FORMAT_OPTIONS: {
-  value: AdFormatKey;
+/* ---------- 4 true ad formats ---------- */
+
+export const FORMAT_OPTIONS: {
+  value: AdFormat;
   label: string;
   desc: string;
   icon: React.ReactNode;
   maxAssets: number;
 }[] = [
   {
-    value: "WEB_VIEW",
+    value: "SINGLE",
     label: "Single Image / Video",
-    desc: "Full-screen snap with swipe-up to your website. Upload up to 8 creatives.",
+    desc: "Full-screen snap ad. Upload up to 8 creatives per ad group.",
     icon: <ImageIcon className="size-5" />,
     maxAssets: 8,
   },
   {
     value: "COLLECTION",
     label: "Collection Ad",
-    desc: "Top snap + 2-4 product tiles. Great for showcasing multiple products.",
+    desc: "Top snap + 2–4 product tiles from your store.",
     icon: <LayoutGrid className="size-5" />,
     maxAssets: 1,
   },
   {
-    value: "COMPOSITE",
+    value: "STORY",
     label: "Story Ad",
-    desc: "1-20 snaps played in sequence. Each snap has its own CTA.",
+    desc: "3–20 snaps played in sequence. Each snap has its own CTA.",
     icon: <Layers className="size-5" />,
     maxAssets: 20,
   },
   {
     value: "DYNAMIC",
     label: "Dynamic Product Ad",
-    desc: "Auto-generate ads from your catalog. Products are shown dynamically based on user behavior.",
+    desc: "Auto-generated ads from your catalog based on user behavior.",
     icon: <Zap className="size-5" />,
     maxAssets: 1,
   },
-  {
-    value: "INFLUENCER",
-    label: "Influencer Content",
-    desc: "Use a video created by an influencer. Paste the Ad Code they share with you from Snapchat.",
-    icon: <Users className="size-5" />,
-    maxAssets: 1,
-  },
-  {
-    value: "LEAD_GENERATION",
-    label: "Lead Generation",
-    desc: "Full-screen snap with swipe-up to open a lead form. Collect leads directly on Snapchat.",
-    icon: <FileText className="size-5" />,
-    maxAssets: 1,
-  },
-  {
-    value: "APP_INSTALL",
-    label: "App Install Ad",
-    desc: "Full-screen snap that directs users to download your app from the App Store or Google Play.",
-    icon: <Download className="size-5" />,
-    maxAssets: 8,
-  },
-  {
-    value: "SNAP_AD",
-    label: "Snap Ad (No CTA)",
-    desc: "Full-screen snap with no swipe-up action. Awareness-only — great for brand storytelling.",
-    icon: <Eye className="size-5" />,
-    maxAssets: 8,
-  },
-  {
-    value: "DEEP_LINK",
-    label: "Deep Link Ad",
-    desc: "Sends users directly into your app via deep link. Falls back to web or app store if not installed.",
-    icon: <Link2 className="size-5" />,
-    maxAssets: 8,
-  },
 ];
+
+/* ---------- Destination options ---------- */
+
+export const DESTINATION_OPTIONS: {
+  value: AdDestination;
+  label: string;
+  desc: string;
+  icon: React.ReactNode;
+}[] = [
+  { value: "WEBSITE",     label: "Website",          desc: "Swipe-up opens a web page",          icon: <Globe className="size-4" /> },
+  { value: "DEEP_LINK",   label: "Deep Link",        desc: "Opens directly inside your app",     icon: <Link2 className="size-4" /> },
+  { value: "APP_INSTALL", label: "App Install",       desc: "Directs to App Store / Google Play", icon: <Download className="size-4" /> },
+  { value: "NO_CTA",      label: "No CTA (Awareness)", desc: "No swipe-up action — brand awareness only", icon: <Eye className="size-4" /> },
+  { value: "LEAD_FORM",   label: "Lead Form",         desc: "Swipe-up opens a native lead form",  icon: <FileText className="size-4" /> },
+];
+
+/* ---------- Legacy: map old 9-card array for any remaining consumers ---------- */
+export const AD_FORMAT_OPTIONS = FORMAT_OPTIONS.map((f) => ({
+  value: f.value as unknown as AdFormatKey,
+  label: f.label,
+  desc: f.desc,
+  icon: f.icon,
+  maxAssets: f.maxAssets,
+}));
 
 /** All valid CTA values for WEB_VIEW and DEEP_LINK creatives per Snap API. */
 export const CTA_OPTIONS: { value: WebViewCTA; label: string }[] = [
@@ -153,6 +149,27 @@ export const APP_INSTALL_CTA_OPTIONS: { value: AppInstallCTA; label: string }[] 
   { value: "VOTE",        label: "Vote" },
   { value: "DIRECTIONS",  label: "Directions" },
   { value: "PLAY_GAME",   label: "Play Game" },
+];
+
+/**
+ * Valid CTA values for DEEP_LINK creatives per Snap API.
+ */
+export const DEEP_LINK_CTA_OPTIONS: { value: DeepLinkCTA; label: string }[] = [
+  { value: "OPEN_APP",      label: "Open App" },
+  { value: "USE_APP",       label: "Use App" },
+  { value: "SHOP_NOW",      label: "Shop Now" },
+  { value: "PLAY",          label: "Play" },
+  { value: "TRY",           label: "Try" },
+  { value: "WATCH",         label: "Watch" },
+  { value: "SIGN_UP",       label: "Sign Up" },
+  { value: "MORE",          label: "More" },
+  { value: "DOWNLOAD",      label: "Download" },
+  { value: "DONATE",        label: "Donate" },
+  { value: "VOTE",          label: "Vote" },
+  { value: "VIEW_PROFILE",  label: "View Profile" },
+  { value: "DIRECTIONS",    label: "Directions" },
+  { value: "PRE_REGISTER",  label: "Pre-Register" },
+  { value: "PLAY_GAME",     label: "Play Game" },
 ];
 
 export const LEAD_FIELD_LABELS: Record<LeadFormFieldType, string> = {

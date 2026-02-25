@@ -310,7 +310,7 @@ export function StepObjective() {
                   </div>
                   <div className="px-4 text-center">
                     <p className="text-[10px] text-muted-foreground">Ad formats</p>
-                    <p className="mt-0.5 text-[11px] font-medium text-foreground">{currentConfig.allowedAdFormats.length} available</p>
+                    <p className="mt-0.5 text-[11px] font-medium text-foreground">{currentConfig.allowedFormats.length} available</p>
                   </div>
                 </div>
               </div>
@@ -362,13 +362,21 @@ export function StepObjective() {
                       <div>
                         <p className="text-sm font-semibold text-foreground">Product Catalog</p>
                         <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-                          Show personalized product ads based on your Salla catalog and visitor behavior.
+                          All ads in this campaign will be auto-generated from your product catalog (Dynamic Product Ads).
                         </p>
                       </div>
                     </div>
                     <Switch
                       checked={obj.catalogEnabled}
-                      onCheckedChange={(checked) => updateNested("objective", { catalogEnabled: checked })}
+                      onCheckedChange={(checked) => {
+                        updateNested("objective", { catalogEnabled: checked });
+                        if (checked) {
+                          const nonDynamic = campaign.creative.ads.filter((a) => (a.adFormat ?? "SINGLE") !== "DYNAMIC");
+                          if (nonDynamic.length > 0) {
+                            updateNested("creative", { ads: campaign.creative.ads.filter((a) => (a.adFormat ?? "SINGLE") === "DYNAMIC") });
+                          }
+                        }
+                      }}
                     />
                   </div>
                   {obj.catalogEnabled && (

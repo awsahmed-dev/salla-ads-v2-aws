@@ -3,18 +3,19 @@
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tv, ShieldCheck } from "lucide-react";
+import { Tv, ShieldCheck, Layers, AlertCircle } from "lucide-react";
 import { type AdGroup } from "@/lib/snapchat/campaign-types";
 
 export function CommercialSection({
   ad,
   onUpdate,
+  isInfluencer,
 }: {
   ad: AdGroup;
   onUpdate: (next: AdGroup) => void;
+  isInfluencer?: boolean;
 }) {
-  // Only eligible for WEB_VIEW with at least one VIDEO asset
-  const isEligibleFormat = ad.adType === "WEB_VIEW";
+  const isEligibleFormat = ad.adFormat === "SINGLE" && (ad.adDestination === "WEBSITE" || ad.adDestination === "DEEP_LINK");
   const hasVideo = ad.assets.some((a) => a.mediaType === "VIDEO");
   if (!isEligibleFormat || !hasVideo) return null;
 
@@ -89,6 +90,40 @@ export function CommercialSection({
                   : "Your video ad will play inside Snapchat Discover Shows. Viewers must watch the first 6 seconds before they can skip. This guarantees meaningful brand exposure."}
               </p>
             </div>
+          </div>
+
+          {isInfluencer && (
+            <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
+              <AlertCircle className="mt-px size-3.5 shrink-0 text-amber-600" />
+              <p className="text-xs leading-relaxed text-amber-700">
+                This ad uses influencer content — you cannot control the video duration. Ensure the creator&apos;s video meets Commercial requirements ({commercialMode === "FULL_DURATION" ? "3–6 seconds" : "7+ seconds"}) before enabling.
+              </p>
+            </div>
+          )}
+
+          <div className="mt-2 flex items-center justify-between rounded-lg border border-border px-2.5 py-2">
+            <div className="flex items-center gap-1.5">
+              <Layers className="size-3 text-muted-foreground" />
+              <span className="text-[11px] font-medium text-foreground">Content Bundle</span>
+            </div>
+            <Select
+              value={ad.commercialConfig?.premiumContentBundle ?? "ALL_SHOWS"}
+              onValueChange={(v) => onUpdate({
+                ...ad,
+                commercialConfig: {
+                  ...ad.commercialConfig!,
+                  premiumContentBundle: v as "ALL_SHOWS" | "LIFESTYLE_SPORTS",
+                },
+              })}
+            >
+              <SelectTrigger className="h-7 w-36 text-[11px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL_SHOWS">All Shows (max reach)</SelectItem>
+                <SelectItem value="LIFESTYLE_SPORTS">Lifestyle & Sports</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       )}

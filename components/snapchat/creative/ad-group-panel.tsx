@@ -5,29 +5,25 @@ import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
   Pencil,
   Copy,
   Trash2,
   Users,
-  Download,
-  FileText,
   Plus,
   ImagePlus,
   ChevronUp,
   ChevronDown,
   Check,
-  CheckCircle2,
-  Info,
   Sparkles,
   Upload,
+  AlertCircle,
 } from "lucide-react";
-import type { AdGroup, SnapCreativeType, CreativeAsset, CollectionTile, WebViewCTA } from "@/lib/snapchat/campaign-types";
-import { makeDefaultDynamicTemplate } from "@/lib/snapchat/campaign-types";
-import { type AdFormatKey, AD_FORMAT_OPTIONS } from "./constants";
-import { getMaxAssets, getFormatLabel, isInfluencerAd, makeAsset, makeTile } from "./helpers";
+import type { AdGroup, AdFormat, AdDestination, CreativeAsset, WebViewCTA, CampaignObjective } from "@/lib/snapchat/campaign-types";
+import { deriveCreativeType, makeDefaultDynamicTemplate, OBJECTIVE_CONFIGS } from "@/lib/snapchat/campaign-types";
+import { FORMAT_OPTIONS, DESTINATION_OPTIONS } from "./constants";
+import { getMaxAssets, getFormatLabel, getDestinationLabel, isInfluencerAd, makeAsset } from "./helpers";
 import { CreativeCard } from "./creative-card";
 import { CollectionTilesSection } from "./collection-tiles";
 import { DiscoverTileSection } from "./discover-tile-section";
@@ -45,9 +41,12 @@ export function AdGroupPanel({
   onUpdate,
   onRemove,
   onDuplicate,
-  adFormatOptions,
+  allowedFormats,
+  allowedDestinations,
   catalogEnabled,
   onCreativeFocus,
+  freqCapLockedFormat = null,
+  objective,
 }: {
   ad: AdGroup;
   adIndex: number;
@@ -57,14 +56,17 @@ export function AdGroupPanel({
   onUpdate: (next: AdGroup) => void;
   onRemove: () => void;
   onDuplicate: () => void;
-  adFormatOptions: typeof AD_FORMAT_OPTIONS;
+  allowedFormats: AdFormat[];
+  allowedDestinations: AdDestination[];
   catalogEnabled: boolean;
   onCreativeFocus?: (assetIdx: number) => void;
+  freqCapLockedFormat?: AdFormat | null;
+  objective?: CampaignObjective;
 }) {
   const [editingName, setEditingName] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
   const [expandedCreativeIdx, setExpandedCreativeIdx] = useState(0);
-  const maxAssets = getMaxAssets(ad.adType);
+  const maxAssets = getMaxAssets(ad.adFormat);
   const canAddAsset = ad.assets.length < maxAssets;
 
   const influencer = isInfluencerAd(ad);
@@ -110,20 +112,37 @@ export function AdGroupPanel({
       return Object.keys(d).length > 0 ? d : undefined;
     })() : undefined;
 
-    const newAssets = toAdd.map((file) => {
-      const isVideo = file.type.startsWith("video/");
-      const mediaType = isVideo ? "VIDEO" as const : "IMAGE" as const;
-      return makeAsset({
-        ...smart,
-        mediaType,
-        url: URL.createObjectURL(file),
-        file,
+    const getVideoDuration = (file: File): Promise<number | undefined> => {
+      if (!file.type.startsWith("video/")) return Promise.resolve(undefined);
+      return new Promise((resolve) => {
+        const el = document.createElement("video");
+        el.preload = "metadata";
+        const url = URL.createObjectURL(file);
+        el.onloadedmetadata = () => { resolve(Math.round(el.duration)); URL.revokeObjectURL(url); };
+        el.onerror = () => { resolve(undefined); URL.revokeObjectURL(url); };
+        el.src = url;
       });
+    };
+
+    Promise.all(
+      toAdd.map(async (file) => {
+        const isVideo = file.type.startsWith("video/");
+        const mediaType = isVideo ? "VIDEO" as const : "IMAGE" as const;
+        const videoDuration = await getVideoDuration(file);
+        return makeAsset({
+          ...smart,
+          mediaType,
+          url: URL.createObjectURL(file),
+          file,
+          ...(videoDuration !== undefined && { videoDuration }),
+        });
+      })
+    ).then((newAssets) => {
+      const combined = [...ad.assets, ...newAssets];
+      onUpdate({ ...ad, assets: combined });
+      setExpandedCreativeIdx(combined.length - 1);
+      onCreativeFocus?.(combined.length - 1);
     });
-    const combined = [...ad.assets, ...newAssets];
-    onUpdate({ ...ad, assets: combined });
-    setExpandedCreativeIdx(combined.length - 1);
-    onCreativeFocus?.(combined.length - 1);
   }, [ad, maxAssets, onUpdate, onCreativeFocus]);
 
   const removeAsset = (id: string) => onUpdate({ ...ad, assets: ad.assets.filter((a) => a.id !== id) });
@@ -153,63 +172,83 @@ export function AdGroupPanel({
     onUpdate({ ...ad, assets: next });
   };
 
-  const addTile = () => {
-    if (ad.collectionTiles.length >= 4) return;
-    onUpdate({ ...ad, collectionTiles: [...ad.collectionTiles, makeTile()] });
-  };
 
   const removeTile = (id: string) => onUpdate({ ...ad, collectionTiles: ad.collectionTiles.filter((t) => t.id !== id) });
 
-  const updateTile = (id: string, partial: Partial<CollectionTile>) =>
-    onUpdate({ ...ad, collectionTiles: ad.collectionTiles.map((t) => (t.id === id ? { ...t, ...partial } : t)) });
+  const defaultAssetForDest = (dest: AdDestination): Partial<CreativeAsset> => {
+    switch (dest) {
+      case "DEEP_LINK":
+        return { cta: "OPEN_APP" as WebViewCTA, deepLinkProperties: { deepLinkUri: "", fallbackUrl: "", fallbackType: "WEB_VIEW_FALLBACK" } };
+      case "APP_INSTALL":
+        return { cta: "INSTALL_NOW" as WebViewCTA };
+      case "LEAD_FORM":
+        return { cta: "SIGN_UP" as WebViewCTA };
+      case "NO_CTA":
+        return { shareable: false };
+      default:
+        return {};
+    }
+  };
 
-  const changeFormat = (val: AdFormatKey) => {
-    const isInf = val === "INFLUENCER";
-    const actualType: SnapCreativeType = isInf ? "WEB_VIEW" : (val as SnapCreativeType);
+  const changeFormat = (newFormat: AdFormat) => {
+    if (newFormat === ad.adFormat) return;
+    const dest = newFormat === "SINGLE" ? (allowedDestinations[0] ?? "WEBSITE") : ad.adDestination;
+    const adType = deriveCreativeType(newFormat, dest);
     const defaultAssets =
-      actualType === "DYNAMIC" ? [] :
-      isInf ? [makeAsset({ mediaSource: "ad_code" })] :
-      actualType === "LEAD_GENERATION" ? [makeAsset({ cta: "SIGN_UP" as WebViewCTA })] :
-      actualType === "APP_INSTALL" ? [makeAsset({ cta: "INSTALL_NOW" as WebViewCTA })] :
-      actualType === "SNAP_AD" ? [makeAsset({ shareable: false })] :
-      actualType === "DEEP_LINK" ? [makeAsset({ deepLinkProperties: { deepLinkUri: "", fallbackUrl: "", fallbackType: "WEB_VIEW_FALLBACK" } })] :
-      [makeAsset()];
+      newFormat === "DYNAMIC" ? [] :
+      ad.isInfluencer && newFormat === "SINGLE" ? [makeAsset({ mediaSource: "ad_code" })] :
+      [makeAsset(defaultAssetForDest(dest))];
     onUpdate({
       ...ad,
-      adType: actualType,
-      isInfluencer: isInf,
+      adFormat: newFormat,
+      adDestination: dest,
+      adType,
+      isInfluencer: newFormat !== "SINGLE" ? false : ad.isInfluencer,
       assets: defaultAssets,
-      collectionTiles: actualType === "COLLECTION" ? [makeTile(), makeTile()] : [],
-      dynamicTemplateConfig: actualType === "DYNAMIC" ? makeDefaultDynamicTemplate() : undefined,
-      dynamicCollectionEnabled: actualType === "COLLECTION" ? (ad.dynamicCollectionEnabled ?? false) : false,
-      discoverTile: actualType === "COMPOSITE" ? { enabled: false, headline: "", backgroundImageUrl: "", logoImageUrl: "" } : undefined,
+      collectionTiles: [],
+      dynamicTemplateConfig: newFormat === "DYNAMIC" ? makeDefaultDynamicTemplate() : undefined,
+      dynamicCollectionEnabled: newFormat === "COLLECTION" ? (ad.dynamicCollectionEnabled ?? false) : false,
+      discoverTile: newFormat === "STORY" ? { enabled: true, headline: "", backgroundImageUrl: "", logoImageUrl: "" } : undefined,
     });
+  };
+
+  const changeDestination = (newDest: AdDestination) => {
+    if (newDest === ad.adDestination) return;
+    const adType = deriveCreativeType(ad.adFormat, newDest);
+    const newAssets = ad.isInfluencer
+      ? ad.assets
+      : ad.assets.length === 0
+        ? [makeAsset(defaultAssetForDest(newDest))]
+        : ad.assets.map((a) => ({ ...a, ...defaultAssetForDest(newDest) }));
+    onUpdate({
+      ...ad,
+      adDestination: newDest,
+      adType,
+      assets: newAssets,
+    });
+  };
+
+  const toggleInfluencer = (enabled: boolean) => {
+    if (enabled) {
+      onUpdate({
+        ...ad,
+        isInfluencer: true,
+        assets: [makeAsset({ mediaSource: "ad_code" })],
+      });
+    } else {
+      onUpdate({
+        ...ad,
+        isInfluencer: false,
+        assets: [makeAsset(defaultAssetForDest(ad.adDestination))],
+      });
+    }
   };
 
   const assetCount = ad.assets.length;
   const tileCount = ad.collectionTiles.length;
   const hasMedia = ad.assets.some((a) => a.url || a.claimStatus === "READY");
-  const formatOption = AD_FORMAT_OPTIONS.find((o) => o.value === ad.adType) ?? AD_FORMAT_OPTIONS.find((o) => o.value === (isInfluencerAd(ad) ? "INFLUENCER" : ad.adType));
-
-  const FORMAT_TIPS: Partial<Record<AdFormatKey | SnapCreativeType, { icon: React.ReactNode; title: string; text: string }>> = {
-    INFLUENCER: {
-      icon: <Users className="size-4 text-primary" />,
-      title: "Influencer Content",
-      text: "Paste the Ad Code shared by your influencer. They generate it from their Snapchat app.",
-    },
-    APP_INSTALL: {
-      icon: <Download className="size-4 text-primary" />,
-      title: "App Install",
-      text: "Users swipe up to the App Store / Google Play. Destination is set from your Objective step.",
-    },
-    LEAD_GENERATION: {
-      icon: <FileText className="size-4 text-primary" />,
-      title: "Lead Generation",
-      text: "Swipe-up opens a Lead Form instead of a website. Configure the form in the section above.",
-    },
-  };
-  const activeTipKey = isInfluencerAd(ad) ? "INFLUENCER" : ad.adType;
-  const formatTip = FORMAT_TIPS[activeTipKey];
+  const formatOption = FORMAT_OPTIONS.find((o) => o.value === ad.adFormat);
+  const destOption = DESTINATION_OPTIONS.find((o) => o.value === ad.adDestination);
 
   return (
     <div
@@ -260,12 +299,12 @@ export function AdGroupPanel({
           )}
           <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
             {formatOption && <span className="shrink-0 [&>svg]:size-3">{formatOption.icon}</span>}
-            <span className="font-medium">{isInfluencerAd(ad) ? "Influencer Content" : getFormatLabel(ad.adType)}</span>
+            <span className="font-medium">{getFormatLabel(ad.adFormat)}{ad.adFormat === "SINGLE" ? ` · ${getDestinationLabel(ad.adDestination)}` : ""}{influencer ? " · Influencer" : ""}</span>
             <span className="text-border">·</span>
-            {ad.adType === "DYNAMIC" ? (
+            {ad.adFormat === "DYNAMIC" ? (
               <span>Catalog Product Ad</span>
             ) : (
-              <span>{assetCount} creative{assetCount !== 1 ? "s" : ""}{ad.adType === "COLLECTION" ? `, ${tileCount} tile${tileCount !== 1 ? "s" : ""}` : ""}</span>
+              <span>{assetCount} creative{assetCount !== 1 ? "s" : ""}{ad.adFormat === "COLLECTION" ? `, ${tileCount} tile${tileCount !== 1 ? "s" : ""}` : ""}</span>
             )}
             <span className={cn("inline-block size-2 shrink-0 rounded-full", hasMedia ? "bg-emerald-500" : "bg-amber-400")} title={hasMedia ? "Has media" : "No media yet"} />
           </div>
@@ -288,81 +327,122 @@ export function AdGroupPanel({
       {isActive && (
         <div className="flex flex-col gap-0 border-t border-border">
 
-          {/* ── Format Picker ── */}
+          {/* ── Format Picker (4 cards) ── */}
           <div className="px-4 py-4">
             <div className="mb-3 flex items-center gap-1.5">
               <Label className="text-xs font-semibold text-foreground">Ad Format</Label>
               <InfoTip text="Each ad group uses one format. Create separate ad groups to test different formats." />
             </div>
 
-            <div className="grid gap-1.5 sm:grid-cols-3">
-              {adFormatOptions.map((opt) => {
-                const isSelected = opt.value === "INFLUENCER"
-                  ? isInfluencerAd(ad)
-                  : !isInfluencerAd(ad) && ad.adType === opt.value;
+            <div className="grid gap-1.5 grid-cols-2 sm:grid-cols-4">
+              {FORMAT_OPTIONS.filter((f) => allowedFormats.includes(f.value)).map((opt) => {
+                const isSelected = ad.adFormat === opt.value;
+                const lockedOut = freqCapLockedFormat !== null && opt.value !== freqCapLockedFormat && !isSelected;
                 return (
                   <button
                     key={opt.value}
                     type="button"
+                    disabled={lockedOut}
                     onClick={() => changeFormat(opt.value)}
                     className={cn(
-                      "group relative flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-all",
-                      isSelected
-                        ? "border-primary bg-primary/[0.04] ring-1 ring-primary/20"
-                        : "border-border bg-background hover:border-primary/30 hover:bg-muted/20"
+                      "group relative flex flex-col items-center gap-2 rounded-lg border px-3 py-3 text-center transition-all",
+                      lockedOut
+                        ? "cursor-not-allowed border-border/50 opacity-40"
+                        : isSelected
+                          ? "border-primary bg-primary/[0.04] ring-1 ring-primary/20"
+                          : "border-border bg-background hover:border-primary/30 hover:bg-muted/20"
                     )}
                   >
                     <span className={cn(
-                      "mt-0.5 shrink-0 [&>svg]:size-4 transition-colors",
+                      "shrink-0 [&>svg]:size-5 transition-colors",
                       isSelected ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                     )}>
                       {opt.icon}
                     </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className={cn("text-xs font-semibold", isSelected ? "text-primary" : "text-foreground")}>{opt.label}</span>
-                        {isSelected && <Check className="size-3 text-primary" />}
-                      </div>
-                      <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground">{opt.desc}</p>
+                    <div className="flex items-center gap-1">
+                      <span className={cn("text-xs font-semibold", isSelected ? "text-primary" : "text-foreground")}>{opt.label}</span>
+                      {isSelected && <Check className="size-3 text-primary" />}
                     </div>
+                    <p className="line-clamp-2 text-[10px] leading-snug text-muted-foreground">{opt.desc}</p>
                   </button>
                 );
               })}
             </div>
 
-            {/* Format-specific tip */}
-            {formatTip && (
-              <div className="mt-3 flex items-start gap-2.5 rounded-lg bg-primary/[0.03] px-3.5 py-2.5">
-                <span className="mt-0.5 shrink-0">{formatTip.icon}</span>
-                <div>
-                  <p className="text-xs font-semibold text-foreground">{formatTip.title}</p>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{formatTip.text}</p>
+            {/* ── Destination selector (SINGLE format only, hidden when only 1 option) ── */}
+            {ad.adFormat === "SINGLE" && allowedDestinations.length > 1 && (
+              <div className="mt-4">
+                <div className="mb-2 flex items-center gap-1.5">
+                  <Label className="text-xs font-semibold text-foreground">Destination</Label>
+                  <InfoTip text="Where users go when they swipe up on your ad." />
                 </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {DESTINATION_OPTIONS.filter((d) => allowedDestinations.includes(d.value)).map((opt) => {
+                    const isSelected = ad.adDestination === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => changeDestination(opt.value)}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-left transition-all",
+                          isSelected
+                            ? "border-primary bg-primary/[0.04] ring-1 ring-primary/20"
+                            : "border-border bg-background hover:border-primary/30 hover:bg-muted/20"
+                        )}
+                      >
+                        <span className={cn("[&>svg]:size-3.5", isSelected ? "text-primary" : "text-muted-foreground")}>{opt.icon}</span>
+                        <div>
+                          <span className={cn("text-xs font-semibold", isSelected ? "text-primary" : "text-foreground")}>{opt.label}</span>
+                          <p className="text-[10px] text-muted-foreground">{opt.desc}</p>
+                        </div>
+                        {isSelected && <Check className="ml-auto size-3 text-primary" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Influencer toggle (SINGLE format only) ── */}
+            {ad.adFormat === "SINGLE" && (
+              <div className="mt-4 flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <Users className={cn("size-4", influencer ? "text-primary" : "text-muted-foreground")} />
+                  <div>
+                    <Label className="text-xs font-semibold text-foreground">Use Influencer Content</Label>
+                    <p className="text-[10px] text-muted-foreground">Paste the Ad Code shared by an influencer from their Snapchat app</p>
+                  </div>
+                </div>
+                <Switch checked={influencer} onCheckedChange={toggleInfluencer} />
               </div>
             )}
           </div>
 
           {/* ── Dynamic Ad Config ── */}
-          {ad.adType === "DYNAMIC" && (
+          {ad.adFormat === "DYNAMIC" && (
             <div className="border-t border-border px-4 py-4">
               <DynamicAdConfig ad={ad} onUpdate={onUpdate} />
             </div>
           )}
 
           {/* ── Creative Variations ── */}
-          {ad.adType !== "DYNAMIC" && (
+          {ad.adFormat !== "DYNAMIC" && (
             <div className="border-t border-border px-4 py-4">
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <ImagePlus className="size-3.5 text-muted-foreground" />
                   <Label className="text-xs font-semibold text-foreground">
-                    {ad.adType === "COLLECTION" ? "Top Snap" : ad.adType === "COMPOSITE" ? "Story Snaps" : ad.adType === "LEAD_GENERATION" ? "Top Snap Creative" : "Creatives"}
+                    {ad.adFormat === "COLLECTION" ? "Top Snap" : ad.adFormat === "STORY" ? "Story Snaps" : ad.adDestination === "LEAD_FORM" ? "Top Snap Creative" : "Creatives"}
                   </Label>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">{assetCount}/{maxAssets}</span>
+                  <span className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums",
+                    ad.adFormat === "STORY" && assetCount < 3 ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"
+                  )}>{assetCount}/{maxAssets} {ad.adFormat === "STORY" && assetCount < 3 ? "(min 3)" : ""}</span>
                 </div>
                 <Button size="sm" variant="outline" onClick={addAsset} disabled={!canAddAsset} className="h-7 gap-1 rounded-lg text-xs">
                   <Plus className="size-3" />
-                  Add
+                  {ad.adFormat === "STORY" ? "Add Snap" : "Add"}
                 </Button>
               </div>
 
@@ -391,7 +471,7 @@ export function AdGroupPanel({
                     <input
                       ref={bulkFileRef}
                       type="file"
-                      accept="image/png,image/jpeg,video/mp4,video/quicktime"
+                      accept="image/png,image/jpeg,image/gif,video/mp4,video/quicktime"
                       multiple
                       className="hidden"
                       onChange={(e) => { if (e.target.files?.length) handleBulkFiles(e.target.files); e.target.value = ""; }}
@@ -402,7 +482,7 @@ export function AdGroupPanel({
                     <div className="text-center">
                       <p className="text-xs font-medium">Upload creatives</p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        Drop or select multiple files · PNG, JPG, MP4, MOV · up to {maxAssets} creatives
+                        Drop or select multiple files · PNG, JPG, GIF, MP4, MOV · up to {maxAssets} creatives
                       </p>
                     </div>
                   </div>
@@ -415,12 +495,8 @@ export function AdGroupPanel({
                       asset={asset}
                       index={i}
                       total={assetCount}
-                      isStory={ad.adType === "COMPOSITE"}
-                      isCollection={ad.adType === "COLLECTION"}
-                      isLeadGen={ad.adType === "LEAD_GENERATION"}
-                      isAppInstall={ad.adType === "APP_INSTALL"}
-                      isSnapAd={ad.adType === "SNAP_AD"}
-                      isDeepLink={ad.adType === "DEEP_LINK"}
+                      adFormat={ad.adFormat}
+                      destination={ad.adDestination}
                       isExpanded={expandedCreativeIdx === i}
                       onToggleExpand={() => {
                         setExpandedCreativeIdx(expandedCreativeIdx === i ? -1 : i);
@@ -442,24 +518,28 @@ export function AdGroupPanel({
                 </div>
               )}
 
-              {assetCount > 0 && assetCount < maxAssets && maxAssets > 1 && (
+              {ad.adFormat === "STORY" && assetCount > 0 && assetCount < 3 && (
+                <div className="mt-2 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 dark:border-amber-800/40 dark:bg-amber-950/30">
+                  <AlertCircle className="size-3 shrink-0 text-amber-500" />
+                  <span className="text-xs text-amber-700 dark:text-amber-400">Snap requires at least 3 snaps for Story Ads — add {3 - assetCount} more</span>
+                </div>
+              )}
+              {assetCount > 0 && assetCount < maxAssets && maxAssets > 1 && !(ad.adFormat === "STORY" && assetCount < 3) && (
                 <p className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
                   <Sparkles className="size-3 text-amber-400" />
-                  Snap recommends 3–5 creative variations for best performance
+                  {ad.adFormat === "STORY" ? "Snap recommends 3–5 snaps for a compelling story" : "Snap recommends 3–5 creative variations for best performance"}
                 </p>
               )}
             </div>
           )}
 
           {/* ── Collection Tiles ── */}
-          {ad.adType === "COLLECTION" && (
+          {ad.adFormat === "COLLECTION" && (
             <div className="border-t border-border px-4 py-4">
               <CollectionTilesSection
                 ad={ad}
                 tileCount={tileCount}
-                addTile={addTile}
                 removeTile={removeTile}
-                updateTile={updateTile}
                 onUpdate={onUpdate}
                 catalogEnabled={catalogEnabled}
               />
@@ -467,16 +547,18 @@ export function AdGroupPanel({
           )}
 
           {/* ── Discover Tile (Story Ads) ── */}
-          {ad.adType === "COMPOSITE" && (
+          {ad.adFormat === "STORY" && (
             <div className="border-t border-border px-4 py-4">
               <DiscoverTileSection ad={ad} onUpdate={onUpdate} />
             </div>
           )}
 
-          {/* ── Commercial + Offer Disclaimer ── */}
-          <div className="border-t border-border px-4 py-4">
-            <CommercialSection ad={ad} onUpdate={onUpdate} />
-          </div>
+          {/* ── Commercial (only for objectives where non-skippable ads are relevant) ── */}
+          {(!objective || ["SALES", "AWARENESS", "VIDEO_VIEWS", "ENGAGEMENT"].includes(objective)) && (
+            <div className="border-t border-border px-4 py-4">
+              <CommercialSection ad={ad} onUpdate={onUpdate} isInfluencer={influencer} />
+            </div>
+          )}
 
           <div className="border-t border-border px-4 py-4">
             <OfferDisclaimerSection
@@ -497,42 +579,38 @@ export function AdGroupPanel({
             </button>
             {showTracking && (
               <div className="flex flex-col gap-3 border-t border-border px-4 py-3">
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-medium text-foreground">Impression Tracking URL</Label>
-                  <Input
-                    placeholder="https://tracker.example.com/impression"
-                    type="url"
-                    value={ad.trackingUrls?.impressionUrl || ""}
-                    onChange={(e) => onUpdate({
-                      ...ad,
-                      trackingUrls: {
-                        ...ad.trackingUrls,
-                        impressionUrl: e.target.value,
-                        swipeUpUrl: ad.trackingUrls?.swipeUpUrl || "",
-                      },
-                    })}
-                    className="h-8 text-xs"
-                  />
-                  <p className="text-[11px] text-muted-foreground">Fires when your ad is viewed</p>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-medium text-foreground">Swipe-Up Tracking URL</Label>
-                  <Input
-                    placeholder="https://tracker.example.com/swipe"
-                    type="url"
-                    value={ad.trackingUrls?.swipeUpUrl || ""}
-                    onChange={(e) => onUpdate({
-                      ...ad,
-                      trackingUrls: {
-                        ...ad.trackingUrls,
-                        impressionUrl: ad.trackingUrls?.impressionUrl || "",
-                        swipeUpUrl: e.target.value,
-                      },
-                    })}
-                    className="h-8 text-xs"
-                  />
-                  <p className="text-[11px] text-muted-foreground">Fires when a user swipes up</p>
-                </div>
+                {([
+                  { key: "impressionUrl" as const, label: "Impression Tracking URL", placeholder: "https://tracker.example.com/impression", desc: "Fires when your ad is viewed" },
+                  { key: "swipeUpUrl" as const, label: "Swipe-Up Tracking URL", placeholder: "https://tracker.example.com/swipe", desc: "Fires when a user swipes up" },
+                ] as const).map(({ key, label, placeholder, desc }) => {
+                  const val = ad.trackingUrls?.[key] || "";
+                  const hasValue = val.trim().length > 0;
+                  const isValid = !hasValue || (() => { try { const u = new URL(val); return u.protocol === "https:"; } catch { return false; } })();
+                  return (
+                    <div key={key} className="flex flex-col gap-1">
+                      <Label className="text-xs font-medium text-foreground">{label}</Label>
+                      <Input
+                        placeholder={placeholder}
+                        type="url"
+                        value={val}
+                        onChange={(e) => onUpdate({
+                          ...ad,
+                          trackingUrls: {
+                            impressionUrl: ad.trackingUrls?.impressionUrl || "",
+                            swipeUpUrl: ad.trackingUrls?.swipeUpUrl || "",
+                            [key]: e.target.value,
+                          },
+                        })}
+                        className={cn("h-8 text-xs", hasValue && !isValid ? "border-red-300 focus-visible:ring-red-200" : "")}
+                      />
+                      {hasValue && !isValid ? (
+                        <p className="text-[11px] text-red-600">Must be a valid HTTPS URL (e.g. https://...)</p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">{desc}</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

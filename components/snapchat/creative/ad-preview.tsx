@@ -36,9 +36,9 @@ import {
   CTA_OPTIONS,
   LEAD_CTA_OPTIONS,
   APP_INSTALL_CTA_OPTIONS,
-  AD_FORMAT_OPTIONS,
+  FORMAT_OPTIONS,
 } from "./constants";
-import { isInfluencerAd } from "./helpers";
+import { isInfluencerAd, getFormatLabel, getDestinationLabel } from "./helpers";
 import type {
   AdGroup,
   CreativeAsset,
@@ -131,7 +131,11 @@ export function SnapchatAdPreview({
 
   const displayDomain = websiteUrl ? (() => { try { return new URL(websiteUrl).hostname; } catch { return websiteUrl; } })() : "example.com";
 
-  const formatLabel = isInfluencer ? "Influencer" : (AD_FORMAT_OPTIONS.find((o) => o.value === activeAdType)?.label ?? activeAdType);
+  const formatLabel = isInfluencer
+    ? "Influencer"
+    : activeAd?.adFormat
+      ? `${getFormatLabel(activeAd.adFormat)}${activeAd.adFormat === "SINGLE" ? ` · ${getDestinationLabel(activeAd.adDestination)}` : ""}`
+      : activeAdType;
 
   const totalAssets = activeAd?.assets?.length ?? 0;
 

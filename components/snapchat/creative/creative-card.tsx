@@ -37,10 +37,13 @@ import {
   CTA_OPTIONS,
   LEAD_CTA_OPTIONS,
   APP_INSTALL_CTA_OPTIONS,
+  DEEP_LINK_CTA_OPTIONS,
 } from "./constants";
 import { InfoTip } from "@/components/shared/info-tip";
 import type {
   CreativeAsset,
+  AdFormat,
+  AdDestination,
   SnapMediaType,
   WebViewCTA,
   CropPosition,
@@ -60,12 +63,8 @@ export function CreativeCard({
   asset,
   index,
   total,
-  isStory,
-  isCollection,
-  isLeadGen,
-  isAppInstall,
-  isSnapAd,
-  isDeepLink,
+  adFormat,
+  destination,
   isExpanded,
   onToggleExpand,
   onUpdate,
@@ -77,12 +76,8 @@ export function CreativeCard({
   asset: CreativeAsset;
   index: number;
   total: number;
-  isStory: boolean;
-  isCollection: boolean;
-  isLeadGen: boolean;
-  isAppInstall: boolean;
-  isSnapAd?: boolean;
-  isDeepLink?: boolean;
+  adFormat: AdFormat;
+  destination: AdDestination;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onUpdate: (partial: Partial<CreativeAsset>) => void;
@@ -91,6 +86,12 @@ export function CreativeCard({
   onMove: (dir: "up" | "down") => void;
   onApplyToAll?: (partial: Partial<CreativeAsset>) => void;
 }) {
+  const isStory = adFormat === "STORY";
+  const isCollection = adFormat === "COLLECTION";
+  const isLeadGen = destination === "LEAD_FORM";
+  const isAppInstall = destination === "APP_INSTALL";
+  const isSnapAd = destination === "NO_CTA";
+  const isDeepLink = destination === "DEEP_LINK";
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [sallaProduct, setSallaProduct] = useState<any>(null);
 
@@ -134,7 +135,23 @@ export function CreativeCard({
         };
         img.src = URL.createObjectURL(file);
       } else {
-        onUpdate({ mediaType, url: URL.createObjectURL(file), file });
+        const videoEl = document.createElement("video");
+        videoEl.preload = "metadata";
+        const objectUrl = URL.createObjectURL(file);
+        videoEl.onloadedmetadata = () => {
+          const duration = Math.round(videoEl.duration);
+          if (duration < 3 || duration > 180) {
+            const proceed = window.confirm(
+              `Video is ${duration}s. Snapchat requires 3–180 seconds for ad videos. Continue anyway?`
+            );
+            if (!proceed) { URL.revokeObjectURL(objectUrl); return; }
+          }
+          onUpdate({ mediaType, url: objectUrl, file, videoDuration: duration });
+        };
+        videoEl.onerror = () => {
+          onUpdate({ mediaType, url: objectUrl, file });
+        };
+        videoEl.src = objectUrl;
       }
     },
     [onUpdate]
@@ -212,28 +229,41 @@ export function CreativeCard({
                 <div className="flex items-center gap-1.5">
                   <Link2 className="size-3 text-primary" />
                   <span className="text-xs font-semibold text-foreground">Influencer Ad Code</span>
+                  <InfoTip text="The influencer generates an Ad Code from their Snapchat app: open the Snap/Story → tap ⋯ → Share Ad Code. They then send you the code to paste here." />
                 </div>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Paste ad code from influencer..."
-                    value={asset.adCode ?? ""}
-                    onChange={(e) => onUpdate({ adCode: e.target.value, claimStatus: undefined })}
-                    className="h-8 flex-1 font-mono text-xs"
-                  />
-                  <Button
-                    size="sm"
-                    className="h-8 gap-1 text-sm"
-                    disabled={!asset.adCode || asset.claimStatus === "PENDING"}
-                    onClick={() => {
-                      onUpdate({ claimStatus: "PENDING" });
-                      setTimeout(() => {
-                        onUpdate({ claimStatus: "READY", claimedMediaId: `media_${Date.now()}`, mediaType: "VIDEO", url: "" });
-                      }, 2000);
-                    }}
-                  >
-                    {asset.claimStatus === "PENDING" ? <><Loader2 className="size-3 animate-spin" /> Claiming...</> : "Claim"}
-                  </Button>
+                <div className="flex flex-col gap-1">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Paste ad code from influencer..."
+                      value={asset.adCode ?? ""}
+                      onChange={(e) => onUpdate({ adCode: e.target.value, claimStatus: undefined })}
+                      className="h-8 flex-1 font-mono text-xs"
+                    />
+                    <Button
+                      size="sm"
+                      className="h-8 gap-1 text-sm"
+                      disabled={!asset.adCode || asset.claimStatus === "PENDING"}
+                      onClick={() => {
+                        onUpdate({ claimStatus: "PENDING" });
+                        setTimeout(() => {
+                          onUpdate({ claimStatus: "READY", claimedMediaId: `media_${Date.now()}`, mediaType: "VIDEO", url: "" });
+                        }, 2000);
+                      }}
+                    >
+                      {asset.claimStatus === "PENDING" ? <><Loader2 className="size-3 animate-spin" /> Claiming...</> : "Claim"}
+                    </Button>
+                  </div>
+                  {!asset.claimStatus && (
+                    <p className="text-[10px] text-muted-foreground">Alphanumeric code shared by the creator from their Snapchat app</p>
+                  )}
                 </div>
+
+                {asset.adCode && !asset.claimStatus && (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5">
+                    <AlertCircle className="size-3 shrink-0 text-amber-600" />
+                    <span className="text-xs text-amber-700">Ad code entered but not claimed — click &quot;Claim&quot; to verify and import the content</span>
+                  </div>
+                )}
 
                 {asset.claimStatus === "READY" && (
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5">
@@ -254,12 +284,17 @@ export function CreativeCard({
                       </div>
                       {asset.creatorProfileId && (
                         <>
-                          <Input
-                            placeholder="Creator's Snapchat Profile ID"
-                            value={asset.creatorProfileId === "creator_profile_placeholder" ? "" : (asset.creatorProfileId ?? "")}
-                            onChange={(e) => onUpdate({ creatorProfileId: e.target.value || "creator_profile_placeholder" })}
-                            className="h-7 font-mono text-xs"
-                          />
+                          <div className="flex flex-col gap-1">
+                            <Input
+                              placeholder="Creator's Snapchat Profile ID (UUID)"
+                              value={asset.creatorProfileId === "creator_profile_placeholder" ? "" : (asset.creatorProfileId ?? "")}
+                              onChange={(e) => onUpdate({ creatorProfileId: e.target.value || "creator_profile_placeholder" })}
+                              className={cn("h-7 font-mono text-xs", asset.creatorProfileId === "creator_profile_placeholder" && "border-amber-300")}
+                            />
+                            {asset.creatorProfileId === "creator_profile_placeholder" && (
+                              <p className="text-[10px] text-amber-600">Enter the creator&apos;s Snapchat Profile ID to show their profile on the ad</p>
+                            )}
+                          </div>
                           <div className="flex gap-1.5">
                             {(["NONE", "AD_PARTNERSHIP", "BRAND_PARTNERSHIP"] as CreatorPartnershipType[]).map((val) => {
                               const labels: Record<string, string> = { NONE: "No Label", AD_PARTNERSHIP: "Ad", BRAND_PARTNERSHIP: "Paid Partnership" };
@@ -282,6 +317,18 @@ export function CreativeCard({
                           </div>
                         </>
                       )}
+
+                      {/* Tag brand in headline */}
+                      <div className="flex items-center justify-between border-t border-emerald-200 pt-2">
+                        <div className="flex items-center gap-1.5">
+                          <Label className="text-xs font-medium text-foreground">Tag brand in headline</Label>
+                          <InfoTip text="Adds your brand's profile tag to the ad headline so viewers see both the creator and your brand." />
+                        </div>
+                        <Switch
+                          checked={!!asset.profileTaggedInHeadline}
+                          onCheckedChange={(v) => onUpdate({ profileTaggedInHeadline: v ? "brand_profile_placeholder" : undefined })}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -294,7 +341,7 @@ export function CreativeCard({
               </div>
             ) : (
               <UploadZone
-                accept="image/png,image/jpeg,video/mp4,video/quicktime"
+                accept="image/png,image/jpeg,image/gif,video/mp4,video/quicktime"
                 label="Drop image or video"
                 sublabel="Image: PNG/JPG, 1080x1920, max 5MB | Video: MP4/MOV, 3-180s, max 32MB"
                 preview={asset.url || undefined}
@@ -324,7 +371,12 @@ export function CreativeCard({
                 <Input placeholder="Catchy headline" value={asset.headline} maxLength={34} onChange={(e) => onUpdate({ headline: e.target.value.slice(0, 34) })} className={cn("h-8 text-xs", asset.headline.length >= 34 && "border-amber-400")} />
               </div>
             </div>
-            {(!asset.brandName && !asset.headline) && (
+            {isInfluencer ? (
+              <div className="mt-2 flex items-start gap-1.5 text-[10px] leading-relaxed text-muted-foreground">
+                <Sparkles className="mt-0.5 size-3 shrink-0 text-blue-400" />
+                <span>These fields overlay on the creator&apos;s video — use your brand name and a CTA headline that complements their content</span>
+              </div>
+            ) : (!asset.brandName && !asset.headline) && (
               <div className="mt-2 flex items-start gap-1.5 text-[10px] leading-relaxed text-muted-foreground">
                 <Sparkles className="mt-0.5 size-3 shrink-0 text-blue-400" />
                 <span>Tip: Arabic text performs 40% better in Saudi market. Try <span className="font-medium" dir="rtl">تسوق الآن</span> or <span className="font-medium" dir="rtl">متجر الأناقة</span></span>
@@ -342,17 +394,25 @@ export function CreativeCard({
                     <Select value={asset.cta} onValueChange={(v) => onUpdate({ cta: v as WebViewCTA })}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {(isAppInstall ? APP_INSTALL_CTA_OPTIONS : isLeadGen ? LEAD_CTA_OPTIONS : CTA_OPTIONS).map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                        {(isDeepLink ? DEEP_LINK_CTA_OPTIONS : isAppInstall ? APP_INSTALL_CTA_OPTIONS : isLeadGen ? LEAD_CTA_OPTIONS : CTA_OPTIONS).map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                 )}
                 {showUrl && (
                   <div className="flex flex-col gap-1">
-                    <Label className="text-xs font-medium text-muted-foreground">Swipe-Up URL</Label>
-                    <Input placeholder="https://yourstore.com/product" type="url" value={asset.websiteUrl} onChange={(e) => onUpdate({ websiteUrl: e.target.value })} className={cn("h-8 text-xs", asset.websiteUrl && !asset.websiteUrl.startsWith("https://") && "border-red-400")} />
+                    <Label className="text-xs font-medium text-muted-foreground">
+                      Swipe-Up URL {isStory && <span className="text-destructive">*</span>}
+                    </Label>
+                    <Input placeholder="https://yourstore.com/product" type="url" value={asset.websiteUrl} onChange={(e) => onUpdate({ websiteUrl: e.target.value })} className={cn("h-8 text-xs", asset.websiteUrl && !asset.websiteUrl.startsWith("https://") && "border-red-400", isStory && !asset.websiteUrl && "border-amber-300")} />
                     {asset.websiteUrl && !asset.websiteUrl.startsWith("https://") && (
                       <p className="text-[10px] text-red-600">URL must start with https://</p>
+                    )}
+                    {isStory && !asset.websiteUrl && (
+                      <p className="text-[10px] text-amber-600">Each snap in a Story Ad requires a swipe-up URL</p>
+                    )}
+                    {isInfluencer && !isStory && (
+                      <p className="text-[10px] text-muted-foreground">Where viewers land when they swipe up on the creator&apos;s content — typically your product or landing page</p>
                     )}
                   </div>
                 )}

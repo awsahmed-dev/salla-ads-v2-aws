@@ -113,7 +113,7 @@ export const OBJECTIVE_CONFIGS: Record<string, ObjectiveConfig> = {
     defaultGoal: "CONVERSION",
     pixelRequirement: "required",
     catalogAvailable: true,
-    allowedAdFormats: ["SINGLE_VIDEO", "SINGLE_IMAGE", "CAROUSEL"],
+    allowedAdFormats: ["SINGLE_VIDEO", "SINGLE_IMAGE", "CAROUSEL", "SPARK_AD"],
     defaultCTA: "SHOP_NOW",
   },
   REACH: {
@@ -597,7 +597,7 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
     gender: "GENDER_UNLIMITED",
     languages: ["ar"],
     interests: [],
-    operatingSystems: ["iOS", "ANDROID"],
+    operatingSystems: ["IOS", "ANDROID"],
     customAudienceIds: [],
     excludedAudienceIds: [],
     autoTargetingEnabled: true,

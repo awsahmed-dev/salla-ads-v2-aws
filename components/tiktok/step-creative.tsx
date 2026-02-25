@@ -2621,13 +2621,21 @@ export function TikTokStepCreative() {
   const activeAdFormat = activeAd?.adFormat ?? "SINGLE_VIDEO";
   const isCatalogListing = catalogEnabled && objectiveConfig.shoppingAdsType === "CATALOG_LISTING_ADS";
 
-  /* Auto-create a placeholder ad for Catalog Listing so settings have storage */
+  /* Auto-create a placeholder ad for Catalog Listing; remove it when leaving catalog listing mode */
+  const prevCatalogListing = useRef(isCatalogListing);
   useEffect(() => {
     if (isCatalogListing && ads.length === 0) {
       const catalogAd = makeDefaultAd("SINGLE_VIDEO", 0);
       catalogAd.name = "Catalog Listing Ad";
       updateNested("creative", { ads: [catalogAd] });
     }
+    if (!isCatalogListing && prevCatalogListing.current) {
+      const cleaned = ads.filter((a) => a.name !== "Catalog Listing Ad" || a.assets.length > 0);
+      if (cleaned.length !== ads.length) {
+        updateNested("creative", { ads: cleaned });
+      }
+    }
+    prevCatalogListing.current = isCatalogListing;
   }, [isCatalogListing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Validation */
@@ -2647,6 +2655,10 @@ export function TikTokStepCreative() {
     // Video Shopping or non-catalog: need manual ad uploads
     allChecks.push({ label: "At least 1 ad created", ok: ads.length > 0 });
     ads.forEach((ad, i) => {
+      if (!allowedFormats.includes(ad.adFormat)) {
+        allChecks.push({ label: `Ad ${i + 1}: incompatible format (${ad.adFormat})`, ok: false });
+        return;
+      }
       allChecks.push({ label: `Ad ${i + 1}: has name`, ok: !!ad.name.trim() });
       if (ad.adFormat === "SPARK_AD") {
         allChecks.push({ label: `Ad ${i + 1}: auth code`, ok: !!ad.sparkAdAuthCode.trim() });
@@ -2679,6 +2691,12 @@ export function TikTokStepCreative() {
     if (form.formTemplate !== "SIMPLE_SIGNUP") {
       allChecks.push({ label: "Instant Form: headline", ok: !!form.headline.trim() });
     }
+  }
+
+  // Lead Gen Website Form requires pixel
+  if (isLeadGen && campaign.objective.leadOptimizationLocation === "WEBSITE") {
+    const hasPixel = campaign.objective.pixelMode !== "none" && (campaign.objective.pixelMode === "salla_managed" || !!campaign.objective.pixelId);
+    allChecks.push({ label: "Website Form: pixel configured", ok: hasPixel });
   }
 
   const passingChecks = allChecks.filter((c) => c.ok).length;

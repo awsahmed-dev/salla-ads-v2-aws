@@ -277,18 +277,9 @@ export function DynamicAdConfig({
               <SelectContent>
                 <SelectItem value="product_name">Product name only</SelectItem>
                 <SelectItem value="product_name_price">Product name + price</SelectItem>
-                <SelectItem value="custom">Custom caption</SelectItem>
+                <SelectItem value="product_description">Product description</SelectItem>
               </SelectContent>
             </Select>
-            {config.captionMode === "custom" && (
-              <Input
-                placeholder="e.g. Shop now — limited stock!"
-                value={config.customCaption}
-                onChange={(e) => updateConfig({ customCaption: e.target.value })}
-                className="mt-1.5 h-8 text-xs"
-                maxLength={100}
-              />
-            )}
           </div>
         </div>
       </div>
@@ -355,11 +346,14 @@ export function DynamicAdConfig({
               <div className="flex flex-col gap-2">
                 {filteredSets.map((set) => {
                   const isSelected = config.productSetId === set.id;
+                  const isEmpty = set.productCount === 0;
                   return (
                     <button
                       key={set.id}
                       type="button"
+                      disabled={isEmpty}
                       onClick={() => {
+                        if (isEmpty) return;
                         updateConfig({
                           productSetId: set.id,
                           productSetName: set.nameAr || set.name,
@@ -368,9 +362,11 @@ export function DynamicAdConfig({
                       }}
                       className={cn(
                         "group flex flex-col overflow-hidden rounded-xl border text-left transition-all",
-                        isSelected
-                          ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                          : "border-border hover:border-primary/30 hover:bg-muted/20"
+                        isEmpty
+                          ? "cursor-not-allowed border-border opacity-50"
+                          : isSelected
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                            : "border-border hover:border-primary/30 hover:bg-muted/20"
                       )}
                     >
                       {/* Preview images */}
@@ -425,8 +421,8 @@ export function DynamicAdConfig({
                         </div>
 
                         <div className="flex flex-col items-end gap-0.5">
-                          <span className="text-sm font-bold tabular-nums text-foreground">{set.productCount}</span>
-                          <span className="text-[10px] text-muted-foreground">products</span>
+                          <span className={cn("text-sm font-bold tabular-nums", isEmpty ? "text-red-500" : "text-foreground")}>{set.productCount}</span>
+                          <span className="text-[10px] text-muted-foreground">{isEmpty ? "empty" : "products"}</span>
                         </div>
 
                         {isSelected ? (

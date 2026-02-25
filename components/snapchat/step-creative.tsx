@@ -41,6 +41,8 @@ import {
   makeDefaultLeadForm,
   type PlacementConfig,
   type AdGroup,
+  type AdFormat,
+  type AdDestination,
   type WebViewCTA,
 } from "@/lib/snapchat/campaign-types";
 import {
@@ -50,6 +52,7 @@ import {
   CharCounter,
   LEAD_FIELD_ICONS,
   AD_FORMAT_OPTIONS,
+  FORMAT_OPTIONS,
   SNAP_POSITIONS,
   LEAD_FIELD_LABELS,
   type AdFormatKey,
@@ -79,15 +82,22 @@ export function StepCreative() {
       getCatalogStatus().then(setCatalogStatus);
     }
   }, [catalogEnabled]);
-  const FILTERED_AD_FORMATS = AD_FORMAT_OPTIONS.filter((o) => {
-    if (!objectiveConfig.allowedAdFormats.includes(o.value)) return false;
-    if (o.value === "DYNAMIC" && !catalogEnabled) return false;
-    return true;
-  });
+  const allowedFormats: AdFormat[] = catalogEnabled
+    ? ["DYNAMIC"]
+    : (objectiveConfig.allowedFormats ?? ["SINGLE", "COLLECTION", "STORY"]);
+
+  const allowedDestinations: AdDestination[] = objectiveConfig.allowedDestinations ?? ["WEBSITE"];
+
+  const FILTERED_AD_FORMATS = FORMAT_OPTIONS.filter((o) => allowedFormats.includes(o.value));
+
+  const freqCapEnabled = campaign.budget.frequencyCapEnabled === true;
+  const freqCapLockedFormat: AdFormat | null =
+    freqCapEnabled && ads.length > 0 ? (ads[0].adFormat ?? "SINGLE") : null;
 
   /* ---- Ad CRUD ---- */
-  const addAd = (adType: AdFormatKey = "WEB_VIEW") => {
-    const newAd = makeAdGroup(adType, ads.length);
+  const addAd = (format: AdFormat = "SINGLE", destination?: AdDestination) => {
+    const dest = destination ?? allowedDestinations[0] ?? "WEBSITE";
+    const newAd = makeAdGroup(format, ads.length, dest);
     newAd.assets = newAd.assets.map((a) => ({ ...a, cta: defaultCTA }));
     const next = [...ads, newAd];
     updateNested("creative", { ads: next });
@@ -129,12 +139,21 @@ export function StepCreative() {
 
   /* Validation */
   const allChecks: { label: string; ok: boolean }[] = [];
-  allChecks.push({ label: "Public Profile set", ok: (creative.publicProfileId ?? "").length > 0 });
+  const hasValidProfile = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(creative.publicProfileId ?? "");
+  allChecks.push({ label: "Public Profile set", ok: hasValidProfile });
+  const hasInfluencerAd = ads.some((a) => isInfluencerAd(a));
+  if (hasInfluencerAd && !hasValidProfile) {
+    allChecks.push({ label: "Brand Profile required for influencer ad code claiming", ok: false });
+  }
   allChecks.push({ label: "At least 1 ad created", ok: ads.length > 0 });
   if (creative.placement === "CUSTOM") {
+    const currentAdTypes = new Set(ads.map((a) => a.adType));
     const validPositions = (creative.customPositions ?? []).filter((p) => {
       const pos = SNAP_POSITIONS.find((s) => s.id === p);
-      return pos && !(creative.brandSafety === "LIMITED_INVENTORY" && pos.fullOnly);
+      if (!pos) return false;
+      if (creative.brandSafety === "LIMITED_INVENTORY" && pos.fullOnly) return false;
+      if (pos.formats !== "all" && !(pos.formats as string[]).some((f) => currentAdTypes.has(f))) return false;
+      return true;
     });
     allChecks.push({ label: "At least 1 valid placement selected", ok: validPositions.length > 0 });
   }
@@ -151,40 +170,88 @@ export function StepCreative() {
     allChecks.push({ label: "Lead form: privacy policy URL", ok: !!(lf?.privacy_policy_url?.startsWith("https://")) });
   }
 
+  const destNeedsUrl = (dest: AdDestination) => dest === "WEBSITE" || dest === "DEEP_LINK";
   ads.forEach((ad, i) => {
-    if (ad.adType === "DYNAMIC") {
+    if (ad.adFormat === "DYNAMIC") {
       allChecks.push({ label: `Ad ${i + 1}: product set selected`, ok: !!(ad.dynamicTemplateConfig?.productSetId) });
     } else {
       allChecks.push({ label: `Ad ${i + 1}: has creative`, ok: ad.assets.length > 0 });
       ad.assets.forEach((a, j) => {
-        allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: media`, ok: !!a.url || a.claimStatus === "READY" });
-        if (urlRequired || a.websiteUrl) {
-          allChecks.push({ 
-            label: `Ad ${i + 1} Creative ${j + 1}: valid URL`, 
-            ok: !a.websiteUrl || (() => {
-              try { const u = new URL(a.websiteUrl); return u.protocol === "https:" && u.hostname.includes("."); } catch { return false; }
-            })()
-          });
+        if (a.mediaSource === "ad_code") {
+          if (a.adCode && a.claimStatus !== "READY") {
+            allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: ad code not claimed — click "Claim"`, ok: false });
+          } else {
+            allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: influencer content claimed`, ok: a.claimStatus === "READY" });
+          }
+          if (a.creatorProfileId && a.creatorProfileId !== "creator_profile_placeholder") {
+            const validCreatorUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(a.creatorProfileId);
+            allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: creator profile ID valid`, ok: validCreatorUUID });
+          } else if (a.creatorProfileId === "creator_profile_placeholder") {
+            allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: creator profile ID missing`, ok: false });
+          }
+        } else {
+          allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: media`, ok: !!a.url || a.claimStatus === "READY" });
+        }
+        allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: brand name`, ok: !!a.brandName.trim() });
+        allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: headline`, ok: !!a.headline.trim() });
+        if (ad.adFormat !== "STORY") {
+          const needsUrl = destNeedsUrl(ad.adDestination) || urlRequired;
+          if (needsUrl) {
+            allChecks.push({
+              label: `Ad ${i + 1} Creative ${j + 1}: swipe-up URL`,
+              ok: (() => {
+                try { const u = new URL(a.websiteUrl); return u.protocol === "https:" && u.hostname.includes("."); } catch { return false; }
+              })(),
+            });
+          } else if (a.websiteUrl) {
+            allChecks.push({
+              label: `Ad ${i + 1} Creative ${j + 1}: valid URL`,
+              ok: (() => {
+                try { const u = new URL(a.websiteUrl); return u.protocol === "https:" && u.hostname.includes("."); } catch { return false; }
+              })(),
+            });
+          }
         }
         if (a.mediaType === "VIDEO" && a.url) {
+          const dur = a.videoDuration ?? 0;
+          if (dur > 0) {
+            allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: video 3-180s`, ok: dur >= 3 && dur <= 180 });
+          }
           if (ad.commercialConfig?.enabled) {
             if (ad.commercialConfig.forcedViewEligibility === "FULL_DURATION") {
-              allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: commercial video 3-6s`, ok: true }); // validated at upload
+              allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: commercial video 3-6s`, ok: dur > 0 ? dur >= 3 && dur <= 6 : true });
             } else {
-              allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: commercial video 7s+`, ok: true }); // validated at upload
+              allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: commercial video 7s+`, ok: dur > 0 ? dur >= 7 : true });
             }
           }
         }
       });
     }
-    if (ad.adType === "COLLECTION") {
+    if (ad.adFormat === "COLLECTION") {
       if (ad.dynamicCollectionEnabled) {
         allChecks.push({ label: `Ad ${i + 1}: product set for dynamic tiles`, ok: !!(ad.dynamicTemplateConfig?.productSetId) });
       } else {
         allChecks.push({ label: `Ad ${i + 1}: min 2 tiles`, ok: ad.collectionTiles.length >= 2 });
         const tilesWithMedia = ad.collectionTiles.filter((t) => t.imageUrl);
         allChecks.push({ label: `Ad ${i + 1}: tiles have image`, ok: tilesWithMedia.length >= 2 });
+        const tilesWithUrl = ad.collectionTiles.filter((t) => t.url && t.url.startsWith("https://"));
+        if (ad.collectionTiles.length >= 2) {
+          allChecks.push({ label: `Ad ${i + 1}: tiles have URL`, ok: tilesWithUrl.length === ad.collectionTiles.length });
+        }
       }
+    }
+    if (ad.adFormat === "STORY") {
+      allChecks.push({ label: `Ad ${i + 1}: min 3 snaps`, ok: ad.assets.length >= 3 });
+      const tile = ad.discoverTile;
+      allChecks.push({ label: `Ad ${i + 1}: Discover Tile enabled`, ok: !!tile?.enabled });
+      if (tile?.enabled) {
+        allChecks.push({ label: `Ad ${i + 1}: Discover Tile headline`, ok: (tile.headline ?? "").trim().length > 0 });
+        allChecks.push({ label: `Ad ${i + 1}: Discover Tile background`, ok: !!tile.backgroundImageUrl });
+      }
+      ad.assets.forEach((a, j) => {
+        const hasUrl = (() => { try { const u = new URL(a.websiteUrl); return u.protocol === "https:" && u.hostname.includes("."); } catch { return false; } })();
+        allChecks.push({ label: `Ad ${i + 1} Snap ${j + 1}: swipe-up URL`, ok: hasUrl });
+      });
     }
     if (ad.offerDisclaimer?.enabled) {
       allChecks.push({ label: `Ad ${i + 1}: disclaimer text`, ok: ad.offerDisclaimer.disclaimerText.length > 0 });
@@ -192,6 +259,15 @@ export function StepCreative() {
     if (ad.commercialConfig?.enabled) {
       const hasVideoAsset = ad.assets.some((a) => a.mediaType === "VIDEO");
       allChecks.push({ label: `Ad ${i + 1}: commercial needs video`, ok: hasVideoAsset });
+    }
+    if (ad.trackingUrls) {
+      const isValidHttps = (url: string) => { try { return new URL(url).protocol === "https:"; } catch { return false; } };
+      if (ad.trackingUrls.impressionUrl) {
+        allChecks.push({ label: `Ad ${i + 1}: impression URL is HTTPS`, ok: isValidHttps(ad.trackingUrls.impressionUrl) });
+      }
+      if (ad.trackingUrls.swipeUpUrl) {
+        allChecks.push({ label: `Ad ${i + 1}: swipe-up URL is HTTPS`, ok: isValidHttps(ad.trackingUrls.swipeUpUrl) });
+      }
     }
   });
   const passingChecks = allChecks.filter((c) => c.ok).length;
@@ -203,77 +279,103 @@ export function StepCreative() {
         <div className="flex flex-1 flex-col gap-5">
           {/* ---- Brand Profile ---- */}
           <SectionCard>
-            <div className="flex items-start gap-3.5">
-              {/* Avatar / check indicator */}
-              <div className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors",
-                creative.publicProfileId ? "bg-emerald-100" : "bg-primary/10"
-              )}>
-                {creative.publicProfileId
-                  ? <CheckCircle2 className="size-5 text-emerald-600" />
-                  : <User className="size-5 text-primary" />
-                }
-              </div>
+            {(() => {
+              const profileId = creative.publicProfileId ?? "";
+              const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId);
+              const hasValue = profileId.length > 0;
+              return (
+                <div className="flex items-start gap-3.5">
+                  <div className={cn(
+                    "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors",
+                    hasValue && isValidUUID ? "bg-emerald-100" : hasValue ? "bg-red-100" : "bg-primary/10"
+                  )}>
+                    {hasValue && isValidUUID
+                      ? <CheckCircle2 className="size-5 text-emerald-600" />
+                      : hasValue
+                        ? <AlertCircle className="size-5 text-red-500" />
+                        : <User className="size-5 text-primary" />
+                    }
+                  </div>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm font-semibold text-foreground">Public Profile</Label>
-                  {!creative.publicProfileId && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Required</span>
-                  )}
-                </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Your brand name and profile picture shown on every ad.
-                </p>
-
-                <div className="mt-3 flex flex-col gap-1">
-                  <div className="relative">
-                    <Input
-                      placeholder="Paste your Public Profile ID"
-                      value={creative.publicProfileId ?? ""}
-                      onChange={(e) => updateNested("creative", { publicProfileId: e.target.value })}
-                      className={cn(
-                        "h-9 pr-8 font-mono text-xs transition-colors",
-                        creative.publicProfileId ? "border-emerald-300 focus-visible:ring-emerald-200" : ""
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-semibold text-foreground">Public Profile</Label>
+                      {!hasValue && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Required</span>
                       )}
-                    />
-                    {creative.publicProfileId && (
-                      <CheckCircle2 className="absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-emerald-500" />
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Your brand name and profile picture shown on every ad.
+                    </p>
+
+                    <div className="mt-3 flex flex-col gap-1">
+                      <div className="relative">
+                        <Input
+                          placeholder="e.g. 72cf5c50-8343-48d3-a0a7-3ed45b75faaa"
+                          value={profileId}
+                          onChange={(e) => updateNested("creative", { publicProfileId: e.target.value.trim() })}
+                          className={cn(
+                            "h-9 pr-8 font-mono text-xs transition-colors",
+                            hasValue && isValidUUID ? "border-emerald-300 focus-visible:ring-emerald-200" :
+                            hasValue ? "border-red-300 focus-visible:ring-red-200" : ""
+                          )}
+                        />
+                        {hasValue && isValidUUID && (
+                          <CheckCircle2 className="absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-emerald-500" />
+                        )}
+                        {hasValue && !isValidUUID && (
+                          <AlertCircle className="absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-red-400" />
+                        )}
+                      </div>
+                      {hasValue && !isValidUUID ? (
+                        <p className="text-[11px] text-red-600">
+                          This doesn't look like a valid Profile ID. It should be a UUID (e.g. 72cf5c50-8343-48d3-a0a7-3ed45b75faaa).
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">
+                          Find it in <span className="font-medium text-foreground">Snapchat Business Manager</span> → Public Profiles
+                        </p>
+                      )}
+                    </div>
+
+                    {!hasValue && (
+                      <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
+                        <AlertCircle className="size-3.5 shrink-0 text-amber-500" />
+                        <p className="text-xs text-amber-700">Required to publish ads on Snapchat</p>
+                      </div>
                     )}
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Find it in <span className="font-medium text-foreground">Snapchat Business Manager</span> → Public Profiles
-                  </p>
                 </div>
-
-                {!creative.publicProfileId && (
-                  <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
-                    <AlertCircle className="size-3.5 shrink-0 text-amber-500" />
-                    <p className="text-xs text-amber-700">Required to publish ads on Snapchat</p>
-                  </div>
-                )}
-              </div>
-            </div>
+              );
+            })()}
           </SectionCard>
 
           {/* ---- Catalog Active Banner ---- */}
           {catalogEnabled && (
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5">
-              <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
-              <div className="flex flex-1 items-center gap-2">
-                <span className="text-xs font-medium text-emerald-800">Catalog connected</span>
-                <span className="text-[11px] text-emerald-600">{campaign.objective.catalogSource || "Salla Store"}{catalogStatus ? ` · ${catalogStatus.totalProducts} products` : ""}</span>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-2.5">
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+                <div className="flex flex-1 items-center gap-2">
+                  <span className="text-xs font-medium text-emerald-800">Catalog connected</span>
+                  <span className="text-[11px] text-emerald-600">{campaign.objective.catalogSource || "Salla Store"}{catalogStatus ? ` · ${catalogStatus.totalProducts} products` : ""}</span>
+                </div>
+                {catalogStatus && (
+                  <span className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                    catalogStatus.syncHealth === "healthy" ? "bg-emerald-100 text-emerald-700" :
+                    catalogStatus.syncHealth === "warning" ? "bg-amber-100 text-amber-700" :
+                    "bg-red-100 text-red-700"
+                  )}>
+                    {catalogStatus.syncHealth}
+                  </span>
+                )}
               </div>
-              {catalogStatus && (
-                <span className={cn(
-                  "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                  catalogStatus.syncHealth === "healthy" ? "bg-emerald-100 text-emerald-700" :
-                  catalogStatus.syncHealth === "warning" ? "bg-amber-100 text-amber-700" :
-                  "bg-red-100 text-red-700"
-                )}>
-                  {catalogStatus.syncHealth}
-                </span>
-              )}
+              <div className="flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5">
+                <Info className="mt-0.5 size-3.5 shrink-0 text-blue-600" />
+                <p className="text-xs leading-relaxed text-blue-700">
+                  Catalog campaigns use <span className="font-semibold">Dynamic Product Ads</span> only. Ads are auto-generated from your product catalog. To create manual image/video ads, turn off the catalog toggle in Campaign settings.
+                </p>
+              </div>
             </div>
           )}
 
@@ -299,7 +401,7 @@ export function StepCreative() {
                     key={template.name}
                     type="button"
                     onClick={() => {
-                      const newAd = makeAdGroup("WEB_VIEW", 0);
+                      const newAd = makeAdGroup("SINGLE", 0, allowedDestinations[0] ?? "WEBSITE");
                       newAd.name = template.name;
                       newAd.assets = newAd.assets.map((a) => ({
                         ...a,
@@ -632,8 +734,15 @@ export function StepCreative() {
                       const checked = positions.includes(pos.id);
                       const disabledByBrandSafety = creative.brandSafety === "LIMITED_INVENTORY" && pos.fullOnly;
                       const hasFormatRestriction = pos.formats !== "all";
+                      const requiredFormats = hasFormatRestriction ? (pos.formats as string[]) : [];
+                      const currentAdTypes = new Set(ads.map((a) => a.adType));
+                      const noMatchingAds = hasFormatRestriction && !requiredFormats.some((f) => currentAdTypes.has(f as string));
+                      const isDisabled = disabledByBrandSafety || noMatchingAds;
                       const formatNote = hasFormatRestriction
-                        ? (pos.formats as string[]).map((f) => AD_FORMAT_OPTIONS.find((o) => o.value === f)?.label ?? f).join(", ")
+                        ? requiredFormats.map((f) => {
+                            const match = AD_FORMAT_OPTIONS.find((o) => String(o.value) === f);
+                            return match?.label ?? f;
+                          }).join(", ")
                         : undefined;
                       return (
                         <label
@@ -641,7 +750,7 @@ export function StepCreative() {
                           className={cn(
                             "flex items-center gap-3 px-3.5 py-2.5 transition-colors",
                             posIdx !== 0 && "border-t border-border",
-                            disabledByBrandSafety
+                            isDisabled
                               ? "cursor-not-allowed opacity-40"
                               : checked
                                 ? "cursor-pointer bg-primary/[0.03]"
@@ -650,20 +759,20 @@ export function StepCreative() {
                         >
                           <div className={cn(
                             "flex size-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors",
-                            disabledByBrandSafety
+                            isDisabled
                               ? "border-muted bg-muted/30"
                               : checked
                                 ? "border-primary bg-primary"
                                 : "border-border bg-background"
                           )}>
-                            {checked && !disabledByBrandSafety && <Check className="size-3 text-primary-foreground" />}
+                            {checked && !isDisabled && <Check className="size-3 text-primary-foreground" />}
                           </div>
                           <input
                             type="checkbox"
-                            checked={disabledByBrandSafety ? false : checked}
-                            disabled={disabledByBrandSafety}
+                            checked={isDisabled ? false : checked}
+                            disabled={isDisabled}
                             onChange={(e) => {
-                              if (disabledByBrandSafety) return;
+                              if (isDisabled) return;
                               const next = e.target.checked
                                 ? [...positions, pos.id]
                                 : positions.filter((p) => p !== pos.id);
@@ -673,11 +782,14 @@ export function StepCreative() {
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <span className={cn("text-xs font-medium", checked && !disabledByBrandSafety ? "text-foreground" : "text-foreground")}>{pos.label}</span>
+                              <span className={cn("text-xs font-medium", checked && !isDisabled ? "text-foreground" : "text-foreground")}>{pos.label}</span>
                               {disabledByBrandSafety && (
                                 <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">Full Inventory only</span>
                               )}
-                              {hasFormatRestriction && (
+                              {noMatchingAds && !disabledByBrandSafety && (
+                                <span className="rounded bg-red-50 px-1.5 py-0.5 text-[9px] font-medium text-red-500">No {formatNote} ads</span>
+                              )}
+                              {hasFormatRestriction && !noMatchingAds && (
                                 <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-600">{formatNote}</span>
                               )}
                             </div>
@@ -757,10 +869,7 @@ export function StepCreative() {
                       key={opt.value}
                       type="button"
                       onClick={() => addAd(opt.value)}
-                      className={cn(
-                        "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-all hover:border-primary/40 hover:bg-primary/[0.02]",
-                        opt.value === "INFLUENCER" ? "border-primary/30" : "border-border"
-                      )}
+                      className="flex items-start gap-2.5 rounded-lg border border-border px-3 py-2.5 text-left transition-all hover:border-primary/40 hover:bg-primary/[0.02]"
                     >
                       <span className="mt-0.5 shrink-0 text-muted-foreground [&>svg]:size-4">{opt.icon}</span>
                       <div className="min-w-0">
@@ -780,13 +889,16 @@ export function StepCreative() {
                     adIndex={i}
                     totalAds={ads.length}
                     isActive={i === activeAdIdx}
-                    adFormatOptions={FILTERED_AD_FORMATS}
+                    allowedFormats={allowedFormats}
+                    allowedDestinations={allowedDestinations}
+                    freqCapLockedFormat={freqCapLockedFormat}
                     onSelect={() => { setActiveAdIdx(i); setPreviewAssetIdx(0); }}
                     onUpdate={(next) => updateAd(ad.id, next)}
                     onRemove={() => removeAd(ad.id)}
                     onDuplicate={() => duplicateAd(ad.id)}
                     catalogEnabled={catalogEnabled}
                     onCreativeFocus={(assetIdx) => setPreviewAssetIdx(assetIdx)}
+                    objective={campaign.objective.objective}
                   />
                 ))}
 
@@ -803,21 +915,36 @@ export function StepCreative() {
                   {showNewAdGroupPicker && (
                     <div className="border-t border-border px-4 pb-4 pt-3">
                       <p className="mb-3 text-xs text-muted-foreground">Choose a format for your new ad group:</p>
-                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {FILTERED_AD_FORMATS.map((opt) => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => { addAd(opt.value); setShowNewAdGroupPicker(false); }}
-                            className="flex items-start gap-2.5 rounded-lg border border-border bg-background px-3 py-2.5 text-left transition-all hover:border-primary/40 hover:bg-primary/[0.02]"
-                          >
-                            <span className="mt-0.5 shrink-0 text-muted-foreground [&>svg]:size-4">{opt.icon}</span>
-                            <div className="min-w-0">
+                      {freqCapLockedFormat && (
+                        <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                          <Info className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+                          <p className="text-[11px] leading-relaxed text-amber-700">
+                            Frequency cap requires all ads to use the same format (<span className="font-semibold">{FILTERED_AD_FORMATS.find((f) => f.value === freqCapLockedFormat)?.label ?? freqCapLockedFormat}</span>). Disable frequency cap in Budget settings to use multiple formats.
+                          </p>
+                        </div>
+                      )}
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        {FILTERED_AD_FORMATS.map((opt) => {
+                          const lockedOut = freqCapLockedFormat !== null && opt.value !== freqCapLockedFormat;
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              disabled={lockedOut}
+                              onClick={() => { addAd(opt.value); setShowNewAdGroupPicker(false); }}
+                              className={cn(
+                                "flex flex-col items-center gap-2 rounded-lg border bg-background px-3 py-3 text-center transition-all",
+                                lockedOut
+                                  ? "cursor-not-allowed border-border/50 opacity-40"
+                                  : "border-border hover:border-primary/40 hover:bg-primary/[0.02]"
+                              )}
+                            >
+                              <span className="shrink-0 text-muted-foreground [&>svg]:size-5">{opt.icon}</span>
                               <p className="text-xs font-medium text-foreground">{opt.label}</p>
-                              <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground">{opt.desc}</p>
-                            </div>
-                          </button>
-                        ))}
+                              <p className="line-clamp-2 text-[10px] leading-snug text-muted-foreground">{opt.desc}</p>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -914,6 +1041,9 @@ export function StepCreative() {
               creative={creative}
               allChecks={allChecks}
               passingChecks={passingChecks}
+              frequencyCapEnabled={campaign.budget.frequencyCapEnabled}
+              objective={campaign.objective.objective}
+              catalogEnabled={catalogEnabled}
             />
 
           </div>
@@ -945,49 +1075,81 @@ function CampaignReadinessCard({
   creative,
   allChecks,
   passingChecks,
+  frequencyCapEnabled = false,
+  objective,
+  catalogEnabled = false,
 }: {
   ads: AdGroup[];
   totalCreatives: number;
   creative: { publicProfileId?: string; placement?: string; brandSafety?: string; customPositions?: string[] };
   allChecks: { label: string; ok: boolean }[];
   passingChecks: number;
+  frequencyCapEnabled?: boolean;
+  objective?: string;
+  catalogEnabled?: boolean;
 }) {
   const failingChecks = allChecks.filter((c) => !c.ok);
   const allPassed = passingChecks === allChecks.length && allChecks.length > 0;
 
   /* ── Best-practice signals ── */
   const hasMultipleAds = ads.length >= 2;
-  const nonDynamicAds = ads.filter((a) => a.adType !== "DYNAMIC");
+  const nonDynamicAds = ads.filter((a) => a.adFormat !== "DYNAMIC");
   const avgCreativesPerAd = nonDynamicAds.length > 0
     ? nonDynamicAds.reduce((s, a) => s + a.assets.length, 0) / nonDynamicAds.length
     : 0;
-  const hasEnoughCreatives = avgCreativesPerAd >= 3;
-  const hasVideoCreative = ads.some((a) => a.assets.some((asset) => asset.mediaType === "VIDEO"));
-  const hasMultipleFormats = new Set(ads.map((a) => a.adType)).size >= 2;
+  const hasEnoughCreatives = catalogEnabled || avgCreativesPerAd >= 3;
+  const hasVideoCreative = catalogEnabled || ads.some((a) => a.assets.some((asset) => asset.mediaType === "VIDEO"));
+  const hasMultipleFormats = new Set(ads.map((a) => a.adFormat)).size >= 2;
 
-  const bestPractices: { label: string; met: boolean; tip: string }[] = [
-    {
+  const bestPractices: { label: string; met: boolean; tip: string }[] = [];
+
+  if (!catalogEnabled) {
+    bestPractices.push({
       label: "Multiple ad groups",
       met: hasMultipleAds,
-      tip: "Create 2+ ad groups to test different audiences or formats",
-    },
-    {
+      tip: objective === "SALES"
+        ? "Create 2+ ad groups to A/B test creatives and find the best-performing sales driver"
+        : objective === "LEADS"
+          ? "Test different lead form approaches across multiple ad groups"
+          : "Create 2+ ad groups to test different audiences or formats",
+    });
+  }
+
+  if (!catalogEnabled) {
+    bestPractices.push({
       label: "3+ creatives per ad",
       met: hasEnoughCreatives,
-      tip: "Snap recommends 3-5 creative variations for optimal delivery",
-    },
-    {
+      tip: objective === "SALES"
+        ? "Snap recommends 3-5 creative variations — test different product angles and CTAs"
+        : "Snap recommends 3-5 creative variations for optimal delivery",
+    });
+
+    bestPractices.push({
       label: "Video creative included",
       met: hasVideoCreative,
-      tip: "Video ads get 2× more engagement than static images on Snapchat",
-    },
-  ];
+      tip: objective === "ENGAGEMENT"
+        ? "Video ads generate 3x more engagement than static images on Snapchat"
+        : "Video ads get 2x more engagement than static images on Snapchat",
+    });
+  }
 
-  if (ads.length >= 2) {
+  if (ads.length >= 2 && !frequencyCapEnabled && !catalogEnabled) {
     bestPractices.push({
       label: "Multiple formats",
       met: hasMultipleFormats,
       tip: "Mix formats (Single, Story, Collection) to reach users in different placements",
+    });
+  }
+
+  if (ads.length >= 2 && !catalogEnabled) {
+    const hasDifferentCreatives = ads.some((a, i) =>
+      i > 0 && a.assets.length > 0 && ads[0].assets.length > 0 &&
+      (a.assets[0].headline !== ads[0].assets[0].headline || a.assets[0].cta !== ads[0].assets[0].cta)
+    );
+    bestPractices.push({
+      label: "A/B testing",
+      met: hasDifferentCreatives,
+      tip: "Vary headlines, CTAs, or visuals across ad groups to find what resonates best with your audience",
     });
   }
 

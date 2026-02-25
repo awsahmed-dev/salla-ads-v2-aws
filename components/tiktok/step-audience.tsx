@@ -97,6 +97,27 @@ export function TikTokStepAudience() {
             </p>
           </div>
 
+          {/* Objective-specific audience guidance */}
+          <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
+            <Sparkles className="mt-0.5 size-3.5 shrink-0 text-primary" />
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              <span className="font-semibold text-foreground">
+                {isReach ? "Reach tip" : isTraffic ? "Traffic tip" : isVideoViews ? "Video Views tip" : isLeadGen ? "Lead Gen tip" : isAppPromo ? "App Install tip" : "Sales tip"}:
+              </span>{" "}
+              {isReach
+                ? "Use broad targeting (wide age range, all genders) to maximize unique reach. Narrow interests limit your audience and increase CPM."
+                : isTraffic
+                  ? "Balance reach and relevance. Too narrow wastes budget; too broad brings low-intent visitors. Start broad, then refine based on click-through data."
+                  : isVideoViews
+                    ? "Broader audiences work well for video views since TikTok optimizes for engagement. Focus on age and language rather than niche interests."
+                    : isLeadGen
+                      ? "Target users likely to fill out forms. Narrower demographics (age, interests) improve lead quality even if volume is lower."
+                      : isAppPromo
+                        ? "Device targeting matters most here. TikTok auto-targets the matching app store, but you can exclude older OS versions for better install rates."
+                        : "Narrower targeting improves ROAS for Sales campaigns. Use interests and demographics to reach high-intent shoppers rather than maximizing reach."}
+            </p>
+          </div>
+
           {/* ---- 1. Location (shared component — same UX as all platforms; maps to locationIds + cities) ---- */}
           <SectionCard>
             <LocationSelector

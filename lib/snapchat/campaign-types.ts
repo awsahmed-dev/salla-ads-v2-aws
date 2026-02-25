@@ -54,8 +54,12 @@ export interface ObjectiveConfig {
   hasConversionWindow: boolean;
   /** Allowed bid strategies */
   allowedBidStrategies: BidStrategy[];
-  /** Allowed creative ad types (maps to SnapCreativeType | "INFLUENCER") */
+  /** Allowed creative ad types (legacy, maps to SnapCreativeType | "INFLUENCER") */
   allowedAdFormats: string[];
+  /** Allowed UI-level formats */
+  allowedFormats: AdFormat[];
+  /** Allowed UI-level destinations (for SINGLE format) */
+  allowedDestinations: AdDestination[];
   /** Default CTA */
   defaultCTA: string;
 }
@@ -72,6 +76,8 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     hasConversionWindow: true,
     allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID", "TARGET_COST"],
     allowedAdFormats: ["WEB_VIEW", "DEEP_LINK", "COLLECTION", "COMPOSITE", "DYNAMIC", "INFLUENCER"],
+    allowedFormats: ["SINGLE", "COLLECTION", "STORY", "DYNAMIC"],
+    allowedDestinations: ["WEBSITE", "DEEP_LINK"],
     defaultCTA: "SHOP_NOW",
   },
   WEBSITE_VISITS: {
@@ -85,6 +91,8 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     hasConversionWindow: false,
     allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID"],
     allowedAdFormats: ["WEB_VIEW", "DEEP_LINK", "COLLECTION", "COMPOSITE", "INFLUENCER"],
+    allowedFormats: ["SINGLE", "COLLECTION", "STORY"],
+    allowedDestinations: ["WEBSITE", "DEEP_LINK"],
     defaultCTA: "VIEW",
   },
   ENGAGEMENT: {
@@ -98,6 +106,8 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     hasConversionWindow: false,
     allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID"],
     allowedAdFormats: ["WEB_VIEW", "SNAP_AD", "COLLECTION", "COMPOSITE", "INFLUENCER"],
+    allowedFormats: ["SINGLE", "COLLECTION", "STORY"],
+    allowedDestinations: ["WEBSITE", "NO_CTA"],
     defaultCTA: "VIEW",
   },
   SPONSORED_CHAT: {
@@ -111,6 +121,8 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     hasConversionWindow: false,
     allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID"],
     allowedAdFormats: ["WEB_VIEW", "APP_INSTALL", "COMPOSITE", "INFLUENCER"],
+    allowedFormats: ["SINGLE", "STORY"],
+    allowedDestinations: ["WEBSITE", "APP_INSTALL"],
     defaultCTA: "VIEW",
   },
   APP_PROMOTION: {
@@ -124,10 +136,12 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     hasConversionWindow: true,
     allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID", "TARGET_COST"],
     allowedAdFormats: ["APP_INSTALL", "DEEP_LINK", "COLLECTION", "COMPOSITE", "INFLUENCER"],
+    allowedFormats: ["SINGLE", "COLLECTION", "STORY"],
+    allowedDestinations: ["APP_INSTALL", "DEEP_LINK"],
     defaultCTA: "INSTALL_NOW",
   },
   LEADS: {
-    snapObjectiveV2: "LEADS",           // Snap API objective_v2_type for lead generation
+    snapObjectiveV2: "LEADS",
     conversionLocation: "LEAD_FORM",
     label: "Lead Generation",
     allowedGoals: ["LEAD_FORM_SUBMISSIONS", "SWIPES", "IMPRESSIONS"],
@@ -137,6 +151,8 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     hasConversionWindow: false,
     allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID", "TARGET_COST"],
     allowedAdFormats: ["LEAD_GENERATION"],
+    allowedFormats: ["SINGLE"],
+    allowedDestinations: ["LEAD_FORM"],
     defaultCTA: "SIGN_UP",
   },
 };
@@ -290,6 +306,29 @@ export type SnapCreativeType =
   | "SNAP_AD"
   | "DEEP_LINK";
 
+/** UI-level ad format (what the ad looks like) */
+export type AdFormat = "SINGLE" | "COLLECTION" | "STORY" | "DYNAMIC";
+
+/** UI-level destination (where swipe-up goes) */
+export type AdDestination = "WEBSITE" | "DEEP_LINK" | "APP_INSTALL" | "NO_CTA" | "LEAD_FORM";
+
+/** Derive Snap API creative type from UI format + destination */
+export function deriveCreativeType(format: AdFormat, destination: AdDestination): SnapCreativeType {
+  switch (format) {
+    case "COLLECTION": return "COLLECTION";
+    case "STORY": return "COMPOSITE";
+    case "DYNAMIC": return "DYNAMIC";
+    case "SINGLE":
+      switch (destination) {
+        case "WEBSITE": return "WEB_VIEW";
+        case "DEEP_LINK": return "DEEP_LINK";
+        case "APP_INSTALL": return "APP_INSTALL";
+        case "NO_CTA": return "SNAP_AD";
+        case "LEAD_FORM": return "LEAD_GENERATION";
+      }
+  }
+}
+
 /** Snap API media type */
 export type SnapMediaType = "IMAGE" | "VIDEO";
 
@@ -360,6 +399,27 @@ export type AppInstallCTA =
   | "VOTE"
   | "DIRECTIONS"
   | "PLAY_GAME";
+
+/**
+ * Call-to-action values valid for DEEP_LINK creatives.
+ * Sourced from Snap API creative-type-to-CTA mapping for DEEP_LINK.
+ */
+export type DeepLinkCTA =
+  | "DONATE"
+  | "PLAY"
+  | "SHOP_NOW"
+  | "SIGN_UP"
+  | "USE_APP"
+  | "MORE"
+  | "OPEN_APP"
+  | "TRY"
+  | "WATCH"
+  | "VIEW_PROFILE"
+  | "VOTE"
+  | "DIRECTIONS"
+  | "PRE_REGISTER"
+  | "PLAY_GAME"
+  | "DOWNLOAD";
 
 /** App platform for APP_PROMOTION objective */
 export type AppPlatform = "IOS" | "ANDROID" | "BOTH";
@@ -587,6 +647,8 @@ export interface CreativeAsset {
   url: string;
   /** File reference for upload */
   file?: File;
+  /** Duration in seconds (populated from video metadata on upload) */
+  videoDuration?: number;
   /** Snap API claim_media: ad_code shared by influencer */
   adCode?: string;
   /** Snap API claim_media: media_entity_id once claimed */
@@ -597,6 +659,8 @@ export interface CreativeAsset {
   creatorProfileId?: string;
   /** Snap API: creator_partnership_type -- paid partnership label */
   creatorPartnershipType?: CreatorPartnershipType;
+  /** Snap API: profile_tagged_in_headline -- brand's profile ID tagged in the headline */
+  profileTaggedInHeadline?: string;
   /** Snap API: brand_name -- max 32 chars */
   brandName: string;
   /** Snap API: headline -- max 34 chars */
@@ -669,9 +733,7 @@ export interface DynamicTemplateConfig {
   /** Whether to show sale/discount badge */
   showSaleBadge: boolean;
   /** Caption text overlay mode */
-  captionMode: "product_name" | "product_name_price" | "custom";
-  /** Custom caption (used when captionMode === "custom") */
-  customCaption: string;
+  captionMode: "product_name" | "product_name_price" | "product_description";
 }
 
 export function makeDefaultDynamicTemplate(): DynamicTemplateConfig {
@@ -681,7 +743,6 @@ export function makeDefaultDynamicTemplate(): DynamicTemplateConfig {
     showPrice: true,
     showSaleBadge: true,
     captionMode: "product_name_price",
-    customCaption: "",
   };
 }
 
@@ -748,8 +809,12 @@ export interface DiscoverTile {
 export interface AdGroup {
   id: string;
   name: string;
-  /** Snap creative type for this ad */
+  /** Snap creative type for this ad (derived from adFormat + adDestination) */
   adType: SnapCreativeType;
+  /** UI-level format: what the ad looks like */
+  adFormat: AdFormat;
+  /** UI-level destination: where the swipe-up goes */
+  adDestination: AdDestination;
   /** Main creative assets */
   assets: CreativeAsset[];
   /** Collection tiles (only for COLLECTION type, min 2) */

@@ -1,14 +1,16 @@
 import { cn } from "@/lib/utils";
 import type {
   SnapCreativeType,
+  AdFormat,
+  AdDestination,
   WebViewCTA,
   CreativeAsset,
   CollectionTile,
   AdGroup,
 } from "@/lib/snapchat/campaign-types";
-import { OBJECTIVE_CONFIGS, makeDefaultDynamicTemplate } from "@/lib/snapchat/campaign-types";
+import { OBJECTIVE_CONFIGS, makeDefaultDynamicTemplate, deriveCreativeType } from "@/lib/snapchat/campaign-types";
 import type { CampaignObjective } from "@/lib/snapchat/campaign-types";
-import { AD_FORMAT_OPTIONS, type AdFormatKey } from "./constants";
+import { FORMAT_OPTIONS, DESTINATION_OPTIONS, type AdFormatKey } from "./constants";
 
 export function CharCounter({ current, max }: { current: number; max: number }) {
   const over = current > max;
@@ -26,9 +28,10 @@ let _assetSeq = 0;
 export function makeAsset(partial?: Partial<CreativeAsset>): CreativeAsset {
   const id = `asset_${Date.now()}_${++_assetSeq}_${Math.random().toString(36).slice(2, 6)}`;
   const { id: _ignoreId, ...rest } = partial ?? {};
+  const seq = _assetSeq;
   return {
     id,
-    name: `Creative_${id}`,
+    name: partial?.name ?? `Creative ${seq}`,
     mediaSource: "upload",
     mediaType: "IMAGE",
     url: "",
@@ -56,72 +59,90 @@ export function makeTile(): CollectionTile {
   };
 }
 
-export function makeAdGroup(format: AdFormatKey, index: number): AdGroup {
-  const isInfluencer = format === "INFLUENCER";
-  const isLeadGen = format === "LEAD_GENERATION";
-  const isDynamic = format === "DYNAMIC";
-  const isAppInstall = format === "APP_INSTALL";
-  const isSnapAd = format === "SNAP_AD";
-  const isDeepLink = format === "DEEP_LINK";
-  const adType: SnapCreativeType = isInfluencer ? "WEB_VIEW" : format;
-  const namePrefix = isInfluencer
-    ? "Influencer Ad"
-    : isLeadGen
-      ? "Lead Gen Ad"
-      : isDynamic
-        ? "Dynamic Ad"
-        : isAppInstall
-          ? "App Install Ad"
-          : isSnapAd
-            ? "Snap Ad"
-            : isDeepLink
-              ? "Deep Link Ad"
-              : "Ad";
-  const adName = `${namePrefix} ${index + 1}`;
+/** Create a new ad group from format + destination (new model) */
+export function makeAdGroup(format: AdFormat, index: number, destination?: AdDestination): AdGroup {
+  const dest = destination ?? "WEBSITE";
+  const adType = deriveCreativeType(format, dest);
+
+  const formatLabel = FORMAT_OPTIONS.find((f) => f.value === format)?.label ?? format;
+  const adName = `${formatLabel} ${index + 1}`;
+
+  const defaultAssetForDestination = (): Partial<CreativeAsset> => {
+    switch (dest) {
+      case "DEEP_LINK":
+        return {
+          cta: "OPEN_APP" as WebViewCTA,
+          deepLinkProperties: { deepLinkUri: "", fallbackUrl: "", fallbackType: "WEB_VIEW_FALLBACK" },
+        };
+      case "APP_INSTALL":
+        return { cta: "INSTALL_NOW" as WebViewCTA };
+      case "LEAD_FORM":
+        return { cta: "SIGN_UP" as WebViewCTA };
+      case "NO_CTA":
+        return { shareable: false };
+      default:
+        return {};
+    }
+  };
+
+  const assets: CreativeAsset[] =
+    format === "DYNAMIC"
+      ? []
+      : [makeAsset({ ...defaultAssetForDestination(), name: `${adName} - Creative 1` })];
+
   return {
     id: `ad_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     name: adName,
     adType,
-    isInfluencer,
-    assets: isDynamic
-      ? []
-      : isInfluencer
-        ? [makeAsset({ mediaSource: "ad_code", name: `${adName} - Creative 1` })]
-        : isLeadGen
-          ? [makeAsset({ cta: "SIGN_UP" as WebViewCTA, name: `${adName} - Creative 1` })]
-          : isAppInstall
-            ? [makeAsset({ cta: "INSTALL_NOW" as WebViewCTA, name: `${adName} - Creative 1` })]
-            : isSnapAd
-              ? [makeAsset({ shareable: false, name: `${adName} - Creative 1` })]
-              : isDeepLink
-                ? [makeAsset({
-                    deepLinkProperties: {
-                      deepLinkUri: "",
-                      fallbackUrl: "",
-                      fallbackType: "WEB_VIEW_FALLBACK",
-                    },
-                    name: `${adName} - Creative 1`,
-                  })]
-                : [makeAsset({ name: `${adName} - Creative 1` })],
-    collectionTiles: adType === "COLLECTION" ? [makeTile(), makeTile(), makeTile(), makeTile()] : [],
+    adFormat: format,
+    adDestination: dest,
+    isInfluencer: false,
+    assets,
+    collectionTiles: [],
     offerDisclaimer: { enabled: false, name: "", disclaimerText: "" },
-    dynamicTemplateConfig: isDynamic ? makeDefaultDynamicTemplate() : undefined,
+    dynamicTemplateConfig: format === "DYNAMIC" ? makeDefaultDynamicTemplate() : undefined,
     dynamicCollectionEnabled: false,
-    discoverTile: format === "COMPOSITE" ? { enabled: false, headline: "", backgroundImageUrl: "", logoImageUrl: "" } : undefined,
+    discoverTile: format === "STORY" ? { enabled: true, headline: "", backgroundImageUrl: "", logoImageUrl: "" } : undefined,
   };
 }
 
-export function getMaxAssets(adType: SnapCreativeType | AdFormatKey): number {
-  return AD_FORMAT_OPTIONS.find((o) => o.value === adType)?.maxAssets ?? 8;
+/** Legacy overload: create ad group from old format key */
+export function makeAdGroupLegacy(format: AdFormatKey, index: number): AdGroup {
+  switch (format) {
+    case "WEB_VIEW":      return makeAdGroup("SINGLE", index, "WEBSITE");
+    case "DEEP_LINK":     return makeAdGroup("SINGLE", index, "DEEP_LINK");
+    case "APP_INSTALL":   return makeAdGroup("SINGLE", index, "APP_INSTALL");
+    case "SNAP_AD":       return makeAdGroup("SINGLE", index, "NO_CTA");
+    case "LEAD_GENERATION": return makeAdGroup("SINGLE", index, "LEAD_FORM");
+    case "COLLECTION":    return makeAdGroup("COLLECTION", index, "WEBSITE");
+    case "COMPOSITE":     return makeAdGroup("STORY", index, "WEBSITE");
+    case "DYNAMIC":       return makeAdGroup("DYNAMIC", index, "WEBSITE");
+    case "INFLUENCER": {
+      const ag = makeAdGroup("SINGLE", index, "WEBSITE");
+      ag.isInfluencer = true;
+      ag.assets = [makeAsset({ mediaSource: "ad_code", name: `Influencer Ad ${index + 1} - Creative 1` })];
+      ag.name = `Influencer Ad ${index + 1}`;
+      return ag;
+    }
+    default: return makeAdGroup("SINGLE", index, "WEBSITE");
+  }
 }
 
-export function getFormatLabel(adType: SnapCreativeType | AdFormatKey): string {
-  return AD_FORMAT_OPTIONS.find((o) => o.value === adType)?.label ?? adType;
+export function getMaxAssets(format: AdFormat): number {
+  return FORMAT_OPTIONS.find((o) => o.value === format)?.maxAssets ?? 8;
+}
+
+export function getFormatLabel(format: AdFormat): string {
+  return FORMAT_OPTIONS.find((o) => o.value === format)?.label ?? format;
+}
+
+export function getDestinationLabel(dest: AdDestination): string {
+  return DESTINATION_OPTIONS.find((o) => o.value === dest)?.label ?? dest;
 }
 
 export function isInfluencerAd(ad: AdGroup): boolean {
   if (ad.isInfluencer) return true;
-  return ad.adType === "WEB_VIEW" && ad.assets.length > 0 && ad.assets[0].mediaSource === "ad_code";
+  return ad.assets.length > 0 && ad.assets[0].mediaSource === "ad_code";
 }
 
 export function getDefaultCTA(objective: CampaignObjective): WebViewCTA {

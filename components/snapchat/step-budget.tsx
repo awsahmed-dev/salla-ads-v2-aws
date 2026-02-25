@@ -689,9 +689,9 @@ export function StepBudget() {
               {/* -- Frequency Capping (Snapchat API: ad_squad.cap_and_exclusion_config.frequency_cap_config) -- */}
               <FrequencyCapCard
                 enabled={budget.frequencyCapEnabled}
-                onEnabledChange={(checked) =>
-                  updateNested("budget", { frequencyCapEnabled: checked })
-                }
+                onEnabledChange={(checked) => {
+                  updateNested("budget", { frequencyCapEnabled: checked });
+                }}
                 maxImpressions={budget.frequencyCapCount}
                 onMaxImpressionsChange={(v) =>
                   updateNested("budget", { frequencyCapCount: v })
@@ -721,6 +721,14 @@ export function StepBudget() {
                 showFormatWarning={true}
                 infoTipText="Limit how many times one person sees your ad to prevent ad fatigue. Maps to ad squad frequency_cap_config."
               />
+              {budget.frequencyCapEnabled && campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1 && (
+                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 dark:border-red-800/40 dark:bg-red-950/30">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-600 dark:text-red-500" />
+                  <p className="text-xs leading-relaxed text-red-700 dark:text-red-400">
+                    Your ad groups currently use different formats. Snapchat requires all ads to share the same format when frequency cap is enabled. Go to <span className="font-semibold">Ad Design</span> to fix this, or disable frequency cap.
+                  </p>
+                </div>
+              )}
 
               {/* -- Ad Scheduling (Dayparting) -- */}
               <AdSchedulingCard

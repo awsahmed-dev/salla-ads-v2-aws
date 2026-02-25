@@ -703,6 +703,18 @@ export function TikTokStepBudget() {
                     suggestedRange: suggestedBid,
                     tip: "Calculate your target CPA as: average order value divided by your desired ROAS. For example, if your average order is SAR 150 and you want 3x ROAS, set CPA to SAR 50.",
                   }]
+                : budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "VALUE"
+                  ? [{
+                      label: "Target ROAS (Return on Ad Spend)",
+                      desc: "The minimum return on ad spend you want to achieve. For example, 3.0 means SAR 3 revenue for every SAR 1 spent.",
+                      value: budget.roasBid ?? 1,
+                      onChange: (v) => updateNested("budget", { roasBid: Math.max(0.01, v || 1) }),
+                      prefix: "×",
+                      min: 0.01,
+                      step: 0.1,
+                      suggestedRange: { min: 2.0, max: 5.0 },
+                      tip: "Start with a ROAS target of 2-3x for new campaigns. A higher target means fewer but more profitable conversions. TikTok will optimize delivery to hit your ROAS goal.",
+                    }]
                 : budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "LEAD_GENERATION"
                   ? [{
                       label: "Target Cost per Lead (CPL)",
@@ -999,6 +1011,7 @@ export function TikTokStepBudget() {
         onNext={() => setStep(3)}
         previousLabel="Previous"
         nextLabel="Next: Creative"
+        nextDisabled={isTraffic && budget.optimizationGoal === "LANDING_PAGE_VIEW" && !hasPixel}
       />
     </TooltipProvider>
   );

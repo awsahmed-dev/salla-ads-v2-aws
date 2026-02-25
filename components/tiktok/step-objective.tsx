@@ -175,6 +175,9 @@ export function TikTokStepObjective() {
     const newConfig = OBJECTIVE_CONFIGS[value];
     if (!newConfig) return;
 
+    const leavingLeadGen = obj.objective === "LEAD_GENERATION" && value !== "LEAD_GENERATION";
+    const leavingAppPromo = obj.objective === "APP_PROMOTION" && value !== "APP_PROMOTION";
+
     updateNested("objective", {
       objective: value as typeof obj.objective,
       // Reset pixel for non-pixel objectives
@@ -194,6 +197,36 @@ export function TikTokStepObjective() {
         specificProductIds: [],
         dynamicFormat: false,
       }),
+      // Reset Lead Gen form config when leaving Lead Generation
+      ...(leavingLeadGen && {
+        leadOptimizationLocation: "INSTANT_FORM" as const,
+        instantForm: {
+          formName: "",
+          formTemplate: "SIMPLE_SIGNUP" as const,
+          formType: "MORE_VOLUME" as const,
+          bannerImageUrl: "",
+          headline: "",
+          description: "",
+          questions: [],
+          personalInfoFields: ["NAME", "EMAIL", "PHONE_NUMBER"],
+          companyName: "",
+          privacyPolicyUrl: "",
+          thankYouHeadline: "Thank you for your interest!",
+          thankYouDescription: "We will get back to you shortly.",
+          thankYouButtonText: "Visit Website",
+          thankYouUrl: "",
+        },
+      }),
+      // Reset App Promo settings when leaving App Promotion
+      ...(leavingAppPromo && {
+        appSettings: {
+          appId: "",
+          appName: "",
+          appPlatform: "ANDROID" as const,
+          appDownloadUrl: "",
+          appPromotionType: "APP_INSTALL" as const,
+        },
+      }),
     });
 
     // Also reset budget goal to match new objective default
@@ -212,11 +245,21 @@ export function TikTokStepObjective() {
         frequencyCap: { frequency: 3, schedule: 7 as const },
       }),
     });
+
+    // Remove ads whose format is incompatible with the new objective
+    const allowed = new Set(newConfig.allowedAdFormats);
+    const currentAds = campaign.creative.ads ?? [];
+    const compatibleAds = currentAds.filter((ad) => allowed.has(ad.adFormat));
+    if (compatibleAds.length !== currentAds.length) {
+      updateNested("creative", { ads: compatibleAds });
+    }
   };
 
   const canProceed =
     obj.campaignName.trim().length > 0 &&
-    (needsPixel ? (obj.pixelMode !== "none" || !!obj.pixelId) : true) &&
+    (needsPixel
+      ? (obj.pixelMode === "salla_managed" || (obj.pixelMode === "existing" && !!obj.pixelId.trim()))
+      : true) &&
     (isAppPromo ? (!!obj.appSettings.appDownloadUrl.trim() && !!obj.appSettings.appId.trim()) : true);
 
   return (

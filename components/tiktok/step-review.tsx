@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useTikTokCampaign } from "@/lib/tiktok/campaign-context";
 import { OBJECTIVE_CONFIGS } from "@/lib/tiktok/campaign-types";
+import { minMaxToAgeBands } from "@/lib/demographics";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,38 @@ import {
   Smartphone,
   Download,
 } from "lucide-react";
+
+/* ------------------------------------------------------------------ */
+/*  API Constants & Helpers                                            */
+/* ------------------------------------------------------------------ */
+
+const SALLA_MOCK_PIXEL_ID = "CMOCK1234567890";
+const SALLA_MOCK_CATALOG_ID = "CMOCK_CATALOG_001";
+
+const TIKTOK_AGE_BAND_MAP: Record<string, string> = {
+  "18_24": "AGE_18_24",
+  "25_34": "AGE_25_34",
+  "35_44": "AGE_35_44",
+  "45_54": "AGE_45_54",
+  "55_64": "AGE_55_100",
+  "65_PLUS": "AGE_55_100",
+};
+
+function toTikTokAgeGroups(ageMin: number, ageMax: number): string[] {
+  const bands = minMaxToAgeBands(ageMin, ageMax);
+  const groups = new Set<string>();
+  for (const b of bands) {
+    const mapped = TIKTOK_AGE_BAND_MAP[b];
+    if (mapped) groups.add(mapped);
+  }
+  return Array.from(groups);
+}
+
+function toApiDateTime(dateStr: string, end?: boolean): string {
+  if (!dateStr) return "";
+  if (dateStr.includes(" ")) return dateStr;
+  return end ? `${dateStr} 23:59:59` : `${dateStr} 00:00:00`;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
@@ -249,18 +282,29 @@ export function TikTokStepReview() {
       detail: `SAR ${budget.amount}/day`,
     });
 
-    list.push({
-      id: "ads",
-      label: "At least one ad created",
-      ok: creative.ads.length > 0,
-      detail: `${creative.ads.length} ad${creative.ads.length !== 1 ? "s" : ""}`,
-    });
+    const catalogListingMode = objective.catalogEnabled && objective.shoppingAdsType === "CATALOG_LISTING_ADS";
+
+    if (catalogListingMode) {
+      list.push({
+        id: "ads",
+        label: "Catalog Listing enabled (auto-generated creatives)",
+        ok: true,
+        detail: "TikTok will auto-generate ads from catalog",
+      });
+    } else {
+      list.push({
+        id: "ads",
+        label: "At least one ad created",
+        ok: creative.ads.length > 0,
+        detail: `${creative.ads.length} ad${creative.ads.length !== 1 ? "s" : ""}`,
+      });
+    }
 
     // Carousel music validation (music is mandatory for carousel ads)
     const carouselAdsMissingMusic = creative.ads.filter(
       (a) => a.adFormat === "CAROUSEL" && !a.musicFile
     );
-    if (carouselAdsMissingMusic.length > 0) {
+    if (!catalogListingMode && carouselAdsMissingMusic.length > 0) {
       list.push({
         id: "carousel_music",
         label: "Carousel ads have music",
@@ -269,17 +313,19 @@ export function TikTokStepReview() {
       });
     }
 
-  // Landing page URL validation (required for non-Spark ads, optional for Video Views)
-  const nonSparkMissingUrl = creative.ads.filter(
-    (a) => !a.sparkAdEnabled && !a.landingPageUrl && !isVideoViews && !isLeadGen && !isAppPromo
-  );
-  if (nonSparkMissingUrl.length > 0) {
-      list.push({
-        id: "landing_url",
-        label: "Landing page URLs set",
-        ok: false,
-        detail: `${nonSparkMissingUrl.length} ad${nonSparkMissingUrl.length !== 1 ? "s" : ""} missing landing URL`,
-      });
+    // Landing page URL validation (required for non-Spark Sales/Traffic/Reach ads)
+    if (!catalogListingMode) {
+      const nonSparkMissingUrl = creative.ads.filter(
+        (a) => !a.sparkAdEnabled && !a.landingPageUrl && !isVideoViews && !isLeadGen && !isAppPromo
+      );
+      if (nonSparkMissingUrl.length > 0) {
+        list.push({
+          id: "landing_url",
+          label: "Landing page URLs set",
+          ok: false,
+          detail: `${nonSparkMissingUrl.length} ad${nonSparkMissingUrl.length !== 1 ? "s" : ""} missing landing URL`,
+        });
+      }
     }
 
     return list;
@@ -288,27 +334,60 @@ export function TikTokStepReview() {
   const allPassed = checks.every((c) => c.ok);
   const failCount = checks.filter((c) => !c.ok).length;
 
-  /* ---- API JSON ---- */
+  /* ---- Advisory warnings (non-blocking) ---- */
+  const advisories = useMemo(() => {
+    const list: string[] = [];
+    const adFormats = creative.ads.map((a) => a.adFormat);
+    const allowed = new Set(objConfig.allowedAdFormats ?? []);
+    const incompatible = adFormats.filter((f) => !allowed.has(f));
+    if (incompatible.length > 0) {
+      list.push(`${incompatible.length} ad(s) use formats not supported by this objective and will be skipped.`);
+    }
+    if (!isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo && budget.amount < 50) {
+      list.push("Daily budget is below SAR 50. TikTok recommends at least SAR 50/day for Sales campaigns to exit the learning phase efficiently.");
+    }
+    if (budget.endDate && !budget.endDateOptional) {
+      const days = Math.max(1, Math.ceil((new Date(budget.endDate).getTime() - new Date(budget.startDate).getTime()) / 86400000));
+      if (days < 7) {
+        list.push(`Campaign duration is only ${days} day(s). TikTok typically needs 7+ days to optimize delivery.`);
+      }
+    }
+    if (audience.interests.length > 0 && audience.interests.every((id) => id.startsWith("TT_"))) {
+      list.push("Selected interests use placeholder IDs and will be omitted from the API payload. In production, real TikTok interest category IDs will be used.");
+    }
+    return list;
+  }, [objective, audience, budget, creative]);
+
+  /* ---- API JSON (aligned to TikTok Marketing API v1.3) ---- */
+  const isSales = !isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo;
+  const isCatalogListing = objective.catalogEnabled && objective.shoppingAdsType === "CATALOG_LISTING_ADS";
+
+  const resolvedPixelId = objective.pixelMode === "salla_managed"
+    ? SALLA_MOCK_PIXEL_ID
+    : objective.pixelId || "";
+  const resolvedCatalogId = objective.catalogId || SALLA_MOCK_CATALOG_ID;
+
+  const hasNonMockInterests = audience.interests.length > 0 && !audience.interests.every((id) => id.startsWith("TT_"));
+
   const apiJson = useMemo(() => {
     return {
       campaign: {
         advertiser_id: "<ADVERTISER_ID>",
         campaign_name: objective.campaignName,
         objective_type: objective.objective,
-        budget_mode: budget.budgetMode,
-        budget: budget.amount,
+        ...(isSales && { promotion_type: "WEBSITE" }),
         operation_status: "ENABLE",
       },
       adgroup: {
         advertiser_id: "<ADVERTISER_ID>",
         campaign_id: "<CAMPAIGN_ID>",
         adgroup_name: `${objective.campaignName} - Ad Group`,
+        ...(isSales && { promotion_type: "WEBSITE" }),
         placement_type: creative.placementType,
         budget_mode: budget.budgetMode,
         budget: budget.amount,
         optimization_goal: budget.optimizationGoal,
-        ...(!isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo && { optimization_event: budget.optimizationEvent }),
-        // App Promotion fields
+        ...(isSales && { optimization_event: budget.optimizationEvent }),
         ...(isAppPromo && {
           app_id: objective.appSettings.appId || "<APP_ID>",
           app_type: objective.appSettings.appPlatform,
@@ -317,24 +396,16 @@ export function TikTokStepReview() {
         }),
         billing_event: budget.billingEvent,
         bid_type: budget.bidType,
-        // Cost Cap: send target CPA -- valid for CONVERSION goal per TikTok API
         ...(budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "CONVERSION" && { conversion_bid_price: budget.bidAmount }),
-        // Cost Cap: send CPV bid -- valid for VIDEO_VIEW/FOCUSED_VIEW goals
         ...(budget.bidType === "BID_TYPE_CUSTOM" && (budget.optimizationGoal === "VIDEO_VIEW" || budget.optimizationGoal === "FOCUSED_VIEW") && { bid_price: budget.bidAmount }),
-        // Cost Cap: send CPL bid -- valid for LEAD_GENERATION goal
         ...(budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "LEAD_GENERATION" && { conversion_bid_price: budget.bidAmount }),
-        // Cost Cap: send CPI bid -- valid for INSTALL/IN_APP_EVENT goals
         ...(budget.bidType === "BID_TYPE_CUSTOM" && (budget.optimizationGoal === "INSTALL" || budget.optimizationGoal === "IN_APP_EVENT") && { conversion_bid_price: budget.bidAmount }),
-        // Lead Gen: optimization_location
         ...(isLeadGen && { optimization_location: objective.leadOptimizationLocation }),
-        // Value optimization: send ROAS target with deep_bid_type: VO_MIN_ROAS
         ...(budget.optimizationGoal === "VALUE" && { deep_bid_type: budget.deepBidType, roas_bid: Number(budget.roasBid) || 1 }),
-        // Attribution windows (not for Reach, Traffic, or Video Views)
-        ...(!isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo && {
-          click_attribution_window: budget.clickAttributionWindow,
-          view_attribution_window: budget.viewAttributionWindow,
+        ...(isSales && {
+          click_attribution_window: Number(budget.clickAttributionWindow),
+          view_attribution_window: Number(budget.viewAttributionWindow),
         }),
-        // Frequency cap (Reach objective only)
         ...(isReach && budget.frequencyCap && {
           frequency: budget.frequencyCap.frequency,
           frequency_schedule: budget.frequencyCap.schedule,
@@ -343,25 +414,24 @@ export function TikTokStepReview() {
         skip_learning_phase: budget.skipLearningPhase ? 1 : 0,
         identity_type: creative.identity?.identityType ?? "CUSTOMIZED_USER",
         identity_id: creative.identity?.identityId || "<ADVERTISER_ID>",
-        schedule_start_time: budget.startDate,
-        ...(budget.endDate && !budget.endDateOptional && { schedule_end_time: budget.endDate }),
-  // Pixel (not for Reach or Video Views; optional for Traffic)
-  ...(!isReach && !isVideoViews && !isLeadGen && !isAppPromo && !(isTraffic && objective.pixelMode === "none") && { pixel_id: objective.pixelId || "<PIXEL_ID>" }),
-        // Catalog fields (only when using catalog promotion)
+        schedule_start_time: toApiDateTime(budget.startDate),
+        ...(budget.endDate && !budget.endDateOptional && { schedule_end_time: toApiDateTime(budget.endDate, true) }),
+        ...(!isReach && !isVideoViews && !isLeadGen && !isAppPromo && !(isTraffic && objective.pixelMode === "none") && {
+          pixel_id: resolvedPixelId || "<PIXEL_ID>",
+        }),
         ...(objective.catalogEnabled && {
           shopping_ads_type: objective.shoppingAdsType,
-          catalog_id: objective.catalogId || "<CATALOG_ID>",
+          catalog_id: resolvedCatalogId,
           ...(objective.productSelectionMode === "PRODUCT_SET" && objective.productSetId && { product_set_id: objective.productSetId }),
+          ...(isCatalogListing && { dynamic_format: "DYNAMIC_CREATIVE" }),
         }),
         location_ids: audience.locationIds,
-        age_min: audience.ageMin,
-        age_max: audience.ageMax,
+        age_groups: toTikTokAgeGroups(audience.ageMin, audience.ageMax),
         gender: audience.gender,
         languages: audience.languages,
-        ...(audience.interests.length > 0 && { interest_category_ids: audience.interests }),
+        ...(hasNonMockInterests && { interest_category_ids: audience.interests }),
         ...(audience.operatingSystems.length > 0 && { operating_systems: audience.operatingSystems }),
       },
-      // Instant Form config (Lead Gen only)
       ...(isLeadGen && objective.leadOptimizationLocation === "INSTANT_FORM" && {
         instant_form: {
           form_name: objective.instantForm.formName || `${objective.campaignName} - Lead Form`,
@@ -388,51 +458,41 @@ export function TikTokStepReview() {
           },
         },
       }),
-      ads: creative.ads.map((ad) => ({
-        advertiser_id: creative.identity?.identityId || "<ADVERTISER_ID>",
-        adgroup_id: "<ADGROUP_ID>",
-        creatives: [{
-          ad_name: ad.name,
-          ad_format: ad.adFormat,
-          identity_type: creative.identity?.identityType ?? "CUSTOMIZED_USER",
-          identity_id: creative.identity?.identityId || "<ADVERTISER_ID>",
-          ...(creative.identity?.avatarPreviewUrl && { avatar_icon_web_uri: "<UPLOADED_AVATAR_URI>" }),
-          // Spark Ads: only tiktok_item_id is needed (creative comes from post)
-          ...(ad.sparkAdEnabled
-            ? { tiktok_item_id: `<FROM_AUTH_CODE:${ad.sparkAdAuthCode}>` }
-            : {
-                ad_text: ad.adText,
-                display_name: ad.displayName || creative.identity?.displayName || "",
-                call_to_action: ad.callToAction,
-                ...(ad.landingPageUrl && { landing_page_url: ad.landingPageUrl }),
-              }),
-          // Catalog fields on creative (when using catalog promotion)
-          ...(objective.catalogEnabled && {
-            catalog_id: objective.catalogId || "<CATALOG_ID>",
-            ...(objective.productSelectionMode === "PRODUCT_SET" && objective.productSetId && { product_set_id: objective.productSetId }),
-            ...(objective.dynamicFormat && { dynamic_format: "DYNAMIC_CREATIVE" }),
-          }),
-          // Media references (uploaded via TikTok Media API)
-          ...(ad.adFormat === "SINGLE_VIDEO" && ad.assets.length > 0 && { video_id: ad.assets[0].mediaId || "<VIDEO_ID>" }),
-          ...(ad.adFormat === "SINGLE_IMAGE" && ad.assets.length > 0 && { image_ids: [ad.assets[0].mediaId || "<IMAGE_ID>"] }),
-          ...(ad.adFormat === "CAROUSEL" && ad.carouselCards.length > 0 && {
-            image_ids: ad.carouselCards.map((_, i) => `<IMAGE_ID_${i + 1}>`),
-          }),
-          // Music (required for carousel, optional for video/image)
-          ...(ad.musicFile && { music_id: "<UPLOADED_MUSIC_ID>" }),
-          promotional_music_disabled: ad.promotionalMusicDisabled ?? (ad.adFormat !== "CAROUSEL"),
-          // Spark Ad interaction settings
-          ...(ad.sparkAdEnabled && ad.sparkDuetStatus && { item_duet_status: ad.sparkDuetStatus }),
-          ...(ad.sparkAdEnabled && ad.sparkStitchStatus && { item_stitch_status: ad.sparkStitchStatus }),
-          // Tracking
-          ...(ad.clickTrackingUrl && { click_tracking_url: ad.clickTrackingUrl }),
-          ...(ad.impressionTrackingUrl && { impression_tracking_url: ad.impressionTrackingUrl }),
-          ...(ad.deeplink && { deeplink: ad.deeplink, deeplink_type: ad.deeplinkType || "NORMAL" }),
-          // Advanced
-          ...(ad.aigcDisclosureType && ad.aigcDisclosureType !== "NOT_DECLARED" && { aigc_disclosure_type: ad.aigcDisclosureType }),
-          ...(ad.instantProductPageUsed && { instant_product_page_used: true }),
-        }],
-      })),
+      ads: isCatalogListing
+        ? []
+        : creative.ads.map((ad) => ({
+          advertiser_id: creative.identity?.identityId || "<ADVERTISER_ID>",
+          adgroup_id: "<ADGROUP_ID>",
+          creatives: [{
+            ad_name: ad.name,
+            ad_format: ad.sparkAdEnabled ? "SINGLE_VIDEO" : ad.adFormat,
+            identity_type: creative.identity?.identityType ?? "CUSTOMIZED_USER",
+            identity_id: creative.identity?.identityId || "<ADVERTISER_ID>",
+            ...(creative.identity?.avatarPreviewUrl && { avatar_icon_web_uri: "<UPLOADED_AVATAR_URI>" }),
+            ...(ad.sparkAdEnabled
+              ? { tiktok_item_id: `<RESOLVED_ITEM_ID:${ad.sparkAdAuthCode || "pending"}>` }
+              : {
+                  ad_text: (ad.adText || "").slice(0, 100),
+                  display_name: ad.displayName || creative.identity?.displayName || "",
+                  call_to_action: ad.callToAction,
+                  ...(ad.landingPageUrl && { landing_page_url: ad.landingPageUrl }),
+                }),
+            ...(ad.adFormat === "SINGLE_VIDEO" && !ad.sparkAdEnabled && ad.assets.length > 0 && { video_id: ad.assets[0].mediaId || "<VIDEO_ID>" }),
+            ...(ad.adFormat === "SINGLE_IMAGE" && ad.assets.length > 0 && { image_ids: [ad.assets[0].mediaId || "<IMAGE_ID>"] }),
+            ...(ad.adFormat === "CAROUSEL" && ad.carouselCards.length > 0 && {
+              image_ids: ad.carouselCards.map((_, i) => `<IMAGE_ID_${i + 1}>`),
+            }),
+            ...(ad.musicFile && { music_id: "<UPLOADED_MUSIC_ID>" }),
+            promotional_music_disabled: ad.promotionalMusicDisabled ?? (ad.adFormat !== "CAROUSEL"),
+            ...(ad.sparkAdEnabled && ad.sparkDuetStatus && { item_duet_status: ad.sparkDuetStatus }),
+            ...(ad.sparkAdEnabled && ad.sparkStitchStatus && { item_stitch_status: ad.sparkStitchStatus }),
+            ...(ad.clickTrackingUrl && { click_tracking_url: ad.clickTrackingUrl }),
+            ...(ad.impressionTrackingUrl && { impression_tracking_url: ad.impressionTrackingUrl }),
+            ...(ad.deeplink && { deeplink: ad.deeplink, deeplink_type: ad.deeplinkType || "NORMAL" }),
+            ...(ad.aigcDisclosureType && ad.aigcDisclosureType !== "NOT_DECLARED" && { aigc_disclosure_type: ad.aigcDisclosureType }),
+            ...(ad.instantProductPageUsed && { instant_product_page_used: true }),
+          }],
+        })),
     };
   }, [objective, audience, budget, creative]);
 
@@ -531,6 +591,24 @@ export function TikTokStepReview() {
                   ))}
                 </div>
               </SectionCard>
+
+              {/* ---- Advisory warnings ---- */}
+              {advisories.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+                  <div className="mb-2 flex items-center gap-2">
+                    <AlertCircle className="size-4 text-amber-600" />
+                    <span className="text-xs font-semibold text-amber-800 dark:text-amber-400">Heads up</span>
+                  </div>
+                  <ul className="space-y-1">
+                    {advisories.map((msg, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+                        <span className="mt-1 block size-1 shrink-0 rounded-full bg-amber-500" />
+                        {msg}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* ---- Objective ---- */}
               <SectionCard>
