@@ -3655,7 +3655,7 @@ export function TikTokStepCreative() {
         onPrevious={() => setStep(2)}
         onNext={() => setStep(4)}
         previousLabel="Previous"
-        nextLabel="Next: Review & Launch"
+        nextLabel="Next"
         nextDisabled={passingChecks < allChecks.length}
       />
     </TooltipProvider>

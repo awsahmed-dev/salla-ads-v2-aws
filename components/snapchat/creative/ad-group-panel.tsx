@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import {
   Pencil,
   Copy,
@@ -19,6 +18,7 @@ import {
   Sparkles,
   Upload,
   AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import type { AdGroup, AdFormat, AdDestination, CreativeAsset, WebViewCTA, CampaignObjective } from "@/lib/snapchat/campaign-types";
 import { deriveCreativeType, makeDefaultDynamicTemplate, OBJECTIVE_CONFIGS } from "@/lib/snapchat/campaign-types";
@@ -192,18 +192,19 @@ export function AdGroupPanel({
 
   const changeFormat = (newFormat: AdFormat) => {
     if (newFormat === ad.adFormat) return;
-    const dest = newFormat === "SINGLE" ? (allowedDestinations[0] ?? "WEBSITE") : ad.adDestination;
+    const isNewInfluencer = newFormat === "INFLUENCER";
+    const dest = (newFormat === "SINGLE" || isNewInfluencer) ? (allowedDestinations[0] ?? "WEBSITE") : ad.adDestination;
     const adType = deriveCreativeType(newFormat, dest);
     const defaultAssets =
       newFormat === "DYNAMIC" ? [] :
-      ad.isInfluencer && newFormat === "SINGLE" ? [makeAsset({ mediaSource: "ad_code" })] :
+      isNewInfluencer ? [makeAsset({ mediaSource: "ad_code" })] :
       [makeAsset(defaultAssetForDest(dest))];
     onUpdate({
       ...ad,
       adFormat: newFormat,
       adDestination: dest,
       adType,
-      isInfluencer: newFormat !== "SINGLE" ? false : ad.isInfluencer,
+      isInfluencer: isNewInfluencer,
       assets: defaultAssets,
       collectionTiles: [],
       dynamicTemplateConfig: newFormat === "DYNAMIC" ? makeDefaultDynamicTemplate() : undefined,
@@ -215,7 +216,7 @@ export function AdGroupPanel({
   const changeDestination = (newDest: AdDestination) => {
     if (newDest === ad.adDestination) return;
     const adType = deriveCreativeType(ad.adFormat, newDest);
-    const newAssets = ad.isInfluencer
+    const newAssets = influencer
       ? ad.assets
       : ad.assets.length === 0
         ? [makeAsset(defaultAssetForDest(newDest))]
@@ -226,22 +227,6 @@ export function AdGroupPanel({
       adType,
       assets: newAssets,
     });
-  };
-
-  const toggleInfluencer = (enabled: boolean) => {
-    if (enabled) {
-      onUpdate({
-        ...ad,
-        isInfluencer: true,
-        assets: [makeAsset({ mediaSource: "ad_code" })],
-      });
-    } else {
-      onUpdate({
-        ...ad,
-        isInfluencer: false,
-        assets: [makeAsset(defaultAssetForDest(ad.adDestination))],
-      });
-    }
   };
 
   const assetCount = ad.assets.length;
@@ -299,7 +284,7 @@ export function AdGroupPanel({
           )}
           <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
             {formatOption && <span className="shrink-0 [&>svg]:size-3">{formatOption.icon}</span>}
-            <span className="font-medium">{getFormatLabel(ad.adFormat)}{ad.adFormat === "SINGLE" ? ` · ${getDestinationLabel(ad.adDestination)}` : ""}{influencer ? " · Influencer" : ""}</span>
+            <span className="font-medium">{getFormatLabel(ad.adFormat)}{ad.adFormat === "SINGLE" ? ` · ${getDestinationLabel(ad.adDestination)}` : ""}</span>
             <span className="text-border">·</span>
             {ad.adFormat === "DYNAMIC" ? (
               <span>Catalog Product Ad</span>
@@ -312,11 +297,11 @@ export function AdGroupPanel({
 
         {/* Actions */}
         <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-          <button type="button" onClick={onDuplicate} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Duplicate ad group">
+          <button type="button" onClick={onDuplicate} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" title="Duplicate ad">
             <Copy className="size-3.5" />
           </button>
           {totalAds > 1 && (
-            <button type="button" onClick={onRemove} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive" title="Remove ad group">
+            <button type="button" onClick={onRemove} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive" title="Remove ad">
               <Trash2 className="size-3.5" />
             </button>
           )}
@@ -331,7 +316,7 @@ export function AdGroupPanel({
           <div className="px-4 py-4">
             <div className="mb-3 flex items-center gap-1.5">
               <Label className="text-xs font-semibold text-foreground">Ad Format</Label>
-              <InfoTip text="Each ad group uses one format. Create separate ad groups to test different formats." />
+              <InfoTip text="Choose the format for this ad. You can add more ads with different formats." />
             </div>
 
             <div className="grid gap-1.5 grid-cols-2 sm:grid-cols-4">
@@ -369,8 +354,8 @@ export function AdGroupPanel({
               })}
             </div>
 
-            {/* ── Destination selector (SINGLE format only, hidden when only 1 option) ── */}
-            {ad.adFormat === "SINGLE" && allowedDestinations.length > 1 && (
+            {/* ── Destination selector (SINGLE / INFLUENCER format only, hidden when only 1 option) ── */}
+            {(ad.adFormat === "SINGLE" || ad.adFormat === "INFLUENCER") && allowedDestinations.length > 1 && (
               <div className="mt-4">
                 <div className="mb-2 flex items-center gap-1.5">
                   <Label className="text-xs font-semibold text-foreground">Destination</Label>
@@ -404,19 +389,6 @@ export function AdGroupPanel({
               </div>
             )}
 
-            {/* ── Influencer toggle (SINGLE format only) ── */}
-            {ad.adFormat === "SINGLE" && (
-              <div className="mt-4 flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <Users className={cn("size-4", influencer ? "text-primary" : "text-muted-foreground")} />
-                  <div>
-                    <Label className="text-xs font-semibold text-foreground">Use Influencer Content</Label>
-                    <p className="text-[10px] text-muted-foreground">Paste the Ad Code shared by an influencer from their Snapchat app</p>
-                  </div>
-                </div>
-                <Switch checked={influencer} onCheckedChange={toggleInfluencer} />
-              </div>
-            )}
           </div>
 
           {/* ── Dynamic Ad Config ── */}
@@ -433,7 +405,7 @@ export function AdGroupPanel({
                 <div className="flex items-center gap-1.5">
                   <ImagePlus className="size-3.5 text-muted-foreground" />
                   <Label className="text-xs font-semibold text-foreground">
-                    {ad.adFormat === "COLLECTION" ? "Top Snap" : ad.adFormat === "STORY" ? "Story Snaps" : ad.adDestination === "LEAD_FORM" ? "Top Snap Creative" : "Creatives"}
+                    {ad.adFormat === "COLLECTION" ? "Top Snap" : ad.adFormat === "STORY" ? "Story Snaps" : ad.adDestination === "LEAD_FORM" ? "Top Snap Creative" : ad.adFormat === "INFLUENCER" ? "Influencer Creatives" : "Creatives"}
                   </Label>
                   <span className={cn(
                     "rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums",
@@ -574,43 +546,83 @@ export function AdGroupPanel({
               onClick={() => setShowTracking(!showTracking)}
               className="flex w-full items-center justify-between px-4 py-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              <span>Third-Party Tracking</span>
+              <div className="flex items-center gap-2">
+                <span>Third-Party Tracking</span>
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">Optional</span>
+              </div>
               {showTracking ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
             </button>
             {showTracking && (
-              <div className="flex flex-col gap-3 border-t border-border px-4 py-3">
-                {([
-                  { key: "impressionUrl" as const, label: "Impression Tracking URL", placeholder: "https://tracker.example.com/impression", desc: "Fires when your ad is viewed" },
-                  { key: "swipeUpUrl" as const, label: "Swipe-Up Tracking URL", placeholder: "https://tracker.example.com/swipe", desc: "Fires when a user swipes up" },
-                ] as const).map(({ key, label, placeholder, desc }) => {
-                  const val = ad.trackingUrls?.[key] || "";
-                  const hasValue = val.trim().length > 0;
-                  const isValid = !hasValue || (() => { try { const u = new URL(val); return u.protocol === "https:"; } catch { return false; } })();
-                  return (
-                    <div key={key} className="flex flex-col gap-1">
-                      <Label className="text-xs font-medium text-foreground">{label}</Label>
-                      <Input
-                        placeholder={placeholder}
-                        type="url"
-                        value={val}
-                        onChange={(e) => onUpdate({
-                          ...ad,
-                          trackingUrls: {
-                            impressionUrl: ad.trackingUrls?.impressionUrl || "",
-                            swipeUpUrl: ad.trackingUrls?.swipeUpUrl || "",
-                            [key]: e.target.value,
-                          },
-                        })}
-                        className={cn("h-8 text-xs", hasValue && !isValid ? "border-red-300 focus-visible:ring-red-200" : "")}
-                      />
-                      {hasValue && !isValid ? (
-                        <p className="text-[11px] text-red-600">Must be a valid HTTPS URL (e.g. https://...)</p>
-                      ) : (
-                        <p className="text-[11px] text-muted-foreground">{desc}</p>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="flex flex-col gap-4 border-t border-border px-4 py-4">
+                {/* Explainer */}
+                <div className="rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2.5 dark:border-blue-900/40 dark:bg-blue-950/20">
+                  <p className="text-xs font-medium text-blue-800 dark:text-blue-300">What is this?</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-blue-700/80 dark:text-blue-400/80">
+                    If you use an external analytics tool like <span className="font-medium">Google Analytics, AppsFlyer, Adjust,</span> or <span className="font-medium">Branch</span>, you can paste their tracking URLs here. These URLs get &quot;pinged&quot; automatically when someone sees your ad or swipes up — so your analytics tool can count those events alongside your other marketing data.
+                  </p>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-blue-700/80 dark:text-blue-400/80">
+                    <span className="font-semibold">Don&apos;t have a tracking tool?</span> Skip this — Salla Ads built-in tracking already handles impressions and swipe-ups for you.
+                  </p>
+                </div>
+
+                {/* Tracking URL fields */}
+                <div className="flex flex-col gap-0 rounded-lg border border-border">
+                  {([
+                    {
+                      key: "impressionUrl" as const,
+                      label: "Impression Tracking",
+                      placeholder: "https://tracker.example.com/impression?campaign={campaign_id}",
+                      icon: "eye",
+                      hint: "Triggered each time your ad appears on someone's screen",
+                    },
+                    {
+                      key: "swipeUpUrl" as const,
+                      label: "Swipe-Up Tracking",
+                      placeholder: "https://tracker.example.com/click?campaign={campaign_id}",
+                      icon: "pointer",
+                      hint: "Triggered when someone swipes up on your ad",
+                    },
+                  ] as const).map(({ key, label, placeholder, icon, hint }, idx) => {
+                    const val = ad.trackingUrls?.[key] || "";
+                    const hasValue = val.trim().length > 0;
+                    const isValid = !hasValue || (() => { try { const u = new URL(val); return u.protocol === "https:"; } catch { return false; } })();
+                    return (
+                      <div key={key} className={cn("flex flex-col gap-1.5 px-3 py-3", idx > 0 && "border-t border-border")}>
+                        <div className="flex items-center gap-2">
+                          {icon === "eye" ? (
+                            <svg className="size-3.5 text-muted-foreground" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><ellipse cx="8" cy="8" rx="6" ry="4"/><circle cx="8" cy="8" r="1.5"/></svg>
+                          ) : (
+                            <svg className="size-3.5 text-muted-foreground" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12l4-8 2 4 3-2"/><path d="M10 8l2 4H8"/></svg>
+                          )}
+                          <Label className="text-xs font-medium text-foreground">{label}</Label>
+                          <InfoTip text={hint} />
+                        </div>
+                        <Input
+                          placeholder={placeholder}
+                          type="url"
+                          value={val}
+                          onChange={(e) => onUpdate({
+                            ...ad,
+                            trackingUrls: {
+                              impressionUrl: ad.trackingUrls?.impressionUrl || "",
+                              swipeUpUrl: ad.trackingUrls?.swipeUpUrl || "",
+                              [key]: e.target.value,
+                            },
+                          })}
+                          className={cn("h-8 text-xs font-mono", hasValue && !isValid ? "border-red-300 focus-visible:ring-red-200" : "", hasValue && isValid ? "border-emerald-300" : "")}
+                        />
+                        {hasValue && !isValid && (
+                          <p className="text-[10px] text-red-600">Must be a valid HTTPS URL (e.g. https://...)</p>
+                        )}
+                        {hasValue && isValid && (
+                          <p className="flex items-center gap-1 text-[10px] text-emerald-600">
+                            <CheckCircle2 className="size-2.5" /> Valid URL
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

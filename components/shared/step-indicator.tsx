@@ -8,7 +8,7 @@ export interface StepConfig {
   step: number;
 }
 
-/** Unified step names for all platforms: Audience → Budget → Ad Design → Launch */
+/** Unified step names for all platforms: Audience -> Budget -> Ad Design -> Launch */
 export const UNIFIED_WIZARD_STEPS: StepConfig[] = [
   { label: "Audience", step: 1 },
   { label: "Budget", step: 2 },
@@ -20,81 +20,98 @@ export type StepIndicatorAccent = "primary" | "meta" | "dv360";
 
 const ACCENT_CLASSES: Record<
   StepIndicatorAccent,
-  { circle: string; label: string; line: string }
+  { dot: string; label: string; bar: string; ring: string }
 > = {
   primary: {
-    circle: "bg-primary text-primary-foreground",
+    dot: "bg-primary",
     label: "text-primary",
-    line: "bg-primary",
+    bar: "bg-primary",
+    ring: "ring-primary/30",
   },
   meta: {
-    circle: "bg-[#1877F2] text-white",
+    dot: "bg-[#1877F2]",
     label: "text-[#1877F2]",
-    line: "bg-[#1877F2]",
+    bar: "bg-[#1877F2]",
+    ring: "ring-[#1877F2]/30",
   },
   dv360: {
-    circle: "bg-red-600 text-white",
+    dot: "bg-red-600",
     label: "text-red-600",
-    line: "bg-red-600",
+    bar: "bg-red-600",
+    ring: "ring-red-600/30",
   },
 };
 
 interface StepIndicatorProps {
   steps: StepConfig[];
   current: number;
-  /** Platform accent for active/done state. Default: primary (Snapchat, TikTok, Google). */
   accent?: StepIndicatorAccent;
 }
 
-/**
- * Reusable step progress indicator for campaign wizards.
- * Unified across all platforms: same layout, naming (Audience, Budget, Ad Design, Launch), and behaviour.
- * Connector line fills only when current step is past that segment (current > step number).
- */
 export function StepIndicator({
   steps,
   current,
   accent = "primary",
 }: StepIndicatorProps) {
   const styles = ACCENT_CLASSES[accent];
+  const total = steps.length;
+  const fillPct = ((Math.min(current, total) - 1) / (total - 1)) * 100;
+
   return (
     <nav aria-label="Campaign progress" className="w-full">
-      <ol className="flex items-center gap-0">
-        {steps.map((s, i) => {
+      {/* Step labels */}
+      <div className="flex justify-between mb-3">
+        {steps.map((s) => {
           const done = current > s.step;
           const active = current === s.step;
           return (
-            <li key={s.step} className="flex flex-1 items-center">
-              <div className="flex flex-col items-center gap-1.5">
-                <div
-                  className={cn(
-                    "flex size-8 items-center justify-center rounded-full text-xs font-bold transition-colors",
-                    done ? styles.circle : active ? styles.circle : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {done ? <Check className="size-4" /> : i + 1}
-                </div>
-                <span
-                  className={cn(
-                    "text-sm font-medium",
-                    active ? styles.label : "text-muted-foreground"
-                  )}
-                >
-                  {s.label}
-                </span>
-              </div>
-              {i < steps.length - 1 && (
-                <div
-                  className={cn(
-                    "mx-2 h-0.5 flex-1",
-                    current > s.step ? styles.line : "bg-border"
-                  )}
-                />
+            <span
+              key={s.step}
+              className={cn(
+                "flex items-center gap-1 text-xs font-medium transition-colors",
+                active ? cn(styles.label, "font-semibold") : done ? "text-foreground" : "text-muted-foreground"
               )}
-            </li>
+            >
+              {done && <Check className="size-3" />}
+              {s.label}
+            </span>
           );
         })}
-      </ol>
+      </div>
+
+      {/* Progress track */}
+      <div className="relative h-1 w-full rounded-full bg-border/60">
+        {/* Filled bar */}
+        <div
+          className={cn("absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out", styles.bar)}
+          style={{ width: `${fillPct}%` }}
+        />
+
+        {/* Step dots */}
+        {steps.map((s, i) => {
+          const done = current > s.step;
+          const active = current === s.step;
+          const left = (i / (total - 1)) * 100;
+          return (
+            <div
+              key={s.step}
+              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${left}%` }}
+            >
+              <div
+                className={cn(
+                  "size-2.5 rounded-full transition-all",
+                  done
+                    ? styles.dot
+                    : active
+                      ? cn(styles.dot, "ring-4", styles.ring)
+                      : "bg-border"
+                )}
+              />
+            </div>
+          );
+        })}
+      </div>
     </nav>
   );
 }

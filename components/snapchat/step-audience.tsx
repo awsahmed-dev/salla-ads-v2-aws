@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useCampaign } from "@/lib/snapchat/campaign-context";
 import { cn } from "@/lib/utils";
-import { getCityById, getCountryByCode } from "@/lib/locations";
+import { getCityById, getCountryByCode, REGIONS } from "@/lib/locations";
 import { LocationSelector } from "@/components/shared/location-selector";
 import { LocationReachCard } from "@/components/shared/location-reach-card";
 import { DeliveryCheckCard } from "@/components/shared/delivery-check-card";
@@ -14,6 +14,7 @@ import { DeviceTargetingCard } from "@/components/shared/device-targeting-card";
 import { InterestTargetingCard } from "@/components/shared/interest-targeting-card";
 import { TargetingSummaryCard } from "@/components/shared/targeting-summary-card";
 import { AudienceReadinessChecklist } from "@/components/shared/audience-readiness-checklist";
+import { LocationMapPreview } from "@/components/shared/location-map-preview";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
@@ -28,7 +29,6 @@ import {
 } from "@/components/ui/tooltip";
 import {
   ChevronDown,
-  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 
@@ -36,20 +36,7 @@ import {
 /*  Static data                                                        */
 /* ------------------------------------------------------------------ */
 
-const INTERESTS = [
-  { id: "SLC_1", label: "Fashion & Apparel" },
-  { id: "SLC_2", label: "Beauty & Skincare" },
-  { id: "SLC_3", label: "Electronics & Tech" },
-  { id: "SLC_4", label: "Food & Dining" },
-  { id: "SLC_5", label: "Fitness & Wellness" },
-  { id: "SLC_6", label: "Gaming" },
-  { id: "SLC_7", label: "Travel" },
-  { id: "SLC_8", label: "Automotive" },
-  { id: "SLC_9", label: "Home & Living" },
-  { id: "SLC_10", label: "Sports" },
-  { id: "SLC_11", label: "Shopping" },
-  { id: "SLC_12", label: "Kids & Parenting" },
-];
+import { SNAP_INTEREST_GROUPS, getInterestById } from "@/lib/interest-targeting";
 
 
 /* ------------------------------------------------------------------ */
@@ -107,6 +94,7 @@ export function StepAudience() {
                     radiusKm: c.radius / 1000,
                   };
                 }),
+                regions: aud.regions ?? [],
               }}
               onChange={(next) => {
                 updateNested("audience", {
@@ -118,6 +106,7 @@ export function StepAudience() {
                     lng: c.lng,
                     radius: Math.round(c.radiusKm * 1000),
                   })),
+                  regions: next.regions ?? [],
                 });
               }}
               enableCityTargeting
@@ -142,11 +131,15 @@ export function StepAudience() {
             languageRequired={aud.countries.length > 1}
           />
 
-          {/* ---- 3. Interests (unified) ---- */}
+          {/* ---- 3. Interest Targeting (Snap SLC with groups) ---- */}
           <InterestTargetingCard
-            options={INTERESTS}
-            value={aud.interests}
-            onChange={(ids) => updateNested("audience", { interests: ids })}
+            groups={SNAP_INTEREST_GROUPS}
+            includeIds={aud.interests}
+            excludeIds={aud.interestsExclude ?? []}
+            onIncludeChange={(ids) => updateNested("audience", { interests: ids })}
+            onExcludeChange={(ids) => updateNested("audience", { interestsExclude: ids })}
+            interestExpansion={aud.interestExpansion}
+            onInterestExpansionChange={(v) => updateNested("audience", { interestExpansion: v })}
             accent="primary"
           />
 
@@ -185,7 +178,7 @@ export function StepAudience() {
                 )}
               />
               Advanced Settings
-              <span className="ml-auto text-xs text-muted-foreground">Custom audiences, devices, expansion</span>
+              <span className="ml-auto text-xs text-muted-foreground">Audiences, devices, expansion</span>
             </button>
 
             {showAdvanced && (
@@ -213,70 +206,90 @@ export function StepAudience() {
                   accent="primary"
                 />
 
-                {/* Regulated Content + Audience Expansion */}
+                {/* Audience Expansion — maps to Snap API auto_expansion_options */}
                 <SectionCard>
-                  <div className="flex flex-col gap-4">
-                    {/* Regulated Content */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck className="size-4 text-primary" />
-                        <div>
-                          <Label className="text-sm font-semibold text-foreground">Regulated Content</Label>
-                          <p className="text-xs text-muted-foreground">
-                            Enable if your ads promote regulated products (e.g., alcohol, pharmaceuticals).
+                  <div className="flex flex-col gap-0">
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
+                        <Sparkles className="size-4 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <Label className="text-sm font-semibold text-foreground">Audience Expansion</Label>
+                        <p className="text-[11px] text-muted-foreground leading-tight">
+                          Let Snapchat find more people similar to your targeting for better results
+                        </p>
+                      </div>
+                      <InfoTip text="Snap's expansion algorithms find users similar to your targeting settings. Interest Expansion is managed in the Interest Targeting card above. All options map to the API's auto_expansion_options." />
+                    </div>
+
+                    <div className="space-y-0 divide-y divide-border rounded-lg border border-border">
+                      {/* Custom Audience Expansion */}
+                      <div className="flex items-center gap-3 px-3 py-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-foreground">Custom Audience Expansion</p>
+                          <p className="text-[11px] text-muted-foreground leading-tight">
+                            Find users similar to your custom audience segments
                           </p>
                         </div>
+                        <Switch
+                          checked={aud.customAudienceExpansion}
+                          onCheckedChange={(v) => {
+                            const update: Record<string, unknown> = { customAudienceExpansion: v };
+                            if (!v && aud.smartTargeting) update.smartTargeting = false;
+                            updateNested("audience", update);
+                          }}
+                        />
                       </div>
-                      <Switch
-                        checked={aud.regulatedContent}
-                        onCheckedChange={(v) =>
-                          updateNested("audience", { regulatedContent: v })
-                        }
-                      />
-                    </div>
 
-                    <div className="h-px bg-border" />
-
-                    {/* Audience Expansion */}
-                    <div>
-                      <Label className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <Sparkles className="size-4 text-primary" />
-                        Audience Expansion
-                        <InfoTip text="Automatically find similar users beyond your targeting settings for better performance. Recommended for Sales campaigns." />
-                      </Label>
-                      <div className="flex flex-col gap-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs font-medium text-foreground">Interest Expansion</p>
-                            <p className="text-xs text-muted-foreground">
-                              Let Snapchat find users with similar interests beyond your selections.
-                            </p>
+                      {/* Smart Targeting */}
+                      <div className={cn(
+                        "flex items-center gap-3 px-3 py-3 transition-opacity",
+                        (!aud.interestExpansion || !aud.customAudienceExpansion) && "opacity-50"
+                      )}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs font-medium text-foreground">Smart Targeting</p>
+                            <span className="rounded bg-amber-100 px-1 py-px text-[8px] font-bold uppercase text-amber-700">Recommended</span>
                           </div>
-                          <Switch
-                            checked={aud.interestExpansion}
-                            onCheckedChange={(v) =>
-                              updateNested("audience", { interestExpansion: v })
-                            }
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-xs font-medium text-foreground">Custom Audience Expansion</p>
-                            <p className="text-xs text-muted-foreground">
-                              Find users similar to your custom audience segments.
+                          <p className="text-[11px] text-muted-foreground leading-tight">
+                            Expand beyond gender and age limits to maximize conversions. Requires both expansion options enabled.
+                          </p>
+                          {aud.smartTargeting && aud.interestExpansion && aud.customAudienceExpansion && (
+                            <p className="mt-1 text-[10px] text-primary font-medium">
+                              Active — Snap will optimize across demographics for best performance
                             </p>
-                          </div>
-                          <Switch
-                            checked={aud.customAudienceExpansion}
-                            onCheckedChange={(v) =>
-                              updateNested("audience", {
-                                customAudienceExpansion: v,
-                              })
-                            }
-                          />
+                          )}
                         </div>
+                        <Switch
+                          checked={aud.smartTargeting}
+                          disabled={!aud.interestExpansion || !aud.customAudienceExpansion}
+                          onCheckedChange={(v) =>
+                            updateNested("audience", { smartTargeting: v })
+                          }
+                        />
                       </div>
                     </div>
+
+                    {/* Status summary */}
+                    {(aud.interestExpansion || aud.customAudienceExpansion || aud.smartTargeting) && (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {aud.interestExpansion && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                            <Sparkles className="size-2.5" /> Interest
+                          </span>
+                        )}
+                        {aud.customAudienceExpansion && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                            <Sparkles className="size-2.5" /> Custom Audience
+                          </span>
+                        )}
+                        {aud.smartTargeting && aud.interestExpansion && aud.customAudienceExpansion && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                            <Sparkles className="size-2.5" /> Smart Targeting
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </SectionCard>
               </div>
@@ -290,6 +303,22 @@ export function StepAudience() {
         {/* ============================================================ */}
         <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
           <div className="sticky top-20 flex flex-col gap-4">
+
+            {/* ---- Map Preview ---- */}
+            <LocationMapPreview
+              countryCodes={aud.countries}
+              cities={aud.cities.map((c) => {
+                const meta = getCityById(c.id);
+                return {
+                  id: c.id,
+                  name: c.name,
+                  countryCode: meta?.countryCode ?? "",
+                  lat: c.lat,
+                  lng: c.lng,
+                  radiusKm: c.radius / 1000,
+                };
+              })}
+            />
 
             {/* ---- Reach in selected locations (shared, location-only) ---- */}
             <LocationReachCard
@@ -321,11 +350,16 @@ export function StepAudience() {
               accent="primary"
               rows={[
                 { label: "Countries", value: aud.countries.length > 0 ? aud.countries.map((c) => getCountryByCode(c)?.name ?? c).join(", ") : "None" },
+                ...((aud.regions ?? []).length > 0 ? [{ label: "Regions", value: (aud.regions ?? []).map((r) => REGIONS.find((reg) => reg.id === r)?.name ?? r).join(", ") }] : []),
                 ...(aud.cities.length > 0 ? [{ label: "Cities", value: aud.cities.map((c) => c.name).join(", ") }] : []),
                 { label: "Gender", value: aud.genders.length === 2 ? "All" : aud.genders.length === 1 ? aud.genders[0] : "None" },
                 { label: "Age", value: `${aud.ageMin} - ${aud.ageMax === 55 ? "55+" : aud.ageMax}` },
                 { label: "Languages", value: aud.languages.length > 0 ? aud.languages.map((l) => SUPPORTED_LANGUAGES.find((x) => x.code === l)?.label || l).join(", ") : "All" },
-                { label: "Interests", value: aud.interests.length > 0 ? `${aud.interests.length} selected` : "All" },
+                { label: "Interests", value: aud.interests.length > 0
+                  ? aud.interests.slice(0, 3).map((id) => getInterestById(id)?.label ?? id).join(", ") + (aud.interests.length > 3 ? ` +${aud.interests.length - 3}` : "")
+                  : "All"
+                },
+                ...((aud.interestsExclude ?? []).length > 0 ? [{ label: "Excluded interests", value: `${(aud.interestsExclude ?? []).length} excluded`, highlight: true }] : []),
                 { label: "Devices", value: aud.deviceOS.length === 2 ? "All" : aud.deviceOS.join(", ") || "All" },
                 ...(aud.excludeRecentPurchasers ? [{ label: "Exclude buyers", value: `Last ${aud.excludeRecentPurchasersDays}d`, highlight: true }] : []),
                 ...(aud.sallaAudienceEnabled && aud.sallaAudienceCategory ? [{ label: "Lookalike", value: aud.sallaAudienceCategory, highlight: true }] : []),
@@ -338,7 +372,7 @@ export function StepAudience() {
       <WizardStepFooter
         onPrevious={() => setStep(0)}
         onNext={() => setStep(2)}
-        nextLabel="Next: Budget & Schedule"
+        nextLabel="Next"
         nextDisabled={readinessPassed < readinessChecks.length}
         accent="primary"
       />

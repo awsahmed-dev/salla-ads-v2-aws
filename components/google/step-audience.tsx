@@ -14,7 +14,7 @@ import { DeviceTargetingCard } from "@/components/shared/device-targeting-card";
 import { TargetingSummaryCard, type TargetingSummaryRow } from "@/components/shared/targeting-summary-card";
 import { AudienceReadinessChecklist } from "@/components/shared/audience-readiness-checklist";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
-import { InterestTargetingCard } from "@/components/shared/interest-targeting-card";
+import { LegacyInterestTargetingCard as InterestTargetingCard } from "@/components/shared/interest-targeting-card";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
 import { minMaxToAgeBands, ageBandsToMinMax, SUPPORTED_LANGUAGES } from "@/lib/demographics";
@@ -456,6 +456,7 @@ export function GoogleStepAudience() {
             <LocationSelector
               value={{
                 countryCodes: aud.locationIds,
+                regions: [],
                 cities: (aud.cityIds ?? [])
                   .map((id) => getCityById(id))
                   .filter((c): c is NonNullable<typeof c> => c != null)
@@ -1812,7 +1813,7 @@ export function GoogleStepAudience() {
       <WizardStepFooter
         onPrevious={() => setStep(0)}
         onNext={() => setStep(2)}
-        nextLabel="Next: Budget & Bidding"
+        nextLabel="Next"
         nextDisabled={!canProceed}
         accent="primary"
       />

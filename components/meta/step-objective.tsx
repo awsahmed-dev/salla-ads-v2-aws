@@ -852,7 +852,7 @@ export function MetaStepObjective() {
         hidePrevious
         onPrevious={() => {}}
         onNext={() => setStep(1)}
-        nextLabel="Next: Audience"
+        nextLabel="Next"
         nextDisabled={!canProceed}
         accent="meta"
       />

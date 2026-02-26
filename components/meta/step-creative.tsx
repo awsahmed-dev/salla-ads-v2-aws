@@ -1696,7 +1696,7 @@ export function MetaStepCreative() {
         onPrevious={() => setStep(2)}
         onNext={() => setStep(4)}
         previousLabel="Previous"
-        nextLabel="Next: Review"
+        nextLabel="Next"
         nextDisabled={!isValid}
         accent="meta"
       />

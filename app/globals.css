@@ -123,3 +123,11 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Hide Mapbox branding in map preview */
+.mapboxgl-ctrl-logo,
+.mapboxgl-ctrl-attrib,
+.mapboxgl-ctrl-bottom-left,
+.mapboxgl-ctrl-bottom-right {
+  display: none !important;
+}

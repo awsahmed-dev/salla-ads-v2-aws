@@ -29,6 +29,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { OBJECTIVE_CONFIGS, type CampaignObjective, type AppPlatform, makeDefaultLeadForm, makeDefaultAppSettings } from "@/lib/snapchat/campaign-types";
+import { getSnapPixel, type SnapPixelInfo } from "@/lib/salla/store-api";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { StepZeroHeader } from "@/components/shared/step-zero-header";
 
@@ -125,6 +126,12 @@ export function StepObjective() {
   const selectedObj = OBJECTIVES.find((o) => o.value === obj.objective)!;
   const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [connectedPixel, setConnectedPixel] = useState<SnapPixelInfo | null>(null);
+
+  // Load connected Snap Pixel from Salla
+  useEffect(() => {
+    getSnapPixel().then(setConnectedPixel);
+  }, []);
 
   useEffect(() => {
     if (!obj.campaignName && obj.objective === "SALES") return;
@@ -455,7 +462,17 @@ export function StepObjective() {
                     {/* Connect existing */}
                     <button
                       type="button"
-                      onClick={() => updateNested("objective", { pixelMode: "existing" })}
+                      onClick={() => {
+                        if (connectedPixel) {
+                          updateNested("objective", {
+                            pixelMode: "existing",
+                            pixelId: connectedPixel.pixelId,
+                            pixelName: connectedPixel.name,
+                          });
+                        } else {
+                          updateNested("objective", { pixelMode: "existing" });
+                        }
+                      }}
                       className={cn(
                         "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all",
                         obj.pixelMode === "existing"
@@ -481,8 +498,46 @@ export function StepObjective() {
                     </button>
                   </div>
 
-                  {/* Existing pixel input */}
-                  {obj.pixelMode === "existing" && (
+                  {/* Existing pixel — authenticated state (connected via Salla) */}
+                  {obj.pixelMode === "existing" && connectedPixel && (
+                    <div className="mt-4 rounded-lg border border-primary/20 bg-primary/[0.03] p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                          <Scan className="size-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">{connectedPixel.name}</p>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">{connectedPixel.domain}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "rounded-full px-2 py-0 text-[9px] font-medium",
+                              connectedPixel.status === "ACTIVE"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-amber-200 bg-amber-50 text-amber-700"
+                            )}
+                          >
+                            {connectedPixel.status === "ACTIVE" ? "Active" : connectedPixel.status === "PENDING" ? "Pending" : "Inactive"}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground">
+                            Last event {(() => {
+                              const mins = Math.round((Date.now() - new Date(connectedPixel.lastEventAt).getTime()) / 60000);
+                              return mins < 60 ? `${mins}m ago` : `${Math.round(mins / 60)}h ago`;
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                        <ShieldCheck className="size-3.5 shrink-0 text-emerald-600" />
+                        <p className="text-xs text-emerald-700">Pixel connected and tracking events on your store.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Existing pixel — not authenticated (no Snap account connected) */}
+                  {obj.pixelMode === "existing" && !connectedPixel && (
                     <div className="mt-4 rounded-lg border border-border bg-muted/20 p-4">
                       <Label className="mb-1.5 block text-xs font-medium text-foreground">Pixel ID</Label>
                       <Input
@@ -635,7 +690,7 @@ export function StepObjective() {
         hidePrevious
         onPrevious={() => {}}
         onNext={() => setStep(1)}
-        nextLabel="Next: Audience"
+        nextLabel="Next"
         nextDisabled={
           !obj.campaignName.trim() ||
           (currentConfig.pixelRequirement === "required" &&

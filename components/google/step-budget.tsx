@@ -84,13 +84,13 @@ const BUDGET_TYPES: {
   {
     value: "pay_as_you_go",
     label: "Pay as You Go",
-    desc: "Budget is spent daily. You're charged as impressions are delivered.",
+    desc: "Charged daily, stop anytime",
     icon: <CreditCard className="size-4" />,
   },
   {
     value: "prepaid",
     label: "Prepaid (Fixed)",
-    desc: "Full budget reserved upfront. Campaign stops when the limit is reached.",
+    desc: "Pay upfront, fixed budget",
     icon: <Wallet className="size-4" />,
   },
 ];
@@ -350,12 +350,7 @@ export function GoogleStepBudget() {
 
   const canProceed = dailyAmount >= 50;
 
-  const budgetNextLabel =
-    campaign.objective.objective === "APP" ? "Continue to App Ads" :
-    campaign.objective.objective === "DISPLAY" ? "Continue to Display Ads" :
-    campaign.objective.objective === "SEARCH" ? "Continue to Search Ads" :
-    isShopping ? "Continue to Product Groups" :
-    isDemandGen ? "Continue to Creative" : "Continue to Asset Group";
+  const budgetNextLabel = "Next";
 
   return (
     <TooltipProvider delayDuration={200}>

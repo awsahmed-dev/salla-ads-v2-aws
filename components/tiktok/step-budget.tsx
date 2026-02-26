@@ -285,13 +285,13 @@ const BUDGET_TYPES: {
   {
     value: "pay_as_you_go",
     label: "Pay as You Go",
-    desc: "Budget is spent daily. You're charged as impressions are delivered.",
+    desc: "Charged daily, stop anytime",
     icon: <CreditCard className="size-4" />,
   },
   {
     value: "prepaid",
     label: "Prepaid (Fixed)",
-    desc: "Full budget reserved upfront. Campaign stops when the limit is reached.",
+    desc: "Pay upfront, fixed budget",
     icon: <Wallet className="size-4" />,
   },
 ];
@@ -1010,7 +1010,7 @@ export function TikTokStepBudget() {
         onPrevious={() => setStep(1)}
         onNext={() => setStep(3)}
         previousLabel="Previous"
-        nextLabel="Next: Creative"
+        nextLabel="Next"
         nextDisabled={isTraffic && budget.optimizationGoal === "LANDING_PAGE_VIEW" && !hasPixel}
       />
     </TooltipProvider>

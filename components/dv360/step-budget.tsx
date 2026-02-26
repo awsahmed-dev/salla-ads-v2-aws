@@ -536,7 +536,7 @@ export function DV360StepBudget() {
         onPrevious={() => setStep(1)}
         onNext={() => setStep(3)}
         previousLabel="Previous"
-        nextLabel="Next: Video Ads"
+        nextLabel="Next"
         accent="dv360"
       />
     </TooltipProvider>

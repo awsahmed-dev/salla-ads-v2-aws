@@ -15,6 +15,7 @@ export interface GoalOption {
   recommended?: boolean;
   billingLabel?: string;
   bestFor?: string;
+  costHint?: string;
   requiresPixel?: boolean;
   requiresMMP?: boolean;
   locked?: boolean;
@@ -108,11 +109,11 @@ export function OptimizationGoalCard({
               disabled={isLocked}
               onClick={() => !isLocked && onGoalChange(g.value)}
               className={cn(
-                "flex flex-col items-center gap-2 rounded-xl border px-3 py-4 text-center transition-all",
+                "group relative flex flex-col items-center gap-2 rounded-xl border px-3 py-4 text-center transition-all",
                 selected
                   ? "border-primary bg-primary/5 shadow-sm"
                   : "border-border bg-background hover:border-primary/40",
-                isLocked && "cursor-not-allowed opacity-60"
+                isLocked && "cursor-not-allowed opacity-50"
               )}
             >
               {g.icon && (
@@ -121,35 +122,47 @@ export function OptimizationGoalCard({
                     "flex size-7 items-center justify-center rounded-lg",
                     selected
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
+                      : isLocked
+                        ? "bg-muted/60 text-muted-foreground/50"
+                        : "bg-muted text-muted-foreground"
                   )}
                 >
                   {g.icon}
                 </div>
               )}
               <div className="flex flex-wrap items-center justify-center gap-1">
-                <span className="text-xs font-semibold text-foreground">
+                <span className={cn("text-xs font-semibold", isLocked ? "text-muted-foreground" : "text-foreground")}>
                   {g.label}
                 </span>
-                {g.recommended && (
+                {g.recommended && !isLocked && (
                   <Badge className="rounded-full border-0 bg-emerald-100 px-1 py-0 text-[8px] font-medium text-emerald-700">
                     Best
                   </Badge>
                 )}
-                {g.requiresPixel && (
+                {g.requiresPixel && !isLocked && (
                   <Badge variant="outline" className="rounded-full px-1 py-0 text-[8px]">
                     Pixel
                   </Badge>
                 )}
-                {isLocked && (
+                {isLocked && g.requiresPixel && (
+                  <Badge variant="outline" className="rounded-full border-amber-300 bg-amber-50 px-1 py-0 text-[8px] text-amber-600">
+                    Pixel needed
+                  </Badge>
+                )}
+                {isLocked && g.requiresMMP && (
                   <Badge variant="outline" className="rounded-full border-orange-300 bg-orange-50 px-1 py-0 text-[8px] text-orange-600">
-                    MMP Required
+                    MMP needed
                   </Badge>
                 )}
               </div>
               <p className="text-[10px] leading-snug text-muted-foreground">
-                {g.desc}
+                {isLocked && g.requiresPixel
+                  ? "Set up your Snap Pixel first to unlock this goal."
+                  : g.desc}
               </p>
+              {selected && g.costHint && (
+                <span className="mt-0.5 text-[9px] font-medium text-primary/70">{g.costHint}</span>
+              )}
             </button>
           ) : (
             <button
@@ -160,7 +173,7 @@ export function OptimizationGoalCard({
               className={cn(
                 "relative flex items-start gap-3.5 rounded-xl border px-4 py-4 text-left transition-all",
                 selected ? selectedClass : "border-border bg-background hover:border-primary/40",
-                isLocked && "cursor-not-allowed opacity-60"
+                isLocked && "cursor-not-allowed opacity-50"
               )}
               style={selected ? { ...accentBorder, ...accentBg } : undefined}
             >
@@ -170,7 +183,9 @@ export function OptimizationGoalCard({
                     "flex size-9 shrink-0 items-center justify-center rounded-lg",
                     selected
                       ? iconSelectedClass
-                      : "bg-muted text-muted-foreground"
+                      : isLocked
+                        ? "bg-muted/60 text-muted-foreground/50"
+                        : "bg-muted text-muted-foreground"
                   )}
                   style={selected && accent.startsWith("#") ? { backgroundColor: accent, color: "#fff" } : undefined}
                 >
@@ -182,13 +197,13 @@ export function OptimizationGoalCard({
                   <span
                     className={cn(
                       "text-sm font-semibold",
-                      selected ? labelSelectedClass : "text-foreground"
+                      selected ? labelSelectedClass : isLocked ? "text-muted-foreground" : "text-foreground"
                     )}
                     style={selected ? accentText : undefined}
                   >
                     {g.label}
                   </span>
-                  {g.recommended && (
+                  {g.recommended && !isLocked && (
                     <Badge className="rounded-full border-0 bg-emerald-100 px-1.5 py-0 text-[10px] font-medium text-emerald-700">
                       Recommended
                     </Badge>
@@ -198,9 +213,21 @@ export function OptimizationGoalCard({
                       {g.billingLabel}
                     </Badge>
                   )}
+                  {isLocked && g.requiresPixel && (
+                    <Badge variant="outline" className="rounded-full border-amber-300 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-600">
+                      Pixel needed
+                    </Badge>
+                  )}
+                  {isLocked && g.requiresMMP && (
+                    <Badge variant="outline" className="rounded-full border-orange-300 bg-orange-50 px-1.5 py-0 text-[10px] text-orange-600">
+                      MMP needed
+                    </Badge>
+                  )}
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {g.desc}
+                  {isLocked && g.requiresPixel
+                    ? "Set up your Snap Pixel in the Objective step to unlock this goal."
+                    : g.desc}
                 </p>
                 {selected && g.bestFor && (
                   <p
@@ -208,6 +235,11 @@ export function OptimizationGoalCard({
                     style={accent.startsWith("#") ? accentText : undefined}
                   >
                     {g.bestFor}
+                  </p>
+                )}
+                {selected && g.costHint && (
+                  <p className="mt-0.5 text-[11px] text-muted-foreground/80">
+                    {g.costHint}
                   </p>
                 )}
               </div>

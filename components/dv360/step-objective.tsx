@@ -509,7 +509,7 @@ export function DV360StepObjective() {
         hidePrevious
         onPrevious={() => {}}
         onNext={() => setStep(1)}
-        nextLabel={obj.objective === "AWARENESS" ? "Next: Audience & Reach" : obj.objective === "CONSIDERATION" ? "Next: Audience & Interests" : obj.objective === "CONVERSION" ? "Next: Audience & Conversions" : "Next: Audience & Signals"}
+        nextLabel="Next"
         nextDisabled={!canProceed}
         accent="dv360"
       />

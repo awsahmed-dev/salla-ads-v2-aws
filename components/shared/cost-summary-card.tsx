@@ -33,7 +33,7 @@ export function CostSummaryCard({
   totalBudget,
   autoIncreaseEnabled,
   boostEnabled,
-  boostAmount = 149,
+  boostAmount = 299,
   startDate,
   endDate,
   accent,
@@ -124,8 +124,8 @@ export function CostSummaryCard({
 
         {startDate && (
           <p className="text-xs text-muted-foreground">
-            {startDate}
-            {isOngoing ? " (ongoing)" : endDate ? ` to ${endDate}` : ""}
+            {new Date(startDate).toLocaleDateString("en-SA", { month: "short", day: "numeric" })}
+            {isOngoing ? " → Ongoing" : endDate ? ` → ${new Date(endDate).toLocaleDateString("en-SA", { month: "short", day: "numeric" })}` : ""}
           </p>
         )}
       </div>

@@ -12,7 +12,7 @@ import { DemographicsCard } from "@/components/shared/demographics-card";
 import { SallaSmartFeaturesCard } from "@/components/shared/salla-smart-features-card";
 import { CustomAudiencesCard } from "@/components/shared/custom-audiences-card";
 import { DeviceTargetingCard } from "@/components/shared/device-targeting-card";
-import { InterestTargetingCard } from "@/components/shared/interest-targeting-card";
+import { LegacyInterestTargetingCard as InterestTargetingCard } from "@/components/shared/interest-targeting-card";
 import { TargetingSummaryCard } from "@/components/shared/targeting-summary-card";
 import { AudienceReadinessChecklist } from "@/components/shared/audience-readiness-checklist";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
@@ -116,6 +116,7 @@ export function MetaStepAudience() {
             <LocationSelector
               value={{
                 countryCodes: aud.countries,
+                regions: [],
                 cities: aud.cities
                   .map((id) => getCityById(id))
                   .filter((c): c is NonNullable<typeof c> => c != null)
@@ -417,7 +418,7 @@ export function MetaStepAudience() {
         onPrevious={() => setStep(0)}
         onNext={() => setStep(2)}
         previousLabel="Previous"
-        nextLabel="Next: Budget"
+        nextLabel="Next"
         nextDisabled={!allReady}
         accent="meta"
       />

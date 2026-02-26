@@ -70,6 +70,41 @@ export interface SallaStoreInfo {
   vatRate: number;
 }
 
+/**
+ * Snapchat Public Profile linked through the Salla dashboard.
+ * When the store owner has connected their Snap account via Salla,
+ * this data is available and the profile ID is auto-filled.
+ */
+export interface SnapPublicProfile {
+  /** Snap API profile_id (UUID) */
+  profileId: string;
+  /** Display name from Snapchat (e.g. store name / brand) */
+  displayName: string;
+  /** Optional Arabic display name */
+  displayNameAr?: string;
+  /** Profile avatar/logo URL */
+  avatarUrl: string;
+  /** Whether the profile is verified on Snapchat */
+  verified: boolean;
+}
+
+/**
+ * Snap Pixel connected through the advertiser's Snapchat Ads Manager account.
+ * Retrieved after OAuth authentication — merchants cannot manually paste pixel IDs.
+ */
+export interface SnapPixelInfo {
+  /** Snap Pixel ID (UUID) */
+  pixelId: string;
+  /** Display name set in Snapchat Ads Manager */
+  name: string;
+  /** Domain the pixel is installed on */
+  domain: string;
+  /** Pixel status */
+  status: "ACTIVE" | "INACTIVE" | "PENDING";
+  /** When the pixel last fired an event */
+  lastEventAt: string;
+}
+
 export interface ProductFetchOptions {
   query?: string;
   category?: string;
@@ -100,6 +135,22 @@ const MOCK_STORE_INFO: SallaStoreInfo = {
   currency: "SAR",
   country: "SA",
   vatRate: 0.15,
+};
+
+const MOCK_SNAP_PROFILE: SnapPublicProfile = {
+  profileId: "72cf5c50-8343-48d3-a0a7-3ed45b75faaa",
+  displayName: "Mahally",
+  displayNameAr: "محلي",
+  avatarUrl: "https://images.unsplash.com/photo-1560472355-536de3962603?w=100&h=100&fit=crop",
+  verified: true,
+};
+
+const MOCK_SNAP_PIXEL: SnapPixelInfo = {
+  pixelId: "abc12345-1234-1234-1234-abc123456789",
+  name: "Mahally Store Pixel",
+  domain: "mahally.salla.sa",
+  status: "ACTIVE",
+  lastEventAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
 };
 
 const MOCK_PRODUCTS: SallaProduct[] = [
@@ -195,6 +246,22 @@ export async function fetchOnSale(limit = 4): Promise<SallaProduct[]> {
 export async function lookupProductByUrl(url: string): Promise<SallaProduct | null> {
   const match = MOCK_PRODUCTS.find((p) => url.includes(p.url) || url.includes(p.sku.toLowerCase()));
   return match ?? null;
+}
+
+/**
+ * Get the Snapchat Public Profile linked via Salla dashboard.
+ * Returns null if the store owner hasn't connected their Snap account.
+ */
+export async function getSnapPublicProfile(): Promise<SnapPublicProfile | null> {
+  return MOCK_SNAP_PROFILE;
+}
+
+/**
+ * Get the Snap Pixel connected via the advertiser's Snapchat Ads Manager.
+ * Returns null if no pixel has been connected through OAuth.
+ */
+export async function getSnapPixel(): Promise<SnapPixelInfo | null> {
+  return MOCK_SNAP_PIXEL;
 }
 
 /** Get catalog sync status */

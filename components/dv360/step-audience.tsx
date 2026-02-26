@@ -10,7 +10,7 @@ import { LocationReachCard } from "@/components/shared/location-reach-card";
 import { DeliveryCheckCard } from "@/components/shared/delivery-check-card";
 import { DemographicsCard } from "@/components/shared/demographics-card";
 import { SallaSmartFeaturesCard } from "@/components/shared/salla-smart-features-card";
-import { InterestTargetingCard } from "@/components/shared/interest-targeting-card";
+import { LegacyInterestTargetingCard as InterestTargetingCard } from "@/components/shared/interest-targeting-card";
 import { TargetingSummaryCard } from "@/components/shared/targeting-summary-card";
 import { AudienceReadinessChecklist } from "@/components/shared/audience-readiness-checklist";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
@@ -195,6 +195,7 @@ export function DV360StepAudience() {
               <LocationSelector
                 value={{
                   countryCodes: audience.geoTargets.filter((g) => g.type === "country").map((g) => g.id),
+                  regions: [],
                   cities: audience.geoTargets
                     .filter((g) => g.type === "city")
                     .map((g) => {
@@ -1029,7 +1030,7 @@ export function DV360StepAudience() {
         onPrevious={() => setStep(0)}
         onNext={() => setStep(2)}
         previousLabel="Back to Objective"
-        nextLabel="Continue to Budget"
+        nextLabel="Next"
         accent="dv360"
       />
     </TooltipProvider>

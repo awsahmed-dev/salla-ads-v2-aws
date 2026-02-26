@@ -4,12 +4,6 @@
  * Unified location selector for Step 1 (Audience) across all five ad platforms.
  * Same UI and logic everywhere: Cities tab (quick select + search) + Country / Region tab.
  * Per-city radius (enableRadiusPerCity) enabled for Snapchat, Meta, Google, DV360; disabled only for TikTok (API does not support radius).
- * - Snapchat: audience.countries, audience.cities (lat, lng, radius m).
- * - TikTok: locationIds + cities (ids only); no radius.
- * - Meta: countries + cities + cityRadii; accent: meta.
- * - Google: locationIds + cityIds + cityRadii.
- * - DV360: geoTargets (country/city with radiusKm for cities); accent: dv360.
- * Data: lib/locations.ts (COUNTRIES, CITIES, getCountryByCode, getCityById).
  */
 
 import { useState, useMemo } from "react";
@@ -18,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -32,14 +27,17 @@ import {
   Search,
   X,
   Info,
+  ChevronDown,
 } from "lucide-react";
 import {
   COUNTRIES,
   CITIES,
+  REGIONS,
   PRIMARY_COUNTRY_CODE,
   countryEmoji,
   getCountryByCode,
   getPopularCities,
+  getRegionsByCountry,
   type LocationSelection,
   type SelectedCity,
 } from "@/lib/locations";
@@ -73,17 +71,11 @@ const ACCENT_STYLES: Record<
 export interface LocationSelectorProps {
   value: LocationSelection;
   onChange: (value: LocationSelection) => void;
-  /** Show City tab and city-level targeting. Default true. Set false for platforms that only support country (e.g. TikTok). */
   enableCityTargeting?: boolean;
-  /** Allow per-city radius slider (Snapchat-style). Default true. */
   enableRadiusPerCity?: boolean;
-  /** Platform-specific tooltip next to the section label. */
   tooltipText?: string;
-  /** Visual accent for selected state. Default "primary". */
   accent?: LocationSelectorAccent;
-  /** Optional label override. */
   label?: string;
-  /** Optional description under the tabs. */
   countryDescription?: string;
   cityDescription?: string;
 }
@@ -102,14 +94,31 @@ export function LocationSelector({
   const [tab, setTab] = useState<"country" | "city">(enableCityTargeting ? "city" : "country");
   const [countrySearch, setCountrySearch] = useState("");
   const [citySearch, setCitySearch] = useState("");
+  const [regionOpen, setRegionOpen] = useState(false);
+  const [customRadiusCities, setCustomRadiusCities] = useState<Set<string>>(new Set());
 
   const styles = ACCENT_STYLES[accent];
 
   const toggleCountry = (code: string) => {
-    const next = value.countryCodes.includes(code)
+    const removing = value.countryCodes.includes(code);
+    const nextCodes = removing
       ? value.countryCodes.filter((c) => c !== code)
       : [...value.countryCodes, code];
-    onChange({ ...value, countryCodes: next });
+    const nextRegions = removing
+      ? (value.regions ?? []).filter((r) => {
+          const regionData = REGIONS.find((reg) => reg.id === r);
+          return regionData?.countryCode !== code;
+        })
+      : (value.regions ?? []);
+    onChange({ ...value, countryCodes: nextCodes, regions: nextRegions });
+  };
+
+  const toggleRegion = (regionId: string) => {
+    const current = value.regions ?? [];
+    const next = current.includes(regionId)
+      ? current.filter((r) => r !== regionId)
+      : [...current, regionId];
+    onChange({ ...value, regions: next });
   };
 
   const filteredCountries = useMemo(() => {
@@ -148,6 +157,21 @@ export function LocationSelector({
     }));
   }, [filteredCities]);
 
+  const regionsForSelected = useMemo(() => {
+    const all: { countryCode: string; countryName: string; regions: typeof REGIONS }[] = [];
+    for (const code of value.countryCodes) {
+      const regs = getRegionsByCountry(code);
+      if (regs.length > 0) {
+        all.push({
+          countryCode: code,
+          countryName: getCountryByCode(code)?.name ?? code,
+          regions: regs,
+        });
+      }
+    }
+    return all;
+  }, [value.countryCodes]);
+
   const addCity = (city: (typeof CITIES)[0]) => {
     if (value.cities.some((c) => c.id === city.id)) return;
     const newCities: SelectedCity[] = [
@@ -164,10 +188,15 @@ export function LocationSelector({
     const newCountryCodes = value.countryCodes.includes(city.countryCode)
       ? value.countryCodes
       : [...value.countryCodes, city.countryCode];
-    onChange({ countryCodes: newCountryCodes, cities: newCities });
+    onChange({ countryCodes: newCountryCodes, cities: newCities, regions: value.regions ?? [] });
   };
 
   const removeCity = (id: string) => {
+    setCustomRadiusCities((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
     onChange({
       ...value,
       cities: value.cities.filter((c) => c.id !== id),
@@ -181,7 +210,24 @@ export function LocationSelector({
     });
   };
 
+  const resetCityRadius = (id: string) => {
+    const original = CITIES.find((c) => c.id === id);
+    if (original) {
+      updateCityRadius(id, original.radiusKm);
+    }
+    setCustomRadiusCities((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const enableCustomRadius = (id: string) => {
+    setCustomRadiusCities((prev) => new Set(prev).add(id));
+  };
+
   const clearAllCities = () => {
+    setCustomRadiusCities(new Set());
     onChange({ ...value, cities: [] });
   };
 
@@ -201,7 +247,7 @@ export function LocationSelector({
           )}
         </div>
 
-        {/* Tabs — City first (most advertisers target by city, especially Saudi) */}
+        {/* Tabs */}
         <div className="flex border-b border-border">
           {enableCityTargeting && (
             <button
@@ -227,18 +273,23 @@ export function LocationSelector({
             type="button"
             onClick={() => setTab("country")}
             className={cn(
-              "relative px-4 py-2.5 text-sm font-medium transition-colors",
+              "relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors",
               tab === "country" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
             Country / Region
+            {(value.regions ?? []).length > 0 && (
+              <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs">
+                {(value.regions ?? []).length}
+              </Badge>
+            )}
             {tab === "country" && (
               <div className={cn("absolute inset-x-0 bottom-0 h-0.5", styles.underline)} />
             )}
           </button>
         </div>
 
-        {/* Country tab */}
+        {/* ═══ Country tab ═══ */}
         {tab === "country" && (
           <>
             <div className="relative">
@@ -291,10 +342,68 @@ export function LocationSelector({
                 </p>
               </div>
             )}
+
+            {/* ── Narrow by region ── */}
+            {regionsForSelected.length > 0 && (
+              <div className="border-t border-border pt-3">
+                <button
+                  type="button"
+                  onClick={() => setRegionOpen(!regionOpen)}
+                  className="flex w-full items-center justify-between text-sm font-medium text-foreground"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Globe className="size-3.5 text-muted-foreground" />
+                    Narrow by region
+                    {(value.regions ?? []).length > 0 && (
+                      <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                        {(value.regions ?? []).length}
+                      </Badge>
+                    )}
+                  </span>
+                  <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", regionOpen && "rotate-180")} />
+                </button>
+
+                {regionOpen && (
+                  <div className="mt-3 space-y-4">
+                    <p className="text-xs text-muted-foreground">
+                      Selecting regions targets only those areas. Leave empty to target the entire country.
+                    </p>
+                    {regionsForSelected.map(({ countryCode, countryName, regions }) => (
+                      <div key={countryCode}>
+                        <p className="mb-2 text-xs font-medium text-muted-foreground">
+                          {countryEmoji(countryCode)} {countryName}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {regions.map((r) => {
+                            const sel = (value.regions ?? []).includes(r.id);
+                            return (
+                              <button
+                                key={r.id}
+                                type="button"
+                                onClick={() => toggleRegion(r.id)}
+                                className={cn(
+                                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                                  sel
+                                    ? styles.selected
+                                    : "border-border bg-background text-foreground hover:border-primary/30"
+                                )}
+                              >
+                                {r.name}
+                                {sel && " ✓"}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 
-        {/* City tab */}
+        {/* ═══ City tab ═══ */}
         {enableCityTargeting && tab === "city" && (
           <>
             <div className="relative">
@@ -308,7 +417,6 @@ export function LocationSelector({
             </div>
             <p className="text-xs text-muted-foreground">{cityDescription}</p>
 
-            {/* When no search: compact "Quick select" row only. Full list appears on search. */}
             {!citySearch.trim() ? (
               <div className="space-y-4">
                 <div>
@@ -400,6 +508,7 @@ export function LocationSelector({
                 <div className="flex flex-col gap-3">
                   {value.cities.map((city) => {
                     const countryName = getCountryByCode(city.countryCode)?.name ?? "";
+                    const hasCustomRadius = customRadiusCities.has(city.id);
                     return (
                       <div
                         key={city.id}
@@ -413,12 +522,10 @@ export function LocationSelector({
                             )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            {enableRadiusPerCity && (
-                              <Badge variant="outline" className="rounded-full px-2 py-0 text-xs font-medium tabular-nums">
-                                <MapPin className="mr-0.5 size-2.5" />
-                                {city.radiusKm} km
-                              </Badge>
-                            )}
+                            <Badge variant="outline" className="rounded-full px-2 py-0 text-xs font-medium tabular-nums">
+                              <MapPin className="mr-0.5 size-2.5" />
+                              {hasCustomRadius ? `${city.radiusKm} km` : "Full city"}
+                            </Badge>
                             <button
                               type="button"
                               onClick={() => removeCity(city.id)}
@@ -430,18 +537,38 @@ export function LocationSelector({
                           </div>
                         </div>
                         {enableRadiusPerCity && (
-                          <div className="mt-2 flex items-center gap-3">
-                            <span className="text-xs text-muted-foreground">Targeting radius</span>
-                            <span className="text-xs tabular-nums text-muted-foreground">10 km</span>
-                            <Slider
-                              value={[Math.min(100, Math.max(10, city.radiusKm))]}
-                              min={10}
-                              max={100}
-                              step={5}
-                              onValueChange={([v]) => updateCityRadius(city.id, v)}
-                              className="flex-1 max-w-[140px]"
-                            />
-                            <span className="text-xs tabular-nums text-muted-foreground">100 km</span>
+                          <div className="mt-2 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                id={`radius-toggle-${city.id}`}
+                                checked={hasCustomRadius}
+                                onCheckedChange={(checked) => {
+                                  if (checked) enableCustomRadius(city.id);
+                                  else resetCityRadius(city.id);
+                                }}
+                                className="scale-75"
+                              />
+                              <label htmlFor={`radius-toggle-${city.id}`} className="text-xs text-muted-foreground cursor-pointer">
+                                Custom radius
+                              </label>
+                            </div>
+                            {hasCustomRadius && (
+                              <div className="flex items-center gap-3">
+                                <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">5 km</span>
+                                <Slider
+                                  value={[Math.min(100, Math.max(5, city.radiusKm))]}
+                                  min={5}
+                                  max={100}
+                                  step={5}
+                                  onValueChange={([v]) => updateCityRadius(city.id, v)}
+                                  className="flex-1"
+                                />
+                                <span className="w-12 text-xs tabular-nums text-muted-foreground">100 km</span>
+                                <span className="w-12 text-right text-xs font-semibold tabular-nums text-foreground">
+                                  {city.radiusKm} km
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

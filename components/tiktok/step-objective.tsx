@@ -1041,7 +1041,7 @@ export function TikTokStepObjective() {
         hidePrevious
         onPrevious={() => {}}
         onNext={() => setStep(1)}
-        nextLabel="Next: Audience"
+        nextLabel="Next"
         nextDisabled={!canProceed}
         secondaryAction={{
           label: "Discard draft",

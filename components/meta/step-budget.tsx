@@ -583,7 +583,7 @@ export function MetaStepBudget() {
         onPrevious={() => setStep(1)}
         onNext={() => setStep(3)}
         previousLabel="Back"
-        nextLabel="Continue to Ad Design"
+        nextLabel="Next"
         nextDisabled={!isValid}
         accent="meta"
       />

@@ -8,6 +8,7 @@ import {
   Download,
   Eye,
   FileText,
+  Users,
 } from "lucide-react";
 import type {
   SnapCreativeType,
@@ -37,7 +38,7 @@ export const FORMAT_OPTIONS: {
   {
     value: "SINGLE",
     label: "Single Image / Video",
-    desc: "Full-screen snap ad. Upload up to 8 creatives per ad group.",
+    desc: "Full-screen snap ad. Upload up to 8 creative variations.",
     icon: <ImageIcon className="size-5" />,
     maxAssets: 8,
   },
@@ -61,6 +62,13 @@ export const FORMAT_OPTIONS: {
     desc: "Auto-generated ads from your catalog based on user behavior.",
     icon: <Zap className="size-5" />,
     maxAssets: 1,
+  },
+  {
+    value: "INFLUENCER",
+    label: "Influencer Content",
+    desc: "Use a creator's ad code to run their content as your ad.",
+    icon: <Users className="size-5" />,
+    maxAssets: 8,
   },
 ];
 

@@ -38,6 +38,26 @@ import { type CollectionTile, type AdGroup, type DynamicTemplateConfig, makeDefa
 /*  Product Picker Sheet (right-side slider)                          */
 /* ------------------------------------------------------------------ */
 
+type SortKey = "best_selling" | "price_low" | "price_high" | "newest" | "rating";
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "best_selling", label: "Best Selling" },
+  { value: "price_low", label: "Price: Low → High" },
+  { value: "price_high", label: "Price: High → Low" },
+  { value: "newest", label: "Newest" },
+  { value: "rating", label: "Top Rated" },
+];
+
+function sortProducts(products: SallaProduct[], key: SortKey): SallaProduct[] {
+  const sorted = [...products];
+  switch (key) {
+    case "best_selling": return sorted.sort((a, b) => (b.soldCount ?? 0) - (a.soldCount ?? 0));
+    case "price_low":    return sorted.sort((a, b) => (a.salePrice ?? a.price) - (b.salePrice ?? b.price));
+    case "price_high":   return sorted.sort((a, b) => (b.salePrice ?? b.price) - (a.salePrice ?? a.price));
+    case "newest":       return sorted.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    case "rating":       return sorted.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  }
+}
+
 export function ProductPickerSheet({
   open,
   onOpenChange,
@@ -54,15 +74,22 @@ export function ProductPickerSheet({
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<SortKey>("best_selling");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const categories = ["all", ...Array.from(new Set(PREVIEW_PRODUCTS.map((p) => p.category)))];
   const remainingSlots = maxTiles - existingTiles.length;
 
-  const filtered = PREVIEW_PRODUCTS.filter((p) => {
-    const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
-    const matchCategory = selectedCategory === "all" || p.category === selectedCategory;
-    return matchSearch && matchCategory;
-  });
+  const filtered = sortProducts(
+    PREVIEW_PRODUCTS.filter((p) => {
+      const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
+      const matchCategory = selectedCategory === "all" || p.category === selectedCategory;
+      return matchSearch && matchCategory;
+    }),
+    sortBy
+  );
+
+  const selectedProducts = PREVIEW_PRODUCTS.filter((p) => selected.has(p.id));
 
   const toggleProduct = (id: string) => {
     const next = new Set(selected);
@@ -87,12 +114,13 @@ export function ProductPickerSheet({
       setSelected(new Set());
       setSearch("");
       setSelectedCategory("all");
+      setSortBy("best_selling");
     }
   }, [open]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-xl">
         <SheetHeader className="shrink-0 border-b border-border px-5 pb-3 pt-5">
           <SheetTitle className="flex items-center gap-2 text-base">
             <Store className="size-4 text-primary" />
@@ -103,42 +131,98 @@ export function ProductPickerSheet({
           </SheetDescription>
         </SheetHeader>
 
-        {/* Search + filters */}
-        <div className="flex shrink-0 flex-col gap-2 border-b border-border px-4 py-3">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or SKU..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 pl-8 text-xs"
-            />
-            {search && (
-              <button type="button" onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-foreground">
-                <X className="size-3" />
-              </button>
-            )}
+        {/* Selected products strip */}
+        {selectedProducts.length > 0 && (
+          <div className="flex shrink-0 items-center gap-2 border-b border-primary/20 bg-primary/[0.03] px-4 py-2">
+            <span className="shrink-0 text-[11px] font-semibold text-primary">{selectedProducts.length} selected</span>
+            <div className="flex flex-1 gap-1.5 overflow-x-auto">
+              {selectedProducts.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => toggleProduct(p.id)}
+                  className="group flex shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-background py-0.5 pl-0.5 pr-2 transition-colors hover:border-destructive/30 hover:bg-destructive/5"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.image} alt="" className="size-5 rounded-full object-cover" crossOrigin="anonymous" />
+                  <span className="max-w-[80px] truncate text-[10px] font-medium text-foreground">{p.name}</span>
+                  <X className="size-2.5 shrink-0 text-muted-foreground group-hover:text-destructive" />
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => setSelected(new Set())} className="shrink-0 text-[10px] text-primary hover:underline">Clear</button>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {categories.map((cat) => (
+        )}
+
+        {/* Search + Category filters + Sort */}
+        <div className="flex shrink-0 flex-col gap-2 border-b border-border px-4 py-3">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or SKU..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8 pl-8 text-xs"
+              />
+              {search && (
+                <button type="button" onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-foreground">
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
+            {/* View toggle */}
+            <div className="flex shrink-0 rounded-lg border border-border">
               <button
-                key={cat}
                 type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={cn(
-                  "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                  selectedCategory === cat
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                )}
+                onClick={() => setViewMode("grid")}
+                className={cn("flex size-8 items-center justify-center rounded-l-lg transition-colors", viewMode === "grid" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
+                title="Grid view"
               >
-                {cat === "all" ? "All" : cat}
+                <svg className="size-3.5" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                className={cn("flex size-8 items-center justify-center rounded-r-lg border-l border-border transition-colors", viewMode === "list" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground")}
+                title="List view"
+              >
+                <svg className="size-3.5" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="3" rx="1"/><rect x="1" y="7" width="14" height="3" rx="1"/><rect x="1" y="12" width="14" height="3" rx="1"/></svg>
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-1 flex-wrap gap-1.5">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+                    selectedCategory === cat
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  {cat === "all" ? "All" : cat}
+                </button>
+              ))}
+            </div>
+            {/* Sort dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              className="h-7 shrink-0 rounded-md border border-border bg-background px-2 text-[11px] text-foreground outline-none focus:ring-1 focus:ring-primary/30"
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Product grid */}
+        {/* Product grid / list */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
@@ -146,8 +230,8 @@ export function ProductPickerSheet({
               <p className="text-sm font-medium text-muted-foreground">No products found</p>
               <p className="text-xs text-muted-foreground/70">Try a different search or category</p>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
+          ) : viewMode === "grid" ? (
+            <div className="grid grid-cols-3 gap-2">
               {filtered.map((product) => {
                 const isSelected = selected.has(product.id);
                 const isDisabled = !isSelected && selected.size >= remainingSlots;
@@ -169,51 +253,123 @@ export function ProductPickerSheet({
                           ? "cursor-not-allowed border-border opacity-40"
                           : isDisabled
                             ? "cursor-not-allowed border-border opacity-30"
-                            : "border-border hover:border-primary/40"
+                            : "border-border hover:border-primary/40 hover:shadow-sm"
                     )}
                   >
                     <div className="relative aspect-square w-full overflow-hidden bg-muted/30">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={product.image} alt={product.name} className="size-full object-cover transition-transform group-hover:scale-105" crossOrigin="anonymous" />
                       {isSelected && (
-                        <div className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
+                        <div className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
                           <Check className="size-3" />
                         </div>
                       )}
                       {alreadyAdded && (
                         <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Added</span>
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[9px] font-medium text-muted-foreground">Added</span>
                         </div>
                       )}
                       {!product.inStock && (
                         <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-                          <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">Out of stock</span>
+                          <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[9px] font-medium text-destructive">Out of stock</span>
                         </div>
                       )}
                       {product.salePrice && product.salePrice < product.price && (
-                        <div className="absolute left-1.5 top-1.5 flex items-center gap-0.5 rounded bg-red-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                        <div className="absolute left-1 top-1 flex items-center gap-0.5 rounded bg-red-500 px-1 py-0.5 text-[8px] font-bold text-white">
                           <Tag className="size-2" />
-                          {Math.round((1 - product.salePrice / product.price) * 100)}% OFF
+                          {Math.round((1 - product.salePrice / product.price) * 100)}%
                         </div>
                       )}
                     </div>
-                    <div className="flex flex-1 flex-col gap-0.5 p-2">
-                      <p className="line-clamp-2 text-[11px] font-medium leading-tight text-foreground">{product.name}</p>
-                      <div className="mt-auto flex items-center justify-between pt-1">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-xs font-bold tabular-nums text-foreground">{formatSAR(product.salePrice ?? product.price)}</span>
+                    <div className="flex flex-1 flex-col gap-0.5 p-1.5">
+                      <p className="line-clamp-1 text-[10px] font-medium leading-tight text-foreground">{product.name}</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-baseline gap-0.5">
+                          <span className="text-[11px] font-bold tabular-nums text-foreground">{formatSAR(product.salePrice ?? product.price)}</span>
                           {product.salePrice && product.salePrice < product.price && (
-                            <span className="text-[10px] tabular-nums text-muted-foreground line-through">{formatSAR(product.price)}</span>
+                            <span className="text-[8px] tabular-nums text-muted-foreground line-through">{formatSAR(product.price)}</span>
                           )}
                         </div>
                         {product.rating && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                            <Star className="size-2.5 fill-amber-400 text-amber-400" />
+                          <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
+                            <Star className="size-2 fill-amber-400 text-amber-400" />
                             {product.rating}
                           </span>
                         )}
                       </div>
+                      {product.soldCount != null && product.soldCount > 0 && (
+                        <span className="text-[8px] text-muted-foreground/70">{product.soldCount.toLocaleString()} sold</span>
+                      )}
                     </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            /* List view */
+            <div className="flex flex-col gap-1.5">
+              {filtered.map((product) => {
+                const isSelected = selected.has(product.id);
+                const isDisabled = !isSelected && selected.size >= remainingSlots;
+                const alreadyAdded = existingTiles.some(
+                  (t) => t.url === product.url || t.title === product.name
+                );
+
+                return (
+                  <button
+                    key={product.id}
+                    type="button"
+                    disabled={isDisabled || alreadyAdded || !product.inStock}
+                    onClick={() => toggleProduct(product.id)}
+                    className={cn(
+                      "group flex items-center gap-3 rounded-lg border px-2.5 py-2 text-left transition-all",
+                      isSelected
+                        ? "border-primary bg-primary/[0.03] ring-1 ring-primary/20"
+                        : alreadyAdded
+                          ? "cursor-not-allowed border-border opacity-40"
+                          : isDisabled
+                            ? "cursor-not-allowed border-border opacity-30"
+                            : "border-border hover:border-primary/30 hover:bg-muted/20"
+                    )}
+                  >
+                    <div className="relative size-12 shrink-0 overflow-hidden rounded-md bg-muted/30">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={product.image} alt={product.name} className="size-full object-cover" crossOrigin="anonymous" />
+                      {isSelected && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
+                          <Check className="size-4 text-primary" />
+                        </div>
+                      )}
+                      {product.salePrice && product.salePrice < product.price && (
+                        <div className="absolute left-0 top-0 rounded-br bg-red-500 px-1 py-0.5 text-[7px] font-bold text-white">
+                          -{Math.round((1 - product.salePrice / product.price) * 100)}%
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-1 flex-col gap-0.5 min-w-0">
+                      <p className="truncate text-xs font-medium text-foreground">{product.name}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold tabular-nums text-foreground">{formatSAR(product.salePrice ?? product.price)}</span>
+                        {product.salePrice && product.salePrice < product.price && (
+                          <span className="text-[10px] tabular-nums text-muted-foreground line-through">{formatSAR(product.price)}</span>
+                        )}
+                        <span className="text-[9px] text-muted-foreground">SKU: {product.sku}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-[9px] text-muted-foreground">
+                        {product.rating && (
+                          <span className="flex items-center gap-0.5">
+                            <Star className="size-2 fill-amber-400 text-amber-400" />
+                            {product.rating} ({product.reviewCount ?? 0})
+                          </span>
+                        )}
+                        {product.soldCount != null && product.soldCount > 0 && (
+                          <span>{product.soldCount.toLocaleString()} sold</span>
+                        )}
+                        {!product.inStock && <span className="font-medium text-destructive">Out of stock</span>}
+                        {alreadyAdded && <span className="font-medium text-muted-foreground">Already added</span>}
+                      </div>
+                    </div>
+                    {isSelected && <CheckCircle2 className="size-4 shrink-0 text-primary" />}
                   </button>
                 );
               })}
@@ -226,9 +382,10 @@ export function ProductPickerSheet({
           <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
             <span>
               <span className="font-semibold tabular-nums text-foreground">{selected.size}</span> of {remainingSlots} selected
+              <span className="ml-2 text-[10px]">({filtered.length} product{filtered.length !== 1 ? "s" : ""} shown)</span>
             </span>
             {selected.size > 0 && (
-              <button type="button" onClick={() => setSelected(new Set())} className="text-xs text-primary hover:underline">Clear</button>
+              <button type="button" onClick={() => setSelected(new Set())} className="text-xs text-primary hover:underline">Clear all</button>
             )}
           </div>
           <Button className="w-full gap-1.5" onClick={handleConfirm} disabled={selected.size === 0}>

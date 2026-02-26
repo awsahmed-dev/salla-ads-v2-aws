@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Info, Sparkles } from "lucide-react";
+import { TrendingUp, Info, Sparkles, AlertTriangle } from "lucide-react";
 import { InfoTip } from "@/components/shared/info-tip";
 import { SectionCard } from "@/components/shared/section-card";
 
@@ -29,6 +29,7 @@ export interface BidInput {
   min?: number;
   step?: number;
   tip?: string;
+  warning?: string;
 }
 
 interface BidStrategyCardProps {
@@ -115,9 +116,16 @@ export function BidStrategyCard({
             ))}
           </div>
           {activeStrategy && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              {activeStrategy.desc}
-            </p>
+            <div className="mt-2.5">
+              <p className="text-xs text-muted-foreground">
+                {activeStrategy.desc}
+              </p>
+              {activeStrategy.bestFor && (
+                <p className="mt-1 text-xs font-medium text-primary/80">
+                  {activeStrategy.bestFor}
+                </p>
+              )}
+            </div>
           )}
         </>
       ) : (
@@ -237,7 +245,15 @@ export function BidStrategyCard({
                 </div>
               )}
             </div>
-            {input.tip && (
+            {input.warning && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+                <p className="text-[11px] leading-relaxed text-amber-700">
+                  {input.warning}
+                </p>
+              </div>
+            )}
+            {input.tip && !input.warning && (
               <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
                 <Sparkles className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
                 <p className="text-[11px] leading-relaxed text-emerald-700">

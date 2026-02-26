@@ -1424,7 +1424,7 @@ function AppCreativeEditor() {
         onPrevious={() => setStep(2)}
         onNext={() => setStep(4)}
         previousLabel="Previous"
-        nextLabel="Review & Launch"
+        nextLabel="Next"
       />
     </TooltipProvider>
   );
@@ -2038,7 +2038,7 @@ function DisplayCreativeEditor() {
         onPrevious={() => setStep(2)}
         onNext={() => setStep(4)}
         previousLabel="Previous"
-        nextLabel="Review & Launch"
+        nextLabel="Next"
       />
     </TooltipProvider>
   );
@@ -2416,7 +2416,7 @@ function SearchCreativeEditor() {
         onPrevious={() => setStep(2)}
         onNext={() => setStep(4)}
         previousLabel="Previous"
-        nextLabel="Review & Launch"
+        nextLabel="Next"
       />
     </TooltipProvider>
   );
@@ -2873,7 +2873,7 @@ function DemandGenCreativeEditor() {
         onPrevious={() => setStep(2)}
         onNext={() => setStep(4)}
         previousLabel="Previous"
-        nextLabel="Review & Launch"
+        nextLabel="Next"
       />
     </TooltipProvider>
   );
@@ -3271,7 +3271,7 @@ function ShoppingProductGroups() {
         onPrevious={() => setStep(2)}
         onNext={() => setStep(4)}
         previousLabel="Previous"
-        nextLabel="Review & Launch"
+        nextLabel="Next"
       />
     </TooltipProvider>
   );
@@ -4108,7 +4108,7 @@ export function GoogleStepCreative() {
         onPrevious={() => setStep(2)}
         onNext={() => setStep(4)}
         previousLabel="Previous"
-        nextLabel="Next: Review & Launch"
+        nextLabel="Next"
         nextDisabled={!canProceed}
       />
     </TooltipProvider>

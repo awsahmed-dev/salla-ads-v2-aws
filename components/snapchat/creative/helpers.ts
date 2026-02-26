@@ -59,13 +59,13 @@ export function makeTile(): CollectionTile {
   };
 }
 
-/** Create a new ad group from format + destination (new model) */
+/** Create a new ad from format + destination */
 export function makeAdGroup(format: AdFormat, index: number, destination?: AdDestination): AdGroup {
   const dest = destination ?? "WEBSITE";
   const adType = deriveCreativeType(format, dest);
 
   const formatLabel = FORMAT_OPTIONS.find((f) => f.value === format)?.label ?? format;
-  const adName = `${formatLabel} ${index + 1}`;
+  const adName = `Ad ${index + 1} — ${formatLabel}`;
 
   const defaultAssetForDestination = (): Partial<CreativeAsset> => {
     switch (dest) {
@@ -85,10 +85,14 @@ export function makeAdGroup(format: AdFormat, index: number, destination?: AdDes
     }
   };
 
+  const isInfluencer = format === "INFLUENCER";
   const assets: CreativeAsset[] =
     format === "DYNAMIC"
       ? []
-      : [makeAsset({ ...defaultAssetForDestination(), name: `${adName} - Creative 1` })];
+      : [makeAsset({
+          ...(isInfluencer ? { mediaSource: "ad_code" as const } : defaultAssetForDestination()),
+          name: `${adName} - Creative 1`,
+        })];
 
   return {
     id: `ad_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -96,7 +100,7 @@ export function makeAdGroup(format: AdFormat, index: number, destination?: AdDes
     adType,
     adFormat: format,
     adDestination: dest,
-    isInfluencer: false,
+    isInfluencer,
     assets,
     collectionTiles: [],
     offerDisclaimer: { enabled: false, name: "", disclaimerText: "" },
@@ -106,7 +110,7 @@ export function makeAdGroup(format: AdFormat, index: number, destination?: AdDes
   };
 }
 
-/** Legacy overload: create ad group from old format key */
+/** Legacy overload: create ad from old format key */
 export function makeAdGroupLegacy(format: AdFormatKey, index: number): AdGroup {
   switch (format) {
     case "WEB_VIEW":      return makeAdGroup("SINGLE", index, "WEBSITE");
@@ -141,6 +145,7 @@ export function getDestinationLabel(dest: AdDestination): string {
 }
 
 export function isInfluencerAd(ad: AdGroup): boolean {
+  if (ad.adFormat === "INFLUENCER") return true;
   if (ad.isInfluencer) return true;
   return ad.assets.length > 0 && ad.assets[0].mediaSource === "ad_code";
 }

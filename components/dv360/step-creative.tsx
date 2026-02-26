@@ -665,7 +665,7 @@ export function DV360StepCreative() {
         onPrevious={() => setStep(2)}
         onNext={() => setStep(4)}
         previousLabel="Previous"
-        nextLabel="Next: Review & Launch"
+        nextLabel="Next"
         accent="dv360"
       />
     </TooltipProvider>

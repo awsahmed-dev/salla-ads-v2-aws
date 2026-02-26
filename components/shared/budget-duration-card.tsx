@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,13 +16,9 @@ import {
 } from "@/components/ui/select";
 import {
   DollarSign,
-  Calendar,
-  CreditCard,
   AlertCircle,
   CalendarClock,
   ArrowUpRight,
-  Wallet,
-  Sparkles,
 } from "lucide-react";
 
 /* ================================================================ */
@@ -86,6 +83,10 @@ export interface BudgetDurationCardProps {
   autoIncrease?: AutoIncreaseState;
   onAutoIncreaseChange?: (state: AutoIncreaseState) => void;
 
+  /* ── Smart start time ── */
+  /** Show smart start time with review queue awareness (Salla Ads feature) */
+  showSmartStart?: boolean;
+
   /* ── Generic updater for complex state transitions ── */
   onBulkUpdate?: (updates: Record<string, unknown>) => void;
 }
@@ -93,6 +94,53 @@ export interface BudgetDurationCardProps {
 /* ================================================================ */
 /*  Component                                                        */
 /* ================================================================ */
+
+/**
+ * Compute the earliest go-live date/time given Saudi Arabia business hours.
+ * Review takes ~8 hours and the Salla Ads operations team works 9 AM - 11 PM AST (UTC+3).
+ */
+function computeEarliestGoLive(): { date: string; time: string; label: string; sameDayPossible: boolean } {
+  const now = new Date();
+  const saudiOffset = 3 * 60;
+  const saudiMinutes = now.getUTCHours() * 60 + now.getUTCMinutes() + saudiOffset;
+  const saudiHour = Math.floor(((saudiMinutes % 1440) + 1440) % 1440 / 60);
+
+  const REVIEW_HOURS = 8;
+  const OPS_START = 9;
+  const OPS_END = 23;
+
+  let goLiveDate = new Date(now);
+  let goLiveHour: number;
+
+  if (saudiHour < OPS_END - REVIEW_HOURS) {
+    // Submitted early enough — can go live same day
+    goLiveHour = Math.max(saudiHour + REVIEW_HOURS, OPS_START + REVIEW_HOURS);
+    if (goLiveHour > OPS_END) {
+      // Spills into next day
+      goLiveDate.setDate(goLiveDate.getDate() + 1);
+      goLiveHour = OPS_START + REVIEW_HOURS;
+    }
+  } else {
+    // Too late today — review starts next morning
+    goLiveDate.setDate(goLiveDate.getDate() + 1);
+    goLiveHour = OPS_START + REVIEW_HOURS;
+  }
+
+  const sameDayPossible = goLiveDate.toDateString() === now.toDateString();
+  const dateStr = goLiveDate.toISOString().split("T")[0];
+  const timeStr = `${goLiveHour.toString().padStart(2, "0")}:00`;
+
+  let label: string;
+  if (sameDayPossible) {
+    label = `Today by ${goLiveHour > 12 ? goLiveHour - 12 : goLiveHour}:00 ${goLiveHour >= 12 ? "PM" : "AM"} AST`;
+  } else {
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    label = `${dayNames[goLiveDate.getDay()]}, ${monthNames[goLiveDate.getMonth()]} ${goLiveDate.getDate()} by ${goLiveHour > 12 ? goLiveHour - 12 : goLiveHour}:00 ${goLiveHour >= 12 ? "PM" : "AM"} AST`;
+  }
+
+  return { date: dateStr, time: timeStr, label, sameDayPossible };
+}
 
 export function BudgetDurationCard({
   budgetTypes = [],
@@ -103,7 +151,7 @@ export function BudgetDurationCard({
   onBudgetModeChange,
   amount,
   onAmountChange,
-  minAmount = 20,
+  minAmount = 150,
   maxAmount = 500000,
   suggestedDaily,
   goalLabel = "actions",
@@ -121,6 +169,7 @@ export function BudgetDurationCard({
   showAutoIncrease = true,
   autoIncrease,
   onAutoIncreaseChange,
+  showSmartStart = false,
   onBulkUpdate,
 }: BudgetDurationCardProps) {
   const MIN_CAMPAIGN_DAYS = minCampaignDays;
@@ -135,7 +184,9 @@ export function BudgetDurationCard({
 
   const dailyAmount = budgetMode === "daily" ? amount : Math.round(amount / Math.max(1, durationDays));
 
-  const currentMin = budgetMode === "daily" ? minAmount : Math.max(minAmount, 100);
+  const currentMin = minAmount;
+
+  const earliestGoLive = showSmartStart ? computeEarliestGoLive() : null;
 
   const currentTier = [...strengthTiers].reverse().find((t) => dailyAmount >= t.min) ?? strengthTiers[0];
 
@@ -147,14 +198,17 @@ export function BudgetDurationCard({
   })();
 
   const applyPreset = (days: number) => {
-    const today = new Date();
-    const end = new Date(today);
-    end.setDate(today.getDate() + days);
-    onStartDateChange(today.toISOString().split("T")[0]);
+    const start = earliestGoLive?.date ?? new Date().toISOString().split("T")[0];
+    const startD = new Date(start);
+    const end = new Date(startD);
+    end.setDate(startD.getDate() + days);
+    onStartDateChange(start);
     onEndDateChange(end.toISOString().split("T")[0]);
   };
 
   const isPreset = (days: number) => durationDays === days;
+
+  const [customMode, setCustomMode] = useState(false);
 
   /* Auto-increase computations */
   const autoIncreasePreview = (ai.enabled && autoIncreaseAvailable)
@@ -253,7 +307,7 @@ export function BudgetDurationCard({
       {budgetTypes.length > 0 && (
       <div className="mb-5">
         <Label className="mb-2 block text-xs font-medium text-muted-foreground uppercase tracking-wider">Budget Type</Label>
-        <div className={cn("grid gap-2.5", budgetTypes.length <= 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3")}>
+        <div className="grid grid-cols-2 gap-2">
           {budgetTypes.map((m) => {
             const active = paymentMethod === m.value;
             return (
@@ -262,27 +316,27 @@ export function BudgetDurationCard({
                 type="button"
                 onClick={() => handlePaymentMethodChange(m.value)}
                 className={cn(
-                  "group relative flex items-start gap-3 rounded-xl border-2 px-4 py-3.5 text-left transition-all",
+                  "relative flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-all",
                   active
-                    ? "border-primary bg-primary/5 shadow-sm shadow-primary/10"
-                    : "border-transparent bg-muted/40 hover:border-primary/20 hover:bg-muted/60"
+                    ? "border-primary bg-primary/5"
+                    : "border-border/60 bg-background hover:border-primary/30 hover:bg-muted/30"
                 )}
               >
                 <div className={cn(
-                  "flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors",
-                  active ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground shadow-sm"
+                  "flex size-7 shrink-0 items-center justify-center rounded-md",
+                  active ? "bg-primary/10 text-primary" : "bg-muted/60 text-muted-foreground"
                 )}>
                   {m.icon}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <span className={cn("text-sm font-semibold", active ? "text-primary" : "text-foreground")}>
+                <div className="min-w-0">
+                  <span className={cn("text-xs font-semibold leading-tight", active ? "text-primary" : "text-foreground")}>
                     {m.label}
                   </span>
-                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{m.desc}</p>
+                  <p className="text-[10px] leading-snug text-muted-foreground">{m.desc}</p>
                 </div>
                 {active && (
-                  <div className="absolute -right-px -top-px flex size-5 items-center justify-center rounded-bl-lg rounded-tr-xl bg-primary">
-                    <svg className="size-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  <div className="absolute -right-px -top-px flex size-4 items-center justify-center rounded-bl-md rounded-tr-lg bg-primary">
+                    <svg className="size-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                   </div>
                 )}
               </button>
@@ -290,10 +344,10 @@ export function BudgetDurationCard({
           })}
         </div>
         {paymentMethod === "prepaid" && (
-          <div className="mt-2.5 flex items-center gap-2 rounded-lg border border-amber-200/60 bg-amber-50/50 px-3 py-2">
-            <AlertCircle className="size-3.5 shrink-0 text-amber-500" />
-            <p className="text-xs text-amber-700">Prepaid requires an end date. The full budget will be charged upfront.</p>
-          </div>
+          <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-amber-600">
+            <AlertCircle className="size-3 shrink-0" />
+            Prepaid requires an end date. Full budget charged upfront.
+          </p>
         )}
       </div>
       )}
@@ -303,7 +357,7 @@ export function BudgetDurationCard({
       {/* ── 2. Budget Amount ── */}
       <div className="mt-5 mb-5">
         {showLifetimeToggle && paymentMethod === "pay_as_you_go" && (
-          <div className="mb-4 inline-flex rounded-lg bg-muted/50 p-0.5">
+          <div className="mb-3 inline-flex rounded-lg bg-muted/50 p-0.5">
             {(["daily", "lifetime"] as const).map((t) => (
               <button
                 key={t}
@@ -322,39 +376,47 @@ export function BudgetDurationCard({
           </div>
         )}
 
-        <Label className="mb-1 block text-xs font-medium text-foreground">
+        <Label className="mb-1.5 block text-xs font-medium text-foreground">
           {budgetMode === "daily" ? "Daily Budget" : "Lifetime Budget"}
         </Label>
-        <p className="mb-2.5 text-xs text-muted-foreground">
-          {budgetMode === "daily"
-            ? "The maximum amount you want to spend each day."
-            : `The total budget for the entire campaign. ${platformName} distributes it across the duration.`}
-        </p>
 
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground/60">SAR</span>
-          <Input
-            type="number"
-            min={currentMin}
-            max={maxAmount}
-            value={amount}
-            onChange={(e) => onAmountChange(Math.max(currentMin, Math.min(maxAmount, Number(e.target.value))))}
-            className="h-12 pl-12 text-lg font-semibold tabular-nums"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground/60">SAR</span>
+            <Input
+              type="number"
+              min={currentMin}
+              max={maxAmount}
+              value={amount}
+              onChange={(e) => onAmountChange(Math.max(currentMin, Math.min(maxAmount, Number(e.target.value))))}
+              className="h-11 pl-12 text-lg font-semibold tabular-nums"
+            />
+          </div>
+          <span className={cn(
+            "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+            currentTier.textColor,
+            currentTier.textColor.includes("red") && "border-red-200 bg-red-50",
+            currentTier.textColor.includes("orange") && "border-orange-200 bg-orange-50",
+            currentTier.textColor.includes("yellow") && "border-yellow-200 bg-yellow-50",
+            currentTier.textColor.includes("emerald") && "border-emerald-200 bg-emerald-50",
+            currentTier.textColor.includes("primary") && "border-primary/20 bg-primary/10",
+          )}>
+            {currentTier.label}
+          </span>
         </div>
 
-        <div className="mt-1.5 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
+        <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
+          <p>
             {budgetMode === "daily"
-              ? <>Min SAR {currentMin}/day{suggestedDaily ? <> &middot; Recommended <span className="font-semibold text-foreground">SAR {suggestedDaily}</span> for {goalLabel}</> : null}</>
-              : <>Min SAR {currentMin} &middot; ~<span className="font-semibold text-foreground">SAR {dailyAmount}/day</span> over {durationDays} days</>
+              ? <>Min SAR {currentMin}/day{suggestedDaily ? <> · Rec. <span className="font-semibold text-foreground">SAR {suggestedDaily}</span></> : null}</>
+              : <>Min SAR {currentMin} · ~<span className="font-semibold text-foreground">SAR {dailyAmount}/day</span> over {durationDays}d</>
             }
           </p>
           {budgetMode === "daily" && suggestedDaily && amount !== suggestedDaily && (
             <button
               type="button"
               onClick={() => onAmountChange(suggestedDaily)}
-              className="shrink-0 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+              className="shrink-0 text-xs font-medium text-primary hover:underline"
             >
               Use recommended
             </button>
@@ -362,70 +424,23 @@ export function BudgetDurationCard({
         </div>
 
         {budgetMode === "daily" && !endDateOptional && endDate && (
-          <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2">
-            <Wallet className="size-3.5 shrink-0 text-muted-foreground" />
-            <p className="text-xs text-muted-foreground">
-              Est. total: <span className="font-semibold text-foreground">SAR {(ai.enabled && autoIncreaseAvailable ? projectedTotalSpend : dailyAmount * durationDays).toLocaleString()}</span> over {durationDays} days
-              {ai.enabled && autoIncreaseAvailable && (
-                <span className="ml-1 text-primary">(incl. auto-increase)</span>
-              )}
-            </p>
-          </div>
-        )}
-
-        {/* Strength bar */}
-        <div className="mt-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className={cn("text-xs font-semibold", currentTier.textColor)}>{currentTier.label}</span>
-            <span className="text-[10px] text-muted-foreground tabular-nums">SAR {dailyAmount}/day</span>
-          </div>
-          <div className="flex h-1.5 gap-0.5 overflow-hidden rounded-full">
-            {strengthTiers.map((tier, i) => (
-              <div
-                key={i}
-                className={cn("flex-1 rounded-full transition-all", dailyAmount >= tier.min ? tier.color : "bg-muted")}
-              />
-            ))}
-          </div>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-            {dailyAmount >= 500
-              ? `Strong budget. Outperforms competitors in the ${platformName} auction.`
-              : dailyAmount >= 150
-                ? "Good start. A higher budget helps compete more effectively."
-                : "Consider increasing -- the algorithm needs enough data to optimize."}
+          <p className="mt-2 text-xs text-muted-foreground">
+            Est. total: <span className="font-semibold text-foreground">SAR {(ai.enabled && autoIncreaseAvailable ? projectedTotalSpend : dailyAmount * durationDays).toLocaleString()}</span> over {durationDays}d
+            {ai.enabled && autoIncreaseAvailable && (
+              <span className="ml-1 text-primary">(incl. auto-increase)</span>
+            )}
           </p>
-        </div>
+        )}
       </div>
 
       <div className="h-px bg-border/60" />
 
       {/* ── 3. Duration ── */}
       <div className="mt-5 mb-4">
-        <Label className="mb-2.5 block text-xs font-medium text-muted-foreground uppercase tracking-wider">Duration</Label>
-
-        {showRunContinuously && !endDateRequired && (
-          <div className={cn(
-            "mb-3 flex items-center justify-between rounded-xl border px-4 py-3 transition-colors",
-            endDateOptional ? "border-primary/30 bg-primary/5" : "border-border/60 bg-background"
-          )}>
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                "flex size-8 items-center justify-center rounded-lg",
-                endDateOptional ? "bg-primary/10" : "bg-muted/60"
-              )}>
-                <CalendarClock className={cn("size-4", endDateOptional ? "text-primary" : "text-muted-foreground")} />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-foreground">Run continuously</p>
-                <p className="text-[11px] text-muted-foreground">No end date -- runs until paused or budget depleted.</p>
-              </div>
-            </div>
-            <Switch
-              checked={endDateOptional}
-              onCheckedChange={handleRunContinuouslyChange}
-            />
-          </div>
-        )}
+        <div className="mb-2.5 flex items-center justify-between">
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Duration</Label>
+          <span className="text-[10px] text-muted-foreground">AST (UTC+3)</span>
+        </div>
 
         {!endDateOptional && (
           <div className="mb-3 flex gap-1.5">
@@ -436,17 +451,18 @@ export function BudgetDurationCard({
               { days: 0, label: "Custom" },
             ].map((preset) => {
               const active = preset.days === 0
-                ? !isPreset(7) && !isPreset(14) && !isPreset(30)
-                : isPreset(preset.days);
+                ? customMode || (!isPreset(7) && !isPreset(14) && !isPreset(30))
+                : !customMode && isPreset(preset.days);
               return (
                 <button
                   key={preset.label}
                   type="button"
                   onClick={() => {
-                    if (preset.days > 0) applyPreset(preset.days);
-                    else {
-                      onStartDateChange(new Date().toISOString().split("T")[0]);
-                      onEndDateChange("");
+                    if (preset.days > 0) {
+                      setCustomMode(false);
+                      applyPreset(preset.days);
+                    } else {
+                      setCustomMode(true);
                     }
                   }}
                   className={cn(
@@ -465,11 +481,11 @@ export function BudgetDurationCard({
 
         <div className="flex gap-3">
           <div className="flex-1">
-            <Label className="mb-1.5 block text-xs text-muted-foreground">Start</Label>
+            <Label className="mb-1.5 block text-xs text-muted-foreground">Start date</Label>
             <Input
               type="date"
               value={startDate}
-              min={new Date().toISOString().split("T")[0]}
+              min={earliestGoLive?.date ?? new Date().toISOString().split("T")[0]}
               onChange={(e) => {
                 const newStart = e.target.value;
                 onStartDateChange(newStart);
@@ -483,11 +499,24 @@ export function BudgetDurationCard({
               className="h-10"
             />
           </div>
-          {!endDateOptional && (
+          {!endDateOptional ? (
             <div className="flex-1">
-              <Label className="mb-1.5 block text-xs text-muted-foreground">
-                End {endDateRequired && <span className="text-red-500">*</span>}
-              </Label>
+              <div className="mb-1.5 flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">
+                  End date {endDateRequired && <span className="text-red-500">*</span>}
+                </Label>
+                {showRunContinuously && !endDateRequired && (
+                  <label className="flex cursor-pointer items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={endDateOptional}
+                      onChange={(e) => handleRunContinuouslyChange(e.target.checked)}
+                      className="size-3 rounded border-muted-foreground/40 text-primary accent-primary"
+                    />
+                    <span className="text-[11px] text-muted-foreground">No end date</span>
+                  </label>
+                )}
+              </div>
               <Input
                 type="date"
                 value={endDate}
@@ -499,35 +528,57 @@ export function BudgetDurationCard({
                 className="h-10"
               />
             </div>
-          )}
-          {endDateOptional && (
-            <div className="flex flex-1 items-end pb-0.5">
+          ) : (
+            <div className="flex-1">
+              <div className="mb-1.5 flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">End date</Label>
+                {showRunContinuously && !endDateRequired && (
+                  <label className="flex cursor-pointer items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={endDateOptional}
+                      onChange={(e) => handleRunContinuouslyChange(e.target.checked)}
+                      className="size-3 rounded border-muted-foreground/40 text-primary accent-primary"
+                    />
+                    <span className="text-[11px] text-muted-foreground">No end date</span>
+                  </label>
+                )}
+              </div>
               <div className="flex h-10 w-full items-center gap-2 rounded-lg border border-dashed border-primary/30 bg-primary/5 px-3">
                 <CalendarClock className="size-3.5 text-primary/60" />
-                <span className="text-xs font-medium text-primary/70">Ongoing</span>
+                <span className="text-xs font-medium text-primary/70">Ongoing — runs until paused</span>
               </div>
             </div>
           )}
         </div>
 
         {startDate && endDate && endDate > startDate && durationDays >= MIN_CAMPAIGN_DAYS && (
-          <div className="mt-2 flex items-center gap-1.5">
-            <Calendar className="size-3 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">{durationDays} days</span>
-          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">{durationDays} days</p>
         )}
 
         {startDate && endDate && endDate <= startDate && (
-          <div className="mt-2 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-            <AlertCircle className="size-3.5 shrink-0 text-red-600" />
-            <p className="text-xs text-red-700">End date must be after start date.</p>
-          </div>
+          <p className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600">
+            <AlertCircle className="size-3 shrink-0" />
+            End date must be after start date.
+          </p>
         )}
         {startDate && endDate && endDate > startDate && durationDays > 0 && durationDays < MIN_CAMPAIGN_DAYS && (
-          <div className="mt-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-            <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-red-600" />
-            <p className="text-xs leading-relaxed text-red-700">
-              Minimum {MIN_CAMPAIGN_DAYS} days required. {platformName} needs enough time to optimize delivery.
+          <p className="mt-1.5 flex items-center gap-1.5 text-xs text-red-600">
+            <AlertCircle className="size-3 shrink-0" />
+            Minimum {MIN_CAMPAIGN_DAYS} days required for {platformName} to optimize.
+          </p>
+        )}
+
+        {/* ── Smart Start: Estimated Go-Live (only for same-day / earliest start) ── */}
+        {showSmartStart && earliestGoLive && startDate &&
+          (startDate === earliestGoLive.date || startDate === new Date().toISOString().split("T")[0]) && (
+          <div className="mt-2 flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2">
+            <div className={cn(
+              "size-2 shrink-0 rounded-full",
+              earliestGoLive.sameDayPossible ? "bg-emerald-500" : "bg-amber-500"
+            )} />
+            <p className="text-xs text-muted-foreground">
+              Go-live: <span className="font-semibold text-foreground">{earliestGoLive.label}</span> <span className="text-muted-foreground/70">(~8h review)</span>
             </p>
           </div>
         )}
@@ -541,26 +592,21 @@ export function BudgetDurationCard({
         {autoIncreaseAvailable ? (
         <>
           <div className={cn(
-            "flex items-center justify-between rounded-xl border px-4 py-3 transition-colors",
+            "flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors",
             ai.enabled ? "border-primary/30 bg-primary/5" : "border-border/60 bg-background"
           )}>
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                "flex size-8 items-center justify-center rounded-lg",
-                ai.enabled ? "bg-primary/10" : "bg-muted/60"
-              )}>
-                <ArrowUpRight className={cn("size-4", ai.enabled ? "text-primary" : "text-muted-foreground")} />
-              </div>
+            <div className="flex items-center gap-2.5">
+              <ArrowUpRight className={cn("size-4", ai.enabled ? "text-primary" : "text-muted-foreground")} />
               <div>
                 <div className="flex items-center gap-1.5">
                   <p className="text-xs font-semibold text-foreground">Budget Auto-Increase</p>
                   <Badge className="rounded-full border-0 bg-primary/10 px-1.5 py-0 text-[10px] font-medium text-primary">Salla</Badge>
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  {ai.enabled
-                    ? `+${ai.pct}% every ${ai.intervalDays} days, up to SAR ${ai.maxDailyBudget.toLocaleString()}/day`
-                    : "Scale winning campaigns gradually as results come in."}
-                </p>
+                {ai.enabled && (
+                  <p className="text-[11px] text-muted-foreground">
+                    +{ai.pct}% every {ai.intervalDays}d · cap SAR {ai.maxDailyBudget.toLocaleString()}/day
+                  </p>
+                )}
               </div>
             </div>
             <Switch
@@ -570,133 +616,107 @@ export function BudgetDurationCard({
           </div>
 
           {ai.enabled && (
-            <div className="mt-3 space-y-3">
-              <div className="rounded-xl bg-muted/30 p-4">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-                  <div className="min-w-0 flex-1">
-                    <Label className="mb-2 block text-xs font-medium text-foreground">Increase by</Label>
-                    <div className="flex items-center gap-3">
-                      <Slider
-                        value={[ai.pct]}
-                        min={5}
-                        max={100}
-                        step={5}
-                        onValueChange={([v]) => updateAI({ pct: v })}
-                        className="flex-1"
-                      />
-                      <span className="w-14 rounded-md bg-background px-2 py-1 text-center text-sm font-bold tabular-nums text-foreground shadow-sm">{ai.pct}%</span>
-                    </div>
-                  </div>
-                  <div className="w-full sm:w-36">
-                    <Label className="mb-2 block text-xs font-medium text-foreground">Every</Label>
-                    <Select
-                      value={ai.intervalDays.toString()}
-                      onValueChange={(v) => updateAI({ intervalDays: Number(v) })}
-                    >
-                      <SelectTrigger className="h-9 bg-background shadow-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="3">3 days</SelectItem>
-                        <SelectItem value="5">5 days</SelectItem>
-                        <SelectItem value="7">7 days</SelectItem>
-                        <SelectItem value="14">14 days</SelectItem>
-                      </SelectContent>
-                    </Select>
+            <div className="mt-2.5 rounded-lg bg-muted/30 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1">
+                  <Label className="mb-1.5 block text-[11px] font-medium text-foreground">Increase by</Label>
+                  <div className="flex items-center gap-2.5">
+                    <Slider
+                      value={[ai.pct]}
+                      min={5}
+                      max={100}
+                      step={5}
+                      onValueChange={([v]) => updateAI({ pct: v })}
+                      className="flex-1"
+                    />
+                    <span className="w-12 rounded-md bg-background px-2 py-0.5 text-center text-xs font-bold tabular-nums text-foreground shadow-sm">{ai.pct}%</span>
                   </div>
                 </div>
-
-                <div className="mt-4 flex items-end gap-3">
-                  <div className="flex-1">
-                    <Label className="mb-1.5 block text-xs font-medium text-foreground">Safety cap</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">SAR</span>
-                      <Input
-                        type="number"
-                        min={dailyAmount}
-                        max={500000}
-                        value={ai.maxDailyBudget}
-                        onChange={(e) => updateAI({ maxDailyBudget: Math.max(dailyAmount, Math.min(500000, Number(e.target.value))) })}
-                        className="h-9 bg-background pl-11 text-sm shadow-sm"
-                      />
-                    </div>
-                  </div>
-                  <p className="pb-2 text-[11px] text-muted-foreground">max daily budget</p>
+                <div className="w-full sm:w-32">
+                  <Label className="mb-1.5 block text-[11px] font-medium text-foreground">Every</Label>
+                  <Select
+                    value={ai.intervalDays.toString()}
+                    onValueChange={(v) => updateAI({ intervalDays: Number(v) })}
+                  >
+                    <SelectTrigger className="h-8 bg-background text-xs shadow-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3">3 days</SelectItem>
+                      <SelectItem value="5">5 days</SelectItem>
+                      <SelectItem value="7">7 days</SelectItem>
+                      <SelectItem value="14">14 days</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
+              <div className="mt-3 flex items-end gap-2.5">
+                <div className="flex-1">
+                  <Label className="mb-1 block text-[11px] font-medium text-foreground">Safety cap (max daily)</Label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] font-medium text-muted-foreground">SAR</span>
+                    <Input
+                      type="number"
+                      min={dailyAmount}
+                      max={500000}
+                      value={ai.maxDailyBudget}
+                      onChange={(e) => updateAI({ maxDailyBudget: Math.max(dailyAmount, Math.min(500000, Number(e.target.value))) })}
+                      className="h-8 bg-background pl-10 text-xs shadow-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Compact schedule preview */}
               {autoIncreasePreview.length > 0 && (
-                <div className="overflow-hidden rounded-xl border border-border/60">
-                  <div className="flex items-center justify-between bg-muted/30 px-4 py-2">
-                    <span className="text-xs font-semibold text-foreground">Schedule Preview</span>
-                    <span className="text-[10px] text-muted-foreground">{autoIncreasePreview.length + 1} periods</span>
+                <div className="mt-3 space-y-0.5">
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-[11px] text-muted-foreground">Day 1</span>
+                    <span className="text-[11px] font-semibold tabular-nums text-foreground">SAR {dailyAmount.toLocaleString()}/day</span>
                   </div>
-                  <div className="flex max-h-36 flex-col divide-y divide-border/40 overflow-y-auto">
-                    <div className="flex items-center justify-between px-4 py-2">
-                      <div className="flex items-center gap-2">
-                        <div className="size-1.5 rounded-full bg-muted-foreground/40" />
-                        <span className="text-xs text-muted-foreground">Day 1</span>
+                  {autoIncreasePreview.slice(0, 3).map((step) => {
+                    const capped = step.budget >= ai.maxDailyBudget;
+                    return (
+                      <div key={step.day} className="flex items-center justify-between py-1">
+                        <span className={cn("text-[11px]", capped ? "text-amber-600" : "text-muted-foreground")}>Day {step.day}</span>
+                        <span className={cn("text-[11px] font-semibold tabular-nums", capped ? "text-amber-600" : "text-primary")}>
+                          SAR {step.budget.toLocaleString()}/day{capped ? " (cap)" : ""}
+                        </span>
                       </div>
-                      <span className="text-xs font-semibold tabular-nums text-foreground">SAR {dailyAmount.toLocaleString()}/day</span>
-                    </div>
-                    {autoIncreasePreview.map((step) => {
-                      const capped = step.budget >= ai.maxDailyBudget;
-                      return (
-                        <div key={step.day} className="flex items-center justify-between px-4 py-2">
-                          <div className="flex items-center gap-2">
-                            <div className={cn("size-1.5 rounded-full", capped ? "bg-amber-500" : "bg-primary")} />
-                            <span className={cn("text-xs", capped ? "text-amber-700" : "text-muted-foreground")}>Day {step.day}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <ArrowUpRight className={cn("size-3", capped ? "text-amber-500" : "text-primary")} />
-                            <span className={cn("text-xs font-semibold tabular-nums", capped ? "text-amber-700" : "text-primary")}>
-                              SAR {step.budget.toLocaleString()}/day
-                            </span>
-                            {capped && <span className="rounded bg-amber-100 px-1 py-0.5 text-[9px] font-medium text-amber-700">CAP</span>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="flex items-center justify-between border-t border-border bg-primary/5 px-4 py-2.5">
-                    <span className="text-xs font-semibold text-foreground">Projected total</span>
-                    <span className="text-sm font-bold tabular-nums text-primary">SAR {projectedTotalSpend.toLocaleString()}</span>
+                    );
+                  })}
+                  {autoIncreasePreview.length > 3 && (
+                    <p className="py-0.5 text-center text-[10px] text-muted-foreground/60">+{autoIncreasePreview.length - 3} more periods</p>
+                  )}
+                  <div className="flex items-center justify-between border-t border-border/40 pt-1.5">
+                    <span className="text-[11px] font-semibold text-foreground">Projected total</span>
+                    <span className="text-xs font-bold tabular-nums text-primary">SAR {projectedTotalSpend.toLocaleString()}</span>
                   </div>
                 </div>
               )}
 
               {(ai.pct >= 50 || finalAutoIncreaseDailyBudget > dailyAmount * 5) && (
-                <div className="flex items-start gap-2 rounded-lg border border-amber-200/60 bg-amber-50/50 px-3 py-2">
-                  <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-500" />
-                  <p className="text-xs leading-relaxed text-amber-700">
-                    Spend will reach up to <span className="font-semibold">SAR {finalAutoIncreaseDailyBudget.toLocaleString()}/day</span>. Monitor performance and adjust if needed.
-                  </p>
-                </div>
-              )}
-
-              <div className="flex items-start gap-2 rounded-lg bg-emerald-50/50 px-3 py-2">
-                <Sparkles className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
-                <p className="text-xs leading-relaxed text-emerald-700">
-                  <span className="font-semibold">Tip:</span> Start with 10-20% every 7 days. Only enable after 3-5 days of positive results.
+                <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-amber-600">
+                  <AlertCircle className="size-3 shrink-0" />
+                  Spend may reach SAR {finalAutoIncreaseDailyBudget.toLocaleString()}/day. Monitor and adjust as needed.
                 </p>
-              </div>
+              )}
             </div>
           )}
         </>
         ) : (
-        <div className="flex items-center gap-3 rounded-xl border border-dashed border-border/60 px-4 py-3">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-muted/50">
-            <ArrowUpRight className="size-4 text-muted-foreground/50" />
-          </div>
+        <div className="flex items-center gap-2.5 rounded-lg border border-dashed border-border/60 px-3 py-2.5">
+          <ArrowUpRight className="size-4 text-muted-foreground/50" />
           <div>
             <div className="flex items-center gap-1.5">
               <p className="text-xs font-semibold text-muted-foreground/70">Budget Auto-Increase</p>
               <Badge className="rounded-full border-0 bg-muted px-1.5 py-0 text-[10px] font-medium text-muted-foreground/60">Salla</Badge>
             </div>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground">
               {budgetMode === "lifetime"
-                ? "Switch to Daily budget to enable auto-increase."
-                : "Set a fixed end date to enable auto-increase."}
+                ? "Switch to Daily budget to enable."
+                : "Set a fixed end date to enable."}
             </p>
           </div>
         </div>

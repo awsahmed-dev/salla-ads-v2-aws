@@ -16,33 +16,44 @@ import {
   BarChart3,
   Sparkles,
   CheckCircle2,
+  RefreshCw,
+  TrendingUp,
 } from "lucide-react";
 
-const ORIGINAL_PRICE = 199;
-const CURRENT_PRICE = 149;
-const SAVINGS = ORIGINAL_PRICE - CURRENT_PRICE;
-const DISCOUNT_PCT = Math.round((SAVINGS / ORIGINAL_PRICE) * 100);
+const ORIGINAL_PRICE = 500;
+const CURRENT_PRICE = 299;
+const DISCOUNT_PCT = Math.round(((ORIGINAL_PRICE - CURRENT_PRICE) / ORIGINAL_PRICE) * 100);
 
 const BOOST_FEATURES = [
   {
     icon: Rocket,
-    title: "3-Day Launch Boost",
-    desc: "Extra ad credit injected during the critical first 72 hours",
+    title: "3-Day Human + AI Monitoring",
+    desc: "A specialist and Salla's AI monitor your campaign for the first 72 hours",
   },
   {
     icon: BarChart3,
-    title: "Smart Optimization",
-    desc: "AI-driven bid & audience adjustments in real time",
+    title: "Smart Bid Tuning",
+    desc: "AI reviews bids regularly, specialist approves adjustments",
   },
   {
     icon: Shield,
     title: "Priority Review",
-    desc: "Fast-tracked ad approval so your campaign goes live sooner",
+    desc: "Your ads are prioritized in the approval queue",
   },
   {
     icon: Sparkles,
-    title: "Creative Enhancement",
-    desc: "Auto-optimized headlines, thumbnails & ad copy for higher CTR",
+    title: "AI Creative Enhancement",
+    desc: "AI-generated headline and copy suggestions tested for performance",
+  },
+  {
+    icon: TrendingUp,
+    title: "Audience Insights Report",
+    desc: "See which audiences perform best for your campaign",
+  },
+  {
+    icon: RefreshCw,
+    title: "Refund if Disapproved",
+    desc: "Full SAR 299 back if Snapchat rejects your ad",
   },
 ];
 
@@ -64,17 +75,16 @@ export function PerformanceBoostCard({
           : "border-border/60 bg-card hover:border-border"
       )}
     >
-      {/* Subtle gradient glow when active */}
       {enabled && (
         <div className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-primary/[0.06] blur-3xl" />
       )}
 
-      {/* Header row */}
-      <div className="relative flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3.5">
+      {/* Header */}
+      <div className="relative flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
           <div
             className={cn(
-              "flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors",
+              "flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors",
               enabled
                 ? "bg-primary/15 shadow-sm shadow-primary/10"
                 : "bg-muted/60"
@@ -100,19 +110,17 @@ export function PerformanceBoostCard({
                     : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                 )}
               >
-                Save {DISCOUNT_PCT}%
+                {DISCOUNT_PCT}% off
               </Badge>
               {enabled && (
-                <Badge className="rounded-full border-0 bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                <Badge className="rounded-full border-0 bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                   <CheckCircle2 className="mr-0.5 size-3" />
-                  Active
+                  Added
                 </Badge>
               )}
             </div>
-            <p className="mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
-              Supercharge your campaign with Salla&apos;s AI optimization --
-              extra ad credit, smart bidding, and priority review during the
-              first 3 days.
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Human specialist + AI working together on your campaign for 3 days.
             </p>
           </div>
         </div>
@@ -145,7 +153,7 @@ export function PerformanceBoostCard({
       {/* Feature grid */}
       <div
         className={cn(
-          "mt-4 grid grid-cols-2 gap-2.5 transition-all",
+          "mt-4 grid grid-cols-3 gap-2 transition-all",
           enabled ? "opacity-100" : "opacity-60"
         )}
       >
@@ -153,7 +161,7 @@ export function PerformanceBoostCard({
           <div
             key={feat.title}
             className={cn(
-              "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors",
+              "rounded-lg border px-3 py-2.5 transition-colors",
               enabled
                 ? "border-primary/15 bg-primary/[0.03]"
                 : "border-border/40 bg-muted/20"
@@ -161,45 +169,60 @@ export function PerformanceBoostCard({
           >
             <feat.icon
               className={cn(
-                "mt-0.5 size-3.5 shrink-0",
+                "mb-1.5 size-3.5",
                 enabled ? "text-primary" : "text-muted-foreground"
               )}
             />
-            <div>
-              <p className="text-[11px] font-semibold text-foreground">
-                {feat.title}
-              </p>
-              <p className="text-[10px] leading-snug text-muted-foreground">
-                {feat.desc}
-              </p>
-            </div>
+            <p className="text-[11px] font-semibold leading-tight text-foreground">
+              {feat.title}
+            </p>
+            <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+              {feat.desc}
+            </p>
           </div>
         ))}
       </div>
 
-      {/* Bottom info bar */}
-      <div className="mt-3.5 flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
-        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-          <Info className="size-3" />
-          <span>
-            Charged only when enabled &middot; No recurring fees &middot;
-            Cancel anytime before launch
+      {/* Trust bar */}
+      <div className="mt-3.5 flex items-center justify-between rounded-lg bg-muted/30 px-3.5 py-2">
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <CheckCircle2 className="size-3 text-emerald-500" />
+            One-time
+          </span>
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <CheckCircle2 className="size-3 text-emerald-500" />
+            Cancel before launch
+          </span>
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            <CheckCircle2 className="size-3 text-emerald-500" />
+            Refund if disapproved
           </span>
         </div>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               type="button"
-              className="text-[10px] font-semibold text-primary hover:underline"
+              className="flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"
             >
-              Learn more
+              <Info className="size-3" />
+              Details
             </button>
           </TooltipTrigger>
-          <TooltipContent className="max-w-xs text-xs">
-            Salla Performance Boost adds SAR {CURRENT_PRICE} ad credit to your
-            campaign during the first 3 days. Our AI continuously optimizes bids,
-            audiences, and creative elements. You&apos;re only charged if you
-            keep it enabled at launch.
+          <TooltipContent className="max-w-xs text-xs leading-relaxed">
+            <p className="font-semibold">When you enable Boost:</p>
+            <ol className="mt-1 list-inside list-decimal space-y-0.5 text-muted-foreground">
+              <li>A specialist + AI monitor your campaign for 3 days</li>
+              <li>AI tunes bids, specialist reviews and approves</li>
+              <li>Your ads get priority in the review queue</li>
+              <li>AI generates creative suggestions + audience report</li>
+            </ol>
+            <p className="mt-2 text-[11px] font-medium text-emerald-600">
+              Full SAR {CURRENT_PRICE} refund if your ad is disapproved.
+            </p>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Powered by Salla Ads — not a Snapchat feature.
+            </p>
           </TooltipContent>
         </Tooltip>
       </div>

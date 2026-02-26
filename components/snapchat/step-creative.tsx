@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useCampaign } from "@/lib/snapchat/campaign-context";
-import { getCatalogStatus, type SallaCatalogStatus } from "@/lib/salla/store-api";
+import { getCatalogStatus, getSnapPublicProfile, type SallaCatalogStatus, type SnapPublicProfile } from "@/lib/salla/store-api";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -65,7 +65,9 @@ export function StepCreative() {
   const [activeAdIdx, setActiveAdIdx] = useState(0);
   const [previewAssetIdx, setPreviewAssetIdx] = useState(0);
   const [catalogStatus, setCatalogStatus] = useState<SallaCatalogStatus | null>(null);
-  const [showNewAdGroupPicker, setShowNewAdGroupPicker] = useState(false);
+  const [snapProfile, setSnapProfile] = useState<SnapPublicProfile | null>(null);
+  const [profileEnabled, setProfileEnabled] = useState(true);
+  const [showNewAdPicker, setShowNewAdPicker] = useState(false);
   const [placementExpanded, setPlacementExpanded] = useState(true);
 
   const ads = creative.ads ?? [];
@@ -82,9 +84,20 @@ export function StepCreative() {
       getCatalogStatus().then(setCatalogStatus);
     }
   }, [catalogEnabled]);
+
+  // Load Snap Public Profile from Salla
+  useEffect(() => {
+    getSnapPublicProfile().then((profile) => {
+      setSnapProfile(profile);
+      if (profile && !creative.publicProfileId) {
+        updateNested("creative", { publicProfileId: profile.profileId });
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const allowedFormats: AdFormat[] = catalogEnabled
     ? ["DYNAMIC"]
-    : (objectiveConfig.allowedFormats ?? ["SINGLE", "COLLECTION", "STORY"]);
+    : (objectiveConfig.allowedFormats ?? ["SINGLE", "COLLECTION", "STORY", "INFLUENCER"]).filter((f) => f !== "DYNAMIC");
 
   const allowedDestinations: AdDestination[] = objectiveConfig.allowedDestinations ?? ["WEBSITE"];
 
@@ -277,77 +290,132 @@ export function StepCreative() {
       <div className={cn("flex flex-col gap-6 lg:flex-row", WIZARD_FOOTER_PADDING_BOTTOM)}>
         {/* ============ LEFT COLUMN ============ */}
         <div className="flex flex-1 flex-col gap-5">
-          {/* ---- Brand Profile ---- */}
+          {/* ---- Snapchat Public Profile ---- */}
           <SectionCard>
-            {(() => {
-              const profileId = creative.publicProfileId ?? "";
-              const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId);
-              const hasValue = profileId.length > 0;
-              return (
-                <div className="flex items-start gap-3.5">
-                  <div className={cn(
-                    "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors",
-                    hasValue && isValidUUID ? "bg-emerald-100" : hasValue ? "bg-red-100" : "bg-primary/10"
-                  )}>
-                    {hasValue && isValidUUID
-                      ? <CheckCircle2 className="size-5 text-emerald-600" />
-                      : hasValue
-                        ? <AlertCircle className="size-5 text-red-500" />
-                        : <User className="size-5 text-primary" />
-                    }
+            {snapProfile ? (
+              /* ══ STATE 2: Authenticated via Salla — profile auto-linked ══ */
+              <div className="flex flex-col gap-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors",
+                      profileEnabled ? "bg-emerald-100" : "bg-muted"
+                    )}>
+                      {profileEnabled
+                        ? <CheckCircle2 className="size-5 text-emerald-600" />
+                        : <User className="size-5 text-muted-foreground" />}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-semibold text-foreground">Snapchat Public Profile</Label>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Your public profile will appear in the advertisement, and it is advisable to match it with your store name.
+                      </p>
+                    </div>
                   </div>
+                  <Switch
+                    checked={profileEnabled}
+                    onCheckedChange={(checked) => {
+                      setProfileEnabled(checked);
+                      updateNested("creative", { publicProfileId: checked ? snapProfile.profileId : "" });
+                    }}
+                  />
+                </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-sm font-semibold text-foreground">Public Profile</Label>
-                      {!hasValue && (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Required</span>
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Your brand name and profile picture shown on every ad.
-                    </p>
-
-                    <div className="mt-3 flex flex-col gap-1">
-                      <div className="relative">
-                        <Input
-                          placeholder="e.g. 72cf5c50-8343-48d3-a0a7-3ed45b75faaa"
-                          value={profileId}
-                          onChange={(e) => updateNested("creative", { publicProfileId: e.target.value.trim() })}
-                          className={cn(
-                            "h-9 pr-8 font-mono text-xs transition-colors",
-                            hasValue && isValidUUID ? "border-emerald-300 focus-visible:ring-emerald-200" :
-                            hasValue ? "border-red-300 focus-visible:ring-red-200" : ""
-                          )}
-                        />
-                        {hasValue && isValidUUID && (
-                          <CheckCircle2 className="absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-emerald-500" />
+                {profileEnabled && (
+                  <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-3.5 py-2.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={snapProfile.avatarUrl}
+                      alt={snapProfile.displayName}
+                      className="size-8 rounded-lg object-cover"
+                      crossOrigin="anonymous"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {snapProfile.displayName}
+                        {snapProfile.displayNameAr && (
+                          <span className="ml-1 text-muted-foreground"> - {snapProfile.displayNameAr}</span>
                         )}
-                        {hasValue && !isValidUUID && (
-                          <AlertCircle className="absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-red-400" />
-                        )}
-                      </div>
-                      {hasValue && !isValidUUID ? (
-                        <p className="text-[11px] text-red-600">
-                          This doesn't look like a valid Profile ID. It should be a UUID (e.g. 72cf5c50-8343-48d3-a0a7-3ed45b75faaa).
-                        </p>
-                      ) : (
-                        <p className="text-[11px] text-muted-foreground">
-                          Find it in <span className="font-medium text-foreground">Snapchat Business Manager</span> → Public Profiles
-                        </p>
-                      )}
+                      </p>
                     </div>
-
-                    {!hasValue && (
-                      <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
-                        <AlertCircle className="size-3.5 shrink-0 text-amber-500" />
-                        <p className="text-xs text-amber-700">Required to publish ads on Snapchat</p>
-                      </div>
+                    {snapProfile.verified && (
+                      <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
                     )}
                   </div>
-                </div>
-              );
-            })()}
+                )}
+              </div>
+            ) : (
+              /* ══ STATE 1: Not authenticated — manual UUID entry ══ */
+              (() => {
+                const profileId = creative.publicProfileId ?? "";
+                const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId);
+                const hasValue = profileId.length > 0;
+                return (
+                  <div className="flex items-start gap-3.5">
+                    <div className={cn(
+                      "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors",
+                      hasValue && isValidUUID ? "bg-emerald-100" : hasValue ? "bg-red-100" : "bg-primary/10"
+                    )}>
+                      {hasValue && isValidUUID
+                        ? <CheckCircle2 className="size-5 text-emerald-600" />
+                        : hasValue
+                          ? <AlertCircle className="size-5 text-red-500" />
+                          : <User className="size-5 text-primary" />
+                      }
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-semibold text-foreground">Public Profile</Label>
+                        {!hasValue && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Required</span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Your brand name and profile picture shown on every ad.
+                      </p>
+
+                      <div className="mt-3 flex flex-col gap-1">
+                        <div className="relative">
+                          <Input
+                            placeholder="e.g. 72cf5c50-8343-48d3-a0a7-3ed45b75faaa"
+                            value={profileId}
+                            onChange={(e) => updateNested("creative", { publicProfileId: e.target.value.trim() })}
+                            className={cn(
+                              "h-9 pr-8 font-mono text-xs transition-colors",
+                              hasValue && isValidUUID ? "border-emerald-300 focus-visible:ring-emerald-200" :
+                              hasValue ? "border-red-300 focus-visible:ring-red-200" : ""
+                            )}
+                          />
+                          {hasValue && isValidUUID && (
+                            <CheckCircle2 className="absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-emerald-500" />
+                          )}
+                          {hasValue && !isValidUUID && (
+                            <AlertCircle className="absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-red-400" />
+                          )}
+                        </div>
+                        {hasValue && !isValidUUID ? (
+                          <p className="text-[11px] text-red-600">
+                            This doesn't look like a valid Profile ID. It should be a UUID (e.g. 72cf5c50-8343-48d3-a0a7-3ed45b75faaa).
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">
+                            Find it in <span className="font-medium text-foreground">Snapchat Business Manager</span> → Public Profiles
+                          </p>
+                        )}
+                      </div>
+
+                      {!hasValue && (
+                        <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
+                          <AlertCircle className="size-3.5 shrink-0 text-amber-500" />
+                          <p className="text-xs text-amber-700">Required to publish ads on Snapchat</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()
+            )}
           </SectionCard>
 
           {/* ---- Catalog Active Banner ---- */}
@@ -379,51 +447,6 @@ export function StepCreative() {
             </div>
           )}
 
-          {/* ---- Seasonal Templates ---- */}
-          {ads.length === 0 && (
-            <SectionCard>
-              <div className="mb-3 flex items-center gap-2">
-                <Sparkles className="size-4 text-amber-500" />
-                <Label className="text-sm font-semibold text-foreground">Quick Start Templates</Label>
-                <Badge variant="secondary" className="rounded-full bg-amber-100 px-1.5 py-0 text-xs text-amber-700">Saudi Market</Badge>
-              </div>
-              <p className="mb-3 text-xs text-muted-foreground">Pre-built campaign templates optimized for Saudi e-commerce seasons. Select one to auto-create your first ad.</p>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { name: "Ramadan Sale", nameAr: "عروض رمضان", icon: "🌙", desc: "Gift sets, dates, prayer items" },
-                  { name: "Eid Collection", nameAr: "تشكيلة العيد", icon: "🎉", desc: "Eid gifts and celebrations" },
-                  { name: "National Day", nameAr: "اليوم الوطني", icon: "🇸🇦", desc: "Saudi National Day specials" },
-                  { name: "White Friday", nameAr: "الجمعة البيضاء", icon: "🏷️", desc: "Biggest discounts of the year" },
-                  { name: "Back to School", nameAr: "العودة للمدارس", icon: "📚", desc: "School supplies and essentials" },
-                  { name: "Year-End Sale", nameAr: "تخفيضات نهاية السنة", icon: "✨", desc: "End-of-year clearance" },
-                ].map((template) => (
-                  <button
-                    key={template.name}
-                    type="button"
-                    onClick={() => {
-                      const newAd = makeAdGroup("SINGLE", 0, allowedDestinations[0] ?? "WEBSITE");
-                      newAd.name = template.name;
-                      newAd.assets = newAd.assets.map((a) => ({
-                        ...a,
-                        headline: template.nameAr,
-                        cta: defaultCTA,
-                      }));
-                      updateNested("creative", { ads: [newAd] });
-                      setActiveAdIdx(0);
-                    }}
-                    className="flex items-start gap-2.5 rounded-lg border border-border p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.02]"
-                  >
-                    <span className="text-xl">{template.icon}</span>
-                    <div>
-                      <p className="text-xs font-medium text-foreground">{template.name}</p>
-                      <p className="text-[10px] text-muted-foreground" dir="rtl">{template.nameAr}</p>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">{template.desc}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </SectionCard>
-          )}
 
           {/* ---- Sponsored Ads (Chat Feed) Settings ---- */}
           {campaign.objective.objective === "SPONSORED_CHAT" && (
@@ -609,12 +632,24 @@ export function StepCreative() {
               <div className="mb-2.5 flex items-center gap-1.5">
                 <ShieldCheck className="size-3.5 text-muted-foreground" />
                 <Label className="text-xs font-semibold text-foreground">Content Safety</Label>
-                <InfoTip text="Controls the type of content your ads appear alongside. Limited Inventory restricts placement to moderated content only." />
+                <InfoTip text="Controls what type of content your ads appear next to. This doesn't change your ad — it controls the environment around it." />
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 {([
-                  { val: "FULL_INVENTORY" as const, label: "Full Inventory", desc: "Maximum reach across all content", icon: <Zap className="size-4" /> },
-                  { val: "LIMITED_INVENTORY" as const, label: "Limited Inventory", desc: "Moderated, brand-safe content only", icon: <ShieldCheck className="size-4" /> },
+                  {
+                    val: "FULL_INVENTORY" as const,
+                    label: "Full Inventory",
+                    desc: "Your ads can appear alongside all Snapchat content for maximum reach.",
+                    icon: <Zap className="size-4" />,
+                    tradeoff: "More reach, less content control",
+                  },
+                  {
+                    val: "LIMITED_INVENTORY" as const,
+                    label: "Limited Inventory",
+                    desc: "Your ads only appear next to moderated, brand-safe content.",
+                    icon: <ShieldCheck className="size-4" />,
+                    tradeoff: "More brand safety, smaller audience",
+                  },
                 ]).map((opt) => {
                   const selected = creative.brandSafety === opt.val;
                   return (
@@ -631,29 +666,34 @@ export function StepCreative() {
                         }
                       }}
                       className={cn(
-                        "relative flex items-start gap-2.5 rounded-xl border-2 px-3.5 py-3 text-left transition-all",
+                        "relative flex flex-col gap-2 rounded-xl border-2 px-3.5 py-3 text-left transition-all",
                         selected
                           ? "border-primary bg-primary/[0.04] shadow-sm"
                           : "border-border bg-background hover:border-primary/30"
                       )}
                     >
-                      <div className={cn(
-                        "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors",
-                        selected ? "bg-primary/10 text-primary" : "bg-muted/60 text-muted-foreground"
-                      )}>
-                        {opt.icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2.5">
+                        <div className={cn(
+                          "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors",
+                          selected ? "bg-primary/10 text-primary" : "bg-muted/60 text-muted-foreground"
+                        )}>
+                          {opt.icon}
+                        </div>
                         <span className={cn("text-xs font-semibold", selected ? "text-primary" : "text-foreground")}>{opt.label}</span>
-                        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{opt.desc}</p>
+                        {selected && <CheckCircle2 className="ml-auto size-4 shrink-0 text-primary" />}
                       </div>
-                      {selected && (
-                        <CheckCircle2 className="absolute right-2.5 top-2.5 size-4 text-primary" />
-                      )}
+                      <p className="text-[11px] leading-snug text-muted-foreground">{opt.desc}</p>
+                      <span className={cn("text-[10px] font-medium", selected ? "text-primary/70" : "text-muted-foreground/60")}>{opt.tradeoff}</span>
                     </button>
                   );
                 })}
               </div>
+              {creative.brandSafety === "LIMITED_INVENTORY" && (
+                <p className="mt-2 flex items-center gap-1.5 text-[10px] text-blue-600">
+                  <ShieldCheck className="size-3 shrink-0" />
+                  Limited Inventory restricts some placements (like Between User Stories). Recommended for sensitive brands.
+                </p>
+              )}
             </div>
 
             {/* ── Divider ── */}
@@ -682,12 +722,22 @@ export function StepCreative() {
               <div className="mb-2.5 flex items-center gap-1.5">
                 <LayoutGrid className="size-3.5 text-muted-foreground" />
                 <Label className="text-xs font-semibold text-foreground">Ad Placement</Label>
-                <InfoTip text="Where your ads appear on Snapchat. Automatic is recommended for maximum reach." />
+                <InfoTip text="Where on Snapchat your ads are shown. Automatic lets Snap's algorithm find the best-performing surfaces. Custom lets you pick specific locations." />
               </div>
               <div className="grid grid-cols-2 gap-2.5">
                 {([
-                  { val: "AUTOMATIC" as PlacementConfig, label: "Automatic", desc: "Snapchat optimizes across all surfaces", recommended: true },
-                  { val: "CUSTOM" as PlacementConfig, label: "Custom", desc: "Choose specific placements manually", recommended: false },
+                  {
+                    val: "AUTOMATIC" as PlacementConfig,
+                    label: "Automatic",
+                    desc: "Snapchat decides where to show your ads for the best results. Your ads appear across Stories, Spotlight, Discover, and more.",
+                    recommended: true,
+                  },
+                  {
+                    val: "CUSTOM" as PlacementConfig,
+                    label: "Custom",
+                    desc: "You choose exactly which placements to use. Useful if you know your audience is in a specific surface.",
+                    recommended: false,
+                  },
                 ]).map((opt) => {
                   const selected = creative.placement === opt.val;
                   return (
@@ -704,27 +754,40 @@ export function StepCreative() {
                     >
                       <div className="flex w-full items-center justify-between">
                         <span className={cn("text-xs font-semibold", selected ? "text-primary" : "text-foreground")}>{opt.label}</span>
-                        {opt.recommended && (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Recommended</span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {opt.recommended && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Recommended</span>
+                          )}
+                          {selected && <CheckCircle2 className="size-4 text-primary" />}
+                        </div>
                       </div>
                       <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{opt.desc}</p>
-                      {selected && (
-                        <CheckCircle2 className="absolute right-2.5 top-2.5 size-4 text-primary" />
-                      )}
                     </button>
                   );
                 })}
               </div>
 
+              {creative.placement === "AUTOMATIC" && (
+                <p className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <Sparkles className="size-3 shrink-0 text-emerald-500" />
+                  Snapchat typically delivers 20-40% more impressions with Automatic placement vs Custom.
+                </p>
+              )}
+
               {/* Custom placements list */}
               {creative.placement === "CUSTOM" && (
                 <div className="mt-3 flex flex-col gap-1.5">
+                  {/* Explainer */}
+                  <div className="mb-1 rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2 dark:border-blue-900/40 dark:bg-blue-950/20">
+                    <p className="text-[11px] leading-relaxed text-blue-700/80 dark:text-blue-400/80">
+                      Select the surfaces where you want your ads to appear. Some placements are restricted based on your content safety setting or ad format. Greyed-out options can&apos;t be used with your current configuration.
+                    </p>
+                  </div>
                   {creative.brandSafety === "LIMITED_INVENTORY" && (
-                    <div className="mb-1 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2">
-                      <ShieldCheck className="size-3.5 shrink-0 text-blue-500" />
-                      <p className="text-[11px] text-blue-700">
-                        Some placements are restricted under Limited Inventory.
+                    <div className="mb-1 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-950/20">
+                      <ShieldCheck className="size-3.5 shrink-0 text-amber-500" />
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                        Limited Inventory mode — placements marked &quot;Full Inventory only&quot; are unavailable.
                       </p>
                     </div>
                   )}
@@ -789,8 +852,8 @@ export function StepCreative() {
                               {noMatchingAds && !disabledByBrandSafety && (
                                 <span className="rounded bg-red-50 px-1.5 py-0.5 text-[9px] font-medium text-red-500">No {formatNote} ads</span>
                               )}
-                              {hasFormatRestriction && !noMatchingAds && (
-                                <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-600">{formatNote}</span>
+                              {hasFormatRestriction && !noMatchingAds && !isDisabled && (
+                                <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-600">{formatNote} only</span>
                               )}
                             </div>
                             <p className="text-[11px] leading-snug text-muted-foreground">{pos.desc}</p>
@@ -800,15 +863,33 @@ export function StepCreative() {
                     })}
                   </div>
                   {(creative.customPositions ?? []).length === 0 && (
-                    <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
+                    <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-950/20">
                       <AlertCircle className="size-3 shrink-0 text-amber-500" />
-                      <span className="text-xs text-amber-700">Select at least one placement</span>
+                      <span className="text-xs text-amber-700 dark:text-amber-400">Select at least one placement to continue</span>
                     </div>
                   )}
                   {(creative.customPositions ?? []).length > 0 && (
-                    <p className="text-[11px] text-muted-foreground">
-                      {(creative.customPositions ?? []).length} of {SNAP_POSITIONS.filter((p) => !(creative.brandSafety === "LIMITED_INVENTORY" && p.fullOnly)).length} placements selected
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] text-muted-foreground">
+                        {(creative.customPositions ?? []).length} of {SNAP_POSITIONS.filter((p) => !(creative.brandSafety === "LIMITED_INVENTORY" && p.fullOnly)).length} placements selected
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const available = SNAP_POSITIONS.filter((p) => !(creative.brandSafety === "LIMITED_INVENTORY" && p.fullOnly));
+                          const hasFormat = available.filter((p) => {
+                            if (p.formats === "all") return true;
+                            const requiredFormats = p.formats as string[];
+                            const currentAdTypes = new Set(ads.map((a) => a.adType));
+                            return requiredFormats.some((f) => currentAdTypes.has(f as string));
+                          });
+                          updateNested("creative", { customPositions: hasFormat.map((p) => p.id) });
+                        }}
+                        className="text-[10px] font-medium text-primary hover:underline"
+                      >
+                        Select all available
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -818,28 +899,28 @@ export function StepCreative() {
             )}
           </SectionCard>
 
-          {/* ---- Ad Groups List ---- */}
+          {/* ---- Ads List ---- */}
           <SectionCard>
             <div className="mb-1 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Layers className="size-4 text-primary" />
-                <Label className="text-sm font-semibold text-foreground">Ad Groups</Label>
-                <Badge variant="secondary" className="text-xs">{ads.length} group{ads.length !== 1 ? "s" : ""}</Badge>
-                <InfoTip text="Each ad group has its own format and settings. Inside each group you add creative variations (images/videos). Snapchat recommends 3-5 ad groups per campaign." />
+                <Label className="text-sm font-semibold text-foreground">Ads</Label>
+                <Badge variant="secondary" className="text-xs">{ads.length} ad{ads.length !== 1 ? "s" : ""}</Badge>
+                <InfoTip text="Each ad has its own format and creative variations. You can mix formats (e.g. Single Image + Collection) in the same campaign. Snapchat recommends 3-5 ads for optimal delivery." />
               </div>
             </div>
             <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-              Each ad group has its own format, settings, and one or more creative variations.
+              Add one or more ads with different formats and creatives. Snapchat auto-optimizes delivery across them.
             </p>
 
-            {ads.length === 0 && (
+            {ads.length === 0 && !catalogEnabled && (
               <div className="mb-3 flex items-start gap-2.5 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
                 <Zap className="mt-0.5 size-4 shrink-0 text-primary" />
                 <div>
                   <p className="text-xs font-semibold text-foreground">Recommended Format</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {campaign.objective.objective === "SALES"
-                      ? "For Sales campaigns, Collection Ads with your store products perform 2.3x better. Dynamic Product Ads are ideal if your catalog is connected."
+                      ? "For Sales campaigns, Collection Ads with your store products perform 2.3x better."
                       : campaign.objective.objective === "WEBSITE_VISITS"
                         ? "Single Image/Video ads drive the most website traffic. Use eye-catching visuals with a clear CTA."
                         : campaign.objective.objective === "ENGAGEMENT"
@@ -854,14 +935,33 @@ export function StepCreative() {
               </div>
             )}
 
-            {ads.length === 0 ? (
+            {ads.length === 0 && catalogEnabled ? (
+              <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-primary/30 bg-primary/[0.02] py-10">
+                <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10">
+                  <Zap className="size-7 text-primary" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-foreground">Dynamic Product Ad</p>
+                  <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">
+                    Your catalog is connected. Snapchat will auto-generate ads from your products, targeting users based on their behavior.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => addAd("DYNAMIC")}
+                  className="gap-2"
+                >
+                  <Plus className="size-4" />
+                  Create Dynamic Ad
+                </Button>
+              </div>
+            ) : ads.length === 0 ? (
               <div className="flex flex-col items-center gap-5 rounded-xl border-2 border-dashed border-border py-12">
                 <div className="flex size-14 items-center justify-center rounded-2xl bg-muted/60">
                   <ImagePlus className="size-7 text-muted-foreground" />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-foreground">No ad groups yet</p>
-                  <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">Create your first ad group by selecting a format below. Each group can hold multiple creative variations.</p>
+                  <p className="text-sm font-medium text-foreground">No ads yet</p>
+                  <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">Create your first ad by selecting a format below. Each ad can have multiple creative variations.</p>
                 </div>
                 <div className="grid w-full max-w-lg gap-2 px-4 sm:grid-cols-2">
                   {FILTERED_AD_FORMATS.map((opt) => (
@@ -903,18 +1003,29 @@ export function StepCreative() {
                 ))}
 
                 <div className="rounded-xl border-2 border-dashed border-border transition-all">
+                  {catalogEnabled ? (
+                    <button
+                      type="button"
+                      onClick={() => addAd("DYNAMIC")}
+                      className="flex w-full items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/[0.03]"
+                    >
+                      <Plus className="size-4" />
+                      Add Dynamic Ad
+                    </button>
+                  ) : (
+                  <>
                   <button
                     type="button"
-                    onClick={() => setShowNewAdGroupPicker((v) => !v)}
+                    onClick={() => setShowNewAdPicker((v) => !v)}
                     className="flex w-full items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/[0.03]"
                   >
                     <Plus className="size-4" />
-                    New Ad Group
-                    {showNewAdGroupPicker ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                    Add Ad
+                    {showNewAdPicker ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                   </button>
-                  {showNewAdGroupPicker && (
+                  {showNewAdPicker && (
                     <div className="border-t border-border px-4 pb-4 pt-3">
-                      <p className="mb-3 text-xs text-muted-foreground">Choose a format for your new ad group:</p>
+                      <p className="mb-3 text-xs text-muted-foreground">Choose a format for your new ad:</p>
                       {freqCapLockedFormat && (
                         <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                           <Info className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
@@ -931,7 +1042,7 @@ export function StepCreative() {
                               key={opt.value}
                               type="button"
                               disabled={lockedOut}
-                              onClick={() => { addAd(opt.value); setShowNewAdGroupPicker(false); }}
+                              onClick={() => { addAd(opt.value); setShowNewAdPicker(false); }}
                               className={cn(
                                 "flex flex-col items-center gap-2 rounded-lg border bg-background px-3 py-3 text-center transition-all",
                                 lockedOut
@@ -947,6 +1058,8 @@ export function StepCreative() {
                         })}
                       </div>
                     </div>
+                  )}
+                  </>
                   )}
                 </div>
               </div>
@@ -1053,7 +1166,7 @@ export function StepCreative() {
         onPrevious={() => setStep(2)}
         onNext={() => setStep(4)}
         previousLabel="Previous"
-        nextLabel="Next: Review & Launch"
+        nextLabel="Next"
         nextDisabled={passingChecks < allChecks.length}
         accent="primary"
         message={passingChecks < allChecks.length ? {
@@ -1068,6 +1181,47 @@ export function StepCreative() {
 /* ================================================================== */
 /*  Campaign Readiness Card                                           */
 /* ================================================================== */
+
+/* Circular progress ring for readiness score */
+function ReadinessRing({ percent, size = 44, stroke = 3.5 }: { percent: number; size?: number; stroke?: number }) {
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (percent / 100) * circ;
+  const color = percent >= 100 ? "#10b981" : percent >= 60 ? "#3b82f6" : percent >= 30 ? "#f59e0b" : "#ef4444";
+  return (
+    <svg width={size} height={size} className="shrink-0 -rotate-90">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-muted/30" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} className="transition-all duration-500" />
+      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="rotate-90 origin-center fill-foreground text-[11px] font-bold tabular-nums">{percent}%</text>
+    </svg>
+  );
+}
+
+/* Group checks by ad for organized display */
+function groupChecksByAd(checks: { label: string; ok: boolean }[]): { group: string; items: { label: string; ok: boolean }[] }[] {
+  const groups: { group: string; items: { label: string; ok: boolean }[] }[] = [];
+  const general: { label: string; ok: boolean }[] = [];
+
+  for (const c of checks) {
+    const adMatch = c.label.match(/^Ad (\d+)/);
+    if (adMatch) {
+      const groupName = `Ad ${adMatch[1]}`;
+      let existing = groups.find((g) => g.group === groupName);
+      if (!existing) {
+        existing = { group: groupName, items: [] };
+        groups.push(existing);
+      }
+      existing.items.push({ ...c, label: c.label.replace(/^Ad \d+ /, "").replace(/^Creative \d+: /, "").replace(/^Snap \d+: /, "") });
+    } else {
+      general.push(c);
+    }
+  }
+
+  const result: { group: string; items: { label: string; ok: boolean }[] }[] = [];
+  if (general.length > 0) result.push({ group: "General", items: general });
+  result.push(...groups);
+  return result;
+}
 
 function CampaignReadinessCard({
   ads,
@@ -1088,6 +1242,7 @@ function CampaignReadinessCard({
   objective?: string;
   catalogEnabled?: boolean;
 }) {
+  const [showAllChecks, setShowAllChecks] = useState(false);
   const failingChecks = allChecks.filter((c) => !c.ok);
   const allPassed = passingChecks === allChecks.length && allChecks.length > 0;
 
@@ -1101,17 +1256,18 @@ function CampaignReadinessCard({
   const hasVideoCreative = catalogEnabled || ads.some((a) => a.assets.some((asset) => asset.mediaType === "VIDEO"));
   const hasMultipleFormats = new Set(ads.map((a) => a.adFormat)).size >= 2;
 
-  const bestPractices: { label: string; met: boolean; tip: string }[] = [];
+  const bestPractices: { label: string; met: boolean; tip: string; metTip: string }[] = [];
 
   if (!catalogEnabled) {
     bestPractices.push({
-      label: "Multiple ad groups",
+      label: "Multiple ads",
       met: hasMultipleAds,
       tip: objective === "SALES"
-        ? "Create 2+ ad groups to A/B test creatives and find the best-performing sales driver"
+        ? "Create 2+ ads to A/B test creatives and find the best-performing sales driver"
         : objective === "LEADS"
-          ? "Test different lead form approaches across multiple ad groups"
-          : "Create 2+ ad groups to test different audiences or formats",
+          ? "Test different lead form approaches across multiple ads"
+          : "Create 2+ ads to test different formats or creatives",
+      metTip: `${ads.length} ads — great for testing`,
     });
   }
 
@@ -1122,6 +1278,7 @@ function CampaignReadinessCard({
       tip: objective === "SALES"
         ? "Snap recommends 3-5 creative variations — test different product angles and CTAs"
         : "Snap recommends 3-5 creative variations for optimal delivery",
+      metTip: `~${Math.round(avgCreativesPerAd)} creatives per ad`,
     });
 
     bestPractices.push({
@@ -1130,6 +1287,7 @@ function CampaignReadinessCard({
       tip: objective === "ENGAGEMENT"
         ? "Video ads generate 3x more engagement than static images on Snapchat"
         : "Video ads get 2x more engagement than static images on Snapchat",
+      metTip: "Video creatives detected",
     });
   }
 
@@ -1138,6 +1296,7 @@ function CampaignReadinessCard({
       label: "Multiple formats",
       met: hasMultipleFormats,
       tip: "Mix formats (Single, Story, Collection) to reach users in different placements",
+      metTip: `${new Set(ads.map((a) => a.adFormat)).size} formats in use`,
     });
   }
 
@@ -1149,120 +1308,186 @@ function CampaignReadinessCard({
     bestPractices.push({
       label: "A/B testing",
       met: hasDifferentCreatives,
-      tip: "Vary headlines, CTAs, or visuals across ad groups to find what resonates best with your audience",
+      tip: "Vary headlines, CTAs, or visuals across ads to find what resonates best with your audience",
+      metTip: "Different creatives across ads",
     });
   }
 
   const bpMet = bestPractices.filter((bp) => bp.met).length;
   const bpTotal = bestPractices.length;
-  const bpPercent = bpTotal > 0 ? Math.round((bpMet / bpTotal) * 100) : 0;
+
+  const totalWeight = allChecks.length + bpTotal;
+  const totalScore = passingChecks + bpMet;
+  const overallPercent = totalWeight > 0 ? Math.round((totalScore / totalWeight) * 100) : 0;
 
   const readinessLabel = allPassed
-    ? bpPercent >= 75 ? "Excellent" : bpPercent >= 50 ? "Good" : "Ready"
+    ? overallPercent >= 90 ? "Excellent" : overallPercent >= 70 ? "Good" : "Ready"
     : "Incomplete";
 
   const readinessColor = allPassed
-    ? bpPercent >= 75 ? "text-emerald-600" : bpPercent >= 50 ? "text-primary" : "text-amber-600"
+    ? overallPercent >= 90 ? "text-emerald-600" : overallPercent >= 70 ? "text-primary" : "text-amber-600"
     : "text-red-500";
+
+  const groupedFailing = groupChecksByAd(failingChecks);
+  const visibleFailCount = showAllChecks ? failingChecks.length : Math.min(failingChecks.length, 6);
 
   return (
     <SectionCard className="overflow-hidden p-0">
-      {/* ── Header with readiness score ── */}
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="size-4 text-primary" />
-          <Label className="text-sm font-semibold text-foreground">Campaign Readiness</Label>
+      {/* ── Header with progress ring ── */}
+      <div className="flex items-center gap-3 px-4 py-3.5">
+        <ReadinessRing percent={overallPercent} />
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-semibold text-foreground">Campaign Readiness</Label>
+            <span className={cn("text-xs font-bold", readinessColor)}>{readinessLabel}</span>
+          </div>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {allPassed
+              ? bpMet === bpTotal
+                ? "All requirements met and best practices followed"
+                : `All requirements met — ${bpTotal - bpMet} best practice${bpTotal - bpMet !== 1 ? "s" : ""} could improve performance`
+              : `${failingChecks.length} required item${failingChecks.length !== 1 ? "s" : ""} need${failingChecks.length === 1 ? "s" : ""} attention before launching`
+            }
+          </p>
         </div>
-        <span className={cn("text-xs font-bold", readinessColor)}>{readinessLabel}</span>
       </div>
 
-      {/* ── Required checks (only show if something is failing) ── */}
+      {/* ── Required checks (grouped by ad) ── */}
       {failingChecks.length > 0 && (
         <div className="border-t border-border px-4 py-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Required</span>
+          <div className="mb-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Required</span>
+              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-red-600">{failingChecks.length} remaining</span>
+            </div>
             <span className="text-[11px] tabular-nums text-muted-foreground">{passingChecks}/{allChecks.length}</span>
           </div>
-          <div className="mb-2 h-1 w-full overflow-hidden rounded-full bg-muted">
+          <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className={cn("h-full rounded-full transition-all", allPassed ? "bg-emerald-500" : "bg-primary")}
+              className={cn("h-full rounded-full transition-all duration-500", allPassed ? "bg-emerald-500" : passingChecks / allChecks.length > 0.5 ? "bg-primary" : "bg-amber-500")}
               style={{ width: `${allChecks.length > 0 ? (passingChecks / allChecks.length) * 100 : 0}%` }}
             />
           </div>
-          <div className="flex flex-col gap-0.5">
-            {failingChecks.slice(0, 5).map((c, i) => (
-              <div key={i} className="flex items-center gap-2 py-0.5">
-                <div className="flex size-3 shrink-0 items-center justify-center rounded-full border-[1.5px] border-red-400">
-                  <div className="size-1 rounded-full bg-red-400" />
+          <div className="flex flex-col gap-2.5">
+            {groupedFailing.map((group) => {
+              const visibleItems = showAllChecks ? group.items : group.items.slice(0, 3);
+              const hiddenCount = group.items.length - visibleItems.length;
+              return (
+                <div key={group.group}>
+                  {groupedFailing.length > 1 && (
+                    <p className="mb-1 text-[10px] font-semibold text-muted-foreground">{group.group}</p>
+                  )}
+                  <div className="flex flex-col gap-0.5">
+                    {visibleItems.map((c, i) => (
+                      <div key={i} className="flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-red-50/50 dark:hover:bg-red-950/10">
+                        <div className="flex size-3.5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-red-400 bg-red-50">
+                          <div className="size-1 rounded-full bg-red-400" />
+                        </div>
+                        <span className="text-[11px] font-medium text-foreground">{c.label}</span>
+                      </div>
+                    ))}
+                    {!showAllChecks && hiddenCount > 0 && (
+                      <p className="pl-6 text-[10px] text-muted-foreground">+{hiddenCount} more</p>
+                    )}
+                  </div>
                 </div>
-                <span className="text-[11px] font-medium text-foreground">{c.label}</span>
-              </div>
-            ))}
-            {failingChecks.length > 5 && (
-              <p className="mt-0.5 text-[11px] text-muted-foreground">+{failingChecks.length - 5} more</p>
-            )}
+              );
+            })}
           </div>
+          {failingChecks.length > 6 && (
+            <button
+              type="button"
+              onClick={() => setShowAllChecks(!showAllChecks)}
+              className="mt-2 w-full rounded-md bg-muted/40 py-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              {showAllChecks ? "Show less" : `Show all ${failingChecks.length} items`}
+            </button>
+          )}
         </div>
       )}
 
       {/* ── All passed banner ── */}
       {allPassed && (
-        <div className="border-t border-emerald-100 bg-emerald-50/60 px-4 py-2.5">
+        <div className="border-t border-emerald-100 bg-emerald-50/60 px-4 py-2.5 dark:border-emerald-900/30 dark:bg-emerald-950/20">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
-            <span className="text-[11px] font-medium text-emerald-700">All required checks passed</span>
+            <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">All {allChecks.length} required checks passed — ready to launch</span>
           </div>
         </div>
       )}
 
       {/* ── Best Practices ── */}
-      <div className="border-t border-border px-4 py-3">
-        <div className="mb-2.5 flex items-center justify-between">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Best Practices</span>
-          <span className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums",
-            bpPercent >= 75 ? "bg-emerald-100 text-emerald-700" :
-            bpPercent >= 50 ? "bg-primary/10 text-primary" :
-            "bg-amber-100 text-amber-700"
-          )}>
-            {bpMet}/{bpTotal}
-          </span>
-        </div>
-        <div className="flex flex-col gap-2">
-          {bestPractices.map((bp, i) => (
-            <div key={i} className="flex items-start gap-2">
-              {bp.met ? (
-                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
-              ) : (
-                <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-500" />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className={cn("text-[11px] font-medium", bp.met ? "text-muted-foreground" : "text-foreground")}>{bp.label}</p>
-                {!bp.met && (
-                  <p className="text-[10px] leading-relaxed text-muted-foreground">{bp.tip}</p>
-                )}
-              </div>
+      {bpTotal > 0 && (
+        <div className="border-t border-border px-4 py-3">
+          <div className="mb-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Best Practices</span>
+              <InfoTip text="These aren't required to launch, but following them typically improves ad performance and lowers cost per result." />
             </div>
-          ))}
+            <span className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums",
+              bpMet === bpTotal ? "bg-emerald-100 text-emerald-700" :
+              bpMet > 0 ? "bg-primary/10 text-primary" :
+              "bg-amber-100 text-amber-700"
+            )}>
+              {bpMet}/{bpTotal}
+            </span>
+          </div>
+          {/* Best practices progress */}
+          <div className="mb-3 h-1 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn("h-full rounded-full transition-all duration-500", bpMet === bpTotal ? "bg-emerald-500" : "bg-amber-400")}
+              style={{ width: `${bpTotal > 0 ? (bpMet / bpTotal) * 100 : 0}%` }}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {bestPractices.map((bp, i) => (
+              <div key={i} className={cn(
+                "flex items-start gap-2 rounded-lg px-2 py-1.5 transition-colors",
+                bp.met ? "bg-emerald-50/40 dark:bg-emerald-950/10" : "bg-amber-50/40 dark:bg-amber-950/10"
+              )}>
+                {bp.met ? (
+                  <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
+                ) : (
+                  <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-500" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className={cn("text-[11px] font-medium", bp.met ? "text-emerald-700 dark:text-emerald-400" : "text-foreground")}>{bp.label}</p>
+                  <p className="text-[10px] leading-relaxed text-muted-foreground">
+                    {bp.met ? bp.metTip : bp.tip}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Quick Stats Footer ── */}
       <div className="flex items-center justify-between border-t border-border bg-muted/20 px-4 py-2.5">
-        <div className="flex items-center gap-3">
-          <div className="text-center">
-            <span className="block text-sm font-bold tabular-nums text-foreground">{ads.length}</span>
-            <span className="text-[9px] text-muted-foreground">Ad{ads.length !== 1 ? "s" : ""}</span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-bold tabular-nums text-foreground">{ads.length}</span>
+            <span className="text-[10px] text-muted-foreground">Ad{ads.length !== 1 ? "s" : ""}</span>
           </div>
-          <div className="h-5 w-px bg-border" />
-          <div className="text-center">
-            <span className="block text-sm font-bold tabular-nums text-foreground">{totalCreatives}</span>
-            <span className="text-[9px] text-muted-foreground">Creative{totalCreatives !== 1 ? "s" : ""}</span>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-bold tabular-nums text-foreground">{totalCreatives}</span>
+            <span className="text-[10px] text-muted-foreground">Creative{totalCreatives !== 1 ? "s" : ""}</span>
           </div>
+          {ads.some((a) => a.adFormat === "DYNAMIC") && (
+            <>
+              <div className="h-4 w-px bg-border" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold tabular-nums text-foreground">{ads.filter((a) => a.adFormat === "DYNAMIC").length}</span>
+                <span className="text-[10px] text-muted-foreground">Dynamic</span>
+              </div>
+            </>
+          )}
         </div>
-        {!hasEnoughCreatives && nonDynamicAds.length > 0 && (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-medium text-amber-700">
-            Add more creatives
+        {!allPassed && (
+          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-semibold text-red-600">
+            Fix {failingChecks.length} issue{failingChecks.length !== 1 ? "s" : ""}
           </span>
         )}
       </div>

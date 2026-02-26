@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCampaign } from "@/lib/snapchat/campaign-context";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,7 @@ import {
   Eye,
   ShoppingCart,
   AlertCircle,
+  CheckCircle2,
   Wallet,
   MousePointerClick,
   FileText,
@@ -45,10 +46,12 @@ import {
   Settings2,
   Download,
   Lock,
+  ShieldCheck,
+  Users,
+  Clock,
 } from "lucide-react";
-import { FrequencyCapCard } from "@/components/shared/frequency-cap-card";
+import { InfoTip } from "@/components/shared/info-tip";
 import { BudgetDurationCard } from "@/components/shared/budget-duration-card";
-import { AdSchedulingCard } from "@/components/shared/ad-scheduling-card";
 import { PerformanceBoostCard } from "@/components/shared/performance-boost-card";
 import { CostSummaryCard } from "@/components/shared/cost-summary-card";
 import { EstimatedResultsCard } from "@/components/shared/estimated-results-card";
@@ -63,7 +66,6 @@ import {
   type PaymentMethod,
 } from "@/lib/snapchat/campaign-types";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
-import { AttributionWindowCard } from "@/components/shared/attribution-window-card";
 import { DeliveryPacingCard } from "@/components/shared/delivery-pacing-card";
 
 /* ================================================================== */
@@ -76,124 +78,141 @@ const ALL_OPTIMIZATION_GOALS: {
   desc: string;
   icon: React.ReactNode;
   recommended?: Record<string, boolean>;
-  /** If true, this goal requires the advertiser to have an active Snap Pixel with matching events */
   requiresPixel?: boolean;
-  /** If true, this goal requires a Mobile Measurement Partner (MMP) integration */
   requiresMMP?: boolean;
+  bestFor?: string;
+  costHint?: string;
   }[] = [
   {
     value: "PIXEL_PURCHASE",
     label: "Purchases",
-    desc: "Get the most purchases from your store visitors.",
+    desc: "Snap optimizes delivery to people most likely to buy from your store.",
     icon: <ShoppingCart className="size-4" />,
     recommended: { SALES: true },
     requiresPixel: true,
+    bestFor: "Best for: maximizing revenue and ROAS from your ad spend",
+    costHint: "Higher cost per action, highest return",
   },
   {
     value: "PIXEL_ADD_TO_CART",
     label: "Add to Cart",
-    desc: "Drive more customers to add products to their cart.",
+    desc: "Reach shoppers who are likely to add products to their cart — a strong purchase intent signal.",
     icon: <TrendingUp className="size-4" />,
     requiresPixel: true,
+    bestFor: "Best for: building a retargeting pool of high-intent shoppers",
+    costHint: "Moderate cost per action",
   },
   {
     value: "PIXEL_PAGE_VIEW",
     label: "Page Views",
-    desc: "Maximize the number of visitors who view pages on your store.",
+    desc: "Drive the most visitors to your store pages. Great for new stores building traffic.",
     icon: <Eye className="size-4" />,
     requiresPixel: true,
-  },
-  {
-    value: "PIXEL_SIGNUP",
-    label: "Sign Ups",
-    desc: "Get more sign-ups and registrations on your store.",
-    icon: <FileText className="size-4" />,
-    requiresPixel: true,
+    bestFor: "Best for: new stores, product launches, or driving traffic to specific pages",
+    costHint: "Lower cost per action, broader reach",
   },
   {
     value: "SWIPES",
     label: "Swipe Ups",
-    desc: "Drive maximum traffic to your website from ad clicks.",
+    desc: "Maximize clicks to your website. Doesn't require a pixel.",
     icon: <MousePointerClick className="size-4" />,
     recommended: { WEBSITE_VISITS: true },
+    bestFor: "Best for: driving traffic when pixel is not yet installed",
+    costHint: "Lowest cost per action",
   },
   {
     value: "LANDING_PAGE_VIEW",
     label: "Landing Page Views",
-    desc: "Get higher quality visitors who actually load your page fully.",
+    desc: "Optimize for visitors who fully load your page — higher quality traffic than swipe-ups.",
     icon: <FileText className="size-4" />,
     requiresPixel: true,
+    bestFor: "Best for: ensuring visitors actually see your content, not just click",
+    costHint: "Moderate cost, higher quality",
   },
   {
     value: "IMPRESSIONS",
     label: "Impressions",
-    desc: "Maximize the number of times your ad is shown. Best for brand awareness.",
+    desc: "Show your ad to as many people as possible. Best for brand awareness campaigns.",
     icon: <Eye className="size-4" />,
     recommended: { ENGAGEMENT: true, SPONSORED_CHAT: true },
+    bestFor: "Best for: brand awareness, product launches, seasonal promotions",
+    costHint: "Lowest cost per 1,000 views",
   },
   {
     value: "STORY_OPENS",
     label: "Story Opens",
-    desc: "Get more people to open and view your Story Ad.",
+    desc: "Get more people to open and watch your Story Ad in the Discover feed.",
     icon: <Eye className="size-4" />,
+    bestFor: "Best for: Story Ads with multi-snap narratives",
+    costHint: "Low cost per open",
   },
   {
     value: "VIDEO_VIEWS",
     label: "Video Views (2s)",
-    desc: "Get more people to watch your video ad.",
+    desc: "Maximize the number of people who watch at least 2 seconds of your video.",
     icon: <Eye className="size-4" />,
+    bestFor: "Best for: short-form video awareness",
+    costHint: "Low cost per view",
   },
   {
     value: "VIDEO_VIEWS_15_SEC",
     label: "Video Views (15s)",
-    desc: "Get more people to watch at least 15 seconds of your video.",
+    desc: "Reach engaged viewers who watch at least 15 seconds — deeper engagement than 2s views.",
     icon: <Eye className="size-4" />,
+    bestFor: "Best for: longer storytelling videos, product demos",
+    costHint: "Higher cost, more engaged viewers",
   },
   {
     value: "USES",
     label: "Lens/Filter Uses",
-    desc: "Get more people to use your branded Lens or Filter.",
+    desc: "Get more people to use your branded AR Lens or Filter.",
     icon: <Sparkles className="size-4" />,
+    bestFor: "Best for: interactive brand experiences",
   },
   {
     value: "LEAD_FORM_SUBMISSIONS",
     label: "Form Submissions",
-    desc: "Collect leads directly through your ad with a built-in form.",
+    desc: "Collect leads directly through Snapchat's native lead form — no website needed.",
     icon: <FileText className="size-4" />,
     recommended: { LEADS: true },
+    bestFor: "Best for: collecting customer info, pre-orders, waitlists",
+    costHint: "Cost per lead varies by form length",
   },
   {
     value: "APP_INSTALLS",
     label: "App Installs",
-    desc: "Get the most app downloads for your budget.",
+    desc: "Drive the most app downloads for your budget.",
     icon: <Download className="size-4" />,
     recommended: { APP_PROMOTION: true },
+    bestFor: "Best for: growing your app user base",
+    costHint: "Moderate cost per install",
   },
   {
-    value: "APP_PURCHASE",   // Snap API uses singular APP_PURCHASE
+    value: "APP_PURCHASE",
     label: "In-App Purchases",
-    desc: "Drive purchases within your app from new users. Requires an MMP integration.",
+    desc: "Optimize for users most likely to make a purchase inside your app.",
     icon: <ShoppingCart className="size-4" />,
     requiresMMP: true,
+    costHint: "High cost, highest return",
   },
   {
     value: "APP_SIGNUP",
     label: "In-App Sign Ups",
-    desc: "Get more user registrations within your app. Requires an MMP integration.",
+    desc: "Drive registrations within your app.",
     icon: <FileText className="size-4" />,
     requiresMMP: true,
   },
   {
     value: "APP_ADD_TO_CART",
     label: "In-App Add to Cart",
-    desc: "Drive more add-to-cart actions within your app. Requires an MMP integration.",
+    desc: "Drive add-to-cart actions within your app.",
     icon: <TrendingUp className="size-4" />,
     requiresMMP: true,
   },
   {
-    value: "APP_REENGAGE_OPEN",  // Snap API: APP_REENGAGE_OPEN (re-engagement to open the app)
+    value: "APP_REENGAGE_OPEN",
     label: "Re-engage App Opens",
-    desc: "Bring back existing app users and encourage them to re-open your app. Requires an MMP integration.",
+    desc: "Bring back existing users and encourage them to re-open your app.",
     icon: <Download className="size-4" />,
     requiresMMP: true,
   },
@@ -201,25 +220,38 @@ const ALL_OPTIMIZATION_GOALS: {
 
 
 /**
- * Snap API supports exactly 2 conversion_window values for SALES and APP_PROMOTION.
- * SWIPE_1DAY and SWIPE_7DAY_VIEW_1DAY are NOT valid Snap API values.
+ * Valid Snap API `conversion_window` values (per Ad Squads documentation):
+ *  - SWIPE_28DAY_VIEW_1DAY (default) — always available, no eligibility check
+ *  - SWIPE_7DAY — requires pixel eligibility (event quality + conversion volume)
+ *
+ * The eligibility endpoint (/v1/pixels/{pixel_id}/campaign_eligibilities) returns
+ * ELIGIBLE, ELIGIBLE_WARNING, or INELIGIBLE for each goal + window combination.
+ * Since Sept 2025, Snap enforces this at Ad Squad creation time.
  */
 const CONVERSION_WINDOWS: {
   value: ConversionWindow;
   label: string;
+  clickWindow: string;
+  viewWindow: string;
   desc: string;
   recommended?: boolean;
+  requiresEligibility?: boolean;
 }[] = [
   {
     value: "SWIPE_28DAY_VIEW_1DAY",
-    label: "28-Day Click, 1-Day View",
-    desc: "Counts results within 28 days of clicking or 1 day of viewing your ad. Best for most campaigns.",
+    label: "28-Day Click + 1-Day View",
+    clickWindow: "28 days",
+    viewWindow: "1 day",
+    desc: "Captures conversions within 28 days of a swipe-up or 1 day of viewing your ad. Gives Snap the most signal to optimize delivery.",
     recommended: true,
   },
   {
     value: "SWIPE_7DAY",
     label: "7-Day Click Only",
-    desc: "Only counts results within 7 days of clicking your ad. Stricter measurement.",
+    clickWindow: "7 days",
+    viewWindow: "None",
+    desc: "Stricter window — only counts conversions within 7 days of a swipe-up. Requires your pixel to have sufficient event data.",
+    requiresEligibility: true,
   },
 ];
 
@@ -228,23 +260,27 @@ const BID_STRATEGIES: {
   value: BidStrategy;
   label: string;
   desc: string;
+  bestFor?: string;
   recommended?: boolean;
 }[] = [
   {
     value: "AUTO_BID",
     label: "Auto Bid",
-    desc: "We automatically optimize to get the most results for your budget. Best for most advertisers.",
+    desc: "Snapchat automatically sets your bid to get the most results within your budget. No manual input needed.",
+    bestFor: "Best for most advertisers — especially if you're new to Snap Ads or want a hands-off approach.",
     recommended: true,
   },
   {
     value: "LOWEST_COST_WITH_MAX_BID",
     label: "Max Bid",
-    desc: "Set the maximum you are willing to pay per action. You will never pay more than this amount.",
+    desc: "Set a ceiling — Snapchat will try to get results as cheaply as possible but never bid above your maximum.",
+    bestFor: "Best when you have a strict cost-per-result ceiling (e.g. max SAR 15 per purchase).",
   },
   {
     value: "TARGET_COST",
     label: "Target Cost",
-    desc: "Set your target cost per action. Actual cost will average around this amount.",
+    desc: "Set your ideal cost per result. Snapchat will try to average around this amount — some may cost more, some less.",
+    bestFor: "Best for predictable unit economics — keeps your average CPA stable over time.",
   },
 ];
 
@@ -273,13 +309,13 @@ const BUDGET_TYPES: {
   {
     value: "pay_as_you_go",
     label: "Pay as You Go",
-    desc: "Budget is spent daily. You're charged as impressions are delivered.",
+    desc: "Charged daily, stop anytime",
     icon: <CreditCard className="size-4" />,
   },
   {
     value: "prepaid",
     label: "Prepaid (Fixed)",
-    desc: "Full budget reserved upfront. Campaign stops when the limit is reached.",
+    desc: "Pay upfront, fixed budget",
     icon: <Wallet className="size-4" />,
   },
 ];
@@ -307,6 +343,10 @@ export function StepBudget() {
    */
   const canUseAccelerated = ACCELERATED_COMPATIBLE_GOALS.includes(budget.optimizationGoal);
   const hasMMP = false; /* TODO: wire when MMP integration exists */
+  const pixelMode = campaign.objective.pixelMode;
+  const hasPixelConfigured = pixelMode === "salla_managed" || (pixelMode === "existing" && !!campaign.objective.pixelId);
+  const pixelEligibleFor7Day = hasPixelConfigured && pixelMode === "salla_managed";
+
   const goalsWithLocked = OPTIMIZATION_GOALS.map((g) => ({
     value: g.value,
     label: g.label,
@@ -315,8 +355,27 @@ export function StepBudget() {
     recommended: !!g.recommended?.[campaign.objective.objective],
     requiresPixel: g.requiresPixel,
     requiresMMP: g.requiresMMP,
-    locked: !!(g.requiresMMP && !hasMMP),
+    bestFor: g.bestFor,
+    costHint: g.costHint,
+    locked: !!(g.requiresMMP && !hasMMP) || !!(g.requiresPixel && !hasPixelConfigured),
   }));
+  /* If the currently selected goal is now locked (e.g. pixel removed), fall back to the first unlocked goal */
+  useEffect(() => {
+    const currentGoalEntry = goalsWithLocked.find((g) => g.value === budget.optimizationGoal);
+    if (currentGoalEntry?.locked) {
+      const firstUnlocked = goalsWithLocked.find((g) => !g.locked);
+      if (firstUnlocked) {
+        updateNested("budget", { optimizationGoal: firstUnlocked.value as OptimizationGoal });
+      }
+    }
+  }, [hasPixelConfigured, hasMMP]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (budget.conversionWindow === "SWIPE_7DAY" && !pixelEligibleFor7Day) {
+      updateNested("budget", { conversionWindow: "SWIPE_28DAY_VIEW_1DAY" as ConversionWindow });
+    }
+  }, [pixelEligibleFor7Day]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const FILTERED_BID_STRATEGIES = BID_STRATEGIES.filter((s) =>
     objectiveConfig.allowedBidStrategies.includes(s.value)
   );
@@ -333,13 +392,12 @@ export function StepBudget() {
   const [showAdvanced, setShowAdvanced] = useState(
     budget.pacingType !== "STANDARD" || budget.frequencyCapEnabled || budget.schedule === "custom"
   );
-  const [showScheduling, setShowScheduling] = useState(budget.schedule === "custom");
 
-  /* End date is required for Prepaid and Lifetime (both need a finite duration) */
-  const endDateRequired = budget.paymentMethod === "prepaid" || budget.type === "lifetime";
+  /* End date is required for Prepaid (needs a finite duration) */
+  const endDateRequired = budget.paymentMethod === "prepaid";
 
   /* Whether auto-increase is available (only daily budget with a set end date) */
-  const autoIncreaseAvailable = budget.type === "daily" && !budget.endDateOptional;
+  const autoIncreaseAvailable = !budget.endDateOptional;
 
   /* Duration calc (minimum 7 days when an end date is set) */
   const MIN_CAMPAIGN_DAYS = 7;
@@ -355,10 +413,7 @@ export function StepBudget() {
         )
       : 14;
 
-  const dailyAmount =
-    budget.type === "daily"
-      ? budget.amount
-      : Math.round(budget.amount / Math.max(1, durationDays));
+  const dailyAmount = budget.amount;
 
   /* Suggested bid range (from spend_guidance API in prod) */
   const suggestedBidMap: Record<string, { min: number; max: number }> = {
@@ -399,11 +454,11 @@ export function StepBudget() {
     : budget.optimizationGoal === "IMPRESSIONS" ? 0.1
     : 0.15;
   const strengthTiers = [
-    { min: 0, pct: 10, color: "bg-red-400", textColor: "text-red-600", label: "Very Low" },
-    { min: Math.round(50 * goalMultiplier), pct: 30, color: "bg-orange-400", textColor: "text-orange-600", label: "Limited" },
-    { min: Math.round(150 * goalMultiplier), pct: 55, color: "bg-yellow-400", textColor: "text-yellow-600", label: "Moderate" },
-    { min: Math.round(300 * goalMultiplier), pct: 75, color: "bg-emerald-400", textColor: "text-emerald-600", label: "Good" },
-    { min: Math.round(500 * goalMultiplier), pct: 100, color: "bg-primary", textColor: "text-primary", label: "Strong" },
+    { min: 0, pct: 10, color: "bg-red-400", textColor: "text-red-600", label: "Minimum" },
+    { min: Math.round(200 * goalMultiplier), pct: 30, color: "bg-orange-400", textColor: "text-orange-600", label: "Limited" },
+    { min: Math.round(350 * goalMultiplier), pct: 55, color: "bg-yellow-400", textColor: "text-yellow-600", label: "Moderate" },
+    { min: Math.round(500 * goalMultiplier), pct: 75, color: "bg-emerald-400", textColor: "text-emerald-600", label: "Good" },
+    { min: Math.round(800 * goalMultiplier), pct: 100, color: "bg-primary", textColor: "text-primary", label: "Strong" },
   ];
   const currentTier = [...strengthTiers]
     .reverse()
@@ -414,7 +469,6 @@ export function StepBudget() {
     PIXEL_PURCHASE: "purchases",
     PIXEL_ADD_TO_CART: "add to carts",
     PIXEL_PAGE_VIEW: "page views",
-    PIXEL_SIGNUP: "sign ups",
     SWIPES: "swipe-ups",
     LANDING_PAGE_VIEW: "landing page views",
     IMPRESSIONS: "impressions",
@@ -484,15 +538,12 @@ export function StepBudget() {
     : dailyAmount;
 
   /* Mock estimates (from outcome estimates API in prod) */
-  const totalBudgetBase =
-    budget.type === "daily"
-      ? budget.amount * durationDays
-      : budget.amount;
+  const totalBudgetBase = budget.amount * durationDays;
   const totalBudget = (autoIncrease.enabled && autoIncreaseAvailable) ? projectedTotalSpend : totalBudgetBase;
-  const totalWithBoost = totalBudget + (budget.performanceBoost ? 149 : 0);
+  const totalWithBoost = totalBudget + (budget.performanceBoost ? 299 : 0);
 
   const budgetNavDisabled =
-    budget.amount < (budget.type === "daily" ? 20 : 100) ||
+    budget.amount < 150 ||
     !budget.startDate ||
     (!budget.endDateOptional && !budget.endDate) ||
     (!budget.endDateOptional && !!budget.endDate && budget.endDate <= budget.startDate) ||
@@ -511,11 +562,11 @@ export function StepBudget() {
             budgetTypes={BUDGET_TYPES}
             paymentMethod={budget.paymentMethod}
             onPaymentMethodChange={(v) => updateNested("budget", { paymentMethod: v })}
-            showLifetimeToggle={true}
-            budgetMode={budget.type}
-            onBudgetModeChange={(m) => updateNested("budget", { type: m })}
+            showLifetimeToggle={false}
+            budgetMode="daily"
             amount={budget.amount}
             onAmountChange={(v) => updateNested("budget", { amount: v })}
+            minAmount={150}
             suggestedDaily={suggestedDaily}
             goalLabel={goalLabel}
             platformName="Snap"
@@ -531,6 +582,7 @@ export function StepBudget() {
             autoIncrease={autoIncrease}
             onAutoIncreaseChange={(ai) => updateNested("budget", { autoIncrease: ai })}
             onBulkUpdate={(updates) => updateNested("budget", updates)}
+            showSmartStart={true}
           />
 
           {/* ======================================================= */}
@@ -554,11 +606,19 @@ export function StepBudget() {
             infoTipText="Choose what action you want to optimize for. This determines how your budget is spent."
             warnings={
               <>
-                {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && (
+                {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && !hasPixelConfigured && (
                   <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                     <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
                     <p className="text-xs leading-relaxed text-amber-700">
-                      Goals marked <span className="font-semibold">Pixel</span> require a tracking pixel on your store. Make sure you set up your pixel in the previous step for these goals to work.
+                      Some goals require a <span className="font-semibold">Snap Pixel</span>. Go back to the Objective step to connect your pixel and unlock all optimization goals.
+                    </p>
+                  </div>
+                )}
+                {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && hasPixelConfigured && (
+                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                    <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+                    <p className="text-xs leading-relaxed text-emerald-700">
+                      Snap Pixel is connected — all pixel-based goals are available.
                     </p>
                   </div>
                 )}
@@ -566,7 +626,7 @@ export function StepBudget() {
                   <div className="mt-3 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2">
                     <Lock className="mt-0.5 size-3.5 shrink-0 text-orange-600" />
                     <p className="text-xs leading-relaxed text-orange-700">
-                      In-app event goals require a <span className="font-semibold">Mobile Measurement Partner (MMP)</span> such as AppsFlyer, Adjust, or Branch to be integrated into your app. Without an MMP, Snapchat cannot track post-install events.
+                      In-app event goals require a <span className="font-semibold">Mobile Measurement Partner (MMP)</span> integration. Without an MMP, Snapchat cannot track post-install events.
                     </p>
                   </div>
                 )}
@@ -580,21 +640,49 @@ export function StepBudget() {
           <BidStrategyCard
             strategies={FILTERED_BID_STRATEGIES}
             selectedStrategy={budget.bidStrategy}
-            onStrategyChange={(v) => updateNested("budget", { bidStrategy: v })}
+            onStrategyChange={(v) => {
+              const newStrategy = v as BidStrategy;
+              const updates: Record<string, unknown> = { bidStrategy: newStrategy };
+              if (newStrategy !== "AUTO_BID" && (!budget.bidAmount || budget.bidAmount <= 0)) {
+                updates.bidAmount = Math.round(((suggestedBid.min + suggestedBid.max) / 2) * 100) / 100;
+              }
+              updateNested("budget", updates);
+            }}
             layout="buttons"
             infoTipText="Choose how your budget competes for ad placements. Auto Bid is recommended for most advertisers."
             bidInputs={
               budget.bidStrategy !== "AUTO_BID"
                 ? [{
                     label: budget.bidStrategy === "TARGET_COST" ? "Target Cost per Action" : "Maximum Bid per Action",
+                    desc: budget.bidStrategy === "TARGET_COST"
+                      ? "Snap will try to keep your average cost per result close to this amount."
+                      : "Snap will never bid above this amount. Set it too low and you may not win any auctions.",
                     value: budget.bidAmount || undefined,
                     onChange: (v) => updateNested("budget", { bidAmount: v }),
                     prefix: "SAR",
                     suffix: `per ${goalLabel.replace(/s$/, "")}`,
-                    min: 0,
+                    min: 0.01,
                     step: 0.5,
                     suggestedRange: suggestedBid,
+                    warning: budget.bidAmount > 0 && budget.bidAmount < suggestedBid.min
+                      ? `Your bid of SAR ${budget.bidAmount.toFixed(2)} is below the suggested minimum of SAR ${suggestedBid.min.toFixed(2)}. You may get very few or no results.`
+                      : undefined,
+                    tip: budget.bidAmount >= suggestedBid.min && budget.bidAmount <= suggestedBid.max
+                      ? "Your bid is within the suggested range — good balance between cost and delivery."
+                      : undefined,
                   }]
+                : undefined
+            }
+            contextNote={
+              budget.bidStrategy !== "AUTO_BID" && budget.bidAmount > 0 && budget.bidAmount > budget.amount
+                ? (
+                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                      <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+                      <p className="text-xs leading-relaxed text-amber-700">
+                        Your bid of <span className="font-semibold">SAR {budget.bidAmount.toFixed(2)}</span> exceeds your daily budget of <span className="font-semibold">SAR {budget.amount}</span>. You may get very few results per day — consider increasing your budget or lowering your bid.
+                      </p>
+                    </div>
+                  )
                 : undefined
             }
           />
@@ -614,9 +702,8 @@ export function StepBudget() {
                   <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs font-normal">
                     {[
                       objectiveConfig.hasConversionWindow,
-                      budget.pacingType !== "STANDARD",
+                      canUseAccelerated && budget.pacingType !== "STANDARD",
                       budget.frequencyCapEnabled,
-                      showScheduling,
                     ].filter(Boolean).length} active
                   </Badge>
                 </div>
@@ -627,31 +714,131 @@ export function StepBudget() {
             <CollapsibleContent className="flex flex-col gap-5 pt-5">
 
               {/* -- Attribution Window -- */}
-              {objectiveConfig.hasConversionWindow && (
-                <AttributionWindowCard
-                  mode="combined"
-                  combinedOptions={CONVERSION_WINDOWS}
-                  combinedValue={budget.conversionWindow}
-                  onCombinedChange={(v) => updateNested("budget", { conversionWindow: v })}
-                  infoTipText="How long after seeing your ad should results be counted? A wider window helps optimize your campaign better."
-                />
-              )}
+              {objectiveConfig.hasConversionWindow && (() => {
+                const goalTip =
+                  budget.optimizationGoal === "PIXEL_PURCHASE"
+                    ? "Purchases often happen days after the first ad — use the wider window."
+                    : budget.optimizationGoal === "PIXEL_ADD_TO_CART"
+                      ? "Add-to-cart events can be delayed — the wider window captures more."
+                      : undefined;
+                return (
+                  <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                    <div className="mb-4 flex items-center gap-2">
+                      <Clock className="size-4 text-primary" />
+                      <Label className="text-sm font-semibold text-foreground">Attribution Window</Label>
+                      <InfoTip text="How long after seeing or clicking your ad should a conversion count? A wider window gives Snap more data to optimize." />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {CONVERSION_WINDOWS.map((w) => {
+                        const isLocked = !!w.requiresEligibility && !pixelEligibleFor7Day;
+                        const isSelected = !isLocked && budget.conversionWindow === w.value;
+                        return (
+                          <button
+                            key={w.value}
+                            type="button"
+                            disabled={isLocked}
+                            onClick={() => { if (!isLocked) updateNested("budget", { conversionWindow: w.value as ConversionWindow }); }}
+                            className={cn(
+                              "relative flex flex-col rounded-xl border p-4 text-left transition-all",
+                              isLocked
+                                ? "cursor-not-allowed border-border bg-muted/30 opacity-60"
+                                : isSelected
+                                  ? "border-primary bg-primary/5 shadow-sm"
+                                  : "border-border bg-background hover:border-primary/40"
+                            )}
+                          >
+                            {w.recommended && !isLocked && (
+                              <span className="absolute -top-2 right-3 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
+                                Recommended
+                              </span>
+                            )}
+                            {isLocked && (
+                              <span className="absolute -top-2 right-3 flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[9px] font-semibold text-muted-foreground">
+                                <Lock className="size-2.5" /> Locked
+                              </span>
+                            )}
+
+                            <span className={cn(
+                              "text-sm font-semibold",
+                              isLocked ? "text-muted-foreground" : isSelected ? "text-primary" : "text-foreground"
+                            )}>
+                              {w.label}
+                            </span>
+
+                            {/* Visual breakdown */}
+                            <div className="mt-2.5 flex items-center gap-2">
+                              <div className="flex items-center gap-1 rounded-md bg-muted/60 px-2 py-1">
+                                <MousePointerClick className={cn("size-3", isLocked ? "text-muted-foreground/40" : "text-muted-foreground")} />
+                                <span className={cn("text-[11px] font-medium", isLocked ? "text-muted-foreground" : "text-foreground")}>{w.clickWindow}</span>
+                              </div>
+                              {w.viewWindow !== "None" ? (
+                                <>
+                                  <span className="text-[10px] text-muted-foreground">+</span>
+                                  <div className="flex items-center gap-1 rounded-md bg-muted/60 px-2 py-1">
+                                    <Eye className={cn("size-3", isLocked ? "text-muted-foreground/40" : "text-muted-foreground")} />
+                                    <span className={cn("text-[11px] font-medium", isLocked ? "text-muted-foreground" : "text-foreground")}>{w.viewWindow}</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-[10px] text-muted-foreground">+</span>
+                                  <div className="flex items-center gap-1 rounded-md bg-muted/60 px-2 py-1">
+                                    <Eye className="size-3 text-muted-foreground/40" />
+                                    <span className="text-[11px] text-muted-foreground">No view</span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+
+                            {isLocked ? (
+                              <p className="mt-2 flex items-start gap-1 text-[11px] leading-snug text-amber-600">
+                                <Lock className="mt-0.5 size-3 shrink-0" />
+                                Your pixel needs more conversion data — keep running ads to unlock.
+                              </p>
+                            ) : (
+                              <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+                                {w.desc}
+                              </p>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Compact explanation */}
+                    <div className="mt-3 rounded-lg bg-muted/30 px-3 py-2">
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <MousePointerClick className="size-3" />
+                        <span><span className="font-medium text-foreground">Click</span> = user swipes up, then buys later</span>
+                        <span className="mx-1">·</span>
+                        <Eye className="size-3" />
+                        <span><span className="font-medium text-foreground">View</span> = user only sees ad, then buys later</span>
+                      </div>
+                    </div>
+
+                    {goalTip && (
+                      <p className="mt-2 flex items-start gap-1.5 text-[11px] text-primary">
+                        <Sparkles className="mt-0.5 size-3 shrink-0" />
+                        {goalTip}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* -- Delivery Pacing -- */}
-              {/* ACCELERATED is only shown when the selected goal is compatible per Snap API.
-                  Compatible goals: IMPRESSIONS, USES, SWIPES, VIDEO_VIEWS, VIDEO_VIEWS_15_SEC, STORY_OPENS.
-                  All pixel-event, app-event and lead-form goals require STANDARD pacing. */}
+              {/* Only show when ACCELERATED is actually available (awareness/engagement goals).
+                  For SALES (all pixel goals), only STANDARD is valid — no need to show a single-option card. */}
+              {canUseAccelerated && (
               <DeliveryPacingCard
                 layout="buttons"
                 options={[
                   { value: "STANDARD", label: "Standard", desc: "Even spend throughout the day." },
-                  ...(canUseAccelerated
-                    ? [{ value: "ACCELERATED" as const, label: "Accelerated", desc: "Spend budget as fast as possible. Requires Max Bid." }]
-                    : []),
+                  { value: "ACCELERATED" as const, label: "Accelerated", desc: "Spend budget as fast as possible. Requires Max Bid." },
                 ]}
                 selectedPacing={budget.pacingType}
                 onPacingChange={(v) => {
-                  // Snap API requires bid_strategy = LOWEST_COST_WITH_MAX_BID for ACCELERATED pacing
                   updateNested("budget", {
                     pacingType: v,
                     ...(v === "ACCELERATED" ? { bidStrategy: "LOWEST_COST_WITH_MAX_BID" } : {}),
@@ -685,60 +872,100 @@ export function StepBudget() {
                   )
                 }
               />
-
-              {/* -- Frequency Capping (Snapchat API: ad_squad.cap_and_exclusion_config.frequency_cap_config) -- */}
-              <FrequencyCapCard
-                enabled={budget.frequencyCapEnabled}
-                onEnabledChange={(checked) => {
-                  updateNested("budget", { frequencyCapEnabled: checked });
-                }}
-                maxImpressions={budget.frequencyCapCount}
-                onMaxImpressionsChange={(v) =>
-                  updateNested("budget", { frequencyCapCount: v })
-                }
-                minImpressions={1}
-                maxImpressionsMax={15}
-                timeWindowValue={budget.frequencyCapInterval.toString()}
-                timeWindowOptions={[
-                  { value: "6", label: "6 hours" },
-                  { value: "12", label: "12 hours" },
-                  { value: "24", label: "1 day" },
-                  { value: "48", label: "2 days" },
-                  { value: "72", label: "3 days" },
-                  { value: "168", label: "7 days" },
-                  { value: "336", label: "14 days" },
-                  { value: "720", label: "30 days" },
-                ]}
-                onTimeWindowChange={(v) =>
-                  updateNested("budget", { frequencyCapInterval: Number(v) })
-                }
-                timeWindowSummaryLabel={
-                  budget.frequencyCapInterval < 24
-                    ? `${budget.frequencyCapInterval} hours`
-                    : `${budget.frequencyCapInterval / 24} day${budget.frequencyCapInterval > 24 ? "s" : ""}`
-                }
-                accent="primary"
-                showFormatWarning={true}
-                infoTipText="Limit how many times one person sees your ad to prevent ad fatigue. Maps to ad squad frequency_cap_config."
-              />
-              {budget.frequencyCapEnabled && campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1 && (
-                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 dark:border-red-800/40 dark:bg-red-950/30">
-                  <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-600 dark:text-red-500" />
-                  <p className="text-xs leading-relaxed text-red-700 dark:text-red-400">
-                    Your ad groups currently use different formats. Snapchat requires all ads to share the same format when frequency cap is enabled. Go to <span className="font-semibold">Ad Design</span> to fix this, or disable frequency cap.
-                  </p>
-                </div>
               )}
 
-              {/* -- Ad Scheduling (Dayparting) -- */}
-              <AdSchedulingCard
-                enabled={showScheduling}
-                onToggle={(checked) => {
-                  setShowScheduling(checked);
-                  updateNested("budget", { schedule: checked ? "custom" : "all_day" });
-                }}
-                infoTipText="Choose specific days and hours to show your ads. Maps to Snap ad squad scheduled_start_time / scheduled_end_time. Times are in Saudi Arabia time (AST, UTC+3)."
-              />
+              {/* -- Frequency Capping (Snapchat API: ad_squad.cap_and_exclusion_config.frequency_cap_config) -- */}
+              {(() => {
+                const FREQ_PRESETS = [
+                  { id: "conservative", label: "Conservative", count: 2, interval: 168, window: "7 days", hint: "Less fatigue" },
+                  { id: "balanced", label: "Balanced", count: 4, interval: 168, window: "7 days", hint: "Recommended", recommended: true },
+                  { id: "moderate", label: "Moderate", count: 3, interval: 72, window: "3 days", hint: "Promotions" },
+                  { id: "aggressive", label: "Aggressive", count: 6, interval: 168, window: "7 days", hint: "Flash sales" },
+                ] as const;
+                const activePreset = FREQ_PRESETS.find(
+                  (p) => budget.frequencyCapCount === p.count && budget.frequencyCapInterval === p.interval
+                );
+                return (
+                  <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className={cn("size-4", budget.frequencyCapEnabled ? "text-primary" : "text-muted-foreground")} />
+                        <Label className="text-sm font-semibold text-foreground">Frequency Cap</Label>
+                        <InfoTip text="Limit how many times one person sees your ad. Prevents fatigue and improves efficiency." />
+                      </div>
+                      <Switch
+                        checked={budget.frequencyCapEnabled}
+                        onCheckedChange={(checked) => {
+                          if (checked && (!budget.frequencyCapCount || budget.frequencyCapInterval < 24)) {
+                            updateNested("budget", { frequencyCapEnabled: true, frequencyCapCount: 4, frequencyCapInterval: 168 });
+                          } else {
+                            updateNested("budget", { frequencyCapEnabled: checked });
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {budget.frequencyCapEnabled ? (
+                      <div className="mt-4 space-y-3">
+                        <div className="grid grid-cols-4 gap-2">
+                          {FREQ_PRESETS.map((preset) => {
+                            const isActive = activePreset?.id === preset.id;
+                            return (
+                              <button
+                                key={preset.id}
+                                type="button"
+                                onClick={() => updateNested("budget", { frequencyCapCount: preset.count, frequencyCapInterval: preset.interval })}
+                                className={cn(
+                                  "flex flex-col items-center rounded-xl border py-3 transition-all",
+                                  isActive
+                                    ? "border-primary bg-primary/5 shadow-sm"
+                                    : "border-border bg-background hover:border-primary/40"
+                                )}
+                              >
+                                <span className={cn("text-lg font-bold tabular-nums", isActive ? "text-primary" : "text-foreground")}>
+                                  {preset.count}x
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  / {preset.window}
+                                </span>
+                                <span className={cn(
+                                  "mt-1.5 rounded-full px-2 py-0.5 text-[9px] font-medium",
+                                  isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                                )}>
+                                  {preset.recommended && !isActive ? "★ " : ""}{preset.hint}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Summary */}
+                        <div className="flex items-center gap-2 rounded-lg bg-primary/5 px-3 py-2">
+                          <Users className="size-3.5 text-primary" />
+                          <p className="text-xs font-medium text-primary">
+                            Each person sees your ad up to <span className="font-bold">{budget.frequencyCapCount}x</span> every <span className="font-bold">{budget.frequencyCapInterval === 24 ? "day" : `${budget.frequencyCapInterval / 24} days`}</span>
+                          </p>
+                        </div>
+
+                        {/* Mixed formats warning */}
+                        {campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1 && (
+                          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                            <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-red-600" />
+                            <p className="text-[11px] leading-relaxed text-red-700">
+                              Frequency cap requires all ads to use the same format. Fix in <span className="font-semibold">Ad Design</span> or disable this.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        No limit on how many times a person sees your ad.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
 
             </CollapsibleContent>
           </Collapsible>
@@ -759,77 +986,117 @@ export function StepBudget() {
 
             {/* Cost Summary (shared) */}
             <CostSummaryCard
-              budgetLabel={budget.type === "daily" ? "Daily budget" : "Lifetime budget"}
+              budgetLabel="Daily budget"
               budgetAmount={budget.amount}
-              durationDays={budget.type === "daily" ? durationDays : undefined}
+              durationDays={durationDays}
               isOngoing={budget.endDateOptional}
               totalBudget={totalBudget}
               autoIncreaseEnabled={autoIncrease.enabled}
               boostEnabled={budget.performanceBoost}
-              boostAmount={149}
+              boostAmount={299}
               startDate={budget.startDate}
               endDate={budget.endDate}
             />
 
             {/* Estimated Results (shared) */}
-            <EstimatedResultsCard
-              badge="Snap API"
-              bidRange={{
-                min: suggestedBid.min,
-                max: suggestedBid.max,
-                current: budget.bidStrategy !== "AUTO_BID" ? (budget.bidAmount || 0) : undefined,
-                goalName:
-                  budget.optimizationGoal === "PIXEL_PURCHASE"         ? "Purchase"
-                  : budget.optimizationGoal === "PIXEL_ADD_TO_CART"     ? "Add to Cart"
-                  : budget.optimizationGoal === "PIXEL_PAGE_VIEW"       ? "Page View"
-                  : budget.optimizationGoal === "PIXEL_SIGNUP"          ? "Sign Up"
-                  : budget.optimizationGoal === "SWIPES"                ? "Swipe Up"
-                  : budget.optimizationGoal === "LANDING_PAGE_VIEW"     ? "Landing Page View"
-                  : budget.optimizationGoal === "IMPRESSIONS"           ? "1k Impressions"
-                  : budget.optimizationGoal === "STORY_OPENS"           ? "Story Open"
-                  : budget.optimizationGoal === "VIDEO_VIEWS"           ? "Video View"
-                  : budget.optimizationGoal === "VIDEO_VIEWS_15_SEC"    ? "15s Video View"
-                  : budget.optimizationGoal === "USES"                  ? "Lens Use"
-                  : budget.optimizationGoal === "LEAD_FORM_SUBMISSIONS" ? "Form Submission"
-                  : budget.optimizationGoal === "APP_INSTALLS"          ? "App Install"
-                  : budget.optimizationGoal === "APP_PURCHASE"          ? "In-App Purchase"
-                  : budget.optimizationGoal === "APP_SIGNUP"            ? "In-App Sign Up"
-                  : budget.optimizationGoal === "APP_ADD_TO_CART"       ? "In-App Add to Cart"
-                  : budget.optimizationGoal === "APP_REENGAGE_OPEN"     ? "App Re-open"
-                  : "Action",
-              }}
-              dailyBudget={dailyAmount}
-              rows={[]}
-              disclaimer="Bid estimates are from the Snap Bid Estimate API and depend on your targeting, optimization goal, and market competition. Actual costs may differ."
-            />
+            {(() => {
+              const goalNameMap: Record<string, string> = {
+                PIXEL_PURCHASE: "Purchase",
+                PIXEL_ADD_TO_CART: "Add to Cart",
+                PIXEL_PAGE_VIEW: "Page View",
+                SWIPES: "Swipe Up",
+                LANDING_PAGE_VIEW: "Landing Page View",
+                IMPRESSIONS: "1k Impressions",
+                STORY_OPENS: "Story Open",
+                VIDEO_VIEWS: "Video View",
+                VIDEO_VIEWS_15_SEC: "15s Video View",
+                USES: "Lens Use",
+                LEAD_FORM_SUBMISSIONS: "Form Submission",
+                APP_INSTALLS: "App Install",
+                APP_PURCHASE: "In-App Purchase",
+                APP_SIGNUP: "In-App Sign Up",
+                APP_ADD_TO_CART: "In-App Add to Cart",
+                APP_REENGAGE_OPEN: "App Re-open",
+              };
+              const currentGoalName = goalNameMap[budget.optimizationGoal] ?? "Action";
+              const estMin = suggestedBid.max > 0 ? Math.floor(dailyAmount / suggestedBid.max) : 0;
+              const estMax = suggestedBid.min > 0 ? Math.floor(dailyAmount / suggestedBid.min) : 0;
+              const weeklyMin = estMin * 7;
+              const weeklyMax = estMax * 7;
+              const rows = [
+                { label: `Est. daily ${goalLabel}`, value: estMin > 0 ? `${estMin} – ${estMax}` : "—", highlight: true },
+                { label: `Est. weekly ${goalLabel}`, value: weeklyMin > 0 ? `${weeklyMin} – ${weeklyMax}` : "—" },
+                { label: `Cost per ${currentGoalName.toLowerCase()}`, value: suggestedBid.min > 0 ? `SAR ${suggestedBid.min.toFixed(2)} – ${suggestedBid.max.toFixed(2)}` : "—" },
+                ...(durationDays > 0 && !budget.endDateOptional ? [{ label: `Total est. (${durationDays}d)`, value: estMin > 0 ? `${estMin * durationDays} – ${estMax * durationDays} ${goalLabel}` : "—" }] : []),
+              ];
+              return (
+                <EstimatedResultsCard
+                  badge="Snap API"
+                  bidRange={{
+                    min: suggestedBid.min,
+                    max: suggestedBid.max,
+                    current: budget.bidStrategy !== "AUTO_BID" ? (budget.bidAmount || 0) : undefined,
+                    goalName: currentGoalName,
+                  }}
+                  dailyBudget={dailyAmount}
+                  rows={rows}
+                  disclaimer="Estimates are from the Snap Bid Estimate API and depend on targeting, competition, and ad quality. Actual results may vary."
+                />
+              );
+            })()}
 
             {/* Configuration + Delivery (shared) */}
             <ConfigCheckCard
               configRows={[
-                { label: "Payment", value: BUDGET_TYPES.find((m) => m.value === budget.paymentMethod)?.label ?? "-" },
-                { label: "End date", value: budget.endDateOptional ? "Continuous" : budget.endDate || "Not set" },
+                { label: "Daily budget", value: `SAR ${budget.amount.toLocaleString()}` },
+                { label: "Duration", value: budget.endDateOptional ? "Ongoing" : `${durationDays} days` },
                 { label: "Goal", value: OPTIMIZATION_GOALS.find((g) => g.value === budget.optimizationGoal)?.label ?? "-" },
-                { label: "Bid", value: budget.bidStrategy === "AUTO_BID" ? "Auto" : budget.bidStrategy === "TARGET_COST" ? `Target SAR ${budget.bidAmount || 0}` : `Max SAR ${budget.bidAmount || 0}` },
-                ...(objectiveConfig.hasConversionWindow ? [{ label: "Attribution", value: budget.conversionWindow === "SWIPE_28DAY_VIEW_1DAY" ? "28d click, 1d view" : "7d click" }] : []),
-                { label: "Pacing", value: budget.pacingType === "STANDARD" ? "Standard" : "Accelerated" },
-                { label: "Freq. cap", value: budget.frequencyCapEnabled ? `${budget.frequencyCapCount}x / ${budget.frequencyCapInterval < 24 ? `${budget.frequencyCapInterval}h` : `${budget.frequencyCapInterval / 24}d`}` : "Off" },
-                { label: "Schedule", value: showScheduling ? "Custom hours" : "24/7" },
-                ...(autoIncrease.enabled ? [{ label: "Auto-increase", value: `+${autoIncrease.pct}% / ${autoIncrease.intervalDays}d (max ${autoIncrease.maxDailyBudget})` }] : []),
+                { label: "Bid strategy", value: budget.bidStrategy === "AUTO_BID" ? "Auto bid" : budget.bidStrategy === "TARGET_COST" ? `Target SAR ${budget.bidAmount || 0}` : `Max SAR ${budget.bidAmount || 0}` },
+                ...(objectiveConfig.hasConversionWindow ? [{ label: "Attribution", value: CONVERSION_WINDOWS.find((w) => w.value === budget.conversionWindow)?.label ?? "-" }] : []),
+                { label: "Pacing", value: !canUseAccelerated ? "Standard" : budget.pacingType === "STANDARD" ? "Standard" : "Accelerated" },
+                { label: "Freq. cap", value: budget.frequencyCapEnabled ? `${budget.frequencyCapCount}x / ${budget.frequencyCapInterval / 24}d` : "Off" },
+                ...(budget.performanceBoost ? [{ label: "Boost", value: "Active (SAR 299)" }] : []),
               ]}
               checkItems={[
-                { label: "Budget", status: budget.amount >= (budget.type === "daily" ? 20 : 100) ? "ok" : "error", text: budget.amount >= (budget.type === "daily" ? 20 : 100) ? "Meets minimum" : "Below minimum" },
-                { label: "Schedule", status: budget.startDate ? "ok" : "warning", text: budget.startDate ? "Start date set" : "No start date" },
-                { label: "Goal", status: budget.optimizationGoal ? "ok" : "warning", text: budget.optimizationGoal ? "Selected" : "Not set" },
-                { label: "Bid", status: "ok", text: budget.bidStrategy === "AUTO_BID" ? "Auto-optimized" : "Manual" },
+                { label: "Budget", status: budget.amount >= 150 ? "ok" : "error", text: budget.amount >= 150 ? `SAR ${budget.amount}/day` : "Below SAR 150 minimum" },
+                { label: "Schedule", status: budget.startDate ? "ok" : "warning", text: budget.startDate ? `${budget.startDate}${budget.endDateOptional ? " (ongoing)" : ` to ${budget.endDate}`}` : "No start date" },
+                { label: "Goal", status: (() => {
+                  if (!budget.optimizationGoal) return "warning" as const;
+                  const goalEntry = goalsWithLocked.find((g) => g.value === budget.optimizationGoal);
+                  if (goalEntry?.locked) return "error" as const;
+                  return "ok" as const;
+                })(), text: (() => {
+                  if (!budget.optimizationGoal) return "Not set";
+                  const goalEntry = goalsWithLocked.find((g) => g.value === budget.optimizationGoal);
+                  if (goalEntry?.locked) return "Requires pixel — connect in Objective step";
+                  return goalEntry?.label ?? "Selected";
+                })() },
+                { label: "Bid", status: (() => {
+                  if (budget.bidStrategy === "AUTO_BID") return "ok" as const;
+                  if (!budget.bidAmount || budget.bidAmount <= 0) return "error" as const;
+                  if (budget.bidAmount < suggestedBid.min) return "warning" as const;
+                  if (budget.bidAmount > budget.amount) return "warning" as const;
+                  return "ok" as const;
+                })(), text: (() => {
+                  if (budget.bidStrategy === "AUTO_BID") return "Auto-optimized";
+                  if (!budget.bidAmount || budget.bidAmount <= 0) return "No bid amount set";
+                  if (budget.bidAmount < suggestedBid.min) return `SAR ${budget.bidAmount.toFixed(2)} — below suggested`;
+                  if (budget.bidAmount > budget.amount) return `SAR ${budget.bidAmount.toFixed(2)} — exceeds daily budget`;
+                  return `SAR ${budget.bidAmount.toFixed(2)} per ${goalLabel.replace(/s$/, "")}`;
+                })() },
+                ...(objectiveConfig.hasConversionWindow ? [{
+                  label: "Attribution",
+                  status: (budget.conversionWindow === "SWIPE_7DAY" && !pixelEligibleFor7Day ? "warning" : "ok") as "ok" | "warning" | "error",
+                  text: budget.conversionWindow === "SWIPE_7DAY" && !pixelEligibleFor7Day
+                    ? "7-Day requires pixel eligibility"
+                    : CONVERSION_WINDOWS.find((w) => w.value === budget.conversionWindow)?.label ?? "Set",
+                }] : []),
+                ...(budget.frequencyCapEnabled && campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1
+                  ? [{ label: "Freq. cap", status: "error" as const, text: "Mixed ad formats — disable cap or unify formats" }]
+                  : []),
               ]}
             />
 
-            {/* Disclaimer */}
-            <div className="rounded-xl border border-border p-3">
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Estimates are approximate and based on the Snap Outcome Estimates API. Actual results depend on ad quality, competition, and audience engagement.
-              </p>
-            </div>
           </div>
         </div>
       </div>
@@ -837,7 +1104,7 @@ export function StepBudget() {
         onPrevious={() => setStep(1)}
         onNext={() => setStep(3)}
         previousLabel="Previous"
-        nextLabel="Next: Creative"
+        nextLabel="Next"
         nextDisabled={budgetNavDisabled}
         accent="primary"
       />

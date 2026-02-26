@@ -16,14 +16,8 @@ export function CampaignWizard() {
       {/* Hide the top step bar on step 0 (objective) -- full-page layout */}
       {step > 0 && (
         <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-            <span className="text-base font-bold text-foreground">Salla Ads</span>
-            <div className="w-full max-w-2xl px-8">
-              <StepIndicator current={step} />
-            </div>
-            <span className="text-xs text-muted-foreground">
-              Step {step} of 4
-            </span>
+          <div className="mx-auto max-w-3xl px-6 py-3.5">
+            <StepIndicator current={step} />
           </div>
         </header>
       )}

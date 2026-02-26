@@ -33,7 +33,6 @@ import {
 import { UploadZone } from "@/components/shared/upload-zone";
 import {
   MEDIA_SPECS,
-  CROP_OPTIONS,
   CTA_OPTIONS,
   LEAD_CTA_OPTIONS,
   APP_INSTALL_CTA_OPTIONS,
@@ -46,7 +45,6 @@ import type {
   AdDestination,
   SnapMediaType,
   WebViewCTA,
-  CropPosition,
   CreatorPartnershipType,
 } from "@/lib/snapchat/campaign-types";
 
@@ -165,18 +163,39 @@ export function CreativeCard({
   const hasContent = !!(asset.brandName || asset.headline || asset.cta || asset.websiteUrl);
   const canApplyToAll = total > 1 && hasContent && !!onApplyToAll;
 
+  /* Completeness tracking for collapsed summary */
+  const hasMedia = !!(asset.url || asset.claimStatus === "READY");
+  const hasBrand = !!asset.brandName.trim();
+  const hasHeadline = !!asset.headline.trim();
+  const hasUrl = !!(asset.websiteUrl?.startsWith("https://"));
+  const hasCta = !!asset.cta;
+  const completionChecks = [
+    { label: "Media", ok: hasMedia },
+    { label: "Brand", ok: hasBrand },
+    { label: "Headline", ok: hasHeadline },
+    ...(showCta ? [{ label: "CTA", ok: hasCta }] : []),
+    ...(showUrl ? [{ label: "URL", ok: hasUrl }] : []),
+  ];
+  const completionCount = completionChecks.filter((c) => c.ok).length;
+  const completionTotal = completionChecks.length;
+  const isComplete = completionCount === completionTotal;
+
   // Collapsed summary line
   const summaryParts: string[] = [];
-  if (asset.url) summaryParts.push(asset.mediaType === "VIDEO" ? "Video" : "Image");
-  else if (asset.claimStatus === "READY") summaryParts.push("Influencer");
-  else summaryParts.push("No media");
+  if (asset.url) {
+    summaryParts.push(asset.mediaType === "VIDEO" ? `Video${asset.videoDuration ? ` (${asset.videoDuration}s)` : ""}` : "Image");
+  } else if (asset.claimStatus === "READY") {
+    summaryParts.push("Influencer");
+  } else {
+    summaryParts.push("No media");
+  }
   if (asset.brandName) summaryParts.push(asset.brandName);
   if (asset.headline) summaryParts.push(`"${asset.headline}"`);
 
   return (
     <div className={cn(
       "rounded-lg border bg-background transition-all",
-      isExpanded ? "border-primary/30 shadow-sm" : "border-border hover:border-primary/20"
+      isExpanded ? "border-primary/30 shadow-sm" : isComplete ? "border-emerald-200 hover:border-emerald-300" : "border-border hover:border-primary/20"
     )}>
       {/* ── Header ── */}
       <div
@@ -185,12 +204,14 @@ export function CreativeCard({
       >
         {isStory && <GripVertical className="size-3.5 cursor-grab text-muted-foreground" onClick={(e) => e.stopPropagation()} />}
         <div className="flex items-center gap-1.5">
-          {asset.url || asset.claimStatus === "READY" ? (
+          {isComplete ? (
             <CheckCircle2 className="size-3 text-emerald-500" />
-          ) : asset.mediaType === "VIDEO" ? (
-            <Film className="size-3 text-primary" />
+          ) : hasMedia ? (
+            asset.mediaType === "VIDEO" ? <Film className="size-3 text-primary" /> : <ImageIcon className="size-3 text-primary" />
           ) : (
-            <ImageIcon className="size-3 text-primary" />
+            <div className="flex size-3 items-center justify-center rounded-full border-[1.5px] border-amber-400">
+              <div className="size-1 rounded-full bg-amber-400" />
+            </div>
           )}
           <span className="text-xs font-semibold text-foreground">
             {isStory ? `Snap ${index + 1}` : `Creative ${index + 1}`}
@@ -199,9 +220,17 @@ export function CreativeCard({
 
         {/* Collapsed summary */}
         {!isExpanded && (
-          <span className="flex-1 truncate text-[11px] text-muted-foreground">
-            {summaryParts.join(" · ")}
-          </span>
+          <div className="flex flex-1 items-center gap-2 min-w-0">
+            <span className="truncate text-[11px] text-muted-foreground">
+              {summaryParts.join(" · ")}
+            </span>
+            {/* Completion dots */}
+            <div className="flex shrink-0 items-center gap-0.5" title={completionChecks.map((c) => `${c.ok ? "✓" : "○"} ${c.label}`).join(", ")}>
+              {completionChecks.map((c, i) => (
+                <div key={i} className={cn("size-1.5 rounded-full", c.ok ? "bg-emerald-400" : "bg-muted-foreground/25")} />
+              ))}
+            </div>
+          </div>
         )}
 
         <div className="ml-auto flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
@@ -340,16 +369,36 @@ export function CreativeCard({
                 )}
               </div>
             ) : (
-              <UploadZone
-                accept="image/png,image/jpeg,image/gif,video/mp4,video/quicktime"
-                label="Drop image or video"
-                sublabel="Image: PNG/JPG, 1080x1920, max 5MB | Video: MP4/MOV, 3-180s, max 32MB"
-                preview={asset.url || undefined}
-                previewMediaType={asset.mediaType}
-                previewFile={asset.file}
-                onFile={handleFile}
-                onClear={() => onUpdate({ url: "", file: undefined, mediaType: "IMAGE" })}
-              />
+              <>
+                <UploadZone
+                  accept="image/png,image/jpeg,image/gif,video/mp4,video/quicktime"
+                  label="Drop image or video"
+                  sublabel={isStory ? "Full-screen vertical media · 1080×1920px · PNG/JPG/GIF or MP4/MOV" : isCollection ? "Top snap media · 1080×1920px · PNG/JPG/GIF or MP4/MOV" : "Full-screen vertical ad · 1080×1920px · Image (max 5MB) or Video (3–180s, max 32MB)"}
+                  preview={asset.url || undefined}
+                  previewMediaType={asset.mediaType}
+                  previewFile={asset.file}
+                  onFile={handleFile}
+                  onClear={() => onUpdate({ url: "", file: undefined, mediaType: "IMAGE", videoDuration: undefined })}
+                />
+                {/* Video duration badge */}
+                {asset.url && asset.mediaType === "VIDEO" && asset.videoDuration != null && (
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <span className="flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[10px] font-medium text-foreground">
+                      <Film className="size-2.5" />
+                      {asset.videoDuration}s
+                    </span>
+                    {asset.videoDuration >= 3 && asset.videoDuration <= 10 && (
+                      <span className="text-[10px] text-emerald-600">Optimal length for engagement</span>
+                    )}
+                    {asset.videoDuration > 10 && asset.videoDuration <= 180 && (
+                      <span className="text-[10px] text-muted-foreground">Tip: First 2 seconds are critical — lead with the hook</span>
+                    )}
+                    {(asset.videoDuration < 3 || asset.videoDuration > 180) && (
+                      <span className="text-[10px] text-amber-600">Snap requires 3–180 seconds</span>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -358,14 +407,20 @@ export function CreativeCard({
             <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium text-muted-foreground">Brand Name</Label>
+                  <div className="flex items-center gap-1">
+                    <Label className="text-xs font-medium text-muted-foreground">Brand Name</Label>
+                    <InfoTip text="Appears at the top-left of your ad. Use your store or brand name — this is how viewers identify you." />
+                  </div>
                   <CharCounter current={asset.brandName.length} max={32} />
                 </div>
                 <Input placeholder="Your brand" value={asset.brandName} maxLength={32} onChange={(e) => onUpdate({ brandName: e.target.value.slice(0, 32) })} className={cn("h-8 text-xs", asset.brandName.length >= 32 && "border-amber-400")} />
               </div>
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium text-muted-foreground">Headline</Label>
+                  <div className="flex items-center gap-1">
+                    <Label className="text-xs font-medium text-muted-foreground">Headline</Label>
+                    <InfoTip text="Shown on the swipe-up bar at the bottom of the ad. Keep it short and action-oriented — this is what drives the swipe." />
+                  </div>
                   <CharCounter current={asset.headline.length} max={34} />
                 </div>
                 <Input placeholder="Catchy headline" value={asset.headline} maxLength={34} onChange={(e) => onUpdate({ headline: e.target.value.slice(0, 34) })} className={cn("h-8 text-xs", asset.headline.length >= 34 && "border-amber-400")} />
@@ -376,12 +431,12 @@ export function CreativeCard({
                 <Sparkles className="mt-0.5 size-3 shrink-0 text-blue-400" />
                 <span>These fields overlay on the creator&apos;s video — use your brand name and a CTA headline that complements their content</span>
               </div>
-            ) : (!asset.brandName && !asset.headline) && (
+            ) : (!asset.brandName && !asset.headline) ? (
               <div className="mt-2 flex items-start gap-1.5 text-[10px] leading-relaxed text-muted-foreground">
                 <Sparkles className="mt-0.5 size-3 shrink-0 text-blue-400" />
                 <span>Tip: Arabic text performs 40% better in Saudi market. Try <span className="font-medium" dir="rtl">تسوق الآن</span> or <span className="font-medium" dir="rtl">متجر الأناقة</span></span>
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* ── Section 3: CTA & Destination ── */}
@@ -390,7 +445,10 @@ export function CreativeCard({
               <div className={cn("grid gap-2", showCta && !isCollection ? "grid-cols-2" : "grid-cols-1")}>
                 {showCta && (
                   <div className="flex flex-col gap-1">
-                    <Label className="text-xs font-medium text-muted-foreground">Call to Action</Label>
+                    <div className="flex items-center gap-1">
+                      <Label className="text-xs font-medium text-muted-foreground">Call to Action</Label>
+                      <InfoTip text="The text shown on the swipe-up button. 'Shop Now' and 'Learn More' typically perform best for e-commerce." />
+                    </div>
                     <Select value={asset.cta} onValueChange={(v) => onUpdate({ cta: v as WebViewCTA })}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -401,9 +459,12 @@ export function CreativeCard({
                 )}
                 {showUrl && (
                   <div className="flex flex-col gap-1">
-                    <Label className="text-xs font-medium text-muted-foreground">
-                      Swipe-Up URL {isStory && <span className="text-destructive">*</span>}
-                    </Label>
+                    <div className="flex items-center gap-1">
+                      <Label className="text-xs font-medium text-muted-foreground">
+                        Swipe-Up URL {isStory && <span className="text-destructive">*</span>}
+                      </Label>
+                      <InfoTip text="The landing page users see when they swipe up. Use a direct product or offer page for best conversion — avoid homepages." />
+                    </div>
                     <Input placeholder="https://yourstore.com/product" type="url" value={asset.websiteUrl} onChange={(e) => onUpdate({ websiteUrl: e.target.value })} className={cn("h-8 text-xs", asset.websiteUrl && !asset.websiteUrl.startsWith("https://") && "border-red-400", isStory && !asset.websiteUrl && "border-amber-300")} />
                     {asset.websiteUrl && !asset.websiteUrl.startsWith("https://") && (
                       <p className="text-[10px] text-red-600">URL must start with https://</p>
@@ -436,27 +497,43 @@ export function CreativeCard({
               )}
 
               {isDeepLink && (
-                <div className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary/[0.02] p-2.5">
+                <div className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/[0.02] p-3">
                   <div className="flex items-center gap-1.5">
                     <Link2 className="size-3 text-primary" />
-                    <Label className="text-xs font-semibold text-foreground">Deep Link</Label>
+                    <Label className="text-xs font-semibold text-foreground">Deep Link Configuration</Label>
+                    <InfoTip text="Deep links open content directly inside your mobile app. Users who don't have the app will see the fallback page instead." />
                   </div>
                   <div className="flex flex-col gap-1">
+                    <Label className="text-[10px] font-medium text-muted-foreground">Deep Link URI</Label>
                     <Input placeholder="myapp://product/123" value={asset.deepLinkProperties?.deepLinkUri ?? ""} onChange={(e) => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: e.target.value, fallbackUrl: asset.deepLinkProperties?.fallbackUrl ?? "", fallbackType: asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK" } })} className="h-8 text-xs font-mono" />
+                    <p className="text-[9px] text-muted-foreground">Your app&apos;s custom URL scheme (e.g. myapp://path)</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <Input placeholder="iOS App ID" value={asset.deepLinkProperties?.iosAppId ?? ""} onChange={(e) => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: asset.deepLinkProperties?.deepLinkUri ?? "", iosAppId: e.target.value || undefined, fallbackUrl: asset.deepLinkProperties?.fallbackUrl ?? "", fallbackType: asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK" } })} className="h-8 text-xs" />
-                    <Input placeholder="Android Package" value={asset.deepLinkProperties?.androidAppUrl ?? ""} onChange={(e) => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: asset.deepLinkProperties?.deepLinkUri ?? "", androidAppUrl: e.target.value || undefined, fallbackUrl: asset.deepLinkProperties?.fallbackUrl ?? "", fallbackType: asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK" } })} className="h-8 text-xs font-mono" />
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-[10px] font-medium text-muted-foreground">iOS App ID</Label>
+                      <Input placeholder="123456789" value={asset.deepLinkProperties?.iosAppId ?? ""} onChange={(e) => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: asset.deepLinkProperties?.deepLinkUri ?? "", iosAppId: e.target.value || undefined, fallbackUrl: asset.deepLinkProperties?.fallbackUrl ?? "", fallbackType: asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK" } })} className="h-8 text-xs" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-[10px] font-medium text-muted-foreground">Android Package</Label>
+                      <Input placeholder="com.example.app" value={asset.deepLinkProperties?.androidAppUrl ?? ""} onChange={(e) => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: asset.deepLinkProperties?.deepLinkUri ?? "", androidAppUrl: e.target.value || undefined, fallbackUrl: asset.deepLinkProperties?.fallbackUrl ?? "", fallbackType: asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK" } })} className="h-8 text-xs font-mono" />
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <Input placeholder="https://fallback-url.com" type="url" value={asset.deepLinkProperties?.fallbackUrl ?? ""} onChange={(e) => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: asset.deepLinkProperties?.deepLinkUri ?? "", fallbackUrl: e.target.value, fallbackType: asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK" } })} className="h-8 text-xs" />
-                    <Select value={asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK"} onValueChange={(v: "WEB_VIEW_FALLBACK" | "APP_STORE_FALLBACK") => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: asset.deepLinkProperties?.deepLinkUri ?? "", fallbackUrl: asset.deepLinkProperties?.fallbackUrl ?? "", fallbackType: v } })}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="WEB_VIEW_FALLBACK">Web Fallback</SelectItem>
-                        <SelectItem value="APP_STORE_FALLBACK">App Store</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-[10px] font-medium text-muted-foreground">Fallback URL</Label>
+                      <Input placeholder="https://yoursite.com/product" type="url" value={asset.deepLinkProperties?.fallbackUrl ?? ""} onChange={(e) => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: asset.deepLinkProperties?.deepLinkUri ?? "", fallbackUrl: e.target.value, fallbackType: asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK" } })} className="h-8 text-xs" />
+                      <p className="text-[9px] text-muted-foreground">Where users go if the app isn&apos;t installed</p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-[10px] font-medium text-muted-foreground">Fallback Type</Label>
+                      <Select value={asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK"} onValueChange={(v: "WEB_VIEW_FALLBACK" | "APP_STORE_FALLBACK") => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: asset.deepLinkProperties?.deepLinkUri ?? "", fallbackUrl: asset.deepLinkProperties?.fallbackUrl ?? "", fallbackType: v } })}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="WEB_VIEW_FALLBACK">Open web page</SelectItem>
+                          <SelectItem value="APP_STORE_FALLBACK">Open app store</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               )}
@@ -491,7 +568,7 @@ export function CreativeCard({
             </div>
           )}
 
-          {/* ── Advanced Settings (includes crop, CTA color, shareable, web view) ── */}
+          {/* ── Advanced Settings ── */}
           <div className="border-t border-border">
             <button
               type="button"
@@ -502,23 +579,18 @@ export function CreativeCard({
               {showAdvanced ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
             </button>
             {showAdvanced && (
-              <div className="flex flex-col gap-3 px-3 pb-3">
-                {/* Crop, CTA color, Shareable */}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <Label className="text-xs text-foreground">Crop</Label>
-                    <Select value={asset.cropPosition} onValueChange={(v) => onUpdate({ cropPosition: v as CropPosition })}>
-                      <SelectTrigger className="h-7 w-32 text-[11px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {CROP_OPTIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="flex flex-col gap-0 px-3 pb-3">
+
+                {/* ── General settings row ── */}
+                <div className="flex flex-col gap-0 rounded-lg border border-border">
                   {showCta && (
-                    <div className="flex items-center gap-1.5">
-                      <Label className="text-xs text-foreground">CTA Color</Label>
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-xs text-foreground">CTA Button Color</Label>
+                        <InfoTip text="Auto picks a color from your media for the swipe-up button. Default uses Snapchat's standard grey." />
+                      </div>
                       <Select value={asset.ctaColorDisplayMode || "AUTO"} onValueChange={(v) => onUpdate({ ctaColorDisplayMode: v as "AUTO" | "DEFAULT" })}>
-                        <SelectTrigger className="h-7 w-20 text-[11px]"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-7 w-24 text-[11px]"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="AUTO">Auto</SelectItem>
                           <SelectItem value="DEFAULT">Default</SelectItem>
@@ -527,29 +599,43 @@ export function CreativeCard({
                     </div>
                   )}
                   {!isSnapAd && (
-                    <div className="flex items-center gap-1.5">
-                      <Label className="text-xs text-foreground">Shareable</Label>
-                      <Switch checked={asset.shareable} onCheckedChange={(v) => onUpdate({ shareable: v })} className="scale-75" />
+                    <div className={cn("flex items-center justify-between px-3 py-2.5", showCta && "border-t border-border")}>
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-xs text-foreground">Shareable</Label>
+                        <InfoTip text="Allow viewers to share this ad with friends via chat or stories. Increases organic reach but gives less control." />
+                      </div>
+                      <Switch checked={asset.shareable} onCheckedChange={(v) => onUpdate({ shareable: v })} />
                     </div>
                   )}
                 </div>
 
-                {/* Web View settings */}
+                {/* ── Web View settings ── */}
                 {showAdvancedWebView && (
-                  <div className="flex flex-col gap-2.5 border-t border-border pt-2.5">
-                    <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Web View</p>
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-foreground">Snap Browser</Label>
+                  <div className="mt-3 flex flex-col gap-0 rounded-lg border border-border">
+                    <div className="bg-muted/30 px-3 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Swipe-Up Behavior</p>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-border px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-xs text-foreground">In-App Browser</Label>
+                        <InfoTip text="Opens your landing page inside Snapchat instead of the external browser. Keeps users in the app for a faster, smoother experience." />
+                      </div>
                       <Switch checked={asset.webViewProperties?.useSnapBrowser ?? true} onCheckedChange={(v) => onUpdate({ webViewProperties: { ...asset.webViewProperties, url: asset.websiteUrl, useSnapBrowser: v, preloadEnabled: asset.webViewProperties?.preloadEnabled ?? true, blockPreload: asset.webViewProperties?.blockPreload ?? false } })} />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs text-foreground">Preload Page</Label>
+                    <div className="flex items-center justify-between border-t border-border px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-xs text-foreground">Preload Page</Label>
+                        <InfoTip text="Starts loading the landing page while the ad is showing so it opens instantly on swipe-up. Recommended for faster load times." />
+                      </div>
                       <Switch checked={asset.webViewProperties?.preloadEnabled ?? true} onCheckedChange={(v) => onUpdate({ webViewProperties: { ...asset.webViewProperties, url: asset.websiteUrl, useSnapBrowser: asset.webViewProperties?.useSnapBrowser ?? true, preloadEnabled: v, blockPreload: asset.webViewProperties?.blockPreload ?? false } })} />
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-xs text-foreground">App Deep Link URL</Label>
-                      <Input placeholder="myapp://product/123" value={asset.webViewProperties?.deepLinkUrl || ""} onChange={(e) => onUpdate({ webViewProperties: { ...asset.webViewProperties, url: asset.websiteUrl, useSnapBrowser: asset.webViewProperties?.useSnapBrowser ?? true, preloadEnabled: asset.webViewProperties?.preloadEnabled ?? true, blockPreload: asset.webViewProperties?.blockPreload ?? false, deepLinkUrl: e.target.value } })} className="h-7 text-xs" />
-                      <p className="text-[10px] text-muted-foreground">Opens in app if installed, else falls back to web URL</p>
+                    <div className="flex flex-col gap-1 border-t border-border px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-xs text-foreground">App Deep Link</Label>
+                        <InfoTip text="If the user has your app installed, this URI opens the content directly in your app. Otherwise, the web URL is used as fallback." />
+                      </div>
+                      <Input placeholder="myapp://product/123" value={asset.webViewProperties?.deepLinkUrl || ""} onChange={(e) => onUpdate({ webViewProperties: { ...asset.webViewProperties, url: asset.websiteUrl, useSnapBrowser: asset.webViewProperties?.useSnapBrowser ?? true, preloadEnabled: asset.webViewProperties?.preloadEnabled ?? true, blockPreload: asset.webViewProperties?.blockPreload ?? false, deepLinkUrl: e.target.value } })} className="mt-1 h-7 text-xs font-mono" />
+                      <p className="text-[10px] text-muted-foreground">Optional — leave empty if you don&apos;t have a mobile app</p>
                     </div>
                   </div>
                 )}

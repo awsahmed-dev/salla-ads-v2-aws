@@ -69,14 +69,14 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     snapObjectiveV2: "SALES",
     conversionLocation: "WEB",
     label: "Sales",
-    allowedGoals: ["PIXEL_PURCHASE", "PIXEL_ADD_TO_CART", "PIXEL_PAGE_VIEW", "PIXEL_SIGNUP"],
+    allowedGoals: ["PIXEL_PURCHASE", "PIXEL_ADD_TO_CART", "PIXEL_PAGE_VIEW"],
     defaultGoal: "PIXEL_PURCHASE",
     pixelRequirement: "required",
     catalogAvailable: true,
     hasConversionWindow: true,
     allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID", "TARGET_COST"],
     allowedAdFormats: ["WEB_VIEW", "DEEP_LINK", "COLLECTION", "COMPOSITE", "DYNAMIC", "INFLUENCER"],
-    allowedFormats: ["SINGLE", "COLLECTION", "STORY", "DYNAMIC"],
+    allowedFormats: ["SINGLE", "COLLECTION", "STORY", "INFLUENCER"],
     allowedDestinations: ["WEBSITE", "DEEP_LINK"],
     defaultCTA: "SHOP_NOW",
   },
@@ -91,7 +91,7 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     hasConversionWindow: false,
     allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID"],
     allowedAdFormats: ["WEB_VIEW", "DEEP_LINK", "COLLECTION", "COMPOSITE", "INFLUENCER"],
-    allowedFormats: ["SINGLE", "COLLECTION", "STORY"],
+    allowedFormats: ["SINGLE", "COLLECTION", "STORY", "INFLUENCER"],
     allowedDestinations: ["WEBSITE", "DEEP_LINK"],
     defaultCTA: "VIEW",
   },
@@ -106,7 +106,7 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     hasConversionWindow: false,
     allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID"],
     allowedAdFormats: ["WEB_VIEW", "SNAP_AD", "COLLECTION", "COMPOSITE", "INFLUENCER"],
-    allowedFormats: ["SINGLE", "COLLECTION", "STORY"],
+    allowedFormats: ["SINGLE", "COLLECTION", "STORY", "INFLUENCER"],
     allowedDestinations: ["WEBSITE", "NO_CTA"],
     defaultCTA: "VIEW",
   },
@@ -121,7 +121,7 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     hasConversionWindow: false,
     allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID"],
     allowedAdFormats: ["WEB_VIEW", "APP_INSTALL", "COMPOSITE", "INFLUENCER"],
-    allowedFormats: ["SINGLE", "STORY"],
+    allowedFormats: ["SINGLE", "STORY", "INFLUENCER"],
     allowedDestinations: ["WEBSITE", "APP_INSTALL"],
     defaultCTA: "VIEW",
   },
@@ -136,7 +136,7 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     hasConversionWindow: true,
     allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID", "TARGET_COST"],
     allowedAdFormats: ["APP_INSTALL", "DEEP_LINK", "COLLECTION", "COMPOSITE", "INFLUENCER"],
-    allowedFormats: ["SINGLE", "COLLECTION", "STORY"],
+    allowedFormats: ["SINGLE", "COLLECTION", "STORY", "INFLUENCER"],
     allowedDestinations: ["APP_INSTALL", "DEEP_LINK"],
     defaultCTA: "INSTALL_NOW",
   },
@@ -163,8 +163,8 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
  * SWIPE_1DAY and SWIPE_7DAY_VIEW_1DAY are NOT valid Snap API values and have been removed.
  */
 export type ConversionWindow =
-  | "SWIPE_28DAY_VIEW_1DAY"  // 28-day click + 1-day view (recommended)
-  | "SWIPE_7DAY";             // 7-day click only (stricter measurement)
+  | "SWIPE_28DAY_VIEW_1DAY"  // 28-day click + 1-day view (default, always available)
+  | "SWIPE_7DAY";            // 7-day click only (requires pixel eligibility check)
 
 /** Maps to API bid_strategy */
 export type BidStrategy =
@@ -221,17 +221,24 @@ export interface SallaAudienceSegment {
 export interface AudienceSettings {
   countries: string[];
   cities: LocationCircle[];
+  /** Region/state IDs for narrowing within selected countries (Snap API region_id). */
+  regions: string[];
   genders: string[];
   ageMin: number;
   ageMax: number;
   languages: string[];
   deviceOS: string[];
+  /** SLC IDs to include (OR logic — ad shown to anyone matching any). */
   interests: string[];
+  /** SLC IDs to exclude. */
+  interestsExclude: string[];
   customAudiencesInclude: string[];
   customAudiencesExclude: string[];
   regulatedContent: boolean;
   interestExpansion: boolean;
   customAudienceExpansion: boolean;
+  /** SMART_TARGETING — expands across genders and beyond max age. Requires both expansion options enabled. */
+  smartTargeting: boolean;
   excludeRecentPurchasers: boolean;
   excludeRecentPurchasersDays: number;
   sallaAudienceEnabled: boolean;
@@ -307,7 +314,7 @@ export type SnapCreativeType =
   | "DEEP_LINK";
 
 /** UI-level ad format (what the ad looks like) */
-export type AdFormat = "SINGLE" | "COLLECTION" | "STORY" | "DYNAMIC";
+export type AdFormat = "SINGLE" | "COLLECTION" | "STORY" | "DYNAMIC" | "INFLUENCER";
 
 /** UI-level destination (where swipe-up goes) */
 export type AdDestination = "WEBSITE" | "DEEP_LINK" | "APP_INSTALL" | "NO_CTA" | "LEAD_FORM";
@@ -318,6 +325,7 @@ export function deriveCreativeType(format: AdFormat, destination: AdDestination)
     case "COLLECTION": return "COLLECTION";
     case "STORY": return "COMPOSITE";
     case "DYNAMIC": return "DYNAMIC";
+    case "INFLUENCER": return "WEB_VIEW";
     case "SINGLE":
       switch (destination) {
         case "WEBSITE": return "WEB_VIEW";
@@ -839,7 +847,7 @@ export interface AdGroup {
    * Maps to Snap API Creative type: PREVIEW with preview_creative_id on the COMPOSITE.
    */
   discoverTile?: DiscoverTile;
-  /** True when this ad group uses influencer content (ad code claiming) */
+  /** True when this ad uses influencer content (ad code claiming) */
   isInfluencer?: boolean;
   /** Third-party tracking URLs */
   trackingUrls?: { impressionUrl: string; swipeUpUrl: string };
@@ -899,17 +907,20 @@ export const defaultCampaign: CampaignData = {
   audience: {
     countries: ["SA"],
     cities: [],
+    regions: [],
     genders: ["MALE", "FEMALE"],
     ageMin: 18,
     ageMax: 45,
     languages: ["ar"],
     deviceOS: ["iOS", "ANDROID"],
     interests: [],
+    interestsExclude: [],
     customAudiencesInclude: [],
     customAudiencesExclude: [],
     regulatedContent: false,
     interestExpansion: true,
-    customAudienceExpansion: false,
+    customAudienceExpansion: true,
+    smartTargeting: false,
     excludeRecentPurchasers: false,
     excludeRecentPurchasersDays: 30,
     sallaAudienceEnabled: false,
