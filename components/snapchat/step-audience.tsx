@@ -325,6 +325,7 @@ export function StepAudience() {
               countryCount={aud.countries.length}
               countries={aud.countries}
               cityCount={aud.cities.length}
+              objective={campaign.objective.objective}
               accent="primary"
             />
 

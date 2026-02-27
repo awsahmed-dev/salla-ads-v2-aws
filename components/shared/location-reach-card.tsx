@@ -8,35 +8,38 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { MapPin, AlertCircle, Info } from "lucide-react";
+import { MapPin, Info, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { getCountryByCode } from "@/lib/locations";
 
-/** Rough addressable ad population per country code (GCC / MENA focus). */
-const COUNTRY_REACH: Record<string, number> = {
-  SA: 34_000_000,
-  AE: 10_000_000,
-  EG: 55_000_000,
-  KW: 4_500_000,
-  BH: 1_800_000,
-  OM: 5_000_000,
-  QA: 3_000_000,
-  JO: 10_000_000,
-  IQ: 40_000_000,
-  LB: 5_000_000,
-  MA: 20_000_000,
-  TN: 10_000_000,
-  DZ: 22_000_000,
-  PS: 3_500_000,
-  YE: 8_000_000,
-  LY: 4_000_000,
-  SD: 12_000_000,
-};
-const DEFAULT_REACH = 8_000_000;
+/* ------------------------------------------------------------------ */
+/*  Snap addressable audience per country (approximate DAU/MAU for     */
+/*  ad delivery — NOT total population).                               */
+/* ------------------------------------------------------------------ */
 
-/** Cap for bar percentage (100% = this many people). */
-const CAP_FOR_BAR = 50_000_000;
+const SNAP_AUDIENCE: Record<string, number> = {
+  SA: 21_000_000,
+  AE: 7_500_000,
+  EG: 12_000_000,
+  KW: 3_200_000,
+  BH: 1_200_000,
+  OM: 2_800_000,
+  QA: 2_000_000,
+  JO: 4_500_000,
+  IQ: 15_000_000,
+  LB: 2_500_000,
+  MA: 8_000_000,
+  TN: 4_500_000,
+  DZ: 9_000_000,
+  PS: 1_800_000,
+  YE: 3_000_000,
+  LY: 1_500_000,
+  SD: 4_000_000,
+};
+
+const DEFAULT_AUDIENCE = 3_000_000;
 
 export type LocationReachAccent = "primary" | "meta" | "dv360";
+export type ObjectiveType = "SALES" | "AWARENESS" | "VIDEO_VIEWS" | "ENGAGEMENT" | "APP_PROMOTION" | "WEBSITE_VISITS" | "SPONSORED_CHAT" | string;
 
 const ACCENT_ICON: Record<LocationReachAccent, string> = {
   primary: "text-primary",
@@ -44,92 +47,139 @@ const ACCENT_ICON: Record<LocationReachAccent, string> = {
   dv360: "text-red-600",
 };
 
+/* ------------------------------------------------------------------ */
+/*  Objective-based guidance                                           */
+/* ------------------------------------------------------------------ */
+
+interface SizeGuidance {
+  status: "good" | "warning" | "info";
+  icon: typeof TrendingUp;
+  message: string;
+}
+
+function getGuidance(objective: ObjectiveType, audienceSize: number, cityCount: number): SizeGuidance {
+  const isSales = objective === "SALES" || objective === "WEBSITE_VISITS";
+  const isAwareness = objective === "AWARENESS" || objective === "VIDEO_VIEWS";
+
+  if (audienceSize < 100_000) {
+    return {
+      status: "warning",
+      icon: TrendingDown,
+      message: "Very small audience — Snap may struggle to deliver your ads. Consider broadening your targeting.",
+    };
+  }
+
+  if (isSales) {
+    if (audienceSize > 15_000_000) {
+      return {
+        status: "info",
+        icon: TrendingUp,
+        message: "Large audience for Sales — Snap's algorithm will narrow it down, but adding interests or custom audiences helps it learn faster.",
+      };
+    }
+    if (audienceSize > 5_000_000) {
+      return {
+        status: "good",
+        icon: Minus,
+        message: "Good audience size for Sales — enough room for Snap to optimize while staying focused.",
+      };
+    }
+    if (audienceSize > 500_000) {
+      return {
+        status: "good",
+        icon: Minus,
+        message: cityCount > 0
+          ? "Focused audience — good for city-level Sales campaigns with targeted interests."
+          : "Focused audience — works well if you have strong interest or custom audience targeting.",
+      };
+    }
+    return {
+      status: "warning",
+      icon: TrendingDown,
+      message: "Narrow for prospecting — fine for retargeting, but if finding new buyers, consider broadening.",
+    };
+  }
+
+  if (isAwareness) {
+    if (audienceSize > 5_000_000) {
+      return {
+        status: "good",
+        icon: TrendingUp,
+        message: "Great reach for awareness — your ads will be seen by a large audience.",
+      };
+    }
+    return {
+      status: "info",
+      icon: Minus,
+      message: "Smaller audience for awareness — you'll get high frequency (same people see your ad often). Consider broadening for more reach.",
+    };
+  }
+
+  if (audienceSize > 1_000_000) {
+    return { status: "good", icon: Minus, message: "Healthy audience size for your objective." };
+  }
+
+  return { status: "info", icon: Minus, message: "Moderate audience — performance depends on your targeting precision." };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
+
 export interface LocationReachCardProps {
-  /** Number of selected countries (fallback when countries array not provided). */
   countryCount: number;
-  /** Optional array of country codes for country-aware reach estimates. */
   countries?: string[];
-  /** Number of selected cities. When > 0, reach is scaled down (city-level = narrower). */
   cityCount?: number;
+  /** Campaign objective from Step 0 */
+  objective?: ObjectiveType;
   accent?: LocationReachAccent;
   label?: string;
   className?: string;
 }
 
-/**
- * Location-only reach estimate for Step 1 (Audience).
- * Uses per-country addressable population when country codes are provided,
- * otherwise falls back to countryCount * default.
- */
 export function LocationReachCard({
   countryCount,
   countries,
   cityCount = 0,
+  objective = "SALES",
   accent = "primary",
-  label = "Reach in selected locations",
+  label = "Estimated Audience",
   className,
 }: LocationReachCardProps) {
   const hasLocations = countries ? countries.length > 0 : countryCount > 0;
 
-  const baseReach = countries
-    ? countries.reduce((sum, code) => sum + (COUNTRY_REACH[code] ?? DEFAULT_REACH), 0)
-    : countryCount * DEFAULT_REACH;
+  const baseAudience = countries
+    ? countries.reduce((sum, code) => sum + (SNAP_AUDIENCE[code] ?? DEFAULT_AUDIENCE), 0)
+    : countryCount * DEFAULT_AUDIENCE;
 
-  const cityMultiplier =
-    cityCount === 0 ? 1 : Math.max(0.1, 1 - cityCount * 0.05);
-  const estimatedReach = Math.round(baseReach * cityMultiplier);
-  const estimatedMin = Math.round(estimatedReach * 0.85);
-  const estimatedMax = Math.round(estimatedReach * 1.15);
-
-  const sizePercent = Math.min(
-    100,
-    Math.round((estimatedReach / CAP_FOR_BAR) * 100)
-  );
-  const sizeLabel =
-    sizePercent < 20
-      ? "Very narrow"
-      : sizePercent < 40
-        ? "Narrow"
-        : sizePercent < 65
-          ? "Balanced"
-          : sizePercent < 85
-            ? "Broad"
-            : "Very broad";
-  const barColor =
-    sizePercent < 20
-      ? "bg-red-500"
-      : sizePercent < 40
-        ? "bg-amber-500"
-        : sizePercent < 65
-          ? "bg-emerald-500"
-          : sizePercent < 85
-            ? "bg-blue-500"
-            : "bg-purple-500";
-  const labelColor =
-    sizePercent < 20
-      ? "text-red-600"
-      : sizePercent < 40
-        ? "text-amber-600"
-        : sizePercent < 65
-          ? "text-emerald-600"
-          : sizePercent < 85
-            ? "text-blue-600"
-            : "text-purple-600";
+  const cityFactor = cityCount === 0 ? 1 : Math.max(0.15, 1 - cityCount * 0.08);
+  const estimated = Math.round(baseAudience * cityFactor);
 
   const fmt = (n: number) =>
     n >= 1_000_000
-      ? `${(n / 1_000_000).toFixed(1)}M`
+      ? `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`
       : n >= 1_000
         ? `${(n / 1_000).toFixed(0)}K`
-        : n.toString();
+        : String(n);
+
+  const guidance = getGuidance(objective, estimated, cityCount);
 
   const countryNames = countries
-    ?.map((c) => getCountryByCode(c)?.name ?? c)
+    ?.slice(0, 3)
+    .map((c) => getCountryByCode(c)?.name ?? c)
     .join(", ");
+  const extraCountries = (countries?.length ?? 0) - 3;
+
+  const statusColors = {
+    good: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    warning: "border-amber-200 bg-amber-50 text-amber-700",
+    info: "border-blue-200 bg-blue-50 text-blue-700",
+  };
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className={cn("flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm", className)}>
+        {/* Header */}
         <div className="flex items-center gap-2">
           <MapPin className={cn("size-4 shrink-0", ACCENT_ICON[accent])} />
           <Label className="text-sm font-semibold text-foreground">{label}</Label>
@@ -138,53 +188,46 @@ export function LocationReachCard({
               <Info className="size-3.5 cursor-help text-muted-foreground" />
             </TooltipTrigger>
             <TooltipContent className="max-w-xs text-xs">
-              Based only on your selected countries and cities. Full audience size will depend on demographics and interests you set below.
+              Approximate Snapchat addressable audience based on your location selection.
+              The actual delivery size will depend on demographics, interests, and budget you set.
             </TooltipContent>
           </Tooltip>
         </div>
 
         {!hasLocations ? (
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-3">
+          <div className="flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-3">
             <MapPin className="size-4 shrink-0 text-muted-foreground" />
             <p className="text-xs text-muted-foreground">
-              Select at least one location to see reach estimates.
+              Select at least one location to see audience estimates.
             </p>
           </div>
         ) : (
           <>
-            <div className="mb-1 h-2 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className={cn("h-full rounded-full transition-all", barColor)}
-                style={{ width: `${sizePercent}%` }}
-              />
+            {/* Audience size */}
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-bold tracking-tight text-foreground">~{fmt(estimated)}</span>
+              <span className="text-xs text-muted-foreground">people on Snapchat</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-xs text-muted-foreground">Narrow</span>
-              <span className={cn("text-xs font-medium", labelColor)}>{sizeLabel}</span>
-              <span className="text-xs text-muted-foreground">Broad</span>
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-bold text-foreground">{fmt(estimatedMin)}</span>
-              <span className="text-sm text-muted-foreground">–</span>
-              <span className="text-xl font-bold text-foreground">{fmt(estimatedMax)}</span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Estimated reach in selected locations. Refined after you set budget and targeting.
+
+            {/* Location summary */}
+            <p className="text-[11px] text-muted-foreground">
+              {countryNames}
+              {extraCountries > 0 && ` +${extraCountries}`}
+              {cityCount > 0 && ` · ${cityCount} ${cityCount === 1 ? "city" : "cities"}`}
             </p>
-            {countryNames && (
-              <p className="truncate text-xs text-muted-foreground" title={countryNames}>
-                {countryNames}
-                {cityCount > 0 && ` + ${cityCount} ${cityCount === 1 ? "city" : "cities"}`}
-              </p>
-            )}
-            {sizePercent < 20 && (
-              <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 dark:border-amber-900/50 dark:bg-amber-950/30">
-                <AlertCircle className="size-3 shrink-0 text-amber-600" />
-                <p className="text-xs text-amber-700 dark:text-amber-400">
-                  Locations may be too narrow for effective delivery. Consider adding more countries or cities.
-                </p>
-              </div>
-            )}
+
+            {/* Objective-aware guidance */}
+            <div className={cn(
+              "flex items-start gap-2 rounded-lg border px-3 py-2",
+              statusColors[guidance.status]
+            )}>
+              <guidance.icon className="mt-0.5 size-3.5 shrink-0" />
+              <p className="text-[11px] leading-relaxed">{guidance.message}</p>
+            </div>
+
+            <p className="text-[10px] text-muted-foreground">
+              Location-only estimate · Full audience size depends on demographics, interests & budget
+            </p>
           </>
         )}
       </div>

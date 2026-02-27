@@ -53,9 +53,8 @@ import {
 import { InfoTip } from "@/components/shared/info-tip";
 import { BudgetDurationCard } from "@/components/shared/budget-duration-card";
 import { PerformanceBoostCard } from "@/components/shared/performance-boost-card";
-import { CostSummaryCard } from "@/components/shared/cost-summary-card";
-import { EstimatedResultsCard } from "@/components/shared/estimated-results-card";
-import { ConfigCheckCard } from "@/components/shared/config-check-card";
+import { CampaignEstimateCard } from "@/components/shared/campaign-estimate-card";
+import { DeliveryReadinessCard } from "@/components/shared/delivery-readiness-card";
 import { BidStrategyCard } from "@/components/shared/bid-strategy-card";
 import { OptimizationGoalCard } from "@/components/shared/optimization-goal-card";
 import {
@@ -484,6 +483,26 @@ export function StepBudget() {
     APP_REENGAGE_OPEN: "re-engagements",
   };
   const goalLabel = goalLabelMap[budget.optimizationGoal] ?? "actions";
+
+  const goalNameMap: Record<string, string> = {
+    PIXEL_PURCHASE: "Purchase",
+    PIXEL_ADD_TO_CART: "Add to Cart",
+    PIXEL_PAGE_VIEW: "Page View",
+    SWIPES: "Swipe Up",
+    LANDING_PAGE_VIEW: "Landing Page View",
+    IMPRESSIONS: "1k Impressions",
+    STORY_OPENS: "Story Open",
+    VIDEO_VIEWS: "Video View",
+    VIDEO_VIEWS_15_SEC: "15s Video View",
+    USES: "Lens Use",
+    LEAD_FORM_SUBMISSIONS: "Form Submission",
+    APP_INSTALLS: "App Install",
+    APP_PURCHASE: "In-App Purchase",
+    APP_SIGNUP: "In-App Sign Up",
+    APP_ADD_TO_CART: "In-App Add to Cart",
+    APP_REENGAGE_OPEN: "App Re-open",
+  };
+  const goalName = goalNameMap[budget.optimizationGoal] ?? "Action";
 
   /* Duration preset helper */
   const applyPreset = (days: number) => {
@@ -984,82 +1003,23 @@ export function StepBudget() {
         <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
           <div className="sticky top-20 flex flex-col gap-4">
 
-            {/* Cost Summary (shared) */}
-            <CostSummaryCard
-              budgetLabel="Daily budget"
-              budgetAmount={budget.amount}
+            {/* Card A: Budget Summary (cost-only) */}
+            <CampaignEstimateCard
+              dailyBudget={budget.amount}
               durationDays={durationDays}
               isOngoing={budget.endDateOptional}
               totalBudget={totalBudget}
-              autoIncreaseEnabled={autoIncrease.enabled}
               boostEnabled={budget.performanceBoost}
               boostAmount={299}
               startDate={budget.startDate}
               endDate={budget.endDate}
             />
 
-            {/* Estimated Results (shared) */}
-            {(() => {
-              const goalNameMap: Record<string, string> = {
-                PIXEL_PURCHASE: "Purchase",
-                PIXEL_ADD_TO_CART: "Add to Cart",
-                PIXEL_PAGE_VIEW: "Page View",
-                SWIPES: "Swipe Up",
-                LANDING_PAGE_VIEW: "Landing Page View",
-                IMPRESSIONS: "1k Impressions",
-                STORY_OPENS: "Story Open",
-                VIDEO_VIEWS: "Video View",
-                VIDEO_VIEWS_15_SEC: "15s Video View",
-                USES: "Lens Use",
-                LEAD_FORM_SUBMISSIONS: "Form Submission",
-                APP_INSTALLS: "App Install",
-                APP_PURCHASE: "In-App Purchase",
-                APP_SIGNUP: "In-App Sign Up",
-                APP_ADD_TO_CART: "In-App Add to Cart",
-                APP_REENGAGE_OPEN: "App Re-open",
-              };
-              const currentGoalName = goalNameMap[budget.optimizationGoal] ?? "Action";
-              const estMin = suggestedBid.max > 0 ? Math.floor(dailyAmount / suggestedBid.max) : 0;
-              const estMax = suggestedBid.min > 0 ? Math.floor(dailyAmount / suggestedBid.min) : 0;
-              const weeklyMin = estMin * 7;
-              const weeklyMax = estMax * 7;
-              const rows = [
-                { label: `Est. daily ${goalLabel}`, value: estMin > 0 ? `${estMin} – ${estMax}` : "—", highlight: true },
-                { label: `Est. weekly ${goalLabel}`, value: weeklyMin > 0 ? `${weeklyMin} – ${weeklyMax}` : "—" },
-                { label: `Cost per ${currentGoalName.toLowerCase()}`, value: suggestedBid.min > 0 ? `SAR ${suggestedBid.min.toFixed(2)} – ${suggestedBid.max.toFixed(2)}` : "—" },
-                ...(durationDays > 0 && !budget.endDateOptional ? [{ label: `Total est. (${durationDays}d)`, value: estMin > 0 ? `${estMin * durationDays} – ${estMax * durationDays} ${goalLabel}` : "—" }] : []),
-              ];
-              return (
-                <EstimatedResultsCard
-                  badge="Snap API"
-                  bidRange={{
-                    min: suggestedBid.min,
-                    max: suggestedBid.max,
-                    current: budget.bidStrategy !== "AUTO_BID" ? (budget.bidAmount || 0) : undefined,
-                    goalName: currentGoalName,
-                  }}
-                  dailyBudget={dailyAmount}
-                  rows={rows}
-                  disclaimer="Estimates are from the Snap Bid Estimate API and depend on targeting, competition, and ad quality. Actual results may vary."
-                />
-              );
-            })()}
-
-            {/* Configuration + Delivery (shared) */}
-            <ConfigCheckCard
-              configRows={[
-                { label: "Daily budget", value: `SAR ${budget.amount.toLocaleString()}` },
-                { label: "Duration", value: budget.endDateOptional ? "Ongoing" : `${durationDays} days` },
-                { label: "Goal", value: OPTIMIZATION_GOALS.find((g) => g.value === budget.optimizationGoal)?.label ?? "-" },
-                { label: "Bid strategy", value: budget.bidStrategy === "AUTO_BID" ? "Auto bid" : budget.bidStrategy === "TARGET_COST" ? `Target SAR ${budget.bidAmount || 0}` : `Max SAR ${budget.bidAmount || 0}` },
-                ...(objectiveConfig.hasConversionWindow ? [{ label: "Attribution", value: CONVERSION_WINDOWS.find((w) => w.value === budget.conversionWindow)?.label ?? "-" }] : []),
-                { label: "Pacing", value: !canUseAccelerated ? "Standard" : budget.pacingType === "STANDARD" ? "Standard" : "Accelerated" },
-                { label: "Freq. cap", value: budget.frequencyCapEnabled ? `${budget.frequencyCapCount}x / ${budget.frequencyCapInterval / 24}d` : "Off" },
-                ...(budget.performanceBoost ? [{ label: "Boost", value: "Active (SAR 299)" }] : []),
-              ]}
-              checkItems={[
-                { label: "Budget", status: budget.amount >= 150 ? "ok" : "error", text: budget.amount >= 150 ? `SAR ${budget.amount}/day` : "Below SAR 150 minimum" },
-                { label: "Schedule", status: budget.startDate ? "ok" : "warning", text: budget.startDate ? `${budget.startDate}${budget.endDateOptional ? " (ongoing)" : ` to ${budget.endDate}`}` : "No start date" },
+            {/* Card B: Delivery Readiness (checklist only) */}
+            <DeliveryReadinessCard
+              items={[
+                { label: "Budget", status: budget.amount >= 150 ? "ok" : "error", text: budget.amount >= 150 ? `SAR ${budget.amount}/day meets minimum` : "Below SAR 150/day minimum" },
+                { label: "Schedule", status: budget.startDate ? "ok" : "warning", text: budget.startDate ? `Starts ${budget.startDate}${budget.endDateOptional ? " · Ongoing" : budget.endDate ? ` · Ends ${budget.endDate}` : ""}` : "No start date set" },
                 { label: "Goal", status: (() => {
                   if (!budget.optimizationGoal) return "warning" as const;
                   const goalEntry = goalsWithLocked.find((g) => g.value === budget.optimizationGoal);
@@ -1078,9 +1038,9 @@ export function StepBudget() {
                   if (budget.bidAmount > budget.amount) return "warning" as const;
                   return "ok" as const;
                 })(), text: (() => {
-                  if (budget.bidStrategy === "AUTO_BID") return "Auto-optimized";
+                  if (budget.bidStrategy === "AUTO_BID") return "Auto-optimized by Snap";
                   if (!budget.bidAmount || budget.bidAmount <= 0) return "No bid amount set";
-                  if (budget.bidAmount < suggestedBid.min) return `SAR ${budget.bidAmount.toFixed(2)} — below suggested`;
+                  if (budget.bidAmount < suggestedBid.min) return `SAR ${budget.bidAmount.toFixed(2)} — below suggested range`;
                   if (budget.bidAmount > budget.amount) return `SAR ${budget.bidAmount.toFixed(2)} — exceeds daily budget`;
                   return `SAR ${budget.bidAmount.toFixed(2)} per ${goalLabel.replace(/s$/, "")}`;
                 })() },
@@ -1088,11 +1048,11 @@ export function StepBudget() {
                   label: "Attribution",
                   status: (budget.conversionWindow === "SWIPE_7DAY" && !pixelEligibleFor7Day ? "warning" : "ok") as "ok" | "warning" | "error",
                   text: budget.conversionWindow === "SWIPE_7DAY" && !pixelEligibleFor7Day
-                    ? "7-Day requires pixel eligibility"
+                    ? "7-Day Click requires pixel eligibility"
                     : CONVERSION_WINDOWS.find((w) => w.value === budget.conversionWindow)?.label ?? "Set",
                 }] : []),
                 ...(budget.frequencyCapEnabled && campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1
-                  ? [{ label: "Freq. cap", status: "error" as const, text: "Mixed ad formats — disable cap or unify formats" }]
+                  ? [{ label: "Frequency Cap", status: "error" as const, text: "Mixed ad formats — disable cap or unify formats" }]
                   : []),
               ]}
             />
