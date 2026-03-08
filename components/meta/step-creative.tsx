@@ -612,12 +612,26 @@ function CatalogTemplateSection({
               </div>
               {coverType === "CUSTOM_IMAGE" && (
                 <div className="mt-2">
-                  <UploadZone accept="image/jpeg,image/png" label="Upload cover image" sublabel="JPG, PNG -- 1:1 or 4:5" onFile={() => {}} compact />
+                  <UploadZone
+                    accept="image/jpeg,image/png"
+                    label="Upload cover image"
+                    sublabel="JPG, PNG -- 1:1 or 4:5"
+                    onFile={() => {}}
+                    compact
+                    libraryContext="IMAGE"
+                  />
                 </div>
               )}
               {coverType === "CUSTOM_VIDEO" && (
                 <div className="mt-2">
-                  <UploadZone accept="video/mp4,video/quicktime" label="Upload cover video" sublabel="MP4, MOV -- Max 4 GB" onFile={() => {}} compact />
+                  <UploadZone
+                    accept="video/mp4,video/quicktime"
+                    label="Upload cover video"
+                    sublabel="MP4, MOV -- Max 4 GB"
+                    onFile={() => {}}
+                    compact
+                    libraryContext="VIDEO"
+                  />
                 </div>
               )}
             </div>
@@ -1391,6 +1405,8 @@ export function MetaStepCreative() {
                       label={currentAd.adFormat === "SINGLE_VIDEO" ? "Upload Video" : "Upload Image"}
                       sublabel={currentAd.adFormat === "SINGLE_VIDEO" ? "MP4, MOV, GIF -- Max 4 GB" : "JPG, PNG -- Max 30 MB"}
                       onFile={handleMediaUpload}
+                      libraryContext={currentAd.adFormat === "SINGLE_VIDEO" ? "VIDEO" : "IMAGE"}
+                      multiSelect
                     />
                     {currentAd.adFormat === "SINGLE_VIDEO" && (
                       <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2">

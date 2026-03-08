@@ -103,7 +103,7 @@ export function AttributionWindowCard({
       )}
 
       {/* Click vs View explainer */}
-      <div className="mb-4 grid grid-cols-2 gap-2.5">
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
           <div className="mb-1 flex items-center gap-1.5">
             <MousePointerClick className="size-3 text-primary" />
@@ -198,7 +198,7 @@ export function AttributionWindowCard({
         viewOptions &&
         onClickChange &&
         onViewChange && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="rounded-xl border border-border bg-muted/20 p-3.5">
               <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                 <MousePointerClick

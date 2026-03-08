@@ -568,7 +568,7 @@ export function StepReview() {
 
       {/* ============ RIGHT COLUMN (sticky) ============ */}
       <div className="w-full lg:w-[320px] lg:shrink-0">
-        <div className="sticky top-20 flex flex-col gap-3">
+        <div className="lg:sticky lg:top-20 flex flex-col gap-3">
 
           {/* ---- Cost + Payment Card ---- */}
           <div className="rounded-xl border border-border bg-card overflow-hidden">

@@ -144,6 +144,10 @@ export function GoogleStepObjective() {
   const selectedObj = CAMPAIGN_OBJECTIVES.find((o) => o.value === obj.objective)!;
   const needsConversionTag = config.conversionTrackingRequired;
   const needsMerchantCenter = config.merchantCenterRequired;
+  const isPMax = obj.objective === "PERFORMANCE_MAX";
+  const supportsCatalogMode = isPMax;
+  const requiresCatalogConnection =
+    obj.objective === "SHOPPING" || (isPMax && obj.feedEnabled);
 
   // Auto-save indicator
   useEffect(() => {
@@ -159,6 +163,7 @@ export function GoogleStepObjective() {
     const newConfig = OBJECTIVE_CONFIGS[value];
     if (!newConfig) return;
 
+    const supportsCatalogOnNextObjective = value === "PERFORMANCE_MAX" || value === "SHOPPING";
     updateNested("objective", {
       objective: value as typeof obj.objective,
       // Reset tag/conversion for non-tracking objectives
@@ -167,13 +172,14 @@ export function GoogleStepObjective() {
         conversionId: "",
         conversionLabel: "",
       }),
-      // Reset Merchant Center for non-shopping objectives
-      ...(!newConfig.merchantCenterRequired && {
+      // Reset catalog/merchant center only when objective doesn't support catalog mode
+      ...(!supportsCatalogOnNextObjective && {
         merchantCenterConnected: false,
         merchantCenterId: "",
         feedEnabled: false,
         feedId: "",
       }),
+      ...(value === "SHOPPING" && { feedEnabled: true }),
     });
 
     // Also reset budget bidding to match new objective default
@@ -188,7 +194,7 @@ export function GoogleStepObjective() {
   const canProceed =
     obj.campaignName.trim().length > 0 &&
     (needsConversionTag ? (obj.tagMode !== "none" || !!obj.conversionId) : true) &&
-    (needsMerchantCenter ? obj.merchantCenterConnected : true) &&
+    (requiresCatalogConnection ? obj.merchantCenterConnected : true) &&
     (!isApp || !!obj.appSettings?.appId?.trim());
 
   return (
@@ -334,6 +340,13 @@ export function GoogleStepObjective() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground">{selectedObj.label}</p>
                     <p className="text-[11px] text-muted-foreground">{selectedObj.desc}</p>
+                    {isPMax && (
+                      <div className="mt-1">
+                        <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px]">
+                          PMax mode: {obj.feedEnabled ? "Retail (Catalog)" : "Standard"}
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                   <Badge variant="outline" className={cn("rounded-full border text-[10px] font-semibold", FUNNEL_LABELS[selectedObj.funnelStage].color)}>
                     {FUNNEL_LABELS[selectedObj.funnelStage].label}
@@ -510,6 +523,8 @@ export function GoogleStepObjective() {
                         { value: "OPTIMIZE_IN_APP_CONVERSIONS_TARGET_INSTALL_COST" as AppCampaignGoalType, label: "In-App Actions (Install Cost)", desc: "Drive actions, bid on install cost", icon: Target },
                         { value: "OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST" as AppCampaignGoalType, label: "In-App Actions (CPA)", desc: "Drive actions at target CPA", icon: TrendingUp },
                         { value: "OPTIMIZE_RETURN_ON_ADVERTISING_SPEND" as AppCampaignGoalType, label: "ROAS", desc: "Maximize return on ad spend", icon: DollarSign },
+                        { value: "OPTIMIZE_IN_APP_CONVERSIONS_WITHOUT_TARGET_CPA" as AppCampaignGoalType, label: "In-App Actions (No CPA)", desc: "Scale in-app conversions without a fixed CPA target", icon: Zap },
+                        { value: "OPTIMIZE_TOTAL_VALUE_WITHOUT_TARGET_ROAS" as AppCampaignGoalType, label: "Value (No ROAS)", desc: "Scale total conversion value without fixed ROAS", icon: TrendingUp },
                       ]).map((goal) => (
                         <label
                           key={goal.value}
@@ -553,8 +568,50 @@ export function GoogleStepObjective() {
                 </div>
               )}
 
+              {/* ---- PMax Retail Catalog Mode (optional) ---- */}
+              {supportsCatalogMode && (
+                <div className="mb-6 rounded-xl border border-border bg-card p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                        <Store className="size-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-foreground">
+                            Retail catalog mode (PMax)
+                          </p>
+                          <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
+                            Optional
+                          </Badge>
+                        </div>
+                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                          Enable this to run feed-driven Retail Performance Max using Merchant Center products (similar to catalog sales flows).
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={obj.feedEnabled}
+                      onCheckedChange={(checked) =>
+                        updateNested("objective", {
+                          feedEnabled: checked,
+                          ...(!checked && {
+                            merchantCenterConnected: false,
+                            merchantCenterId: "",
+                            feedId: "",
+                          }),
+                        })
+                      }
+                    />
+                  </div>
+                  <p className="mt-3 text-[11px] text-muted-foreground">
+                    Off: standard PMax. On: Retail PMax with product feed signals.
+                  </p>
+                </div>
+              )}
+
               {/* ---- Merchant Center Connection (Shopping / PMax with feed) ---- */}
-              {needsMerchantCenter && (
+              {requiresCatalogConnection && (
                 <div className="mb-6 rounded-xl border border-border bg-card p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
@@ -571,7 +628,7 @@ export function GoogleStepObjective() {
                           </Badge>
                         </div>
                         <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                          Connect your product feed to show product listings in Google Shopping and Search.
+                          Connect your product feed to enable catalog-driven delivery.
                         </p>
                       </div>
                     </div>
@@ -603,7 +660,7 @@ export function GoogleStepObjective() {
                     <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
                       <AlertCircle className="size-3.5 shrink-0 text-amber-600" />
                       <p className="text-xs text-amber-700">
-                        Merchant Center is required for Shopping campaigns. Enable the connection above to continue.
+                        Merchant Center is required for {obj.objective === "SHOPPING" ? "Shopping" : "Retail PMax"} when catalog mode is active.
                       </p>
                     </div>
                   )}

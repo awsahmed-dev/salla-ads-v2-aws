@@ -4,7 +4,7 @@ import { useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Upload, Trash2 } from "lucide-react";
-import { MediaLibrarySheet } from "@/components/shared/media-library-sheet";
+import { MediaLibrarySheet, type MediaLibraryContext } from "@/components/shared/media-library-sheet";
 
 /**
  * Reusable media upload drop zone with preview support.
@@ -25,6 +25,8 @@ export function UploadZone({
   onClear,
   compact,
   enableLibrary = true,
+  libraryContext,
+  multiSelect = false,
 }: {
   accept: string;
   label: string;
@@ -36,6 +38,8 @@ export function UploadZone({
   onClear?: () => void;
   compact?: boolean;
   enableLibrary?: boolean;
+  libraryContext?: MediaLibraryContext;
+  multiSelect?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -43,9 +47,14 @@ export function UploadZone({
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
-      if (files?.[0]) onFile(files[0]);
+      if (!files?.length) return;
+      if (multiSelect) {
+        Array.from(files).forEach((file) => onFile(file));
+        return;
+      }
+      onFile(files[0]);
     },
-    [onFile]
+    [onFile, multiSelect]
   );
 
   const handleMediaSelect = useCallback(
@@ -97,13 +106,15 @@ export function UploadZone({
             <Button size="sm" variant="secondary" className="h-6 px-2 text-xs" onClick={openAction}>Replace</Button>
             {onClear && <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={onClear}>Remove</Button>}
           </div>
-          <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+          <input ref={inputRef} type="file" accept={accept} multiple={multiSelect} className="hidden" onChange={(e) => handleFiles(e.target.files)} />
           {enableLibrary && (
             <MediaLibrarySheet
               open={sheetOpen}
               onOpenChange={setSheetOpen}
               onSelect={handleMediaSelect}
               accept={accept}
+              context={libraryContext}
+              multiSelect={multiSelect}
             />
           )}
         </div>
@@ -146,13 +157,15 @@ export function UploadZone({
             <Trash2 className="size-4" />
           </button>
         )}
-        <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+        <input ref={inputRef} type="file" accept={accept} multiple={multiSelect} className="hidden" onChange={(e) => handleFiles(e.target.files)} />
         {enableLibrary && (
           <MediaLibrarySheet
             open={sheetOpen}
             onOpenChange={setSheetOpen}
             onSelect={handleMediaSelect}
             accept={accept}
+            context={libraryContext}
+            multiSelect={multiSelect}
           />
         )}
       </div>
@@ -177,7 +190,7 @@ export function UploadZone({
         <Upload className={cn("text-muted-foreground", compact ? "size-4" : "size-5")} />
         <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-xs")}>{label}</span>
         <span className={cn("text-center text-muted-foreground", compact ? "text-[8px]" : "text-xs")}>{sublabel}</span>
-        <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+        <input ref={inputRef} type="file" accept={accept} multiple={multiSelect} className="hidden" onChange={(e) => handleFiles(e.target.files)} />
       </button>
       {enableLibrary && (
         <MediaLibrarySheet
@@ -185,6 +198,8 @@ export function UploadZone({
           onOpenChange={setSheetOpen}
           onSelect={handleMediaSelect}
           accept={accept}
+          context={libraryContext}
+          multiSelect={multiSelect}
         />
       )}
     </>

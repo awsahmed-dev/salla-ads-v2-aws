@@ -68,7 +68,7 @@ export function BidStrategyCard({
       </div>
 
       {billingContext && billingContext.length > 0 && (
-        <div className="mb-4 grid grid-cols-2 gap-3">
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           {billingContext.map((ctx) => (
             <div
               key={ctx.label}

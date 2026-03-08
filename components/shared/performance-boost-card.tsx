@@ -153,7 +153,7 @@ export function PerformanceBoostCard({
       {/* Feature grid */}
       <div
         className={cn(
-          "mt-4 grid grid-cols-3 gap-2 transition-all",
+          "mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 transition-all",
           enabled ? "opacity-100" : "opacity-60"
         )}
       >

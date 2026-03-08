@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, type ElementType } from "react";
 import { useGoogleCampaign } from "@/lib/google/campaign-context";
-import { OBJECTIVE_CONFIGS, type GoogleAssetGroup, type GoogleCreativeAsset, type ProductGroupNode, type ProductDimensionType, type DemandGenAd, type DemandGenAdGroup, createDemandGenAd, createDemandGenAdGroup, type GoogleSearchAd, type SearchAdGroup, type RSAHeadline, type RSADescription, type HeadlinePinPosition, type DescriptionPinPosition, type SearchSitelinkAsset, type SearchCalloutAsset, type SearchStructuredSnippet, STRUCTURED_SNIPPET_HEADERS, createSearchAd, createSearchAdGroup, type DisplayAdGroup, type GoogleDisplayAd, createDisplayAd, createDisplayAdGroup, type GoogleAppAd, createAppAd, type DemandGenAdAutomationType, type AssetAutomationStatus } from "@/lib/google/campaign-types";
+import { OBJECTIVE_CONFIGS, type GoogleAssetGroup, type GoogleCreativeAsset, type ProductGroupNode, type ProductDimensionType, type RetailListingMode, type DemandGenAd, type DemandGenAdGroup, createDemandGenAd, createDemandGenAdGroup, type GoogleSearchAd, type SearchAdGroup, type RSAHeadline, type RSADescription, type HeadlinePinPosition, type DescriptionPinPosition, type SearchSitelinkAsset, type SearchCalloutAsset, type SearchStructuredSnippet, STRUCTURED_SNIPPET_HEADERS, createSearchAd, createSearchAdGroup, type DisplayAdGroup, type GoogleDisplayAd, createDisplayAd, createDisplayAdGroup, type GoogleAppAd, createAppAd, type DemandGenAdAutomationType, type AssetAutomationStatus } from "@/lib/google/campaign-types";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -19,6 +19,21 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import {
   Tooltip,
   TooltipContent,
@@ -27,10 +42,12 @@ import {
 } from "@/components/ui/tooltip";
 import {
   Plus,
+  Upload,
   Trash2,
   X,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Image as ImageIcon,
   Video,
   Type,
@@ -78,7 +95,21 @@ import {
   ListChecks,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/section-card";
+import { ObjectiveExplainer } from "@/components/shared/objective-explainer";
 import { InfoTip } from "@/components/shared/info-tip";
+import { UploadZone } from "@/components/shared/upload-zone";
+import { ProductPickerDialog, type SallaProduct } from "@/components/shared/product-picker";
+import {
+  fetchBestSellers,
+  fetchNewArrivals,
+  fetchOnSale,
+  getCategories,
+  getStoreInfo,
+  lookupProductByUrl,
+  PREVIEW_PRODUCTS,
+  formatSAR,
+  type SallaStoreInfo,
+} from "@/lib/salla/store-api";
 
 /* ================================================================== */
 /*  Constants -- Asset Requirements per Google Ads API                 */
@@ -92,8 +123,8 @@ const ASSET_LIMITS = {
   squareImages: { min: 1, max: 20, note: "Square 1:1 (min 300x300)" },
   portraitImages: { min: 0, max: 20, note: "Portrait 4:5 (min 480x600)" },
   logos: { min: 1, max: 5, note: "Square 1:1 (min 128x128)" },
-  landscapeLogos: { min: 0, max: 5, note: "Landscape 4:1 (min 512x128)" },
-  videos: { min: 0, max: 5, note: "YouTube video URL" },
+  landscapeLogos: { min: 0, max: 20, note: "Landscape 4:1 (min 512x128)" },
+  videos: { min: 0, max: 15, note: ">=10s • 16:9, 1:1, or 9:16" },
   businessName: { min: 1, max: 1, charLimit: 25 },
 };
 
@@ -137,6 +168,94 @@ function newAssetGroup(): GoogleAssetGroup {
     displayPath1: "",
     displayPath2: "",
   };
+}
+
+const RETAIL_LISTING_DIMENSIONS: Record<RetailListingMode, ProductDimensionType> = {
+  ALL: "PRODUCT_CATEGORY",
+  CATEGORY: "PRODUCT_CATEGORY",
+  BRAND: "PRODUCT_BRAND",
+  CUSTOM_LABEL: "PRODUCT_CUSTOM_ATTRIBUTE_0",
+};
+
+function toListingId(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "value";
+  return trimmed.toLowerCase().replace(/\s+/g, "-");
+}
+
+function buildRetailListingTree(mode: RetailListingMode, values: string[]): ProductGroupNode | null {
+  const dimensionType = RETAIL_LISTING_DIMENSIONS[mode];
+  if (mode === "ALL") {
+    return {
+      id: "pmax-listing-all",
+      dimensionType,
+      dimensionValue: "ALL_PRODUCTS",
+      type: "UNIT_INCLUDED",
+      children: [],
+    };
+  }
+
+  const normalized = values.map((v) => v.trim()).filter(Boolean);
+  if (normalized.length === 0) return null;
+  const children: ProductGroupNode[] = normalized.map((value) => ({
+    id: `pmax-${mode.toLowerCase()}-${toListingId(value)}`,
+    dimensionType,
+    dimensionValue: value,
+    type: "UNIT_INCLUDED",
+    children: [],
+  }));
+
+  children.push({
+    id: `pmax-${mode.toLowerCase()}-other`,
+    dimensionType,
+    dimensionValue: "ALL_OTHER",
+    type: "UNIT_INCLUDED",
+    children: [],
+  });
+
+  return {
+    id: `pmax-${mode.toLowerCase()}-root`,
+    dimensionType,
+    dimensionValue: "ROOT",
+    type: "SUBDIVISION",
+    children,
+  };
+}
+
+const VIDEO_REQUIREMENTS = {
+  minDurationSec: 10,
+  allowedRatios: [16 / 9, 1, 9 / 16],
+  ratioTolerance: 0.05,
+};
+
+function isAllowedVideoRatio(width: number, height: number) {
+  if (!width || !height) return false;
+  const ratio = width / height;
+  return VIDEO_REQUIREMENTS.allowedRatios.some(
+    (target) => Math.abs(ratio - target) <= VIDEO_REQUIREMENTS.ratioTolerance
+  );
+}
+
+function readVideoMetadata(file: File): Promise<{ duration: number; width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    const cleanup = () => URL.revokeObjectURL(url);
+
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      cleanup();
+      resolve({ duration, width, height });
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("metadata"));
+    };
+    video.src = url;
+  });
 }
 
 /** Calculate Ad Strength score (0-100) mimicking Google's meter */
@@ -188,6 +307,25 @@ function calcAdStrength(ag: GoogleAssetGroup): { score: number; label: string; c
   if (score >= 60) return { score, label: "Good", color: "text-primary" };
   if (score >= 40) return { score, label: "Average", color: "text-amber-600" };
   return { score, label: "Poor", color: "text-destructive" };
+}
+
+function ReadinessRing({ percent, size = 44, stroke = 4 }: { percent: number; size?: number; stroke?: number }) {
+  const safe = Math.max(0, Math.min(100, percent));
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (safe / 100) * circ;
+  const color =
+    safe >= 100 ? "#10b981" :
+    safe >= 70 ? "#3b82f6" :
+    safe >= 40 ? "#f59e0b" :
+    "#ef4444";
+  return (
+    <svg width={size} height={size} className="shrink-0 -rotate-90">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-muted/30" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} className="transition-all duration-500" />
+      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="rotate-90 origin-center fill-foreground text-[10px] font-bold tabular-nums">{safe}%</text>
+    </svg>
+  );
 }
 
 /* ================================================================== */
@@ -2584,6 +2722,15 @@ function DemandGenCreativeEditor() {
                   <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{enabledChannels.length} active</Badge>
                   <InfoTip text="Per-ad-group channel controls. Maps to DemandGenAdGroupSettings.channel_controls.selected_channels in the Google Ads API." />
                 </div>
+                <ObjectiveExplainer
+                  className="mb-3"
+                  highlight={
+                    <>
+                      <span className="font-semibold text-primary">Simple setup:</span> keep YouTube + Discover + Gmail ON, then test Display expansion after baseline performance is stable.
+                    </>
+                  }
+                  secondary="More channels = more reach. Fewer channels = tighter control and easier testing."
+                />
                 <div className="flex flex-wrap gap-1.5">
                   {DG_CHANNEL_DEFS.map((ch) => {
                     const isOn = activeGroup.channelControls[ch.key];
@@ -2605,6 +2752,13 @@ function DemandGenCreativeEditor() {
                       </button>
                     );
                   })}
+                </div>
+                <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {DG_CHANNEL_DEFS.map((ch) => (
+                    <p key={`${ch.key}-desc`} className="text-[10px] text-muted-foreground">
+                      <span className="font-medium text-foreground">{ch.label}:</span> {ch.desc}
+                    </p>
+                  ))}
                 </div>
                 {!Object.values(activeGroup.channelControls).some(Boolean) && (
                   <div className="mt-2 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5">
@@ -3283,18 +3437,58 @@ function ShoppingProductGroups() {
 
 export function GoogleStepCreative() {
   const { campaign, setStep, updateNested } = useGoogleCampaign();
+  const budget = campaign.budget;
   const creative = campaign.creative;
   const objConfig = OBJECTIVE_CONFIGS[campaign.objective.objective] ?? OBJECTIVE_CONFIGS.PERFORMANCE_MAX;
   const isPMax = campaign.objective.objective === "PERFORMANCE_MAX";
+  const isRetailPMax = isPMax && campaign.objective.feedEnabled;
   const isShopping = campaign.objective.objective === "SHOPPING";
   const isDemandGen = campaign.objective.objective === "DEMAND_GEN";
 
   const [activeGroupIdx, setActiveGroupIdx] = useState(0);
-  const [previewChannel, setPreviewChannel] = useState<"search" | "display" | "youtube" | "discover">("search");
+  type PreviewChannel = "search" | "display" | "youtube" | "discover" | "gmail" | "shopping";
+  const [previewChannel, setPreviewChannel] = useState<PreviewChannel>("search");
+  const [previewAssetIndex, setPreviewAssetIndex] = useState<Record<PreviewChannel, number>>({
+    search: 0,
+    display: 0,
+    youtube: 0,
+    discover: 0,
+    gmail: 0,
+    shopping: 0,
+  });
+  const [showYoutubeConnect, setShowYoutubeConnect] = useState(false);
+  const [youtubeUrlDraft, setYoutubeUrlDraft] = useState("");
+  const [videoInputMode, setVideoInputMode] = useState<"upload" | "url">("upload");
+  const [activeImageType, setActiveImageType] = useState<"LANDSCAPE" | "SQUARE" | "PORTRAIT">("LANDSCAPE");
+  const [activeLogoType, setActiveLogoType] = useState<"SQUARE" | "LANDSCAPE">("SQUARE");
+  const [textInputMode, setTextInputMode] = useState<"ai" | "manual">("ai");
+  const [aiTextDraft, setAiTextDraft] = useState<{
+    headlines: string[];
+    longHeadlines: string[];
+    descriptions: string[];
+  } | null>(null);
+  const [aiApplyMode, setAiApplyMode] = useState<"replace" | "append">("replace");
+  const [aiTextLoading, setAiTextLoading] = useState(false);
+  const [showAiAdvanced, setShowAiAdvanced] = useState(false);
+  const [linkType, setLinkType] = useState<"store" | "product" | "category" | "custom">("store");
+  const [storeInfo, setStoreInfo] = useState<SallaStoreInfo | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedProduct, setSelectedProduct] = useState<SallaProduct | null>(null);
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [showUrlAdvanced, setShowUrlAdvanced] = useState(false);
+  const [listingCategorySearch, setListingCategorySearch] = useState("");
+  const [listingValueDraft, setListingValueDraft] = useState("");
+  const [videoValidationError, setVideoValidationError] = useState<string | null>(null);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
 
   const isSearch = campaign.objective.objective === "SEARCH";
   const isDisplay = campaign.objective.objective === "DISPLAY";
   const isApp = campaign.objective.objective === "APP";
+  const retailListingMode: RetailListingMode = creative.retailListingMode ?? "ALL";
+  const retailListingValues = creative.retailListingValues ?? [];
 
   /* For Search, render the RSA editor */
   if (isSearch) return <SearchCreativeEditor />;
@@ -3311,9 +3505,57 @@ export function GoogleStepCreative() {
   /* For Shopping, render the product groups UI instead of asset groups */
   if (isShopping) return <ShoppingProductGroups />;
 
-  /* Ensure at least 1 asset group exists */
+  /* Ensure PMax keeps exactly one asset group (matches payload mapper) */
+  useEffect(() => {
+    if (creative.assetGroups.length === 0) {
+      updateNested("creative", { assetGroups: [newAssetGroup()] });
+      return;
+    }
+    if (creative.assetGroups.length > 1) {
+      updateNested("creative", { assetGroups: [creative.assetGroups[0]] });
+    }
+    if (activeGroupIdx !== 0) setActiveGroupIdx(0);
+  }, [activeGroupIdx, creative.assetGroups, updateNested]);
+
+  /* Keep a single active PMax group */
   const assetGroups = creative.assetGroups.length > 0 ? creative.assetGroups : [newAssetGroup()];
   const currentGroup = assetGroups[activeGroupIdx] ?? assetGroups[0];
+  const filteredCategories = useMemo(() => {
+    const query = categorySearch.trim().toLowerCase();
+    if (!query) return categories;
+    return categories.filter((cat) => cat.toLowerCase().includes(query));
+  }, [categories, categorySearch]);
+
+  const filteredListingCategories = useMemo(() => {
+    const query = listingCategorySearch.trim().toLowerCase();
+    if (!query) return categories;
+    return categories.filter((cat) => cat.toLowerCase().includes(query));
+  }, [categories, listingCategorySearch]);
+
+  const listingGroupTree = useMemo(
+    () => buildRetailListingTree(retailListingMode, retailListingValues),
+    [retailListingMode, retailListingValues]
+  );
+
+  useEffect(() => {
+    getStoreInfo().then(setStoreInfo).catch(() => {});
+    getCategories().then(setCategories).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (showCategoryPicker) setCategorySearch("");
+  }, [showCategoryPicker]);
+
+  useEffect(() => {
+    if (!isRetailPMax) return;
+    const current = creative.productGroupRoot;
+    if (!listingGroupTree) {
+      if (current) updateNested("creative", { productGroupRoot: null });
+      return;
+    }
+    if (JSON.stringify(current) === JSON.stringify(listingGroupTree)) return;
+    updateNested("creative", { productGroupRoot: listingGroupTree });
+  }, [isRetailPMax, listingGroupTree, creative.productGroupRoot, updateNested]);
 
   /* Update a single group in the array */
   const updateGroup = useCallback((groupId: string, partial: Partial<GoogleAssetGroup>) => {
@@ -3323,20 +3565,36 @@ export function GoogleStepCreative() {
     updateNested("creative", { assetGroups: groups });
   }, [assetGroups, updateNested]);
 
-  /* Add group */
-  const addGroup = () => {
-    const groups = [...assetGroups, newAssetGroup()];
-    updateNested("creative", { assetGroups: groups });
-    setActiveGroupIdx(groups.length - 1);
-  };
+  const setRetailListingMode = useCallback((mode: RetailListingMode) => {
+    updateNested("creative", {
+      retailListingMode: mode,
+      retailListingValues: mode === retailListingMode ? retailListingValues : [],
+    });
+    setListingValueDraft("");
+  }, [retailListingMode, retailListingValues, updateNested]);
 
-  /* Remove group */
-  const removeGroup = (idx: number) => {
-    if (assetGroups.length <= 1) return;
-    const groups = assetGroups.filter((_, i) => i !== idx);
-    updateNested("creative", { assetGroups: groups });
-    setActiveGroupIdx(Math.min(activeGroupIdx, groups.length - 1));
-  };
+  const toggleRetailListingValue = useCallback((value: string) => {
+    const normalized = value.trim();
+    if (!normalized) return;
+    const exists = retailListingValues.includes(normalized);
+    const next = exists
+      ? retailListingValues.filter((v) => v !== normalized)
+      : [...retailListingValues, normalized];
+    updateNested("creative", { retailListingValues: next });
+  }, [retailListingValues, updateNested]);
+
+  const addRetailListingValues = useCallback((raw: string) => {
+    const entries = raw
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+    if (entries.length === 0) return;
+    const merged = [...retailListingValues];
+    entries.forEach((entry) => {
+      if (!merged.includes(entry)) merged.push(entry);
+    });
+    updateNested("creative", { retailListingValues: merged });
+  }, [retailListingValues, updateNested]);
 
   /* Add text asset to a list */
   const addTextAsset = (field: "headlines" | "longHeadlines" | "descriptions", type: GoogleCreativeAsset["type"]) => {
@@ -3356,21 +3614,38 @@ export function GoogleStepCreative() {
     updateGroup(currentGroup.id, { [field]: list });
   };
 
-  /* Add placeholder image */
-  const addImageAsset = (field: "images" | "logos") => {
-    const asset: GoogleCreativeAsset = { id: makeId(), type: field === "logos" ? "LOGO" : "IMAGE", url: "" };
-    updateGroup(currentGroup.id, { [field]: [...currentGroup[field], asset] });
+  const addImageUpload = (imageType: "LANDSCAPE" | "SQUARE" | "PORTRAIT", file: File) => {
+    const asset: GoogleCreativeAsset = {
+      id: makeId(),
+      type: "IMAGE",
+      file,
+      url: "",
+      pmaxImageType: imageType,
+    };
+    updateGroup(currentGroup.id, { images: [...currentGroup.images, asset] });
+  };
+
+  const addLogoUpload = (logoType: "SQUARE" | "LANDSCAPE", file: File) => {
+    setLogoUploadError(null);
+    const logoLimit = logoType === "LANDSCAPE" ? ASSET_LIMITS.landscapeLogos.max : ASSET_LIMITS.logos.max;
+    const logoCount = currentGroup.logos.filter((logo) => (logo.pmaxImageType ?? "SQUARE") === logoType).length;
+    if (logoCount >= logoLimit) {
+      setLogoUploadError(`You can add up to ${logoLimit} ${logoType.toLowerCase()} logo${logoLimit !== 1 ? "s" : ""}.`);
+      return;
+    }
+    const asset: GoogleCreativeAsset = {
+      id: makeId(),
+      type: "LOGO",
+      file,
+      url: "",
+      pmaxImageType: logoType,
+    };
+    updateGroup(currentGroup.id, { logos: [...currentGroup.logos, asset] });
   };
 
   /* Remove image */
   const removeImageAsset = (field: "images" | "logos", assetId: string) => {
     updateGroup(currentGroup.id, { [field]: currentGroup[field].filter((a) => a.id !== assetId) });
-  };
-
-  /* Add video */
-  const addVideoAsset = () => {
-    const asset: GoogleCreativeAsset = { id: makeId(), type: "YOUTUBE_VIDEO", youtubeVideoId: "", url: "" };
-    updateGroup(currentGroup.id, { videos: [...currentGroup.videos, asset] });
   };
 
   const updateVideoAsset = (assetId: string, url: string) => {
@@ -3382,14 +3657,377 @@ export function GoogleStepCreative() {
     updateGroup(currentGroup.id, { videos: list });
   };
 
+  const addVideoUpload = async (file: File) => {
+    setVideoValidationError(null);
+    if (currentGroup.videos.length >= ASSET_LIMITS.videos.max) {
+      setVideoValidationError(`You can add up to ${ASSET_LIMITS.videos.max} videos.`);
+      return;
+    }
+    try {
+      const meta = await readVideoMetadata(file);
+      if (!Number.isFinite(meta.duration) || meta.duration < VIDEO_REQUIREMENTS.minDurationSec) {
+        setVideoValidationError(`Video must be at least ${VIDEO_REQUIREMENTS.minDurationSec} seconds.`);
+        return;
+      }
+      if (!isAllowedVideoRatio(meta.width, meta.height)) {
+        setVideoValidationError("Video must be 16:9, 1:1, or 9:16.");
+        return;
+      }
+    } catch {
+      setVideoValidationError("We couldn't read this video's details. Try another file.");
+      return;
+    }
+    const asset: GoogleCreativeAsset = { id: makeId(), type: "YOUTUBE_VIDEO", file, url: "" };
+    updateGroup(currentGroup.id, { videos: [...currentGroup.videos, asset] });
+  };
+
+  const addVideoUrl = () => {
+    if (currentGroup.videos.length >= ASSET_LIMITS.videos.max) {
+      setVideoValidationError(`You can add up to ${ASSET_LIMITS.videos.max} videos.`);
+      return;
+    }
+    const url = youtubeUrlDraft.trim();
+    if (!url) return;
+    setVideoValidationError(null);
+    const idMatch = url.match(/(?:v=|\/embed\/|\.be\/)([a-zA-Z0-9_-]{11})/);
+    const vId = idMatch ? idMatch[1] : url;
+    const asset: GoogleCreativeAsset = { id: makeId(), type: "YOUTUBE_VIDEO", url, youtubeVideoId: vId };
+    updateGroup(currentGroup.id, { videos: [...currentGroup.videos, asset] });
+    setYoutubeUrlDraft("");
+  };
+
   const removeVideoAsset = (assetId: string) => {
     updateGroup(currentGroup.id, { videos: currentGroup.videos.filter((v) => v.id !== assetId) });
   };
 
-  /* Auto-initialize if needed */
-  if (creative.assetGroups.length === 0) {
-    updateNested("creative", { assetGroups: [newAssetGroup()] });
-  }
+  const clampText = (value: string, limit: number) => {
+    const trimmed = value.trim().replace(/\s+/g, " ");
+    if (trimmed.length <= limit) return trimmed;
+    const slice = trimmed.slice(0, limit);
+    const lastSpace = slice.lastIndexOf(" ");
+    if (lastSpace > 10) {
+      return slice.slice(0, lastSpace).trim();
+    }
+    return slice.trim();
+  };
+
+  const getFinalUrlHost = (url: string) => {
+    try {
+      return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+      return "";
+    }
+  };
+
+  const getDisplayPathSuggestions = (url: string) => {
+    try {
+      const { pathname } = new URL(url);
+      const parts = pathname
+        .split("/")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) =>
+          part
+            .replace(/[-_]/g, " ")
+            .replace(/\s+/g, "-")
+            .slice(0, 15)
+        );
+      return {
+        path1: parts[0] ?? "",
+        path2: parts[1] ?? "",
+      };
+    } catch {
+      return { path1: "", path2: "" };
+    }
+  };
+
+  const ensureHttps = (value: string) => {
+    if (!value) return "";
+    return value.startsWith("http") ? value : `https://${value}`;
+  };
+
+  const getStoreOrigin = () => {
+    if (storeInfo?.domain) return ensureHttps(storeInfo.domain);
+    try {
+      return new URL(currentGroup.finalUrl).origin;
+    } catch {
+      return "";
+    }
+  };
+
+  const formatCategoryPath = (value: string) =>
+    encodeURIComponent(value.trim().toLowerCase().replace(/\s+/g, "-"));
+
+  const applyFinalUrl = (url: string) => {
+    if (!url) return;
+    updateGroup(currentGroup.id, { finalUrl: url });
+    if (!currentGroup.displayPath1 && !currentGroup.displayPath2) {
+      const suggestion = getDisplayPathSuggestions(url);
+      if (suggestion.path1 || suggestion.path2) {
+        updateGroup(currentGroup.id, {
+          displayPath1: suggestion.path1,
+          displayPath2: suggestion.path2,
+        });
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (linkType !== "store") return;
+    if (currentGroup.finalUrl.trim()) return;
+    const origin = getStoreOrigin();
+    if (origin) applyFinalUrl(origin);
+  }, [linkType, currentGroup.finalUrl, storeInfo?.domain]);
+
+  const mergeTextAssets = (
+    existing: GoogleCreativeAsset[],
+    type: GoogleCreativeAsset["type"],
+    incoming: string[],
+    max: number,
+    charLimit: number
+  ) => {
+    const normalized = (text: string) => text.trim().toLowerCase();
+    const used = new Set(existing.map((a) => a.text?.trim()).filter(Boolean).map((t) => normalized(t as string)));
+    const queue = incoming
+      .map((text) => clampText(text, charLimit))
+      .filter(Boolean)
+      .filter((text) => !used.has(normalized(text)));
+
+    const updated = existing.map((a) => ({ ...a }));
+    let idx = 0;
+
+    for (const asset of updated) {
+      if (idx >= queue.length) break;
+      if (!asset.text || !asset.text.trim()) {
+        asset.text = queue[idx];
+        used.add(normalized(queue[idx]));
+        idx += 1;
+      }
+    }
+
+    while (idx < queue.length && updated.length < max) {
+      updated.push(newTextAsset(type, queue[idx]));
+      used.add(normalized(queue[idx]));
+      idx += 1;
+    }
+
+    return updated;
+  };
+
+  const buildAiTextDraft = async (fillAll = false) => {
+    if (aiTextLoading) return;
+    setAiTextLoading(true);
+    try {
+      const [storeInfo, bestSellers, newArrivals, onSale, urlProduct] = await Promise.all([
+        getStoreInfo(),
+        fetchBestSellers(4),
+        fetchNewArrivals(4),
+        fetchOnSale(4),
+        currentGroup.finalUrl ? lookupProductByUrl(currentGroup.finalUrl) : Promise.resolve(null),
+      ]);
+
+      const storeName =
+        storeInfo?.name ||
+        currentGroup.businessName.trim() ||
+        campaign.objective.campaignName.trim() ||
+        "Your Store";
+      const host = getFinalUrlHost(currentGroup.finalUrl) || storeInfo?.domain || "";
+      const pathHint = [currentGroup.displayPath1, currentGroup.displayPath2]
+        .filter(Boolean)
+        .join(" ")
+        .replace(/[-_]/g, " ")
+        .trim();
+      const objectiveLabel =
+        OBJECTIVE_CONFIGS[campaign.objective.objective]?.label ?? "Performance Max";
+
+      const productPool = [
+        ...(urlProduct ? [urlProduct] : []),
+        ...bestSellers,
+        ...newArrivals,
+        ...onSale,
+      ];
+      const uniqueProductNames: string[] = [];
+      const uniqueCategories: string[] = [];
+      const seenNames = new Set<string>();
+      const seenCategories = new Set<string>();
+
+      productPool.forEach((p) => {
+        if (!p?.name) return;
+        const nameKey = p.name.toLowerCase();
+        if (!seenNames.has(nameKey)) {
+          uniqueProductNames.push(p.name);
+          seenNames.add(nameKey);
+        }
+        if (p.category && !seenCategories.has(p.category.toLowerCase())) {
+          uniqueCategories.push(p.category);
+          seenCategories.add(p.category.toLowerCase());
+        }
+      });
+
+      const primaryProduct = uniqueProductNames[0];
+      const secondaryProduct = uniqueProductNames[1];
+      const primaryCategory = uniqueCategories[0];
+      const secondaryCategory = uniqueCategories[1];
+
+      const headlinePool = [
+        `${storeName} Official Store`,
+        pathHint ? `Shop ${pathHint} at ${storeName}` : `Shop ${storeName} Online`,
+        primaryProduct ? `Shop ${primaryProduct}` : `Best Sellers at ${storeName}`,
+        secondaryProduct ? `New: ${secondaryProduct}` : `New Arrivals at ${storeName}`,
+        primaryCategory ? `${primaryCategory} Picks at ${storeName}` : `Quality Picks from ${storeName}`,
+        secondaryCategory ? `${secondaryCategory} Favorites` : `Fast Shipping from ${storeName}`,
+        host ? `Visit ${host} Today` : `Limited Deals on ${storeName}`,
+        `Save on Top ${objectiveLabel} Picks`,
+        primaryCategory ? `Top ${primaryCategory} Deals` : `Shop Trusted Products`,
+        `Great Prices from ${storeName}`,
+      ];
+
+      const longHeadlinePool = [
+        primaryProduct
+          ? `Discover ${primaryProduct} and more from ${storeName} — shop online today.`
+          : `Discover ${storeName} top picks and shop exclusive offers online.`,
+        primaryCategory
+          ? `Explore ${primaryCategory} collections from ${storeName} with fast delivery.`
+          : `Everything you love from ${storeName}, delivered fast and securely.`,
+        secondaryCategory
+          ? `Find ${secondaryCategory} favorites and best sellers at ${storeName}.`
+          : `Explore curated collections from ${storeName} and shop with confidence.`,
+      ];
+
+      const descriptionPool = [
+        `Shop trusted products from ${storeName}. Secure checkout and fast delivery.`,
+        primaryCategory
+          ? `Find new ${primaryCategory.toLowerCase()} arrivals, best sellers, and seasonal offers.`
+          : `Find new arrivals, best sellers, and seasonal offers in one place.`,
+        primaryProduct
+          ? `Order ${primaryProduct} online in minutes and track delivery to your door.`
+          : `Order online in minutes and track delivery to your door.`,
+        `Great value, easy returns, and reliable customer support.`,
+      ];
+
+      if (fillAll) {
+        const extraHeadlines: string[] = [];
+        uniqueProductNames.slice(0, 6).forEach((product) => {
+          extraHeadlines.push(`Buy ${product}`);
+          extraHeadlines.push(`Shop ${product}`);
+          extraHeadlines.push(`${product} at ${storeName}`);
+          extraHeadlines.push(`Save on ${product}`);
+        });
+        uniqueCategories.slice(0, 4).forEach((category) => {
+          extraHeadlines.push(`Shop ${category}`);
+          extraHeadlines.push(`Best ${category} Deals`);
+          extraHeadlines.push(`Top ${category} Picks`);
+          extraHeadlines.push(`New ${category} Arrivals`);
+        });
+        extraHeadlines.push(
+          `Official ${storeName} Store`,
+          `Exclusive ${storeName} Offers`,
+          `Secure Checkout at ${storeName}`,
+          `Easy Returns at ${storeName}`
+        );
+        headlinePool.push(...extraHeadlines);
+
+        const extraLongHeadlines: string[] = [];
+        if (primaryProduct) {
+          extraLongHeadlines.push(`Shop ${primaryProduct} and more at ${storeName} with fast delivery.`);
+        }
+        if (secondaryProduct) {
+          extraLongHeadlines.push(`Discover ${secondaryProduct} and fresh arrivals at ${storeName} today.`);
+        }
+        if (primaryCategory) {
+          extraLongHeadlines.push(`Find ${primaryCategory.toLowerCase()} favorites at ${storeName} and checkout securely.`);
+        }
+        if (secondaryCategory) {
+          extraLongHeadlines.push(`Explore ${secondaryCategory.toLowerCase()} picks and seasonal offers at ${storeName}.`);
+        }
+        if (host) {
+          extraLongHeadlines.push(`Visit ${host} to explore ${storeName} collections and shop online.`);
+        }
+        longHeadlinePool.push(...extraLongHeadlines);
+
+        const extraDescriptions: string[] = [];
+        if (primaryCategory) {
+          extraDescriptions.push(`Shop ${primaryCategory.toLowerCase()} essentials with fast delivery and easy returns.`);
+        }
+        if (secondaryCategory) {
+          extraDescriptions.push(`Discover ${secondaryCategory.toLowerCase()} favorites with secure checkout.`);
+        }
+        if (primaryProduct) {
+          extraDescriptions.push(`Get ${primaryProduct} from ${storeName} with reliable delivery.`);
+        }
+        if (secondaryProduct) {
+          extraDescriptions.push(`Browse ${secondaryProduct} and other best sellers today.`);
+        }
+        extraDescriptions.push(`Curated collections, clear pricing, and dependable support.`);
+        descriptionPool.push(...extraDescriptions);
+      }
+
+      const dedupe = (items: string[]) => {
+        const seen = new Set<string>();
+        return items.filter((text) => {
+          const key = text.trim().toLowerCase();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      };
+
+      const headlines = dedupe(headlinePool)
+        .map((text) => clampText(text, ASSET_LIMITS.headlines.charLimit))
+        .filter(Boolean)
+        .slice(0, ASSET_LIMITS.headlines.max);
+
+      const longHeadlines = dedupe(longHeadlinePool)
+        .map((text) => clampText(text, ASSET_LIMITS.longHeadlines.charLimit))
+        .filter(Boolean)
+        .slice(0, ASSET_LIMITS.longHeadlines.max);
+
+      const descriptions = dedupe(descriptionPool)
+        .map((text) => clampText(text, ASSET_LIMITS.descriptions.charLimit))
+        .filter(Boolean)
+        .slice(0, ASSET_LIMITS.descriptions.max);
+
+      setAiTextDraft({ headlines, longHeadlines, descriptions });
+    } finally {
+      setAiTextLoading(false);
+    }
+  };
+
+  const applyAiTextDraft = () => {
+    if (!aiTextDraft) return;
+    if (aiApplyMode === "replace") {
+      updateGroup(currentGroup.id, {
+        headlines: aiTextDraft.headlines.map((text) => newTextAsset("HEADLINE", text)),
+        longHeadlines: aiTextDraft.longHeadlines.map((text) => newTextAsset("LONG_HEADLINE", text)),
+        descriptions: aiTextDraft.descriptions.map((text) => newTextAsset("DESCRIPTION", text)),
+      });
+    } else {
+      updateGroup(currentGroup.id, {
+        headlines: mergeTextAssets(
+          currentGroup.headlines,
+          "HEADLINE",
+          aiTextDraft.headlines,
+          ASSET_LIMITS.headlines.max,
+          ASSET_LIMITS.headlines.charLimit
+        ),
+        longHeadlines: mergeTextAssets(
+          currentGroup.longHeadlines,
+          "LONG_HEADLINE",
+          aiTextDraft.longHeadlines,
+          ASSET_LIMITS.longHeadlines.max,
+          ASSET_LIMITS.longHeadlines.charLimit
+        ),
+        descriptions: mergeTextAssets(
+          currentGroup.descriptions,
+          "DESCRIPTION",
+          aiTextDraft.descriptions,
+          ASSET_LIMITS.descriptions.max,
+          ASSET_LIMITS.descriptions.charLimit
+        ),
+      });
+    }
+    setTextInputMode("manual");
+  };
 
   /* Ad strength */
   const adStrength = calcAdStrength(currentGroup);
@@ -3398,14 +4036,372 @@ export function GoogleStepCreative() {
   const filledHeadlines = currentGroup.headlines.filter((h) => h.text?.trim()).length;
   const filledLongHeadlines = currentGroup.longHeadlines.filter((h) => h.text?.trim()).length;
   const filledDescriptions = currentGroup.descriptions.filter((d) => d.text?.trim()).length;
+  const pmaxLandscapeCount = currentGroup.images.filter(
+    (img) => (img.pmaxImageType ?? "PORTRAIT") === "LANDSCAPE"
+  ).length;
+  const pmaxSquareCount = currentGroup.images.filter(
+    (img) => (img.pmaxImageType ?? "PORTRAIT") === "SQUARE"
+  ).length;
+  const pmaxPortraitCount = currentGroup.images.filter(
+    (img) => (img.pmaxImageType ?? "PORTRAIT") === "PORTRAIT"
+  ).length;
+  const logoSquareCount = currentGroup.logos.filter(
+    (logo) => (logo.pmaxImageType ?? "SQUARE") === "SQUARE"
+  ).length;
+  const logoLandscapeCount = currentGroup.logos.filter(
+    (logo) => (logo.pmaxImageType ?? "SQUARE") === "LANDSCAPE"
+  ).length;
+  const minRequiredImages = isRetailPMax ? 0 : 2;
+  const minRequiredLogos = isRetailPMax ? 0 : (budget.brandGuidelinesEnabled ? 0 : 1);
+  const requireBusinessName = !isRetailPMax && !budget.brandGuidelinesEnabled;
+  const hasValidFinalUrl = (url: string) => /^https?:\/\/\S+\.\S+/i.test(url.trim());
+  const imageRequirementsMet = pmaxLandscapeCount >= 1 && pmaxSquareCount >= 1;
+  const logoRequirementMet = minRequiredLogos === 0 ? true : logoSquareCount >= 1;
+  const imageTypeSpecs = [
+    {
+      key: "LANDSCAPE" as const,
+      label: "Landscape (1.91:1)",
+      shortLabel: "Landscape",
+      note: "Min 600x314 • Rec 1200x628",
+      required: true,
+      count: pmaxLandscapeCount,
+    },
+    {
+      key: "SQUARE" as const,
+      label: "Square (1:1)",
+      shortLabel: "Square",
+      note: "Min 300x300 • Rec 1200x1200",
+      required: true,
+      count: pmaxSquareCount,
+    },
+    {
+      key: "PORTRAIT" as const,
+      label: "Portrait (4:5)",
+      shortLabel: "Portrait",
+      note: "Min 480x600 • Rec 960x1200",
+      required: false,
+      count: pmaxPortraitCount,
+    },
+  ];
+  const logoTypeSpecs = [
+    {
+      key: "SQUARE" as const,
+      label: "Square logo (1:1)",
+      shortLabel: "Square logo",
+      note: `Min 128x128 • Rec 1200x1200 • Max ${ASSET_LIMITS.logos.max}`,
+      required: true,
+      count: logoSquareCount,
+    },
+    {
+      key: "LANDSCAPE" as const,
+      label: "Landscape logo (4:1)",
+      shortLabel: "Landscape logo",
+      note: `Min 512x128 • Rec 1200x300 • Max ${ASSET_LIMITS.landscapeLogos.max}`,
+      required: false,
+      count: logoLandscapeCount,
+    },
+  ];
+  const activeImageSpec = imageTypeSpecs.find((spec) => spec.key === activeImageType) ?? imageTypeSpecs[0];
+  const activeLogoSpec = logoTypeSpecs.find((spec) => spec.key === activeLogoType) ?? logoTypeSpecs[0];
+  const activeImageRequired = !isRetailPMax && activeImageSpec.required;
+  const activeLogoRequired = !isRetailPMax && !budget.brandGuidelinesEnabled && activeLogoSpec.required;
+  const retailAssetsLinked = isRetailPMax && (currentGroup.images.length + currentGroup.logos.length + currentGroup.videos.length > 0);
+  const listingValuesMissing = isRetailPMax && retailListingMode !== "ALL" && retailListingValues.length === 0;
+  const listingValueLabel =
+    retailListingMode === "CATEGORY"
+      ? "category"
+      : retailListingMode === "BRAND"
+        ? "brand"
+        : "custom label";
+  const imageLibraryContext =
+    activeImageSpec.key === "LANDSCAPE"
+      ? "IMAGE_LANDSCAPE"
+      : activeImageSpec.key === "SQUARE"
+        ? "IMAGE_SQUARE"
+        : "IMAGE_PORTRAIT";
+  const logoLibraryContext = activeLogoSpec.key === "LANDSCAPE" ? "LOGO_LANDSCAPE" : "LOGO_SQUARE";
+  const hasListingGroup = !isRetailPMax || !!listingGroupTree;
+
+  const blockers = [
+    ...(isRetailPMax
+      ? [{ label: "Listing groups configured", ok: hasListingGroup, step: "Catalog" }]
+      : []),
+    { label: `Add at least ${isRetailPMax ? 1 : 3} headlines`, ok: filledHeadlines >= (isRetailPMax ? 1 : 3), step: "Text assets" },
+    { label: "Add at least 1 long headline", ok: filledLongHeadlines >= 1, step: "Text assets" },
+    { label: `Add at least ${isRetailPMax ? 1 : 2} descriptions`, ok: filledDescriptions >= (isRetailPMax ? 1 : 2), step: "Text assets" },
+    ...(!isRetailPMax ? [
+      { label: "Add at least 1 landscape image", ok: pmaxLandscapeCount >= 1, step: "Media assets" },
+      { label: "Add at least 1 square image", ok: pmaxSquareCount >= 1, step: "Media assets" },
+      {
+        label: budget.brandGuidelinesEnabled ? "Brand guidelines enabled (business name optional here)" : "Add at least 1 logo",
+        ok: currentGroup.logos.length >= minRequiredLogos,
+        step: "Media assets",
+      },
+    ] : []),
+    { label: "Business name is required", ok: requireBusinessName ? currentGroup.businessName.trim().length > 0 : true, step: "Basics" },
+    { label: "Final URL must be valid (https://...)", ok: hasValidFinalUrl(currentGroup.finalUrl), step: "Basics" },
+  ];
+
+  const previewTabs: { key: PreviewChannel; label: string; icon: ElementType; color: string }[] = [
+    { key: "search", label: "Search", icon: Search, color: "text-blue-600" },
+    { key: "display", label: "Display", icon: Monitor, color: "text-emerald-600" },
+    { key: "youtube", label: "YouTube", icon: Youtube, color: "text-red-600" },
+    { key: "discover", label: "Discover", icon: Sparkles, color: "text-amber-500" },
+    { key: "gmail", label: "Gmail", icon: Mail, color: "text-pink-500" },
+    ...(isRetailPMax ? [{ key: "shopping", label: "Shopping", icon: ShoppingCart, color: "text-slate-600" } as const] : []),
+  ];
+  const activePreviewLabel = previewTabs.find((tab) => tab.key === previewChannel)?.label ?? "Search";
+  const previewIndex = Math.max(0, previewTabs.findIndex((tab) => tab.key === previewChannel));
+  const previewLockItems = isRetailPMax
+    ? [
+        ...(campaign.objective.merchantCenterConnected ? [] : ["Connect Merchant Center feed"]),
+        "1 shopping product",
+      ]
+    : [];
+  const previewLocked = previewLockItems.length > 0;
+  const goToPreview = (delta: number) => {
+    const nextIdx = (previewIndex + delta + previewTabs.length) % previewTabs.length;
+    setPreviewChannel(previewTabs[nextIdx].key);
+  };
+  useEffect(() => {
+    if (!isRetailPMax && previewChannel === "shopping") {
+      setPreviewChannel("search");
+    }
+  }, [isRetailPMax, previewChannel]);
+  const requiredTotal = blockers.length;
+  const requiredDone = blockers.filter((b) => b.ok).length;
+  const requiredRemaining = Math.max(0, requiredTotal - requiredDone);
+  const readinessPercent = requiredTotal > 0 ? Math.round((requiredDone / requiredTotal) * 100) : 0;
+  const readinessStatus = requiredRemaining === 0 ? "Ready" : "Incomplete";
+  const youtubeUploadDestination = creative.youtubeUploadDestination ?? "GOOGLE_MANAGED";
+  const youtubeChannelId = creative.youtubeChannelId ?? "";
+  const youtubeChannelName = creative.youtubeChannelName ?? "";
+  const youtubeChannelConnected = youtubeUploadDestination === "BRAND" && youtubeChannelId.trim().length > 0;
+  const uploadedVideoCount = currentGroup.videos.filter((v) => !!v.file).length;
+  const linkedVideoCount = currentGroup.videos.filter((v) => !v.file && !!v.url?.trim()).length;
+  const totalVideoCount = uploadedVideoCount + linkedVideoCount;
+  const uniqueHeadlineCount = new Set(
+    currentGroup.headlines.map((h) => h.text?.trim().toLowerCase()).filter(Boolean)
+  ).size;
+
+  const previewUrls = useMemo(() => {
+    const map = new Map<string, string>();
+    [...currentGroup.images, ...currentGroup.logos, ...currentGroup.videos].forEach((asset) => {
+      if (asset.url) {
+        map.set(asset.id, asset.url);
+        return;
+      }
+      if (asset.file instanceof Blob) {
+        map.set(asset.id, URL.createObjectURL(asset.file));
+      }
+    });
+    return map;
+  }, [currentGroup.images, currentGroup.logos, currentGroup.videos]);
+
+  useEffect(() => {
+    return () => {
+      previewUrls.forEach((url) => {
+        if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+      });
+    };
+  }, [previewUrls]);
+
+  const getPreviewUrl = useCallback((asset?: GoogleCreativeAsset) => {
+    if (!asset) return undefined;
+    return previewUrls.get(asset.id);
+  }, [previewUrls]);
+
+  const formatBytes = useCallback((bytes?: number) => {
+    if (!bytes || Number.isNaN(bytes)) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }, []);
+
+  const headlineTexts = currentGroup.headlines.map((h) => h.text?.trim()).filter(Boolean) as string[];
+  const descriptionTexts = currentGroup.descriptions.map((d) => d.text?.trim()).filter(Boolean) as string[];
+  const longHeadlineTexts = currentGroup.longHeadlines.map((h) => h.text?.trim()).filter(Boolean) as string[];
+  const landscapeImages = currentGroup.images.filter((img) => (img.pmaxImageType ?? "PORTRAIT") === "LANDSCAPE");
+  const squareImages = currentGroup.images.filter((img) => (img.pmaxImageType ?? "PORTRAIT") === "SQUARE");
+  const displayImages = squareImages.length > 0 ? squareImages : currentGroup.images;
+  const discoverImages = landscapeImages.length > 0 ? landscapeImages : currentGroup.images;
+  const gmailImages = landscapeImages.length > 0 ? landscapeImages : currentGroup.images;
+  const youtubeVideos = currentGroup.videos;
+  const youtubeFallbackImages = landscapeImages.length > 0 ? landscapeImages : currentGroup.images;
+  const logoSquares = currentGroup.logos.filter((logo) => (logo.pmaxImageType ?? "SQUARE") === "SQUARE");
+  const logoLandscapes = currentGroup.logos.filter((logo) => (logo.pmaxImageType ?? "SQUARE") === "LANDSCAPE");
+  const displayLogo = logoSquares[0] ?? currentGroup.logos[0];
+  const discoverLogo = logoLandscapes[0] ?? currentGroup.logos[0];
+  const mediaChecks = [
+    { label: "Landscape image", ok: pmaxLandscapeCount >= 1, required: !isRetailPMax },
+    { label: "Square image", ok: pmaxSquareCount >= 1, required: !isRetailPMax },
+    { label: "Logo", ok: logoRequirementMet, required: minRequiredLogos > 0 },
+    { label: "Video", ok: totalVideoCount > 0, required: false },
+  ];
+  const requiredMediaTotal = mediaChecks.filter((c) => c.required).length;
+  const requiredMediaDone = mediaChecks.filter((c) => c.required && c.ok).length;
+  const totalMediaCount = currentGroup.images.length + currentGroup.logos.length + totalVideoCount;
+  const mediaStatusText =
+    totalMediaCount === 0
+      ? "No media yet"
+      : `${currentGroup.images.length} images · ${currentGroup.logos.length} logos · ${totalVideoCount} videos${
+          requiredMediaTotal > 0 ? ` · ${requiredMediaDone}/${requiredMediaTotal} required` : ""
+        }`;
+  const minHeadlines = isRetailPMax ? 1 : ASSET_LIMITS.headlines.min;
+  const minDescriptions = isRetailPMax ? 1 : ASSET_LIMITS.descriptions.min;
+  const textChecks = [
+    { label: "Headlines", ok: filledHeadlines >= minHeadlines, required: true },
+    { label: "Long headline", ok: filledLongHeadlines >= 1, required: true },
+    { label: "Descriptions", ok: filledDescriptions >= minDescriptions, required: true },
+  ];
+  const textStatusText =
+    filledHeadlines + filledLongHeadlines + filledDescriptions === 0
+      ? "No text yet"
+      : `${filledHeadlines} headlines · ${filledLongHeadlines} long · ${filledDescriptions} descriptions`;
+  const businessNameSet = currentGroup.businessName.trim().length > 0;
+  const finalUrlValid = hasValidFinalUrl(currentGroup.finalUrl);
+  const ctaSet = !!currentGroup.callToAction;
+  const basicsChecks = [
+    { label: "Business name", ok: requireBusinessName ? businessNameSet : true, required: requireBusinessName },
+    { label: "Landing page", ok: finalUrlValid, required: true },
+    { label: "CTA", ok: ctaSet, required: false },
+  ];
+  const basicsStatusText = [
+    requireBusinessName ? (businessNameSet ? "Business name set" : "Business name missing") : "Business name optional",
+    finalUrlValid ? "Landing page set" : "Landing page missing",
+    ctaSet ? "CTA set" : "CTA missing",
+  ].join(" · ");
+  const listingStatusText =
+    retailListingMode === "ALL"
+      ? "All products"
+      : retailListingValues.length > 0
+        ? `${retailListingValues.length} ${listingValueLabel}${retailListingValues.length > 1 ? "s" : ""}`
+        : `No ${listingValueLabel} selected`;
+  const listingChecks = [{ label: "Listing groups", ok: hasListingGroup, required: true }];
+
+  const getPreviewIndex = useCallback(
+    (key: PreviewChannel, total: number) => (total > 0 ? previewAssetIndex[key] % total : 0),
+    [previewAssetIndex]
+  );
+  const stepPreviewIndex = useCallback(
+    (key: PreviewChannel, delta: number, total: number) => {
+      if (total <= 0) return;
+      setPreviewAssetIndex((prev) => ({
+        ...prev,
+        [key]: (prev[key] + delta + total) % total,
+      }));
+    },
+    []
+  );
+
+  const renderPreviewControls = (key: PreviewChannel, total: number, label: string) => {
+    if (total <= 1) return null;
+    const idx = getPreviewIndex(key, total);
+    return (
+      <div className="mt-2 flex items-center justify-between text-[9px] text-muted-foreground">
+        <button
+          type="button"
+          onClick={() => stepPreviewIndex(key, -1, total)}
+          className="flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-[9px] text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-3" />
+          Prev
+        </button>
+        <div className="flex items-center gap-1.5">
+          <span>{label}</span>
+          <span className="font-medium text-foreground">{idx + 1}/{total}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => stepPreviewIndex(key, 1, total)}
+          className="flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-[9px] text-muted-foreground hover:text-foreground"
+        >
+          Next
+          <ArrowRight className="size-3" />
+        </button>
+      </div>
+    );
+  };
+
+  const searchComboCount = Math.max(headlineTexts.length, descriptionTexts.length, 1);
+  const searchComboIndex = getPreviewIndex("search", searchComboCount);
+  const searchHeadline = headlineTexts[searchComboIndex] ?? "Your Headline Here";
+  const searchHeadline2 = headlineTexts.length > 1 ? headlineTexts[(searchComboIndex + 1) % headlineTexts.length] : "Second Headline";
+  const searchDescription = descriptionTexts[searchComboIndex] ?? "Your description will appear here.";
+  const searchDescription2 = descriptionTexts.length > 1 ? descriptionTexts[(searchComboIndex + 1) % descriptionTexts.length] : "";
+  const previewDomain = (() => {
+    if (!currentGroup.finalUrl) return "your-store.salla.sa";
+    try {
+      const input = currentGroup.finalUrl.startsWith("http") ? currentGroup.finalUrl : `https://${currentGroup.finalUrl}`;
+      return new URL(input).hostname;
+    } catch {
+      return currentGroup.finalUrl;
+    }
+  })();
+  const bestPracticeItems = isRetailPMax
+    ? [
+        {
+          title: "Product feed healthy",
+          desc: "Approved items with accurate titles, pricing, and availability.",
+          done: campaign.objective.merchantCenterConnected,
+        },
+        {
+          title: "Add core text assets",
+          desc: "At least 3 headlines and 2 descriptions for broader coverage.",
+          done: filledHeadlines >= 3 && filledDescriptions >= 2,
+        },
+        {
+          title: "Add logo + one image",
+          desc: "Unlock more placements across Display and Discover.",
+          done: currentGroup.logos.length > 0 && currentGroup.images.length > 0,
+        },
+        {
+          title: "Video creative included",
+          desc: "Boosts YouTube delivery and reach.",
+          done: totalVideoCount > 0,
+        },
+      ]
+    : [
+        {
+          title: "Use all 15 headline slots",
+          desc: "More combinations improve optimization.",
+          done: filledHeadlines >= ASSET_LIMITS.headlines.max,
+        },
+        {
+          title: "Include diverse headlines",
+          desc: "Mix features, benefits, and promotions.",
+          done: uniqueHeadlineCount >= 5,
+        },
+        {
+          title: "Add all 3 image ratios",
+          desc: "Landscape, square, and portrait for maximum reach.",
+          done: pmaxLandscapeCount >= 1 && pmaxSquareCount >= 1 && pmaxPortraitCount >= 1,
+        },
+        {
+          title: "Video creative included",
+          desc: "Boosts YouTube performance significantly.",
+          done: totalVideoCount > 0,
+        },
+        {
+          title: "Aim for Excellent ad strength",
+          desc: "Target 80%+ readiness score.",
+          done: adStrength.score >= 80,
+        },
+      ];
+  const bestPracticeDone = bestPracticeItems.filter((item) => item.done).length;
+  const bestPracticeTotal = bestPracticeItems.length;
 
   const canProceed = assetGroups.every((g) => {
-    const h = g.headlines.filter((x) => x.text?.trim()).length >= 3;
+    const h = g.headlines.filter((x) => x.text?.trim()).length >= (isRetailPMax ? 1 : 3);
     const lh = g.longHeadlines.filter((x) => x.text?.trim()).length >= 1;
-    const d = g.descriptions.filter((x) => x.text?.trim()).length >= 2;
-    const bn = g.businessName.trim().length > 0;
-    const url = g.finalUrl.trim().length > 0;
-    return h && lh && d && bn && url;
+    const d = g.descriptions.filter((x) => x.text?.trim()).length >= (isRetailPMax ? 1 : 2);
+    const landscape = g.images.filter((img) => (img.pmaxImageType ?? "PORTRAIT") === "LANDSCAPE").length >= 1;
+    const square = g.images.filter((img) => (img.pmaxImageType ?? "PORTRAIT") === "SQUARE").length >= 1;
+    const imgs = isRetailPMax ? true : (landscape && square);
+    const logos = g.logos.length >= minRequiredLogos;
+    const bn = requireBusinessName ? g.businessName.trim().length > 0 : true;
+    const url = hasValidFinalUrl(g.finalUrl);
+    return h && lh && d && imgs && logos && bn && url && hasListingGroup;
   });
 
   return (
@@ -3417,71 +4413,221 @@ export function GoogleStepCreative() {
         {/* ============================================================ */}
         <div className="flex flex-1 flex-col gap-5">
 
-              {/* Hero */}
-              <div>
-                <h1 className="text-balance text-2xl font-bold tracking-tight text-foreground">
-                  Build your asset group
-                </h1>
-                <p className="mt-2 max-w-lg text-pretty text-sm leading-relaxed text-muted-foreground">
-                  Asset groups contain all the creative elements Google uses to build ads across channels. Provide more assets for better optimization and higher ad strength.
-                </p>
-              </div>
+              {isRetailPMax && (
+                <SectionCard className="border-primary/20 bg-primary/[0.03] p-4">
+                  <div className="mb-1 flex items-center gap-2">
+                    <ShoppingBag className="size-4 text-primary" />
+                    <Label className="text-sm font-semibold text-foreground">Retail PMax mode (Catalog ON)</Label>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Feed-driven</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Product feed powers core ad delivery. In this mode, media assets are optional enhancements and text requirements are lighter.
+                  </p>
+                </SectionCard>
+              )}
 
-              {/* ---- Asset Group Tabs ---- */}
-              <div className="mb-6 flex items-center gap-2 overflow-x-auto">
-                {assetGroups.map((g, idx) => (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => setActiveGroupIdx(idx)}
-                    className={cn(
-                      "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                      idx === activeGroupIdx
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-background text-foreground hover:border-primary/40"
-                    )}
-                  >
-                    <Layers className="size-3" />
-                    {g.name || `Asset Group ${idx + 1}`}
-                    {assetGroups.length > 1 && idx === activeGroupIdx && (
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => { e.stopPropagation(); removeGroup(idx); }}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); removeGroup(idx); } }}
-                        className="ml-1 inline-flex cursor-pointer rounded-full p-0.5 hover:bg-primary-foreground/20"
+              {isRetailPMax && (
+                <SectionCard>
+                  <div className="flex flex-wrap items-start gap-3">
+                    <div>
+                      <Label className="text-sm font-semibold text-foreground">Product listing groups</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Required for Retail PMax. Choose how to split your catalog for serving.
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="ml-auto rounded-full px-2 py-0 text-[10px]">Required</Badge>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2">
+                    <span className="text-xs font-semibold text-foreground">Listing status</span>
+                    <span className="text-[10px] text-muted-foreground">{listingStatusText}</span>
+                    <div
+                      className="ml-auto flex items-center gap-1"
+                      title={listingChecks.map((c) => `${c.ok ? "✓" : "○"} ${c.label}`).join(", ")}
+                    >
+                      {listingChecks.map((check) => (
+                        <div
+                          key={check.label}
+                          className={cn(
+                            "size-1.5 rounded-full",
+                            check.ok
+                              ? "bg-emerald-400"
+                              : check.required
+                                ? "bg-amber-400"
+                                : "bg-muted-foreground/25"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {([
+                      { key: "ALL" as const, label: "All products" },
+                      { key: "CATEGORY" as const, label: "Category" },
+                      { key: "BRAND" as const, label: "Brand" },
+                      { key: "CUSTOM_LABEL" as const, label: "Custom label" },
+                    ]).map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => setRetailListingMode(option.key)}
+                        className={cn(
+                          "rounded-md border px-3 py-1 text-[11px] font-medium transition-colors",
+                          retailListingMode === option.key
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-background text-muted-foreground hover:text-foreground"
+                        )}
                       >
-                        <X className="size-3" />
-                      </span>
-                    )}
-                  </button>
-                ))}
-                <Button variant="outline" size="sm" className="h-7 gap-1 rounded-full text-xs" onClick={addGroup}>
-                  <Plus className="size-3" />
-                  Add Group
-                </Button>
-              </div>
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {retailListingMode === "ALL" ? (
+                    <div className="mt-3 rounded-lg border border-border bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+                      All products in your Merchant Center feed are eligible to serve.
+                    </div>
+                  ) : retailListingMode === "CATEGORY" ? (
+                    <div className="mt-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                          placeholder="Search categories"
+                          value={listingCategorySearch}
+                          onChange={(e) => setListingCategorySearch(e.target.value)}
+                          className="h-8 w-full text-xs sm:w-64"
+                        />
+                        {retailListingValues.length > 0 && (
+                          <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
+                            {retailListingValues.length} selected
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {filteredListingCategories.map((cat) => {
+                          const active = retailListingValues.includes(cat);
+                          return (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => toggleRetailListingValue(cat)}
+                              className={cn(
+                                "rounded-full border px-3 py-1 text-[10px] font-medium transition-colors",
+                                active
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "border-border bg-background text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              {cat}
+                            </button>
+                          );
+                        })}
+                        {filteredListingCategories.length === 0 && (
+                          <span className="text-[11px] text-muted-foreground">No categories found.</span>
+                        )}
+                      </div>
+                      {listingValuesMissing && (
+                        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-destructive">
+                          <AlertTriangle className="size-3.5" />
+                          <span>Select at least one category to continue.</span>
+                        </div>
+                      )}
+                      <p className="mt-2 text-[10px] text-muted-foreground">
+                        All other products stay eligible to keep coverage broad.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                          placeholder={retailListingMode === "BRAND" ? "Add brand names (comma separated)" : "Add custom labels (comma separated)"}
+                          value={listingValueDraft}
+                          onChange={(e) => setListingValueDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addRetailListingValues(listingValueDraft);
+                              setListingValueDraft("");
+                            }
+                          }}
+                          className="h-8 w-full text-xs sm:w-72"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs"
+                          onClick={() => {
+                            addRetailListingValues(listingValueDraft);
+                            setListingValueDraft("");
+                          }}
+                          disabled={!listingValueDraft.trim()}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {retailListingValues.map((value) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => toggleRetailListingValue(value)}
+                            className="group flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] font-medium text-primary"
+                          >
+                            <span>{value}</span>
+                            <X className="size-3 text-primary/70 group-hover:text-destructive" />
+                          </button>
+                        ))}
+                        {retailListingValues.length === 0 && (
+                          <span className="text-[11px] text-muted-foreground">
+                            No values added yet.
+                          </span>
+                        )}
+                      </div>
+                      {listingValuesMissing && (
+                        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-destructive">
+                          <AlertTriangle className="size-3.5" />
+                          <span>Select at least one {listingValueLabel} to continue.</span>
+                        </div>
+                      )}
+                      <p className="mt-2 text-[10px] text-muted-foreground">
+                        All other products stay eligible to keep coverage broad.
+                      </p>
+                    </div>
+                  )}
+                </SectionCard>
+              )}
 
               {/* ---- Group Name & Final URL ---- */}
               <SectionCard>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                      <Layers className="size-3 text-muted-foreground" />
-                      Asset Group Name
-                    </Label>
-                    <Input
-                      placeholder="e.g. Summer Collection"
-                      value={currentGroup.name}
-                      onChange={(e) => updateGroup(currentGroup.id, { name: e.target.value })}
-                      className="h-9 text-sm"
-                    />
+                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2">
+                  <span className="text-xs font-semibold text-foreground">Basics status</span>
+                  <span className="text-[10px] text-muted-foreground">{basicsStatusText}</span>
+                  <div
+                    className="ml-auto flex items-center gap-1"
+                    title={basicsChecks
+                      .map((c) => `${c.ok ? "✓" : "○"} ${c.label}${c.required ? "" : " (optional)"}`)
+                      .join(", ")}
+                  >
+                    {basicsChecks.map((check) => (
+                      <div
+                        key={check.label}
+                        className={cn(
+                          "size-1.5 rounded-full",
+                          check.ok
+                            ? "bg-emerald-400"
+                            : check.required
+                              ? "bg-amber-400"
+                              : "bg-muted-foreground/25"
+                        )}
+                      />
+                    ))}
                   </div>
+                </div>
+                <div className="grid gap-4">
                   <div>
                     <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                       <Building2 className="size-3 text-muted-foreground" />
-                      Business Name <span className="text-destructive">*</span>
-                      <InfoTip text="Up to 25 characters. Maps to AssetFieldType.BUSINESS_NAME." />
+                      Business Name {requireBusinessName && <span className="text-destructive">*</span>}
+                      <InfoTip text="Up to 25 characters. Required when brand guidelines are disabled. When enabled, this is used as a campaign-level brand asset." />
                     </Label>
                     <Input
                       placeholder="Your store name"
@@ -3495,515 +4641,1182 @@ export function GoogleStepCreative() {
                 </div>
 
                 <div className="mt-4">
-                  <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                    <Link2 className="size-3 text-muted-foreground" />
-                    Final URL <span className="text-destructive">*</span>
-                    <InfoTip text="The landing page for this asset group. Maps to AssetGroup.final_urls." />
-                  </Label>
-                  <Input
-                    placeholder="https://your-store.salla.sa/collection/summer"
-                    value={currentGroup.finalUrl}
-                    onChange={(e) => updateGroup(currentGroup.id, { finalUrl: e.target.value })}
-                    className="h-9 text-sm"
-                  />
-                  <div className="mt-2 flex gap-2">
-                    <div className="flex-1">
-                      <Label className="mb-1 block text-[10px] text-muted-foreground">Display Path 1</Label>
-                      <Input
-                        placeholder="summer"
-                        maxLength={15}
-                        value={currentGroup.displayPath1}
-                        onChange={(e) => updateGroup(currentGroup.id, { displayPath1: e.target.value.slice(0, 15) })}
-                        className="h-8 text-xs"
-                      />
+                  <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <Link2 className="size-3.5 text-primary" />
+                      <Label className="text-xs font-semibold text-foreground">Target link type</Label>
+                      <InfoTip text="Choose what the ad should link to. We auto-fill the landing page based on your selection." />
                     </div>
-                    <div className="flex-1">
-                      <Label className="mb-1 block text-[10px] text-muted-foreground">Display Path 2</Label>
-                      <Input
-                        placeholder="collection"
-                        maxLength={15}
-                        value={currentGroup.displayPath2}
-                        onChange={(e) => updateGroup(currentGroup.id, { displayPath2: e.target.value.slice(0, 15) })}
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </SectionCard>
-
-              {/* ---- Headlines ---- */}
-              <SectionCard>
-                <div className="mb-1 flex items-center gap-2">
-                  <Type className="size-4 text-primary" />
-                  <Label className="text-sm font-semibold text-foreground">Headlines</Label>
-                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-                    {filledHeadlines}/{ASSET_LIMITS.headlines.max} (min {ASSET_LIMITS.headlines.min})
-                  </Badge>
-                  <InfoTip text={`Up to ${ASSET_LIMITS.headlines.max} headlines, ${ASSET_LIMITS.headlines.charLimit} chars each. Maps to AssetFieldType.HEADLINE.`} />
-                </div>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Short headlines shown across all Google channels. More unique headlines = better optimization.
-                </p>
-
-                <div className="flex flex-col gap-2">
-                  {currentGroup.headlines.map((h, idx) => (
-                    <div key={h.id} className="flex items-center gap-2">
-                      <span className="w-5 text-right text-[10px] text-muted-foreground">{idx + 1}</span>
-                      <div className="relative flex-1">
-                        <Input
-                          placeholder={`Headline ${idx + 1}`}
-                          maxLength={ASSET_LIMITS.headlines.charLimit}
-                          value={h.text ?? ""}
-                          onChange={(e) => updateTextAsset("headlines", h.id, e.target.value)}
-                          className={cn("h-9 pr-12 text-sm", (h.text?.length ?? 0) > 25 && "border-amber-300")}
-                        />
-                        <span className={cn(
-                          "absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tabular-nums",
-                          (h.text?.length ?? 0) > 25 ? "text-amber-500" : "text-muted-foreground"
-                        )}>
-                          {h.text?.length ?? 0}/{ASSET_LIMITS.headlines.charLimit}
-                        </span>
-                      </div>
-                      {currentGroup.headlines.length > ASSET_LIMITS.headlines.min && (
-                        <button type="button" onClick={() => removeTextAsset("headlines", h.id)} className="p-1 text-muted-foreground hover:text-destructive">
-                          <Trash2 className="size-3.5" />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {([
+                        { key: "store" as const, label: "Store" },
+                        { key: "product" as const, label: "Product" },
+                        { key: "category" as const, label: "Category" },
+                        { key: "custom" as const, label: "Custom" },
+                      ]).map((option) => (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => {
+                            setLinkType(option.key);
+                            if (option.key !== "product") setSelectedProduct(null);
+                            if (option.key !== "category") setSelectedCategory("");
+                            if (option.key === "store") {
+                              const origin = getStoreOrigin();
+                              if (origin) applyFinalUrl(origin);
+                            }
+                            if (option.key === "product") {
+                              if (selectedProduct?.url) {
+                                applyFinalUrl(selectedProduct.url);
+                              } else {
+                                setShowProductPicker(true);
+                              }
+                            }
+                            if (option.key === "category") {
+                              if (selectedCategory) {
+                                const origin = getStoreOrigin();
+                                if (origin) applyFinalUrl(`${origin}/category/${formatCategoryPath(selectedCategory)}`);
+                              } else {
+                                setShowCategoryPicker(true);
+                              }
+                            }
+                          }}
+                          className={cn(
+                            "rounded-md border px-3 py-1 text-[11px] font-medium transition-colors",
+                            linkType === option.key
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-background text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {option.label}
                         </button>
+                      ))}
+                    </div>
+
+                    <div className="mt-2 text-[10px] text-muted-foreground">
+                      {linkType === "store" && (
+                        <span>{storeInfo?.domain ? `Store homepage: ${storeInfo.domain}` : "Store homepage will be used."}</span>
+                      )}
+                      {linkType === "product" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs"
+                            onClick={() => setShowProductPicker(true)}
+                          >
+                            {selectedProduct ? "Change product" : "Choose product"}
+                          </Button>
+                          {selectedProduct ? (
+                            <span>
+                              Selected: <span className="font-medium text-foreground">{selectedProduct.name}</span>
+                            </span>
+                          ) : (
+                            <span>Link a specific product page.</span>
+                          )}
+                        </div>
+                      )}
+                      {linkType === "category" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs"
+                            onClick={() => setShowCategoryPicker(true)}
+                          >
+                            {selectedCategory ? "Change category" : "Choose category"}
+                          </Button>
+                          {selectedCategory ? (
+                            <span>
+                              Selected: <span className="font-medium text-foreground">{selectedCategory}</span>
+                            </span>
+                          ) : (
+                            <span>Link a category collection.</span>
+                          )}
+                        </div>
+                      )}
+                      {linkType === "custom" && (
+                        <span>Use any landing page URL (collection, campaign, or deep link).</span>
                       )}
                     </div>
-                  ))}
-                </div>
 
-                {currentGroup.headlines.length < ASSET_LIMITS.headlines.max && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3 gap-1 text-xs"
-                    onClick={() => addTextAsset("headlines", "HEADLINE")}
-                  >
-                    <Plus className="size-3" />
-                    Add Headline ({currentGroup.headlines.length}/{ASSET_LIMITS.headlines.max})
-                  </Button>
-                )}
-              </SectionCard>
-
-              {/* ---- Long Headlines ---- */}
-              <SectionCard>
-                <div className="mb-1 flex items-center gap-2">
-                  <FileText className="size-4 text-primary" />
-                  <Label className="text-sm font-semibold text-foreground">Long Headlines</Label>
-                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-                    {filledLongHeadlines}/{ASSET_LIMITS.longHeadlines.max} (min {ASSET_LIMITS.longHeadlines.min})
-                  </Badge>
-                  <InfoTip text={`Up to ${ASSET_LIMITS.longHeadlines.max} long headlines, ${ASSET_LIMITS.longHeadlines.charLimit} chars each. Maps to AssetFieldType.LONG_HEADLINE.`} />
-                </div>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Used in larger ad formats like YouTube and Discover. Can be more descriptive.
-                </p>
-
-                <div className="flex flex-col gap-2">
-                  {currentGroup.longHeadlines.map((h, idx) => (
-                    <div key={h.id} className="flex items-center gap-2">
-                      <span className="w-5 text-right text-[10px] text-muted-foreground">{idx + 1}</span>
-                      <div className="relative flex-1">
-                        <Input
-                          placeholder={`Long Headline ${idx + 1}`}
-                          maxLength={ASSET_LIMITS.longHeadlines.charLimit}
-                          value={h.text ?? ""}
-                          onChange={(e) => updateTextAsset("longHeadlines", h.id, e.target.value)}
-                          className="h-9 pr-12 text-sm"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground">
-                          {h.text?.length ?? 0}/{ASSET_LIMITS.longHeadlines.charLimit}
-                        </span>
+                    {currentGroup.finalUrl && (
+                      <div className="mt-3 flex items-center justify-between rounded-md border border-border bg-background px-3 py-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Link2 className="size-3 text-muted-foreground" />
+                          <span className="text-[10px] text-muted-foreground">Landing page</span>
+                          <span className="truncate text-[10px] text-foreground">{currentGroup.finalUrl}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">UTM on</Badge>
+                          {linkType !== "custom" && (
+                            <button
+                              type="button"
+                              onClick={() => setLinkType("custom")}
+                              className="text-[10px] text-primary hover:underline"
+                            >
+                              Edit URL
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      {currentGroup.longHeadlines.length > ASSET_LIMITS.longHeadlines.min && (
-                        <button type="button" onClick={() => removeTextAsset("longHeadlines", h.id)} className="p-1 text-muted-foreground hover:text-destructive">
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {currentGroup.longHeadlines.length < ASSET_LIMITS.longHeadlines.max && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3 gap-1 text-xs"
-                    onClick={() => addTextAsset("longHeadlines", "LONG_HEADLINE")}
-                  >
-                    <Plus className="size-3" />
-                    Add Long Headline
-                  </Button>
-                )}
-              </SectionCard>
-
-              {/* ---- Descriptions ---- */}
-              <SectionCard>
-                <div className="mb-1 flex items-center gap-2">
-                  <FileText className="size-4 text-primary" />
-                  <Label className="text-sm font-semibold text-foreground">Descriptions</Label>
-                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-                    {filledDescriptions}/{ASSET_LIMITS.descriptions.max} (min {ASSET_LIMITS.descriptions.min})
-                  </Badge>
-                  <InfoTip text={`Up to ${ASSET_LIMITS.descriptions.max} descriptions, ${ASSET_LIMITS.descriptions.charLimit} chars each. Maps to AssetFieldType.DESCRIPTION.`} />
-                </div>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Provide details about your products or services. Used across all channels.
-                </p>
-
-                <div className="flex flex-col gap-2">
-                  {currentGroup.descriptions.map((d, idx) => (
-                    <div key={d.id} className="flex items-start gap-2">
-                      <span className="mt-2.5 w-5 text-right text-[10px] text-muted-foreground">{idx + 1}</span>
-                      <div className="relative flex-1">
-                        <Textarea
-                          placeholder={`Description ${idx + 1}`}
-                          maxLength={ASSET_LIMITS.descriptions.charLimit}
-                          value={d.text ?? ""}
-                          onChange={(e) => updateTextAsset("descriptions", d.id, e.target.value)}
-                          className="min-h-[60px] text-sm"
-                          rows={2}
-                        />
-                        <span className="absolute bottom-2 right-3 text-[10px] tabular-nums text-muted-foreground">
-                          {d.text?.length ?? 0}/{ASSET_LIMITS.descriptions.charLimit}
-                        </span>
-                      </div>
-                      {currentGroup.descriptions.length > ASSET_LIMITS.descriptions.min && (
-                        <button type="button" onClick={() => removeTextAsset("descriptions", d.id)} className="mt-2 p-1 text-muted-foreground hover:text-destructive">
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {currentGroup.descriptions.length < ASSET_LIMITS.descriptions.max && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3 gap-1 text-xs"
-                    onClick={() => addTextAsset("descriptions", "DESCRIPTION")}
-                  >
-                    <Plus className="size-3" />
-                    Add Description
-                  </Button>
-                )}
-              </SectionCard>
-
-              {/* ---- Images ---- */}
-              <SectionCard>
-                <div className="mb-1 flex items-center gap-2">
-                  <ImageIcon className="size-4 text-primary" />
-                  <Label className="text-sm font-semibold text-foreground">Images</Label>
-                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-                    {currentGroup.images.length}/{ASSET_LIMITS.images.max}
-                  </Badge>
-                  <InfoTip text="Marketing images for your ads. Provide landscape (1.91:1, min 600x314), square (1:1, min 300x300), and optionally portrait (4:5, min 480x600). Maps to AssetFieldType.MARKETING_IMAGE, SQUARE_MARKETING_IMAGE, PORTRAIT_MARKETING_IMAGE." />
-                </div>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Upload images in multiple aspect ratios for best results across all channels.
-                </p>
-
-                {/* Image requirements */}
-                <div className="mb-3 grid grid-cols-3 gap-2">
-                  {[
-                    { label: "Landscape (1.91:1)", note: "Min 600x314", required: true },
-                    { label: "Square (1:1)", note: "Min 300x300", required: true },
-                    { label: "Portrait (4:5)", note: "Min 480x600", required: false },
-                  ].map((spec) => (
-                    <div key={spec.label} className="rounded-lg border border-border bg-muted/20 p-2.5 text-center">
-                      <p className="text-[10px] font-semibold text-foreground">{spec.label}</p>
-                      <p className="text-[9px] text-muted-foreground">{spec.note}</p>
-                      {spec.required && <Badge className="mt-1 rounded-full border-0 bg-destructive/10 px-1 py-0 text-[8px] text-destructive">Required</Badge>}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Image grid placeholder */}
-                <div className="flex flex-wrap gap-2">
-                  {currentGroup.images.map((img) => (
-                    <div key={img.id} className="group relative flex size-20 items-center justify-center rounded-lg border border-dashed border-border bg-muted/30">
-                      <ImageIcon className="size-6 text-muted-foreground/50" />
-                      <button
-                        type="button"
-                        onClick={() => removeImageAsset("images", img.id)}
-                        className="absolute -right-1 -top-1 hidden rounded-full bg-destructive p-0.5 text-destructive-foreground group-hover:block"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </div>
-                  ))}
-                  {currentGroup.images.length < ASSET_LIMITS.images.max && (
-                    <button
-                      type="button"
-                      onClick={() => addImageAsset("images")}
-                      className="flex size-20 items-center justify-center rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] text-primary transition-colors hover:bg-primary/5"
-                    >
-                      <Plus className="size-5" />
-                    </button>
-                  )}
-                </div>
-                <p className="mt-2 text-[10px] text-muted-foreground">
-                  In production, images are uploaded to Google Ads via the Asset service. Click + to add placeholder slots.
-                </p>
-              </SectionCard>
-
-              {/* ---- Logos ---- */}
-              <SectionCard>
-                <div className="mb-1 flex items-center gap-2">
-                  <ImageIcon className="size-4 text-primary" />
-                  <Label className="text-sm font-semibold text-foreground">Logos</Label>
-                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-                    {currentGroup.logos.length}/{ASSET_LIMITS.logos.max} (min 1)
-                  </Badge>
-                  <InfoTip text="Square logo (1:1, min 128x128) required. Landscape logo (4:1, min 512x128) optional. Maps to AssetFieldType.LOGO and LANDSCAPE_LOGO." />
-                </div>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Your brand logo appears alongside your ads for recognition.
-                </p>
-
-                <div className="flex flex-wrap gap-2">
-                  {currentGroup.logos.map((logo) => (
-                    <div key={logo.id} className="group relative flex size-16 items-center justify-center rounded-lg border border-dashed border-border bg-muted/30">
-                      <ImageIcon className="size-5 text-muted-foreground/50" />
-                      <button
-                        type="button"
-                        onClick={() => removeImageAsset("logos", logo.id)}
-                        className="absolute -right-1 -top-1 hidden rounded-full bg-destructive p-0.5 text-destructive-foreground group-hover:block"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </div>
-                  ))}
-                  {currentGroup.logos.length < ASSET_LIMITS.logos.max && (
-                    <button
-                      type="button"
-                      onClick={() => addImageAsset("logos")}
-                      className="flex size-16 items-center justify-center rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] text-primary transition-colors hover:bg-primary/5"
-                    >
-                      <Plus className="size-4" />
-                    </button>
-                  )}
-                </div>
-              </SectionCard>
-
-              {/* ---- YouTube Videos ---- */}
-              <SectionCard>
-                <div className="mb-1 flex items-center gap-2">
-                  <Video className="size-4 text-primary" />
-                  <Label className="text-sm font-semibold text-foreground">YouTube Videos</Label>
-                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-                    {currentGroup.videos.length}/{ASSET_LIMITS.videos.max} (optional)
-                  </Badge>
-                  <InfoTip text="Add YouTube video URLs. Maps to AssetFieldType.YOUTUBE_VIDEO. If you don't provide videos, Google will auto-generate them from your images." />
-                </div>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Videos for YouTube placements. Google can auto-generate videos from images if none are provided.
-                </p>
-
-                <div className="flex flex-col gap-2">
-                  {currentGroup.videos.map((v, idx) => (
-                    <div key={v.id} className="flex items-center gap-2">
-                      <Video className="size-4 shrink-0 text-muted-foreground" />
-                      <Input
-                        placeholder="https://youtube.com/watch?v=..."
-                        value={v.url ?? ""}
-                        onChange={(e) => updateVideoAsset(v.id, e.target.value)}
-                        className="h-9 flex-1 text-sm"
-                      />
-                      <button type="button" onClick={() => removeVideoAsset(v.id)} className="p-1 text-muted-foreground hover:text-destructive">
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                {currentGroup.videos.length < ASSET_LIMITS.videos.max && (
-                  <Button variant="outline" size="sm" className="mt-3 gap-1 text-xs" onClick={addVideoAsset}>
-                    <Plus className="size-3" />
-                    Add YouTube Video
-                  </Button>
-                )}
-              </SectionCard>
-
-              {/* ---- Call to Action ---- */}
-              <SectionCard>
-                <div className="mb-1 flex items-center gap-2">
-                  <MousePointerClick className="size-4 text-primary" />
-                  <Label className="text-sm font-semibold text-foreground">Call to Action</Label>
-                  <InfoTip text="Maps to AssetFieldType.CALL_TO_ACTION_SELECTION. 'Automated' lets Google choose the best CTA." />
-                </div>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Choose a CTA button text, or let Google optimize it automatically.
-                </p>
-
-                <div className="flex flex-wrap gap-1.5">
-                  {CTA_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => updateGroup(currentGroup.id, { callToAction: opt.value })}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                        currentGroup.callToAction === opt.value
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-background text-foreground hover:border-primary/40"
-                      )}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </SectionCard>
-
-              {/* ---- Ad Strength Meter ---- */}
-              <div className="mb-8 rounded-xl border border-border bg-card p-5">
-                <div className="mb-3 flex items-center gap-2">
-                  <Gauge className="size-4 text-primary" />
-                  <p className="text-sm font-semibold text-foreground">Ad Strength</p>
-                  <span className={cn("text-sm font-bold", adStrength.color)}>{adStrength.label}</span>
-                </div>
-
-                {/* Strength bar */}
-                <div className="mb-3 h-2.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={cn(
-                      "h-full rounded-full transition-all duration-500",
-                      adStrength.label === "Excellent" ? "bg-emerald-500" :
-                      adStrength.label === "Good" ? "bg-primary" :
-                      adStrength.label === "Average" ? "bg-amber-500" :
-                      "bg-destructive"
                     )}
-                    style={{ width: `${adStrength.score}%` }}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  {[
-                    { label: `Headlines (${filledHeadlines}/${ASSET_LIMITS.headlines.min}+)`, ok: filledHeadlines >= ASSET_LIMITS.headlines.min },
-                    { label: `Long Headlines (${filledLongHeadlines}/${ASSET_LIMITS.longHeadlines.min}+)`, ok: filledLongHeadlines >= ASSET_LIMITS.longHeadlines.min },
-                    { label: `Descriptions (${filledDescriptions}/${ASSET_LIMITS.descriptions.min}+)`, ok: filledDescriptions >= ASSET_LIMITS.descriptions.min },
-                    { label: `Images (${currentGroup.images.length}/1+)`, ok: currentGroup.images.length >= 1 },
-                    { label: `Logos (${currentGroup.logos.length}/1+)`, ok: currentGroup.logos.length >= 1 },
-                    { label: "Business Name", ok: currentGroup.businessName.trim().length > 0 },
-                    { label: "Final URL", ok: currentGroup.finalUrl.trim().length > 0 },
-                    { label: `Videos (${currentGroup.videos.length} bonus)`, ok: currentGroup.videos.length > 0 },
-                  ].map((item) => (
-                    <div key={item.label} className="flex items-center gap-1.5">
-                      <CheckCircle2 className={cn("size-3", item.ok ? "text-emerald-500" : "text-muted-foreground/40")} />
-                      <span className={cn(item.ok ? "text-foreground" : "text-muted-foreground")}>{item.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* ---- Multi-Channel Preview ---- */}
-              <div className="mb-8 rounded-xl border border-border bg-card p-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Eye className="size-4 text-primary" />
-                    <p className="text-sm font-semibold text-foreground">Ad Preview</p>
                   </div>
-                  <div className="flex gap-1">
-                    {(["search", "display", "youtube", "discover"] as const).map((ch) => (
-                      <button
-                        key={ch}
-                        type="button"
-                        onClick={() => setPreviewChannel(ch)}
-                        className={cn(
-                          "rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize transition-colors",
-                          previewChannel === ch
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-background text-muted-foreground"
-                        )}
+
+                  {linkType === "custom" && (
+                    <div className="mt-3">
+                      <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <Link2 className="size-3 text-muted-foreground" />
+                        Final URL <span className="text-destructive">*</span>
+                        <InfoTip text="The landing page for this asset group. Maps to AssetGroup.final_urls." />
+                      </Label>
+                      <Input
+                        placeholder="https://your-store.salla.sa/collection/summer"
+                        value={currentGroup.finalUrl}
+                        onChange={(e) => {
+                          updateGroup(currentGroup.id, { finalUrl: e.target.value });
+                          if (selectedProduct) setSelectedProduct(null);
+                          if (selectedCategory) setSelectedCategory("");
+                        }}
+                        onBlur={() => {
+                          if (currentGroup.displayPath1 || currentGroup.displayPath2) return;
+                          const suggestion = getDisplayPathSuggestions(currentGroup.finalUrl);
+                          if (!suggestion.path1 && !suggestion.path2) return;
+                          updateGroup(currentGroup.id, {
+                            displayPath1: suggestion.path1,
+                            displayPath2: suggestion.path2,
+                          });
+                        }}
+                        className="h-9 text-sm"
+                      />
+                      <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">UTM on</Badge>
+                        <span>UTM tags are added automatically to help track performance.</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr,0.6fr]">
+                    <div>
+                      <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <MousePointerClick className="size-3 text-muted-foreground" />
+                        Call to action
+                      </Label>
+                      <Select
+                        value={currentGroup.callToAction}
+                        onValueChange={(value) => updateGroup(currentGroup.id, { callToAction: value })}
                       >
-                        {ch}
-                      </button>
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue placeholder="Select a CTA" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CTA_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowUrlAdvanced((prev) => !prev)}
+                      className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      {showUrlAdvanced ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+                      URL options (optional)
+                    </button>
+                    {showUrlAdvanced && (
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        <div>
+                          <Label className="mb-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                            Display Path 1 (Search only)
+                            <InfoTip text="Optional. Appears only in Search placements as the display URL path (does not change the landing page)." />
+                          </Label>
+                          <Input
+                            placeholder="summer"
+                            maxLength={15}
+                            value={currentGroup.displayPath1}
+                            onChange={(e) => updateGroup(currentGroup.id, { displayPath1: e.target.value.slice(0, 15) })}
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <Label className="mb-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                            Display Path 2 (Search only)
+                            <InfoTip text="Optional. Appears only in Search placements as the display URL path (does not change the landing page)." />
+                          </Label>
+                          <Input
+                            placeholder="collection"
+                            maxLength={15}
+                            value={currentGroup.displayPath2}
+                            onChange={(e) => updateGroup(currentGroup.id, { displayPath2: e.target.value.slice(0, 15) })}
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <ProductPickerDialog
+                  open={showProductPicker}
+                  onOpenChange={setShowProductPicker}
+                  existingProductNames={[]}
+                  maxProducts={1}
+                  onAddProducts={(products) => {
+                    const product = products[0];
+                    if (!product) return;
+                    setSelectedProduct(product);
+                    setSelectedCategory("");
+                    setLinkType("product");
+                    applyFinalUrl(product.url);
+                  }}
+                />
+
+                <Sheet open={showCategoryPicker} onOpenChange={setShowCategoryPicker}>
+                  <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+                    <SheetHeader className="border-b border-border px-5 pb-3 pt-5">
+                      <SheetTitle className="flex items-center gap-2 text-base">
+                        <Store className="size-4 text-primary" />
+                        Select Category
+                      </SheetTitle>
+                      <SheetDescription className="text-xs">
+                        Choose a category to link — we’ll use it as your landing page.
+                      </SheetDescription>
+                    </SheetHeader>
+                    {selectedCategory && (
+                      <div className="flex items-center gap-2 border-b border-primary/20 bg-primary/[0.03] px-5 py-2">
+                        <span className="shrink-0 text-[11px] font-semibold text-primary">Selected</span>
+                        <div className="flex flex-1 gap-1.5 overflow-x-auto">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCategory("")}
+                            className="group flex shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-background py-0.5 pl-2 pr-2 transition-colors hover:border-destructive/30 hover:bg-destructive/5"
+                          >
+                            <span className="max-w-[140px] truncate text-[10px] font-medium text-foreground">{selectedCategory}</span>
+                            <X className="size-2.5 shrink-0 text-muted-foreground group-hover:text-destructive" />
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCategory("")}
+                          className="shrink-0 text-[10px] text-primary hover:underline"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
+                    <div className="border-b border-border px-5 py-3">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          placeholder="Search categories..."
+                          value={categorySearch}
+                          onChange={(e) => setCategorySearch(e.target.value)}
+                          className="h-9 pl-9 text-xs"
+                        />
+                        {categorySearch && (
+                          <button
+                            type="button"
+                            onClick={() => setCategorySearch("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto px-5 py-4">
+                      {filteredCategories.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-10 text-center">
+                          <Package className="mb-2 size-6 text-muted-foreground" />
+                          <p className="text-sm font-medium text-muted-foreground">No categories found</p>
+                          <p className="text-xs text-muted-foreground">Try a different search term.</p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          {filteredCategories.map((category) => (
+                            <button
+                              key={category}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCategory(category);
+                                setSelectedProduct(null);
+                                setLinkType("category");
+                                const origin = getStoreOrigin();
+                                if (origin) applyFinalUrl(`${origin}/category/${formatCategoryPath(category)}`);
+                                setShowCategoryPicker(false);
+                              }}
+                              className={cn(
+                                "flex items-center justify-between rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors",
+                                selectedCategory === category
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "border-border bg-background text-foreground hover:border-primary/40"
+                              )}
+                            >
+                              <span>{category}</span>
+                              {selectedCategory === category && (
+                                <Check className="size-3.5 text-primary" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between border-t border-border px-5 py-3">
+                      <Button variant="outline" size="sm" onClick={() => setShowCategoryPicker(false)}>
+                        Cancel
+                      </Button>
+                      {selectedCategory && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCategory("");
+                            setShowCategoryPicker(false);
+                          }}
+                        >
+                          Clear selection
+                        </Button>
+                      )}
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </SectionCard>
+
+              <SectionCard>
+                <div className="mb-2 flex items-center gap-2">
+                  <Type className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">Text assets</Label>
+                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Required</Badge>
+                  <InfoTip text="Provide enough text variety for Google AI. Minimums: 3 headlines, 1 long headline, 2 descriptions." />
+                </div>
+                <p className="mb-4 text-xs text-muted-foreground">
+                  Keep your messaging short, clear, and varied. Google mixes these across placements.
+                </p>
+                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2">
+                  <span className="text-xs font-semibold text-foreground">Text status</span>
+                  <span className="text-[10px] text-muted-foreground">{textStatusText}</span>
+                  <div
+                    className="ml-auto flex items-center gap-1"
+                    title={textChecks.map((c) => `${c.ok ? "✓" : "○"} ${c.label}`).join(", ")}
+                  >
+                    {textChecks.map((check) => (
+                      <div
+                        key={check.label}
+                        className={cn(
+                          "size-1.5 rounded-full",
+                          check.ok
+                            ? "bg-emerald-400"
+                            : check.required
+                              ? "bg-amber-400"
+                              : "bg-muted-foreground/25"
+                        )}
+                      />
                     ))}
                   </div>
                 </div>
 
-                {/* Search preview */}
-                {previewChannel === "search" && (
-                  <div className="rounded-lg border border-border bg-background p-4">
-                    <div className="mb-1 flex items-center gap-1.5">
-                      <Badge className="rounded bg-foreground/10 px-1 py-0 text-[9px] font-bold text-foreground">Ad</Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {currentGroup.finalUrl || "your-store.salla.sa"}
-                        {currentGroup.displayPath1 && ` / ${currentGroup.displayPath1}`}
-                        {currentGroup.displayPath2 && ` / ${currentGroup.displayPath2}`}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-primary">
-                      {currentGroup.headlines.find((h) => h.text?.trim())?.text || "Your Headline Here"}
-                      {" - "}
-                      {currentGroup.headlines.filter((h) => h.text?.trim())[1]?.text || "Second Headline"}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {currentGroup.descriptions.find((d) => d.text?.trim())?.text || "Your description will appear here. Add descriptions to see the preview."}
-                    </p>
-                  </div>
-                )}
+                <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-muted/20 px-2 py-1">
+                  {(["ai", "manual"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setTextInputMode(mode)}
+                      className={cn(
+                        "flex-1 rounded-md border px-2 py-1 text-[10px] font-medium transition-colors",
+                        textInputMode === mode
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-transparent text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {mode === "ai" ? "AI generated" : "Manual entry"}
+                    </button>
+                  ))}
+                </div>
 
-                {/* Display preview */}
-                {previewChannel === "display" && (
-                  <div className="rounded-lg border border-border bg-background p-4">
-                    <div className="flex gap-3">
-                      <div className="flex size-16 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <ImageIcon className="size-6 text-muted-foreground/50" />
+                {textInputMode === "ai" ? (
+                  <div>
+                    <div className="rounded-lg border border-border bg-muted/20 p-3">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="size-3.5 text-primary" />
+                        <p className="text-xs font-semibold text-foreground">Generate from store data</p>
+                        <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">
+                          Recommended
+                        </Badge>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold text-foreground">
-                          {currentGroup.headlines.find((h) => h.text?.trim())?.text || "Headline"}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">
-                          {currentGroup.descriptions.find((d) => d.text?.trim())?.text || "Description"}
-                        </p>
-                        <div className="mt-2 flex items-center gap-2">
-                          <div className="size-4 rounded bg-muted" />
-                          <span className="text-[10px] text-muted-foreground">{currentGroup.businessName || "Business"}</span>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        We use your store name, landing page, and campaign goal to draft headlines and descriptions.
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() => void buildAiTextDraft(false)}
+                          disabled={aiTextLoading}
+                        >
+                          {aiTextLoading ? "Generating..." : aiTextDraft ? "Regenerate draft" : "Generate draft"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 text-xs"
+                          onClick={applyAiTextDraft}
+                          disabled={!aiTextDraft || aiTextLoading}
+                        >
+                          Use this draft
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-xs"
+                          onClick={() => setShowAiAdvanced((prev) => !prev)}
+                        >
+                          {showAiAdvanced ? "Hide options" : "More options"}
+                        </Button>
+                      </div>
+
+                      {showAiAdvanced && (
+                        <div className="mt-2 rounded-lg border border-border bg-background p-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs"
+                              onClick={() => void buildAiTextDraft(true)}
+                              disabled={aiTextLoading}
+                            >
+                              Fill all slots
+                            </Button>
+                            <div className="flex items-center gap-1 rounded-md border border-border bg-background p-0.5 text-[10px]">
+                              {(["replace", "append"] as const).map((mode) => (
+                                <button
+                                  key={mode}
+                                  type="button"
+                                  onClick={() => setAiApplyMode(mode)}
+                                  className={cn(
+                                    "rounded-md px-2 py-1 font-medium transition-colors",
+                                    aiApplyMode === mode
+                                      ? "bg-primary text-primary-foreground"
+                                      : "text-muted-foreground hover:text-foreground"
+                                  )}
+                                >
+                                  {mode === "replace" ? "Replace" : "Append"}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            Replace overwrites all text. Append fills empty slots then adds new ones.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {aiTextDraft ? (
+                      <div className="mt-3 grid gap-3">
+                        <div className="rounded-lg border border-border bg-background p-3">
+                          <p className="text-xs font-semibold text-foreground">Headlines</p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {aiTextDraft.headlines.slice(0, 8).map((text) => (
+                              <Badge key={text} variant="secondary" className="rounded-full px-2 py-0 text-[9px]">
+                                {text}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-border bg-background p-3">
+                          <p className="text-xs font-semibold text-foreground">Long headlines</p>
+                          <div className="mt-2 flex flex-col gap-1 text-[11px] text-muted-foreground">
+                            {aiTextDraft.longHeadlines.slice(0, 3).map((text) => (
+                              <span key={text}>• {text}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-lg border border-border bg-background p-3">
+                          <p className="text-xs font-semibold text-foreground">Descriptions</p>
+                          <div className="mt-2 flex flex-col gap-1 text-[11px] text-muted-foreground">
+                            {aiTextDraft.descriptions.slice(0, 3).map((text) => (
+                              <span key={text}>• {text}</span>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="mt-3 rounded-lg border border-dashed border-border bg-background p-3 text-[11px] text-muted-foreground">
+                        No AI draft yet. Generate to see suggested copy.
+                      </div>
+                    )}
                   </div>
-                )}
-
-                {/* YouTube preview */}
-                {previewChannel === "youtube" && (
-                  <div className="rounded-lg border border-border bg-background p-4">
-                    <div className="mb-3 flex aspect-video items-center justify-center rounded-lg bg-foreground/5">
-                      <Video className="size-10 text-muted-foreground/30" />
-                    </div>
-                    <p className="text-xs font-semibold text-foreground">
-                      {currentGroup.longHeadlines.find((h) => h.text?.trim())?.text || "Long Headline Here"}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {currentGroup.descriptions.find((d) => d.text?.trim())?.text || "Description"}
-                    </p>
-                    <Button size="sm" className="mt-2 h-7 rounded-full text-[10px]">
-                      {CTA_OPTIONS.find((c) => c.value === currentGroup.callToAction)?.label ?? "Shop now"}
+                ) : (
+                  <>
+                {/* Headlines */}
+                <div>
+                  <div className="mb-1 flex items-center gap-2">
+                    <Label className="text-xs font-semibold text-foreground">Headlines</Label>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
+                      {filledHeadlines}/{ASSET_LIMITS.headlines.max} (min {ASSET_LIMITS.headlines.min})
+                    </Badge>
+                    <InfoTip text={`Up to ${ASSET_LIMITS.headlines.max} headlines, ${ASSET_LIMITS.headlines.charLimit} chars each.`} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {currentGroup.headlines.map((h, idx) => (
+                      <div key={h.id} className="flex items-center gap-2">
+                        <span className="w-5 text-right text-[10px] text-muted-foreground">{idx + 1}</span>
+                        <div className="relative flex-1">
+                          <Input
+                            placeholder={`Headline ${idx + 1}`}
+                            maxLength={ASSET_LIMITS.headlines.charLimit}
+                            value={h.text ?? ""}
+                            onChange={(e) => updateTextAsset("headlines", h.id, e.target.value)}
+                            className={cn("h-9 pr-12 text-sm", (h.text?.length ?? 0) > 25 && "border-amber-300")}
+                          />
+                          <span className={cn(
+                            "absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tabular-nums",
+                            (h.text?.length ?? 0) > 25 ? "text-amber-500" : "text-muted-foreground"
+                          )}>
+                            {h.text?.length ?? 0}/{ASSET_LIMITS.headlines.charLimit}
+                          </span>
+                        </div>
+                        {currentGroup.headlines.length > ASSET_LIMITS.headlines.min && (
+                          <button type="button" onClick={() => removeTextAsset("headlines", h.id)} className="p-1 text-muted-foreground hover:text-destructive">
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {currentGroup.headlines.length < ASSET_LIMITS.headlines.max && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 gap-1 text-xs"
+                      onClick={() => addTextAsset("headlines", "HEADLINE")}
+                    >
+                      <Plus className="size-3" />
+                      Add Headline ({currentGroup.headlines.length}/{ASSET_LIMITS.headlines.max})
                     </Button>
+                  )}
+                </div>
+
+                {/* Long headlines */}
+                <div className="mt-4 border-t border-border pt-4">
+                  <div className="mb-1 flex items-center gap-2">
+                    <Label className="text-xs font-semibold text-foreground">Long headlines</Label>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
+                      {filledLongHeadlines}/{ASSET_LIMITS.longHeadlines.max} (min {ASSET_LIMITS.longHeadlines.min})
+                    </Badge>
+                    <InfoTip text={`Up to ${ASSET_LIMITS.longHeadlines.max} long headlines, ${ASSET_LIMITS.longHeadlines.charLimit} chars each.`} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {currentGroup.longHeadlines.map((h, idx) => (
+                      <div key={h.id} className="flex items-center gap-2">
+                        <span className="w-5 text-right text-[10px] text-muted-foreground">{idx + 1}</span>
+                        <div className="relative flex-1">
+                          <Input
+                            placeholder={`Long Headline ${idx + 1}`}
+                            maxLength={ASSET_LIMITS.longHeadlines.charLimit}
+                            value={h.text ?? ""}
+                            onChange={(e) => updateTextAsset("longHeadlines", h.id, e.target.value)}
+                            className="h-9 pr-12 text-sm"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground">
+                            {h.text?.length ?? 0}/{ASSET_LIMITS.longHeadlines.charLimit}
+                          </span>
+                        </div>
+                        {currentGroup.longHeadlines.length > ASSET_LIMITS.longHeadlines.min && (
+                          <button type="button" onClick={() => removeTextAsset("longHeadlines", h.id)} className="p-1 text-muted-foreground hover:text-destructive">
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {currentGroup.longHeadlines.length < ASSET_LIMITS.longHeadlines.max && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 gap-1 text-xs"
+                      onClick={() => addTextAsset("longHeadlines", "LONG_HEADLINE")}
+                    >
+                      <Plus className="size-3" />
+                      Add Long Headline
+                    </Button>
+                  )}
+                </div>
+
+                {/* Descriptions */}
+                <div className="mt-4 border-t border-border pt-4">
+                  <div className="mb-1 flex items-center gap-2">
+                    <Label className="text-xs font-semibold text-foreground">Descriptions</Label>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
+                      {filledDescriptions}/{ASSET_LIMITS.descriptions.max} (min {ASSET_LIMITS.descriptions.min})
+                    </Badge>
+                    <InfoTip text={`Up to ${ASSET_LIMITS.descriptions.max} descriptions, ${ASSET_LIMITS.descriptions.charLimit} chars each.`} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {currentGroup.descriptions.map((d, idx) => (
+                      <div key={d.id} className="flex items-start gap-2">
+                        <span className="mt-2.5 w-5 text-right text-[10px] text-muted-foreground">{idx + 1}</span>
+                        <div className="relative flex-1">
+                          <Textarea
+                            placeholder={`Description ${idx + 1}`}
+                            maxLength={ASSET_LIMITS.descriptions.charLimit}
+                            value={d.text ?? ""}
+                            onChange={(e) => updateTextAsset("descriptions", d.id, e.target.value)}
+                            className="min-h-[60px] text-sm"
+                            rows={2}
+                          />
+                          <span className="absolute bottom-2 right-3 text-[10px] tabular-nums text-muted-foreground">
+                            {d.text?.length ?? 0}/{ASSET_LIMITS.descriptions.charLimit}
+                          </span>
+                        </div>
+                        {currentGroup.descriptions.length > ASSET_LIMITS.descriptions.min && (
+                          <button type="button" onClick={() => removeTextAsset("descriptions", d.id)} className="mt-2 p-1 text-muted-foreground hover:text-destructive">
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {currentGroup.descriptions.length < ASSET_LIMITS.descriptions.max && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 gap-1 text-xs"
+                      onClick={() => addTextAsset("descriptions", "DESCRIPTION")}
+                    >
+                      <Plus className="size-3" />
+                      Add Description
+                    </Button>
+                  )}
+                </div>
+                  </>
+                )}
+              </SectionCard>
+
+              <SectionCard>
+                <div className="mb-2 flex items-center gap-2">
+                  <ImageIcon className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">Media assets</Label>
+                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
+                    {isRetailPMax ? "Optional in retail" : "Required + optional"}
+                  </Badge>
+                  <InfoTip text="Standard PMax requires 1 landscape + 1 square image. Logos are required when brand guidelines are off. Videos and CTA are optional." />
+                </div>
+                <p className="mb-3 text-xs text-muted-foreground">
+                  {isRetailPMax
+                    ? "Retail PMax uses your product feed. Add images, logos, and videos to improve coverage."
+                    : "Provide required image types and logos, then optional videos and CTA for stronger reach."}
+                </p>
+                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2">
+                  <span className="text-xs font-semibold text-foreground">Media status</span>
+                  <span className="text-[10px] text-muted-foreground">{mediaStatusText}</span>
+                  <div
+                    className="ml-auto flex items-center gap-1"
+                    title={mediaChecks
+                      .map((c) => `${c.ok ? "✓" : "○"} ${c.label}${c.required ? "" : " (optional)"}`)
+                      .join(", ")}
+                  >
+                    {mediaChecks.map((check) => (
+                      <div
+                        key={check.label}
+                        className={cn(
+                          "size-1.5 rounded-full",
+                          check.ok
+                            ? "bg-emerald-400"
+                            : check.required
+                              ? "bg-amber-400"
+                              : "bg-muted-foreground/25"
+                        )}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {isRetailPMax && retailAssetsLinked && (
+                  <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+                    <AlertTriangle className="mt-0.5 size-3.5" />
+                    <span>
+                      When you add assets in Retail PMax, the full asset requirements apply (images, logos, and text).
+                    </span>
                   </div>
                 )}
 
-                {/* Discover preview */}
-                {previewChannel === "discover" && (
-                  <div className="rounded-lg border border-border bg-background p-4">
-                    <div className="mb-2 flex aspect-[1.91/1] items-center justify-center rounded-lg bg-foreground/5">
-                      <ImageIcon className="size-8 text-muted-foreground/30" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="size-5 rounded bg-muted" />
-                      <span className="text-[10px] font-medium text-muted-foreground">{currentGroup.businessName || "Business"}</span>
-                      <span className="text-[10px] text-muted-foreground">Sponsored</span>
-                    </div>
-                    <p className="mt-1 text-xs font-semibold text-foreground">
-                      {currentGroup.longHeadlines.find((h) => h.text?.trim())?.text || "Long Headline"}
-                    </p>
+                {/* Images */}
+                <div className="mb-3 flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    {isRetailPMax ? (
+                      <CheckCircle2 className="size-3.5 text-primary" />
+                    ) : imageRequirementsMet ? (
+                      <CheckCircle2 className="size-3.5 text-emerald-500" />
+                    ) : (
+                      <AlertCircle className="size-3.5 text-amber-500" />
+                    )}
+                    <span className="text-xs font-semibold text-foreground">Images</span>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">
+                      Landscape {pmaxLandscapeCount}/1
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">
+                      Square {pmaxSquareCount}/1
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">
+                      Portrait {pmaxPortraitCount} optional
+                    </Badge>
                   </div>
-                )}
-              </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    {isRetailPMax ? "Optional in retail mode" : imageRequirementsMet ? "Required covered" : "Missing required types"}
+                  </span>
+                </div>
+
+                <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-muted/20 px-2 py-1">
+                  {imageTypeSpecs.map((spec) => {
+                    const required = !isRetailPMax && spec.required;
+                    return (
+                      <button
+                        key={spec.key}
+                        type="button"
+                        onClick={() => setActiveImageType(spec.key)}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium transition-colors",
+                          activeImageType === spec.key
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <span>{spec.shortLabel}</span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "rounded-full px-1.5 py-0 text-[9px]",
+                            activeImageType === spec.key ? "border-primary-foreground/30 text-primary-foreground" : ""
+                          )}
+                        >
+                          {spec.count}
+                        </Badge>
+                        {required && (
+                          <Badge className="rounded-full border-0 bg-destructive/10 px-1 py-0 text-[8px] text-destructive">
+                            Req
+                          </Badge>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <ImageIcon className="size-3.5 text-primary" />
+                    <p className="text-xs font-semibold text-foreground">{activeImageSpec.label}</p>
+                    {activeImageRequired && (
+                      <Badge className="rounded-full border-0 bg-destructive/10 px-1 py-0 text-[8px] text-destructive">Required</Badge>
+                    )}
+                    <Badge variant="outline" className="ml-auto rounded-full px-1.5 py-0 text-[9px]">
+                      {activeImageSpec.count}
+                    </Badge>
+                  </div>
+                  <p className="text-[9px] text-muted-foreground">{activeImageSpec.note}</p>
+                  <div className="mt-2">
+                    <UploadZone
+                      accept="image/png,image/jpeg"
+                      label="Upload or choose"
+                      sublabel="JPG/PNG • safe area 80%"
+                      onFile={(file) => addImageUpload(activeImageSpec.key, file)}
+                      compact
+                      libraryContext={imageLibraryContext}
+                      multiSelect
+                    />
+                  </div>
+                  {currentGroup.images.filter((img) => (img.pmaxImageType ?? "PORTRAIT") === activeImageSpec.key).length > 0 && (
+                    <div className="mt-2 flex flex-col gap-2">
+                      {currentGroup.images
+                        .filter((img) => (img.pmaxImageType ?? "PORTRAIT") === activeImageSpec.key)
+                        .map((img) => {
+                          const previewUrl = getPreviewUrl(img);
+                          const size = formatBytes(img.file?.size);
+                          const name = img.file?.name ?? (img.url ? "Library image" : "Image asset");
+                          return (
+                            <div key={img.id} className="flex items-center gap-3 rounded-lg border border-border bg-muted/5 px-3 py-2">
+                              <div className="size-11 overflow-hidden rounded-md bg-muted">
+                                {previewUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={previewUrl} alt={name} className="size-full object-cover" crossOrigin="anonymous" />
+                                ) : (
+                                  <div className="flex size-full items-center justify-center">
+                                    <ImageIcon className="size-4 text-muted-foreground/60" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-medium text-foreground">{name}</p>
+                                <p className="text-[10px] text-muted-foreground">{size || "Ready to use"}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeImageAsset("images", img.id)}
+                                className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Logos */}
+                <div className="mt-4 border-t border-border pt-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <ImageIcon className="size-3.5 text-primary" />
+                    <Label className="text-xs font-semibold text-foreground">Logos</Label>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">
+                      {logoRequirementMet ? "Requirement met" : "Logo required"}
+                    </Badge>
+                    <InfoTip text="Square logo (1:1) required when brand guidelines are off: min 128x128, rec 1200x1200. Optional landscape logo (4:1): min 512x128, rec 1200x300." />
+                  </div>
+                  <p className="mb-2 text-[10px] text-muted-foreground">
+                    Tip: avoid white logos on transparent backgrounds; they can render on white in some placements.
+                  </p>
+                  <div className="mb-3 flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      {minRequiredLogos === 0 ? (
+                        <CheckCircle2 className="size-3.5 text-primary" />
+                      ) : logoRequirementMet ? (
+                        <CheckCircle2 className="size-3.5 text-emerald-500" />
+                      ) : (
+                        <AlertCircle className="size-3.5 text-amber-500" />
+                      )}
+                      <span className="text-xs font-semibold text-foreground">Logos</span>
+                      <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">
+                        Square {logoSquareCount}/{ASSET_LIMITS.logos.max}
+                      </Badge>
+                      <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">
+                        Landscape {logoLandscapeCount}/{ASSET_LIMITS.landscapeLogos.max}
+                      </Badge>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      {minRequiredLogos === 0 ? "Optional in retail or with brand guidelines" : logoRequirementMet ? "Required covered" : "Logo required"}
+                    </span>
+                  </div>
+
+                  <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-muted/20 px-2 py-1">
+                    {logoTypeSpecs.map((spec) => {
+                      const required = !isRetailPMax && !budget.brandGuidelinesEnabled && spec.required;
+                      return (
+                        <button
+                          key={spec.key}
+                          type="button"
+                          onClick={() => setActiveLogoType(spec.key)}
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-medium transition-colors",
+                            activeLogoType === spec.key
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-transparent text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          <span>{spec.shortLabel}</span>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "rounded-full px-1.5 py-0 text-[9px]",
+                              activeLogoType === spec.key ? "border-primary-foreground/30 text-primary-foreground" : ""
+                            )}
+                          >
+                            {spec.count}
+                          </Badge>
+                          {required && (
+                            <Badge className="rounded-full border-0 bg-destructive/10 px-1 py-0 text-[8px] text-destructive">
+                              Req
+                            </Badge>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="rounded-lg border border-border bg-background p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <ImageIcon className="size-3.5 text-primary" />
+                      <p className="text-xs font-semibold text-foreground">{activeLogoSpec.label}</p>
+                      {activeLogoRequired && (
+                        <Badge className="rounded-full border-0 bg-destructive/10 px-1 py-0 text-[8px] text-destructive">Required</Badge>
+                      )}
+                      <Badge variant="outline" className="ml-auto rounded-full px-1.5 py-0 text-[9px]">
+                        {activeLogoSpec.count}
+                      </Badge>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground">{activeLogoSpec.note}</p>
+                    <div className="mt-2">
+                      <UploadZone
+                        accept="image/png,image/jpeg"
+                        label="Upload or choose"
+                        sublabel="JPG/PNG • safe area 80%"
+                        onFile={(file) => addLogoUpload(activeLogoSpec.key, file)}
+                        compact
+                        libraryContext={logoLibraryContext}
+                        multiSelect
+                      />
+                    </div>
+                    {logoUploadError && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-destructive">
+                        <AlertTriangle className="size-3.5" />
+                        <span>{logoUploadError}</span>
+                      </div>
+                    )}
+                    {currentGroup.logos.filter((logo) => (logo.pmaxImageType ?? "SQUARE") === activeLogoSpec.key).length > 0 && (
+                      <div className="mt-2 flex flex-col gap-2">
+                        {currentGroup.logos
+                          .filter((logo) => (logo.pmaxImageType ?? "SQUARE") === activeLogoSpec.key)
+                          .map((logo) => {
+                            const previewUrl = getPreviewUrl(logo);
+                            const size = formatBytes(logo.file?.size);
+                            const name = logo.file?.name ?? (logo.url ? "Library logo" : "Logo asset");
+                            return (
+                              <div key={logo.id} className="flex items-center gap-3 rounded-lg border border-border bg-muted/5 px-3 py-2">
+                                <div className="size-11 overflow-hidden rounded-md bg-muted">
+                                  {previewUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={previewUrl} alt={name} className="size-full object-cover" crossOrigin="anonymous" />
+                                  ) : (
+                                    <div className="flex size-full items-center justify-center">
+                                      <ImageIcon className="size-4 text-muted-foreground/60" />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-xs font-medium text-foreground">{name}</p>
+                                  <p className="text-[10px] text-muted-foreground">{size || "Ready to use"}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeImageAsset("logos", logo.id)}
+                                  className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                >
+                                  <Trash2 className="size-4" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* YouTube videos */}
+                <div className="mt-4 border-t border-border pt-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Video className="size-3.5 text-primary" />
+                    <Label className="text-xs font-semibold text-foreground">YouTube videos</Label>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">
+                      {currentGroup.videos.length}/{ASSET_LIMITS.videos.max} (optional)
+                    </Badge>
+                  <InfoTip text="Add YouTube video URLs or upload videos (min 10s, 16:9 / 1:1 / 9:16). If none are provided, Google can auto-generate videos from images." />
+                    <span className="ml-auto text-[10px] text-muted-foreground">
+                      {uploadedVideoCount > 0 && `Uploaded ${uploadedVideoCount}`}
+                      {uploadedVideoCount > 0 && linkedVideoCount > 0 && " • "}
+                      {linkedVideoCount > 0 && `Linked ${linkedVideoCount}`}
+                      {totalVideoCount === 0 && "Optional"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/20 px-2 py-1">
+                    {(["upload", "url"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setVideoInputMode(mode)}
+                        className={cn(
+                          "flex-1 rounded-md border px-2 py-1 text-[10px] font-medium transition-colors",
+                          videoInputMode === mode
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {mode === "upload" ? "Upload / Library" : "Paste URL"}
+                      </button>
+                    ))}
+                  </div>
+
+                  {videoInputMode === "upload" ? (
+                    <div className="mt-3 rounded-lg border border-border bg-background p-3">
+                      <div className="mb-2 flex items-center gap-2">
+                        <Upload className="size-3.5 text-primary" />
+                        <p className="text-xs font-semibold text-foreground">Upload or reuse</p>
+                        <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">Media Library</Badge>
+                      </div>
+                      <UploadZone
+                        accept="video/mp4,video/quicktime"
+                        label="Upload or choose from library"
+                        sublabel="MP4/MOV • >=10s • 16:9, 1:1, 9:16"
+                        onFile={addVideoUpload}
+                        compact
+                        libraryContext="VIDEO"
+                        multiSelect
+                      />
+                      <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+                        <div className="mb-2 flex items-center gap-2">
+                          <Youtube className="size-3.5 text-primary" />
+                          <p className="text-xs font-semibold text-foreground">Upload destination</p>
+                          <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">For uploads</Badge>
+                          {youtubeUploadDestination === "BRAND" && (
+                            <Badge variant={youtubeChannelConnected ? "secondary" : "outline"} className="rounded-full px-1.5 py-0 text-[9px]">
+                              {youtubeChannelConnected ? "Channel connected" : "No channel"}
+                            </Badge>
+                          )}
+                        </div>
+                        <RadioGroup
+                          value={youtubeUploadDestination}
+                          onValueChange={(value) =>
+                            updateNested("creative", {
+                              youtubeUploadDestination: value as "GOOGLE_MANAGED" | "BRAND",
+                            })
+                          }
+                          className="flex flex-col gap-2"
+                        >
+                          <label className="flex items-start gap-2 rounded-md border border-border bg-background px-2 py-2 text-[11px]">
+                            <RadioGroupItem value="GOOGLE_MANAGED" className="mt-0.5" />
+                            <span>
+                              <span className="block font-medium text-foreground">Google-managed channel (recommended)</span>
+                              <span className="block text-muted-foreground">No channel connection required. Videos are uploaded as Unlisted.</span>
+                            </span>
+                          </label>
+                          <label className="flex items-start gap-2 rounded-md border border-border bg-background px-2 py-2 text-[11px]">
+                            <RadioGroupItem value="BRAND" className="mt-0.5" />
+                            <span>
+                              <span className="block font-medium text-foreground">Your YouTube channel</span>
+                              <span className="block text-muted-foreground">Connect a brand channel so uploads appear in your own library.</span>
+                            </span>
+                          </label>
+                        </RadioGroup>
+
+                        {youtubeUploadDestination === "BRAND" && (
+                          <div className="mt-2 flex flex-col gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => setShowYoutubeConnect(true)}
+                              >
+                                Connect YouTube (OAuth)
+                              </Button>
+                              <span className="text-[10px] text-muted-foreground">
+                                Recommended for real ownership. Use manual entry for the prototype.
+                              </span>
+                            </div>
+                            <Input
+                              placeholder="YouTube channel ID (UC...)"
+                              value={youtubeChannelId}
+                              onChange={(e) => updateNested("creative", { youtubeChannelId: e.target.value })}
+                              className="h-8 text-xs"
+                            />
+                            <Input
+                              placeholder="Channel name (optional)"
+                              value={youtubeChannelName}
+                              onChange={(e) => updateNested("creative", { youtubeChannelName: e.target.value })}
+                              className="h-8 text-xs"
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                              Uploads default to Unlisted. We can switch to Public after verification.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-lg border border-border bg-background p-3">
+                      <div className="mb-2 flex items-center gap-2">
+                        <Link2 className="size-3.5 text-primary" />
+                        <p className="text-xs font-semibold text-foreground">Paste YouTube URL</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="https://youtube.com/watch?v=..."
+                          value={youtubeUrlDraft}
+                          onChange={(e) => setYoutubeUrlDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addVideoUrl();
+                            }
+                          }}
+                          className="h-8 text-xs"
+                        />
+                        <Button size="sm" className="h-8 text-xs" onClick={addVideoUrl} disabled={!youtubeUrlDraft.trim()}>
+                          Add URL
+                        </Button>
+                      </div>
+                      <p className="mt-2 text-[10px] text-muted-foreground">
+                        We save the video ID and use it in the asset group. Use videos that are 10+ seconds and 16:9, 1:1, or 9:16.
+                      </p>
+                    </div>
+                  )}
+
+                  {videoValidationError && (
+                    <div className="mt-2 flex items-center gap-1.5 text-[10px] text-destructive">
+                      <AlertTriangle className="size-3.5" />
+                      <span>{videoValidationError}</span>
+                    </div>
+                  )}
+
+                  {currentGroup.videos.length > 0 && (
+                    <div className="mt-3 flex flex-col gap-2">
+                      {currentGroup.videos.map((v) => {
+                        const previewUrl = v.file
+                          ? getPreviewUrl(v)
+                          : v.youtubeVideoId
+                            ? `https://img.youtube.com/vi/${v.youtubeVideoId}/hqdefault.jpg`
+                            : undefined;
+                        const size = formatBytes(v.file?.size);
+                        return (
+                          <div key={v.id} className="flex items-center gap-3 rounded-lg border border-border bg-muted/5 px-3 py-2">
+                            <div className="size-12 overflow-hidden rounded-md bg-muted">
+                              {previewUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={previewUrl} alt="Video preview" className="size-full object-cover" crossOrigin="anonymous" />
+                              ) : (
+                                <div className="flex size-full items-center justify-center">
+                                  <Video className="size-4 text-muted-foreground/60" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              {v.file ? (
+                                <>
+                                  <p className="truncate text-xs font-medium text-foreground">{v.file.name}</p>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    {size ? `${size} • ` : ""}Uploaded (pending YouTube processing)
+                                  </p>
+                                </>
+                              ) : (
+                                <Input
+                                  placeholder="https://youtube.com/watch?v=..."
+                                  value={v.url ?? ""}
+                                  onChange={(e) => updateVideoAsset(v.id, e.target.value)}
+                                  className="h-8 text-xs"
+                                />
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeVideoAsset(v.id)}
+                              className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </SectionCard>
+
         </div>
 
         {/* ============================================================ */}
@@ -4012,94 +5825,421 @@ export function GoogleStepCreative() {
         <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
           <div className="sticky top-6 flex flex-col gap-4">
 
-            {/* Ad Strength */}
+            {/* Ad Preview */}
             <SectionCard className="p-4">
               <div className="mb-3 flex items-center gap-2">
-                <Gauge className="size-4 text-primary" />
-                <p className="text-xs font-bold text-foreground">Ad Strength</p>
-                <span className={cn("ml-auto text-sm font-bold", adStrength.color)}>{adStrength.label}</span>
+                <Eye className="size-4 text-primary" />
+                <Label className="text-sm font-semibold text-foreground">Ad Preview</Label>
+                {isRetailPMax && (
+                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">
+                    Retail
+                  </Badge>
+                )}
               </div>
-              <div className="mb-2 h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-all",
-                    adStrength.label === "Excellent" ? "bg-emerald-500" :
-                    adStrength.label === "Good" ? "bg-primary" :
-                    adStrength.label === "Average" ? "bg-amber-500" :
-                    "bg-destructive"
+              <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-muted/10 px-2 py-1">
+                <button
+                  type="button"
+                  aria-label="Previous preview"
+                  onClick={() => goToPreview(-1)}
+                  className="flex size-6 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:text-foreground"
+                >
+                  <ArrowLeft className="size-3" />
+                </button>
+                <div className="flex flex-1 items-end justify-between gap-2 border-b border-border/60 pb-1">
+                  {previewTabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = previewChannel === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setPreviewChannel(tab.key)}
+                        className={cn(
+                          "flex flex-1 flex-col items-center gap-0.5 border-b-2 pb-1 text-[9px] font-medium transition-colors",
+                          isActive
+                            ? "border-primary text-foreground"
+                            : "border-transparent text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <Icon className={cn("size-3.5", tab.color)} />
+                        <span>{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  aria-label="Next preview"
+                  onClick={() => goToPreview(1)}
+                  className="flex size-6 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:text-foreground"
+                >
+                  <ArrowRight className="size-3" />
+                </button>
+              </div>
+
+              <div className="relative rounded-[26px] border border-border bg-muted/30 p-2">
+                <div className="relative mx-auto rounded-[22px] border border-border bg-background p-2 shadow-sm">
+                  <div className="mb-2 flex items-center justify-between text-[9px] text-muted-foreground">
+                    <span>9:41</span>
+                    <div className="flex items-center gap-1">
+                      <div className="h-2 w-3 rounded-sm bg-muted" />
+                      <div className="h-2 w-4 rounded-sm bg-muted" />
+                      <div className="h-2 w-5 rounded-sm bg-muted" />
+                    </div>
+                  </div>
+                  <div className="mb-2 flex items-center gap-1.5 text-[9px] text-muted-foreground">
+                    <div className="size-3 rounded-full bg-primary/20" />
+                    <span className="font-medium text-foreground">Sponsored</span>
+                    <span className="text-muted-foreground">•</span>
+                    <span>{activePreviewLabel}</span>
+                  </div>
+
+                  {previewChannel === "search" && (
+                    <div className="rounded-lg border border-border bg-background p-2">
+                      <div className="mb-1 flex items-center gap-1">
+                        <Badge className="rounded bg-foreground/10 px-1 py-0 text-[8px] font-bold text-foreground">Ad</Badge>
+                        <span className="text-[9px] text-muted-foreground">
+                          {previewDomain}
+                          {currentGroup.displayPath1 && ` / ${currentGroup.displayPath1}`}
+                          {currentGroup.displayPath2 && ` / ${currentGroup.displayPath2}`}
+                        </span>
+                      </div>
+                      <p className="text-[11px] font-semibold text-primary">
+                        {searchHeadline}
+                        {" - "}
+                        {searchHeadline2}
+                      </p>
+                      <p className="mt-0.5 text-[9px] text-muted-foreground">
+                        {searchDescription}{searchDescription2 ? ` ${searchDescription2}` : ""}
+                      </p>
+                      {renderPreviewControls("search", searchComboCount, "Text combos")}
+                    </div>
                   )}
-                  style={{ width: `${adStrength.score}%` }}
-                />
+
+                  {previewChannel === "display" && (
+                    <div className="rounded-lg border border-border bg-background p-2">
+                      {(() => {
+                        const total = displayImages.length;
+                        const idx = getPreviewIndex("display", total);
+                        const primary = displayImages[idx];
+                        const secondary = total > 1 ? displayImages[(idx + 1) % total] : undefined;
+                        const primaryUrl = getPreviewUrl(primary);
+                        const secondaryUrl = getPreviewUrl(secondary);
+                        const headline = headlineTexts[0] || "Headline";
+                        const description = descriptionTexts[0] || "Description";
+                        const logoUrl = getPreviewUrl(displayLogo);
+                        return (
+                          <>
+                            <div className="mb-2 grid grid-cols-2 gap-1">
+                              <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-md bg-muted">
+                                {primaryUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={primaryUrl} alt="Preview" className="size-full object-cover" crossOrigin="anonymous" />
+                                ) : (
+                                  <ImageIcon className="size-4 text-muted-foreground/40" />
+                                )}
+                              </div>
+                              <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-md bg-muted">
+                                {secondaryUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={secondaryUrl} alt="Preview" className="size-full object-cover" crossOrigin="anonymous" />
+                                ) : (
+                                  <ImageIcon className="size-4 text-muted-foreground/40" />
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-[10px] font-semibold text-foreground">{headline}</p>
+                            <p className="mt-0.5 text-[9px] text-muted-foreground">{description}</p>
+                            <div className="mt-2 flex items-center gap-1.5">
+                              {logoUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={logoUrl} alt="Logo" className="h-3 w-3 rounded-sm object-cover" crossOrigin="anonymous" />
+                              ) : (
+                                <div className="size-3 rounded bg-muted" />
+                              )}
+                              <span className="text-[9px] text-muted-foreground">{currentGroup.businessName || "Business"}</span>
+                              <span className="ml-auto inline-flex items-center rounded-full bg-primary px-2 py-0.5 text-[8px] font-medium text-primary-foreground">
+                                {CTA_OPTIONS.find((c) => c.value === currentGroup.callToAction)?.label ?? "Shop now"}
+                              </span>
+                            </div>
+                            {renderPreviewControls("display", total, "Images")}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {previewChannel === "youtube" && (
+                    <div className="rounded-lg border border-border bg-background p-2">
+                      {(() => {
+                        const totalVideos = youtubeVideos.length;
+                        const totalFallback = youtubeFallbackImages.length;
+                        const total = totalVideos > 0 ? totalVideos : totalFallback;
+                        const idx = getPreviewIndex("youtube", total || 1);
+                        const video = totalVideos > 0 ? youtubeVideos[idx] : undefined;
+                        const fallbackImage = totalVideos === 0 ? youtubeFallbackImages[idx] : undefined;
+                        const videoUrl = getPreviewUrl(video);
+                        const imageUrl = getPreviewUrl(fallbackImage);
+                        const headline = longHeadlineTexts[0] || headlineTexts[0] || "Long Headline Here";
+                        const description = descriptionTexts[0] || "Description";
+                        return (
+                          <>
+                            <div className="mb-2 flex aspect-video items-center justify-center overflow-hidden rounded-md bg-muted">
+                              {videoUrl ? (
+                                <video src={videoUrl} muted loop playsInline className="size-full object-cover" />
+                              ) : imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={imageUrl} alt="Preview" className="size-full object-cover" crossOrigin="anonymous" />
+                              ) : (
+                                <PlayCircle className="size-6 text-muted-foreground/40" />
+                              )}
+                            </div>
+                            <p className="text-[10px] font-semibold text-foreground">{headline}</p>
+                            <p className="mt-0.5 text-[9px] text-muted-foreground">{description}</p>
+                            <div className="mt-2 inline-flex items-center rounded-full bg-primary px-2 py-0.5 text-[9px] font-medium text-primary-foreground">
+                              {CTA_OPTIONS.find((c) => c.value === currentGroup.callToAction)?.label ?? "Shop now"}
+                            </div>
+                            {renderPreviewControls("youtube", total, totalVideos > 0 ? "Videos" : "Images")}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {previewChannel === "discover" && (
+                    <div className="rounded-lg border border-border bg-background p-2">
+                      {(() => {
+                        const total = discoverImages.length;
+                        const idx = getPreviewIndex("discover", total || 1);
+                        const image = discoverImages[idx];
+                        const imageUrl = getPreviewUrl(image);
+                        const headline = longHeadlineTexts[0] || headlineTexts[0] || "Long Headline";
+                        const logoUrl = getPreviewUrl(discoverLogo);
+                        return (
+                          <>
+                            <div className="mb-2 flex aspect-[1.91/1] items-center justify-center overflow-hidden rounded-md bg-muted">
+                              {imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={imageUrl} alt="Preview" className="size-full object-cover" crossOrigin="anonymous" />
+                              ) : (
+                                <ImageIcon className="size-5 text-muted-foreground/40" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {logoUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={logoUrl} alt="Logo" className="h-3 w-3 rounded-sm object-cover" crossOrigin="anonymous" />
+                              ) : (
+                                <div className="size-3 rounded bg-muted" />
+                              )}
+                              <span className="text-[9px] text-muted-foreground">{currentGroup.businessName || "Business"}</span>
+                              <span className="text-[9px] text-muted-foreground">Sponsored</span>
+                            </div>
+                            <p className="mt-1 text-[10px] font-semibold text-foreground">{headline}</p>
+                            {renderPreviewControls("discover", total, "Images")}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {previewChannel === "gmail" && (
+                    <div className="rounded-lg border border-border bg-background p-2">
+                      {(() => {
+                        const total = gmailImages.length;
+                        const idx = getPreviewIndex("gmail", total || 1);
+                        const image = gmailImages[idx];
+                        const imageUrl = getPreviewUrl(image);
+                        const headline = headlineTexts[0] || "New arrivals in store";
+                        const description = descriptionTexts[0] || "Discover curated products from your store.";
+                        return (
+                          <>
+                            <div className="mb-2 flex items-center justify-between text-[9px] text-muted-foreground">
+                              <span className="font-medium text-foreground">Promotions</span>
+                              <span>Ad</span>
+                            </div>
+                            <div className="flex items-center gap-2 rounded-md border border-border/60 p-2">
+                              <div className="flex size-10 items-center justify-center overflow-hidden rounded-md bg-muted">
+                                {imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={imageUrl} alt="Preview" className="size-full object-cover" crossOrigin="anonymous" />
+                                ) : (
+                                  <ImageIcon className="size-4 text-muted-foreground/40" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-[10px] font-semibold text-foreground">{currentGroup.businessName || "Your Store"}</p>
+                                <p className="truncate text-[9px] text-muted-foreground">{headline}</p>
+                              </div>
+                              <ChevronRight className="size-3.5 text-muted-foreground" />
+                            </div>
+                            <div className="mt-2 rounded-md border border-border/60 p-2">
+                              <p className="text-[10px] font-semibold text-foreground">{headline}</p>
+                              <p className="mt-0.5 text-[9px] text-muted-foreground">{description}</p>
+                              <div className="mt-2 inline-flex items-center rounded-full bg-primary px-2 py-0.5 text-[9px] font-medium text-primary-foreground">
+                                {CTA_OPTIONS.find((c) => c.value === currentGroup.callToAction)?.label ?? "Shop now"}
+                              </div>
+                            </div>
+                            {renderPreviewControls("gmail", total, "Images")}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {previewChannel === "shopping" && (
+                    <div className="rounded-lg border border-border bg-background p-2">
+                      {(() => {
+                        const total = PREVIEW_PRODUCTS.length;
+                        const idx = getPreviewIndex("shopping", total || 1);
+                        const productA = PREVIEW_PRODUCTS[idx % total];
+                        const productB = PREVIEW_PRODUCTS[(idx + 1) % total];
+                        const headline = longHeadlineTexts[0] || "Shop top picks";
+                        return (
+                          <>
+                            <p className="mb-2 text-[10px] font-semibold text-foreground">{headline}</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {[productA, productB].map((product) => (
+                                <div key={product.id} className="overflow-hidden rounded-md border border-border/60">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={product.image} alt={product.name} className="aspect-square w-full object-cover" crossOrigin="anonymous" />
+                                  <div className="p-1.5">
+                                    <p className="truncate text-[9px] font-medium text-foreground">{product.name}</p>
+                                    <p className="text-[9px] text-muted-foreground">
+                                      {product.salePrice ? (
+                                        <>
+                                          <span className="font-semibold text-foreground">{formatSAR(product.salePrice)}</span>{" "}
+                                          <span className="line-through">{formatSAR(product.price)}</span>
+                                        </>
+                                      ) : (
+                                        <span className="font-semibold text-foreground">{formatSAR(product.price)}</span>
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            {renderPreviewControls("shopping", total, "Products")}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                {previewLocked && (
+                  <div className="pointer-events-none absolute left-3 right-3 top-4 rounded-lg border border-amber-300 bg-white/95 px-2.5 py-2 text-[9px] text-amber-900 shadow-sm">
+                    <div className="flex items-center gap-1.5">
+                      <AlertCircle className="size-3 text-amber-600" />
+                      <span className="font-semibold">To unlock this format, add the following assets:</span>
+                    </div>
+                    <ul className="mt-1 list-disc pl-4 text-amber-900">
+                      {previewLockItems.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                {adStrength.label === "Excellent"
-                  ? "Great! Your asset group has strong creative variety."
-                  : adStrength.label === "Good"
-                    ? "Good progress. Add more assets to reach Excellent."
-                    : "Add more assets to improve ad performance."
-                }
+              <p className="mt-2 text-[10px] text-muted-foreground">
+                Preview is illustrative. Final layout varies by placement and inventory.
               </p>
             </SectionCard>
 
-            {/* Asset Requirements */}
+            {/* Campaign Readiness */}
             <SectionCard className="p-4">
-              <p className="mb-3 text-xs font-bold text-foreground">Asset Requirements</p>
-              <div className="flex flex-col gap-2 text-[11px]">
-                {[
-                  { label: "Headlines", count: filledHeadlines, min: 3, max: 15 },
-                  { label: "Long Headlines", count: filledLongHeadlines, min: 1, max: 5 },
-                  { label: "Descriptions", count: filledDescriptions, min: 2, max: 5 },
-                  { label: "Images", count: currentGroup.images.length, min: 1, max: 20 },
-                  { label: "Logos", count: currentGroup.logos.length, min: 1, max: 5 },
-                  { label: "Videos", count: currentGroup.videos.length, min: 0, max: 5 },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className={cn("size-3", item.count >= item.min ? "text-emerald-500" : "text-muted-foreground/40")} />
-                      <span className="text-muted-foreground">{item.label}</span>
-                    </div>
-                    <span className={cn("font-medium tabular-nums", item.count >= item.min ? "text-foreground" : "text-destructive")}>
-                      {item.count}/{item.min}-{item.max}
+              <div className="flex items-start gap-3">
+                <ReadinessRing percent={readinessPercent} />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground">Campaign Readiness</p>
+                    <span className={cn("text-xs font-semibold", requiredRemaining === 0 ? "text-emerald-600" : "text-destructive")}>
+                      {readinessStatus}
                     </span>
                   </div>
-                ))}
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {requiredRemaining === 0
+                      ? "All required items are complete."
+                      : `${requiredRemaining} required item${requiredRemaining === 1 ? "" : "s"} need attention before launching.`}
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <span>Ad strength:</span>
+                    <span className={cn("font-semibold", adStrength.color)}>{adStrength.label}</span>
+                  </div>
+                </div>
               </div>
-            </SectionCard>
-
-            {/* Asset Groups */}
-            <SectionCard className="p-4">
-              <p className="mb-3 text-xs font-bold text-foreground">Asset Groups ({assetGroups.length})</p>
-              <div className="flex flex-col gap-1.5">
-                {assetGroups.map((g, idx) => {
-                  const str = calcAdStrength(g);
-                  return (
-                    <button
-                      key={g.id}
-                      type="button"
-                      onClick={() => setActiveGroupIdx(idx)}
+              <div className="mt-3 rounded-lg border border-border bg-muted/10 p-3">
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Required</span>
+                    <Badge
+                      variant="outline"
                       className={cn(
-                        "flex items-center justify-between rounded-lg border px-3 py-2 text-left transition-colors",
-                        idx === activeGroupIdx ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"
+                        "rounded-full px-1.5 py-0 text-[9px]",
+                        requiredRemaining === 0 ? "text-emerald-600" : "text-destructive"
                       )}
                     >
-                      <span className="text-[11px] font-medium text-foreground">{g.name || `Group ${idx + 1}`}</span>
-                      <span className={cn("text-[10px] font-medium", str.color)}>{str.label}</span>
-                    </button>
-                  );
-                })}
+                      {requiredRemaining} remaining
+                    </Badge>
+                  </div>
+                  <span className="tabular-nums">{requiredDone}/{requiredTotal}</span>
+                </div>
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      readinessPercent >= 100 ? "bg-emerald-500" :
+                      readinessPercent >= 70 ? "bg-primary" :
+                      readinessPercent >= 40 ? "bg-amber-500" :
+                      "bg-destructive"
+                    )}
+                    style={{ width: `${readinessPercent}%` }}
+                  />
+                </div>
+                <div className="mt-3 flex flex-col gap-2 text-[11px]">
+                  {blockers.map((b) => (
+                    <div key={b.label} className="flex items-start gap-2">
+                      {b.ok ? (
+                        <CheckCircle2 className="mt-0.5 size-3 text-emerald-500" />
+                      ) : (
+                        <AlertCircle className="mt-0.5 size-3 text-destructive" />
+                      )}
+                      <span className={cn(b.ok ? "text-muted-foreground" : "text-foreground")}>
+                        {b.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </SectionCard>
 
-            {/* Tips */}
-            <SectionCard className="p-4">
-              <p className="text-xs font-semibold text-foreground">Asset Tips</p>
-              <ul className="mt-2 flex flex-col gap-1.5 text-xs leading-relaxed text-muted-foreground">
-                <li>- Use all 15 headline slots for maximum optimization</li>
-                <li>- Include diverse headlines (features, benefits, promotions)</li>
-                <li>- Add images in all 3 aspect ratios</li>
-                <li>- Videos boost YouTube performance significantly</li>
-                <li>- Aim for "Excellent" ad strength</li>
-              </ul>
+              <div className="mt-3 rounded-lg border border-border bg-muted/10 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ListChecks className="size-3.5 text-primary" />
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Best practices</p>
+                  </div>
+                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">
+                    {bestPracticeDone}/{bestPracticeTotal}
+                  </Badge>
+                </div>
+                <div className="mt-2 flex flex-col gap-2">
+                  {bestPracticeItems.map((item) => (
+                    <div key={item.title} className="flex items-start gap-2">
+                      {item.done ? (
+                        <CheckCircle2 className="mt-0.5 size-3 text-emerald-500" />
+                      ) : (
+                        <AlertCircle className="mt-0.5 size-3 text-amber-500" />
+                      )}
+                      <div>
+                        <p className={cn("text-[11px] font-medium", item.done ? "text-muted-foreground" : "text-foreground")}>
+                          {item.title}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </SectionCard>
           </div>
         </div>
@@ -4111,6 +6251,20 @@ export function GoogleStepCreative() {
         nextLabel="Next"
         nextDisabled={!canProceed}
       />
+      <Dialog open={showYoutubeConnect} onOpenChange={setShowYoutubeConnect}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Connect YouTube channel</DialogTitle>
+            <DialogDescription>
+              We&apos;ll request access to your Google account to upload videos to your brand channel. This OAuth flow
+              is a production integration; for the prototype, you can paste the channel ID manually.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => setShowYoutubeConnect(false)}>Got it</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }

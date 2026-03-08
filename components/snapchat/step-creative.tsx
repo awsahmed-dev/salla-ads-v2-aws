@@ -1070,7 +1070,7 @@ export function StepCreative() {
 
         {/* ============ RIGHT COLUMN ============ */}
         <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
-          <div className="sticky top-20 flex flex-col gap-4">
+          <div className="lg:sticky lg:top-20 flex flex-col gap-4">
 
             <SnapchatAdPreview
               ads={ads}

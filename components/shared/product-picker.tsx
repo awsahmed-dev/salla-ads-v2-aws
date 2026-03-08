@@ -5,11 +5,12 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Store, Search, Check, Package, Plus, X, Star, ArrowUpDown } from "lucide-react";
 import {
   type SallaProduct,
@@ -52,12 +53,14 @@ export function ProductPickerDialog({
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortOption>("best_selling");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectedItems, setSelectedItems] = useState<Record<string, SallaProduct>>({});
   const [products, setProducts] = useState<SallaProduct[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
   const [showSortMenu, setShowSortMenu] = useState(false);
 
   const remainingSlots = maxProducts;
+  const selectedProducts = Object.values(selectedItems);
 
   const loadProducts = useCallback(async () => {
     const result = await fetchProducts({
@@ -74,23 +77,34 @@ export function ProductPickerDialog({
     if (open) {
       loadProducts();
       getCategories().then(setCategories);
+      setSelected(new Set());
+      setSelectedItems({});
+      setSearch("");
     }
   }, [open, loadProducts]);
 
-  const toggleProduct = (id: string) => {
+  const toggleProduct = (product: SallaProduct) => {
+    const id = product.id;
     const next = new Set(selected);
     if (next.has(id)) {
       next.delete(id);
+      setSelectedItems((prev) => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
     } else if (next.size < remainingSlots) {
       next.add(id);
+      setSelectedItems((prev) => ({ ...prev, [id]: product }));
     }
     setSelected(next);
   };
 
   const handleConfirm = () => {
-    const chosen = products.filter((p) => selected.has(p.id));
+    const chosen = selectedProducts;
     onAddProducts(chosen);
     setSelected(new Set());
+    setSelectedItems({});
     setSearch("");
     onOpenChange(false);
   };
@@ -98,18 +112,49 @@ export function ProductPickerDialog({
   const allCategories = ["all", ...categories];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col gap-0 p-0">
-        <DialogHeader className="border-b border-border px-5 py-4">
-          <DialogTitle className="flex items-center gap-2 text-base">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-xl">
+        <SheetHeader className="border-b border-border px-5 pb-3 pt-5">
+          <SheetTitle className="flex items-center gap-2 text-base">
             <Store className="size-4 text-primary" />
             Select Products from Store
-          </DialogTitle>
-          <p className="text-xs text-muted-foreground">
+          </SheetTitle>
+          <SheetDescription className="text-xs">
             Choose up to {remainingSlots} product{remainingSlots !== 1 ? "s" : ""} &middot;{" "}
             <span className="font-medium text-foreground">{total}</span> products available
-          </p>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
+
+        {selectedProducts.length > 0 && (
+          <div className="flex shrink-0 items-center gap-2 border-b border-primary/20 bg-primary/[0.03] px-5 py-2">
+            <span className="shrink-0 text-[11px] font-semibold text-primary">{selectedProducts.length} selected</span>
+            <div className="flex flex-1 gap-1.5 overflow-x-auto">
+              {selectedProducts.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => toggleProduct(p)}
+                  className="group flex shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-background py-0.5 pl-0.5 pr-2 transition-colors hover:border-destructive/30 hover:bg-destructive/5"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.image} alt="" className="size-5 rounded-full object-cover" crossOrigin="anonymous" />
+                  <span className="max-w-[80px] truncate text-[10px] font-medium text-foreground">{p.name}</span>
+                  <X className="size-2.5 shrink-0 text-muted-foreground group-hover:text-destructive" />
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSelected(new Set());
+                setSelectedItems({});
+              }}
+              className="shrink-0 text-[10px] text-primary hover:underline"
+            >
+              Clear
+            </button>
+          </div>
+        )}
 
         {/* Search + Category filter + Sort */}
         <div className="flex flex-col gap-2.5 border-b border-border px-5 py-3">
@@ -208,7 +253,7 @@ export function ProductPickerDialog({
                     key={product.id}
                     type="button"
                     disabled={isDisabled || alreadyAdded || !product.inStock}
-                    onClick={() => toggleProduct(product.id)}
+                  onClick={() => toggleProduct(product)}
                     className={cn(
                       "group relative flex flex-col overflow-hidden rounded-xl border-2 text-left transition-all",
                       isSelected
@@ -317,7 +362,7 @@ export function ProductPickerDialog({
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

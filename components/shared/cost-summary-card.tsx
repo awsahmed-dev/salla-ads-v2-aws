@@ -17,6 +17,7 @@ interface CostSummaryCardProps {
   durationDays?: number;
   isOngoing?: boolean;
   totalBudget: number;
+  totalBudgetLabel?: string;
   autoIncreaseEnabled?: boolean;
   boostEnabled?: boolean;
   boostAmount?: number;
@@ -31,6 +32,7 @@ export function CostSummaryCard({
   durationDays,
   isOngoing,
   totalBudget,
+  totalBudgetLabel = "Ad spend",
   autoIncreaseEnabled,
   boostEnabled,
   boostAmount = 299,
@@ -69,7 +71,7 @@ export function CostSummaryCard({
         {totalBudget !== budgetAmount && (
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Ad spend</span>
+              <span className="text-muted-foreground">{totalBudgetLabel}</span>
               <span className="font-medium tabular-nums text-foreground">
                 {totalBudget.toLocaleString()} SAR
               </span>

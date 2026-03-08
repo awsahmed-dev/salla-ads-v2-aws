@@ -126,7 +126,7 @@ export function TargetingSummaryCard({
             const valueEl = (
               <span
                 className={cn(
-                  "max-w-[180px] truncate text-right font-medium",
+                  "max-w-[140px] sm:max-w-[180px] truncate text-right font-medium",
                   empty
                     ? "text-muted-foreground font-normal italic"
                     : row.highlight

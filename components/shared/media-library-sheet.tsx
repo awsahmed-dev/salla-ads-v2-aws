@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -30,6 +30,8 @@ import {
   relativeDate,
   type MediaItem,
   type MediaFilter,
+  type MediaUsage,
+  type MediaAspect,
 } from "@/lib/salla/media-library";
 
 export interface MediaLibrarySheetProps {
@@ -42,15 +44,40 @@ export interface MediaLibrarySheetProps {
     name: string;
   }) => void;
   accept?: string;
+  context?: MediaLibraryContext;
+  multiSelect?: boolean;
 }
 
 type TabId = "library" | "upload";
+
+export type MediaLibraryContext =
+  | "IMAGE"
+  | "VIDEO"
+  | "LOGO"
+  | "IMAGE_LANDSCAPE"
+  | "IMAGE_SQUARE"
+  | "IMAGE_PORTRAIT"
+  | "LOGO_SQUARE"
+  | "LOGO_LANDSCAPE";
+
+const CONTEXT_CONFIG: Record<MediaLibraryContext, { filter: MediaFilter; usage?: MediaUsage; aspect?: MediaAspect }> = {
+  IMAGE: { filter: "IMAGE", usage: "IMAGE" },
+  VIDEO: { filter: "VIDEO", usage: "VIDEO" },
+  LOGO: { filter: "IMAGE", usage: "LOGO" },
+  IMAGE_LANDSCAPE: { filter: "IMAGE", usage: "IMAGE", aspect: "LANDSCAPE" },
+  IMAGE_SQUARE: { filter: "IMAGE", usage: "IMAGE", aspect: "SQUARE" },
+  IMAGE_PORTRAIT: { filter: "IMAGE", usage: "IMAGE", aspect: "PORTRAIT" },
+  LOGO_SQUARE: { filter: "IMAGE", usage: "LOGO", aspect: "SQUARE" },
+  LOGO_LANDSCAPE: { filter: "IMAGE", usage: "LOGO", aspect: "LANDSCAPE" },
+};
 
 export function MediaLibrarySheet({
   open,
   onOpenChange,
   onSelect,
   accept = "image/png,image/jpeg,video/mp4,video/quicktime",
+  context,
+  multiSelect = false,
 }: MediaLibrarySheetProps) {
   const [tab, setTab] = useState<TabId>("library");
   const [items, setItems] = useState<MediaItem[]>([]);
@@ -58,10 +85,52 @@ export function MediaLibrarySheet({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<MediaFilter>("ALL");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const isMulti = multiSelect;
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  const FILTER_OPTIONS: { value: MediaFilter; label: string }[] = [
+    { value: "ALL", label: "All" },
+    { value: "IMAGE", label: "Images" },
+    { value: "VIDEO", label: "Videos" },
+  ];
+
+  const inferFilterFromAccept = useCallback((value: string): MediaFilter => {
+    const hasImage = /image\//i.test(value);
+    const hasVideo = /video\//i.test(value);
+    if (hasImage && hasVideo) return "ALL";
+    if (hasImage) return "IMAGE";
+    if (hasVideo) return "VIDEO";
+    return "ALL";
+  }, []);
+
+  const contextConfig = context ? CONTEXT_CONFIG[context] : undefined;
+  const acceptFilter = inferFilterFromAccept(accept);
+  const baseFilter = contextConfig?.filter ?? acceptFilter;
+  const allowedFilters = useMemo(
+    () => FILTER_OPTIONS.filter((opt) => baseFilter === "ALL" || opt.value === baseFilter),
+    [baseFilter]
+  );
+
+  const applyContextFilter = useCallback(
+    (list: MediaItem[]) => {
+      if (!contextConfig) return list;
+      return list.filter((item) => {
+        if (contextConfig.filter !== "ALL" && item.mediaType !== contextConfig.filter) return false;
+        if (contextConfig.usage) {
+          if (item.usage !== contextConfig.usage) return false;
+        } else if (item.usage === "LOGO") {
+          return false;
+        }
+        if (contextConfig.aspect && item.aspect !== contextConfig.aspect) return false;
+        return true;
+      });
+    },
+    [contextConfig]
+  );
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -69,11 +138,11 @@ export function MediaLibrarySheet({
       const results = query.trim()
         ? await searchMedia(query, filter)
         : await fetchMediaLibrary(filter);
-      setItems(results);
+      setItems(applyContextFilter(results));
     } finally {
       setLoading(false);
     }
-  }, [query, filter]);
+  }, [query, filter, applyContextFilter]);
 
   useEffect(() => {
     if (open && tab === "library") loadItems();
@@ -82,13 +151,27 @@ export function MediaLibrarySheet({
   useEffect(() => {
     if (open) {
       setSelectedId(null);
+      setSelectedIds([]);
       setQuery("");
-      setFilter("ALL");
+      setFilter(baseFilter);
       setTab("library");
     }
-  }, [open]);
+  }, [open, baseFilter]);
 
   const handleSelect = () => {
+    if (isMulti) {
+      const selectedItems = items.filter((m) => selectedIds.includes(m.id));
+      if (selectedItems.length === 0) return;
+      selectedItems.forEach((item) => {
+        onSelect({
+          url: item.url,
+          mediaType: item.mediaType,
+          name: item.name,
+        });
+      });
+      onOpenChange(false);
+      return;
+    }
     const item = items.find((m) => m.id === selectedId);
     if (!item) return;
     onSelect({
@@ -100,35 +183,42 @@ export function MediaLibrarySheet({
   };
 
   const handleUploadFile = useCallback(
-    async (file: File) => {
+    async (file: File, closeAfter = true) => {
       setUploading(true);
       try {
-        const item = await addMediaToLibrary(file);
+        const item = await addMediaToLibrary(file, {
+          usage: contextConfig?.usage,
+          aspect: contextConfig?.aspect,
+        });
         onSelect({
           url: item.url,
           mediaType: item.mediaType,
           file,
           name: item.name,
         });
-        onOpenChange(false);
+        if (closeAfter) onOpenChange(false);
       } finally {
         setUploading(false);
       }
     },
-    [onSelect, onOpenChange]
+    [onSelect, onOpenChange, contextConfig]
   );
 
-  const handleUploadFiles = (files: FileList | null) => {
-    if (files?.[0]) handleUploadFile(files[0]);
+  const handleUploadFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    if (isMulti) {
+      for (const file of Array.from(files)) {
+        await handleUploadFile(file, false);
+      }
+      onOpenChange(false);
+      return;
+    }
+    handleUploadFile(files[0]);
   };
 
-  const FILTER_OPTIONS: { value: MediaFilter; label: string }[] = [
-    { value: "ALL", label: "All" },
-    { value: "IMAGE", label: "Images" },
-    { value: "VIDEO", label: "Videos" },
-  ];
-
+  const selectedItems = isMulti ? items.filter((m) => selectedIds.includes(m.id)) : [];
   const selected = items.find((m) => m.id === selectedId);
+  const selectedCount = isMulti ? selectedItems.length : selected ? 1 : 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -186,23 +276,25 @@ export function MediaLibrarySheet({
                     className="h-8 pl-8 text-xs"
                   />
                 </div>
-                <div className="flex gap-1.5">
-                  {FILTER_OPTIONS.map((f) => (
-                    <button
-                      key={f.value}
-                      type="button"
-                      onClick={() => setFilter(f.value)}
-                      className={cn(
-                        "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                        filter === f.value
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                      )}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
+                {allowedFilters.length > 1 && (
+                  <div className="flex gap-1.5">
+                    {allowedFilters.map((f) => (
+                      <button
+                        key={f.value}
+                        type="button"
+                        onClick={() => setFilter(f.value)}
+                        className={cn(
+                          "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                          filter === f.value
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Grid */}
@@ -226,14 +318,28 @@ export function MediaLibrarySheet({
                 ) : (
                   <div className="grid grid-cols-3 gap-2">
                     {items.map((item) => {
-                      const isSelected = selectedId === item.id;
+                      const isSelected = isMulti
+                        ? selectedIds.includes(item.id)
+                        : selectedId === item.id;
+                      const aspectRatio =
+                        item.width && item.height
+                          ? `${item.width} / ${item.height}`
+                          : "9 / 16";
                       return (
                         <button
                           key={item.id}
                           type="button"
-                          onClick={() =>
-                            setSelectedId(isSelected ? null : item.id)
-                          }
+                          onClick={() => {
+                            if (isMulti) {
+                              setSelectedIds((prev) =>
+                                prev.includes(item.id)
+                                  ? prev.filter((id) => id !== item.id)
+                                  : [...prev, item.id]
+                              );
+                              return;
+                            }
+                            setSelectedId(isSelected ? null : item.id);
+                          }}
                           className={cn(
                             "group relative flex flex-col overflow-hidden rounded-lg border text-left transition-all",
                             isSelected
@@ -242,7 +348,10 @@ export function MediaLibrarySheet({
                           )}
                         >
                           {/* Thumbnail */}
-                          <div className="relative aspect-[9/16] w-full overflow-hidden bg-muted/20">
+                          <div
+                            className="relative w-full overflow-hidden bg-muted/20"
+                            style={{ aspectRatio }}
+                          >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={item.thumbnailUrl}
@@ -304,13 +413,17 @@ export function MediaLibrarySheet({
               <div className="shrink-0 border-t border-border px-4 py-3">
                 <Button
                   className="w-full gap-1.5"
-                  disabled={!selectedId}
+                  disabled={selectedCount === 0}
                   onClick={handleSelect}
                 >
                   <CheckCircle2 className="size-3.5" />
-                  {selected
-                    ? `Use "${selected.name.length > 20 ? selected.name.slice(0, 20) + "…" : selected.name}"`
-                    : "Select a media asset"}
+                  {isMulti
+                    ? selectedCount > 0
+                      ? `Add ${selectedCount} item${selectedCount !== 1 ? "s" : ""}`
+                      : "Select media"
+                    : selected
+                      ? `Use "${selected.name.length > 20 ? selected.name.slice(0, 20) + "…" : selected.name}"`
+                      : "Select a media asset"}
                 </Button>
               </div>
             </>
@@ -363,6 +476,7 @@ export function MediaLibrarySheet({
                 ref={uploadInputRef}
                 type="file"
                 accept={accept}
+                multiple={isMulti}
                 className="hidden"
                 onChange={(e) => handleUploadFiles(e.target.files)}
               />

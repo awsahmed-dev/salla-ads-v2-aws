@@ -1030,6 +1030,8 @@ function AdPanel({
                     label="Add carousel card images"
                     sublabel="JPG/PNG, min 2 - max 35 cards, < 100KB suggested each"
                     onFile={handleCarouselFile}
+                    libraryContext="IMAGE"
+                    multiSelect
                   />
                 ) : (
                   <div className="flex flex-col gap-2">
@@ -1061,6 +1063,8 @@ function AdPanel({
                           sublabel="JPG/PNG"
                           compact
                           onFile={handleCarouselFile}
+                          libraryContext="IMAGE"
+                          multiSelect
                         />
                       )}
                     </div>
@@ -1117,6 +1121,7 @@ function AdPanel({
                       }
                       onUpdate({ ...ad, musicFile: file, musicUrl: URL.createObjectURL(file) });
                     }}
+                    enableLibrary={false}
                   />
                 )}
                 <div className="mt-2 flex flex-col gap-1.5">
@@ -1239,6 +1244,7 @@ function AdPanel({
                   previewFile={ad.assets[0]?.file}
                   onFile={handleFile}
                   onClear={() => onUpdate({ ...ad, assets: [] })}
+                  libraryContext="VIDEO"
                 />
 
                 <div className="mt-2 flex items-start gap-1.5">
@@ -1279,10 +1285,16 @@ function AdPanel({
                         <button type="button" onClick={() => onUpdate({ ...ad, musicFile: undefined, musicUrl: "" })} className="text-destructive/60 hover:text-destructive"><Trash2 className="size-3.5" /></button>
                       </div>
                     ) : (
-                      <UploadZone accept="audio/mpeg,audio/wav,audio/x-m4a,audio/flac" label="Upload music" sublabel="MP3/WAV/M4A/FLAC, max 10MB" onFile={(file) => {
-                        if (file.size > 10 * 1024 * 1024) { alert("Music file must be under 10MB."); return; }
-                        onUpdate({ ...ad, musicFile: file, musicUrl: URL.createObjectURL(file) });
-                      }} />
+                      <UploadZone
+                        accept="audio/mpeg,audio/wav,audio/x-m4a,audio/flac"
+                        label="Upload music"
+                        sublabel="MP3/WAV/M4A/FLAC, max 10MB"
+                        onFile={(file) => {
+                          if (file.size > 10 * 1024 * 1024) { alert("Music file must be under 10MB."); return; }
+                          onUpdate({ ...ad, musicFile: file, musicUrl: URL.createObjectURL(file) });
+                        }}
+                        enableLibrary={false}
+                      />
                     )}
                   </div>
                 )}
@@ -1426,6 +1438,7 @@ function AdPanel({
                   previewFile={ad.assets[0]?.file}
                   onFile={handleFile}
                   onClear={() => onUpdate({ ...ad, assets: [] })}
+                  libraryContext="IMAGE"
                 />
 
                 <div className="mt-2 flex items-start gap-1.5">
@@ -1466,10 +1479,16 @@ function AdPanel({
                         <button type="button" onClick={() => onUpdate({ ...ad, musicFile: undefined, musicUrl: "" })} className="text-destructive/60 hover:text-destructive"><Trash2 className="size-3.5" /></button>
                       </div>
                     ) : (
-                      <UploadZone accept="audio/mpeg,audio/wav,audio/x-m4a,audio/flac" label="Upload music" sublabel="MP3/WAV/M4A/FLAC, max 10MB" onFile={(file) => {
-                        if (file.size > 10 * 1024 * 1024) { alert("Music file must be under 10MB."); return; }
-                        onUpdate({ ...ad, musicFile: file, musicUrl: URL.createObjectURL(file) });
-                      }} />
+                      <UploadZone
+                        accept="audio/mpeg,audio/wav,audio/x-m4a,audio/flac"
+                        label="Upload music"
+                        sublabel="MP3/WAV/M4A/FLAC, max 10MB"
+                        onFile={(file) => {
+                          if (file.size > 10 * 1024 * 1024) { alert("Music file must be under 10MB."); return; }
+                          onUpdate({ ...ad, musicFile: file, musicUrl: URL.createObjectURL(file) });
+                        }}
+                        enableLibrary={false}
+                      />
                     )}
                   </div>
                 )}

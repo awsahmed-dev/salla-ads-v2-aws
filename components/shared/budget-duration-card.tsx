@@ -307,7 +307,7 @@ export function BudgetDurationCard({
       {budgetTypes.length > 0 && (
       <div className="mb-5">
         <Label className="mb-2 block text-xs font-medium text-muted-foreground uppercase tracking-wider">Budget Type</Label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {budgetTypes.map((m) => {
             const active = paymentMethod === m.value;
             return (

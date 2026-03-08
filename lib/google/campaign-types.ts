@@ -1,5 +1,5 @@
 /* ================================================================
-   Campaign Types -- aligned to Google Ads API v18
+   Campaign Types -- aligned to Google Ads API v23
    Objectives: PERFORMANCE_MAX, SHOPPING, DEMAND_GEN, SEARCH, DISPLAY, APP
    All objectives labelled; implementation TBD per objective.
    ================================================================ */
@@ -22,6 +22,7 @@ export type BiddingStrategy =
   | "MAXIMIZE_CONVERSIONS"
   | "MAXIMIZE_CONVERSION_VALUE"
   | "TARGET_CPA"
+  | "TARGET_CPC"
   | "TARGET_ROAS"
   | "TARGET_IMPRESSION_SHARE"
   | "MANUAL_CPC"
@@ -163,7 +164,7 @@ export const OBJECTIVE_CONFIGS: Record<string, GoogleObjectiveConfig> = {
     apiChannelType: "DEMAND_GEN",
     label: "Demand Gen",
     description: "Engage audiences on YouTube, Discover, and Gmail with visually rich image and video ads",
-    allowedBiddingStrategies: ["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE", "TARGET_CPA", "TARGET_ROAS"],
+    allowedBiddingStrategies: ["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE", "TARGET_CPA", "TARGET_CPC", "TARGET_ROAS"],
     defaultBiddingStrategy: "MAXIMIZE_CONVERSIONS",
     conversionTrackingRequired: true,
     merchantCenterRequired: false,
@@ -245,6 +246,13 @@ export interface GoogleObjectiveSettings {
   demandGenAdType: DemandGenAdType;
   /** App campaign settings. Maps to AppCampaignSetting */
   appSettings: AppCampaignSettings;
+  /**
+   * Required declaration when targeting EU political advertising.
+   * Maps to Campaign.contains_eu_political_advertising.
+   */
+  containsEuPoliticalAdvertising:
+    | "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING"
+    | "CONTAINS_EU_POLITICAL_ADVERTISING";
 }
 
 /* ---- Step: Audience ---- */
@@ -342,6 +350,8 @@ export interface GoogleBudgetSettings {
   biddingStrategy: BiddingStrategy;
   /** Target CPA amount (when using TARGET_CPA) */
   targetCpa: number;
+  /** Target CPC amount (when using TARGET_CPC; Demand Gen only) */
+  targetCpc: number;
   /** Target ROAS percentage (when using TARGET_ROAS, e.g. 400 for 400%) */
   targetRoas: number;
   /** Maximum CPC bid limit (when using MANUAL_CPC) */
@@ -361,6 +371,9 @@ export interface GoogleBudgetSettings {
   /** Schedule */
   startDate: string;
   endDate: string;
+  /** Optional time precision (v23) in HH:mm */
+  startTime: string;
+  endTime: string;
   endDateOptional: boolean;
   schedule: "all_day" | "custom";
   /** Ad scheduling (day-parting) */
@@ -386,6 +399,16 @@ export interface GoogleBudgetSettings {
   /** AI Max for Search settings. Maps to Campaign.ai_max_setting.
    *  Only applies to Search campaigns. */
   aiMaxSettings: AiMaxSettings;
+  /** Programmatic text controls for AI generated assets (Search + PMax). */
+  textGuidelines: TextGuidelines;
+  /**
+   * Demand Gen budget mode.
+   * DAILY -> amount
+   * TOTAL -> demandGenTotalAmount
+   */
+  demandGenBudgetMode: "DAILY" | "TOTAL";
+  /** Total budget amount in SAR for Demand Gen TOTAL mode. */
+  demandGenTotalAmount: number;
 }
 
 /* ---- AI / Automation Settings ---- */
@@ -419,6 +442,13 @@ export interface AiMaxSettings {
   brandExclusions: string[];
   /** URL patterns to restrict final URL expansion to. Maps to PageFeedAsset */
   urlInclusions: string[];
+}
+
+export interface TextGuidelines {
+  /** Terms that must never appear in generated text. */
+  termExclusions: string[];
+  /** Required short messaging restrictions/instructions. */
+  messagingRestrictions: string[];
 }
 
 /** Demand Gen ad-level automation types. Maps to ad.asset_automation_settings.
@@ -489,6 +519,8 @@ export interface DemandGenAd {
   /* ---- VIDEO ASSETS (Video Responsive) ---- */
   /** YouTube video assets. Maps to DemandGenVideoResponsiveAdInfo.videos */
   videos: { id: string; youtubeUrl: string }[];
+  /** v23: optional companion banner for Video Responsive ads */
+  companionBannerUrl?: string;
   /** Breadcrumbs shown next to displayed URL (Video Responsive only) */
   breadcrumb1: string;
   breadcrumb2: string;
@@ -613,6 +645,9 @@ export interface ProductGroupNode {
   /** Children partitions (only for SUBDIVISION) */
   children: ProductGroupNode[];
 }
+
+/** Retail PMax listing group mode (asset-group listing filter) */
+export type RetailListingMode = "ALL" | "CATEGORY" | "BRAND" | "CUSTOM_LABEL";
 
 /** A negative keyword for Shopping campaigns */
 export interface NegativeKeyword {
@@ -763,6 +798,8 @@ export interface GoogleCreativeAsset {
   text?: string;
   /** URL for image/video assets */
   url?: string;
+  /** PMax image slot classification used for asset requirement validation in prototype UI. */
+  pmaxImageType?: "LANDSCAPE" | "SQUARE" | "PORTRAIT";
   file?: File;
   /** YouTube video ID for video assets */
   youtubeVideoId?: string;
@@ -777,7 +814,9 @@ export type AppCampaignGoalType =
   | "OPTIMIZE_INSTALLS_TARGET_INSTALL_COST"
   | "OPTIMIZE_IN_APP_CONVERSIONS_TARGET_INSTALL_COST"
   | "OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST"
-  | "OPTIMIZE_RETURN_ON_ADVERTISING_SPEND";
+  | "OPTIMIZE_RETURN_ON_ADVERTISING_SPEND"
+  | "OPTIMIZE_IN_APP_CONVERSIONS_WITHOUT_TARGET_CPA"
+  | "OPTIMIZE_TOTAL_VALUE_WITHOUT_TARGET_ROAS";
 
 /** App store type. Maps to AppCampaignAppStore. */
 export type AppStore = "APPLE_APP_STORE" | "GOOGLE_APP_STORE";
@@ -967,6 +1006,12 @@ export function createDisplayAdGroup(index = 1): DisplayAdGroup {
 export interface GoogleCreativeSettings {
   /** Asset groups (PMax only) */
   assetGroups: GoogleAssetGroup[];
+  /** YouTube upload destination (prototype) */
+  youtubeUploadDestination?: "GOOGLE_MANAGED" | "BRAND";
+  /** Optional YouTube channel ID for brand uploads */
+  youtubeChannelId?: string;
+  /** Optional YouTube channel name for display */
+  youtubeChannelName?: string;
   /** Demand Gen ad groups (each with multiple ads). Maps to AdGroup + AdGroupAd */
   demandGenAdGroups: DemandGenAdGroup[];
   /** Search ad groups (each with keywords + RSAs). Maps to AdGroup + AdGroupCriterion + AdGroupAd */
@@ -980,6 +1025,10 @@ export interface GoogleCreativeSettings {
   appAds: GoogleAppAd[];
   /** Product group listing tree root (Shopping). Maps to AdGroupListingGroupFilter tree */
   productGroupRoot: ProductGroupNode | null;
+  /** Retail PMax listing group mode */
+  retailListingMode?: RetailListingMode;
+  /** Selected values for retail listing groups (categories/brands/labels) */
+  retailListingValues?: string[];
   /** Negative keywords (Shopping). Maps to CampaignCriterion with negative=true */
   negativeKeywords: NegativeKeyword[];
   /** Campaign-level sitelink extensions. Maps to CampaignAsset with SitelinkAsset */
@@ -1032,6 +1081,7 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
       appName: "",
       biddingStrategyGoalType: "OPTIMIZE_INSTALLS_TARGET_INSTALL_COST",
     },
+    containsEuPoliticalAdvertising: "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
   },
   audience: {
     locationIds: ["SA"],
@@ -1074,6 +1124,7 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
     amount: 200,
     biddingStrategy: "MAXIMIZE_CONVERSIONS",
     targetCpa: 0,
+    targetCpc: 0,
     targetRoas: 400,
     maxCpcBid: 0,
     enhancedCpc: true,
@@ -1084,6 +1135,8 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
     deliveryMethod: "STANDARD",
     startDate: "",
     endDate: "",
+    startTime: "00:00",
+    endTime: "23:59",
     endDateOptional: false,
     schedule: "all_day",
     adSchedule: [],
@@ -1104,9 +1157,18 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
       brandExclusions: [],
       urlInclusions: [],
     },
+    textGuidelines: {
+      termExclusions: [],
+      messagingRestrictions: [],
+    },
+    demandGenBudgetMode: "DAILY",
+    demandGenTotalAmount: 0,
   },
   creative: {
     assetGroups: [],
+    youtubeUploadDestination: "GOOGLE_MANAGED",
+    youtubeChannelId: "",
+    youtubeChannelName: "",
     demandGenAdGroups: [
       {
         id: "dg-ag-1",
@@ -1133,6 +1195,7 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
             images: [],
             logos: [],
             videos: [],
+            companionBannerUrl: "",
             breadcrumb1: "",
             breadcrumb2: "",
             carouselHeadline: "",
@@ -1156,6 +1219,8 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
     appAds: [createAppAd(1)],
   displayAds: [],
     productGroupRoot: null,
+    retailListingMode: "ALL",
+    retailListingValues: [],
     negativeKeywords: [],
     sitelinkExtensions: [],
     calloutExtensions: [],

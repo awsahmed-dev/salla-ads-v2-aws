@@ -6,7 +6,7 @@ import { OBJECTIVE_CONFIGS, type SearchKeyword, type KeywordMatchType, type Audi
 import { cn } from "@/lib/utils";
 import { getCountryByCode, getCityById } from "@/lib/locations";
 import { LocationSelector } from "@/components/shared/location-selector";
-import { LocationReachCard } from "@/components/shared/location-reach-card";
+import { LocationMapPreview } from "@/components/shared/location-map-preview";
 import { DeliveryCheckCard } from "@/components/shared/delivery-check-card";
 import { DemographicsCard } from "@/components/shared/demographics-card";
 import { SallaSmartFeaturesCard } from "@/components/shared/salla-smart-features-card";
@@ -16,6 +16,7 @@ import { AudienceReadinessChecklist } from "@/components/shared/audience-readine
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { LegacyInterestTargetingCard as InterestTargetingCard } from "@/components/shared/interest-targeting-card";
 import { SectionCard } from "@/components/shared/section-card";
+import { ObjectiveExplainer } from "@/components/shared/objective-explainer";
 import { InfoTip } from "@/components/shared/info-tip";
 import { minMaxToAgeBands, ageBandsToMinMax, SUPPORTED_LANGUAGES } from "@/lib/demographics";
 import { Input } from "@/components/ui/input";
@@ -106,6 +107,18 @@ const REMARKETING_AUDIENCES = [
   { id: "rm_6", name: "Product Page Viewers" },
 ];
 
+const REMARKETING_AUDIENCE_META: Record<
+  string,
+  { intent: "High intent" | "Mid intent" | "Broad"; freshness: string; starter?: boolean }
+> = {
+  rm_1: { intent: "Broad", freshness: "30d" },
+  rm_2: { intent: "High intent", freshness: "90d", starter: true },
+  rm_3: { intent: "High intent", freshness: "30d", starter: true },
+  rm_4: { intent: "Mid intent", freshness: "90d" },
+  rm_5: { intent: "High intent", freshness: "90d" },
+  rm_6: { intent: "Mid intent", freshness: "30d" },
+};
+
 /** Google Display Network topic categories.
  *  Maps to AdGroupCriterion.topic (TopicInfo). */
 const DISPLAY_TOPICS = [
@@ -161,6 +174,22 @@ function TagPill({ label, onRemove }: { label: string; onRemove: () => void }) {
       </button>
     </span>
   );
+}
+
+function SectionGroupHeader({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-foreground">{title}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function isGenericSiteDomain(input: string): boolean {
+  const normalized = input.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "");
+  const domain = normalized.split("/")[0] ?? "";
+  const blocked = ["google.com", "youtube.com", "facebook.com", "instagram.com", "tiktok.com", "x.com", "twitter.com"];
+  return blocked.some((d) => domain === d || domain.endsWith(`.${d}`));
 }
 
 /* ================================================================== */
@@ -326,20 +355,62 @@ export function GoogleStepAudience() {
     signalCount >= 10 ? 100 :
     signalCount >= 5 ? 70 :
     signalCount >= 1 ? 35 : 5;
+  const hasGenericSiteHint = aud.customSegmentUrls.some(isGenericSiteDomain);
+  const selectedCities = useMemo(
+    () =>
+      (aud.cityIds ?? [])
+        .map((id) => getCityById(id))
+        .filter((c): c is NonNullable<typeof c> => c != null)
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          countryCode: c.countryCode,
+          lat: c.lat,
+          lng: c.lng,
+          radiusKm: aud.cityRadii?.[c.id] ?? c.radiusKm,
+        })),
+    [aud.cityIds, aud.cityRadii]
+  );
 
   const hasLocation = (aud.locationIds?.length ?? 0) > 0 || (aud.cityIds?.length ?? 0) > 0;
-  const canProceed = hasLocation && aud.languages.length > 0 && (!isSearch || searchKeywords.length > 0) && (!isApp || !!campaign.objective.appSettings.appId.trim());
+  const deliveryIssues = useMemo(() => {
+    const issues: { message: string }[] = [];
+    if (!hasLocation) issues.push({ message: "No location selected" });
+    if (aud.languages.length === 0) issues.push({ message: "No language set" });
+    if (aud.ageMin >= aud.ageMax) issues.push({ message: "Invalid age range" });
+    if (isSearch && searchKeywords.length === 0) issues.push({ message: "Add at least one keyword for Search campaigns" });
+    if (isApp && !campaign.objective.appSettings.appId.trim()) issues.push({ message: "App ID is required for App campaigns" });
+    return issues;
+  }, [
+    hasLocation,
+    aud.languages.length,
+    aud.ageMin,
+    aud.ageMax,
+    isSearch,
+    searchKeywords.length,
+    isApp,
+    campaign.objective.appSettings.appId,
+  ]);
+  const canProceed = deliveryIssues.length === 0;
 
-  const readinessChecks = useMemo(() => {
-    const base: { label: string; done: boolean }[] = [
-      { label: "At least 1 location selected", done: hasLocation },
-      { label: "Language set", done: aud.languages.length > 0 },
-      { label: "Age range configured", done: aud.ageMin < aud.ageMax },
-    ];
-    if (isSearch) {
-      base.push({ label: "Keywords added", done: searchKeywords.length > 0 });
-      base.push({ label: "5+ keywords (recommended)", done: searchKeywords.length >= 5 });
+  const bestPracticeChecks = useMemo(() => {
+    const base: { label: string; done: boolean }[] = [];
+
+    if (isPMax) {
+      base.push({ label: "Add 3+ audience signals", done: signalCount >= 3 });
+      base.push({ label: "Add 5-15 search themes", done: aud.searchThemes.length >= 5 && aud.searchThemes.length <= 15 });
+      base.push({ label: "Select 1+ first-party audience list", done: aud.audienceSignals.length > 0 });
+      return base;
     }
+
+    if (isSearch) {
+      const matchTypesUsed = new Set(searchKeywords.map((k) => k.matchType)).size;
+      base.push({ label: "Add 10+ keywords", done: searchKeywords.length >= 10 });
+      base.push({ label: "Use 2+ keyword match types", done: matchTypesUsed >= 2 });
+      base.push({ label: "Add negative keywords", done: searchNegKeywords.length > 0 });
+      return base;
+    }
+
     if (isDisplay) {
       const hasContentTargeting =
         displayContentKeywords.length > 0 ||
@@ -347,30 +418,52 @@ export function GoogleStepAudience() {
         displayPlacements.length > 0 ||
         aud.inMarketSegments.length > 0 ||
         aud.affinitySegments.length > 0;
-      base.push({ label: "Content targeting or audience segments", done: hasContentTargeting });
+      base.push({ label: "Add content targeting or audience segments", done: hasContentTargeting });
       if (displayContentKeywords.length > 0 || displayTopics.length > 0 || displayPlacements.length > 0) {
-        base.push({ label: "10+ content keywords (recommended)", done: displayContentKeywords.length >= 10 });
+        base.push({ label: "Add 10+ content keywords (if using keyword targeting)", done: displayContentKeywords.length >= 10 });
       }
+      return base;
     }
+
+    if (isDemandGen) {
+      base.push({ label: "Add in-market or affinity audiences", done: aud.inMarketSegments.length + aud.affinitySegments.length > 0 });
+      base.push({ label: "Select 1+ first-party audience list", done: aud.audienceSignals.length > 0 });
+      return base;
+    }
+
+    if (isShopping) {
+      base.push({ label: "Add negative keywords", done: aud.negativeKeywords.length > 0 });
+      base.push({ label: "Add audience signals (in-market, affinity, or your data)", done: aud.inMarketSegments.length + aud.affinitySegments.length + aud.audienceSignals.length > 0 });
+      return base;
+    }
+
     if (isApp) {
-      base.push({ label: "App ID set", done: !!campaign.objective.appSettings.appId.trim() });
+      base.push({ label: "Keep locations broad for scale", done: (aud.cityIds?.length ?? 0) === 0 });
+      base.push({ label: "Set at least one language", done: aud.languages.length > 0 });
+      return base;
     }
+
     return base;
   }, [
-    hasLocation,
-    aud.languages.length,
-    aud.ageMin,
-    aud.ageMax,
+    signalCount,
+    aud.searchThemes.length,
+    aud.audienceSignals.length,
     aud.inMarketSegments.length,
     aud.affinitySegments.length,
     isSearch,
     isDisplay,
+    isDemandGen,
+    isShopping,
+    isPMax,
     isApp,
     searchKeywords.length,
+    searchNegKeywords.length,
     displayContentKeywords.length,
     displayTopics.length,
     displayPlacements.length,
-    campaign.objective.appSettings.appId,
+    aud.negativeKeywords.length,
+    aud.cityIds?.length,
+    aud.languages.length,
   ]);
 
   const targetingSummaryRows: TargetingSummaryRow[] = useMemo(() => {
@@ -402,6 +495,7 @@ export function GoogleStepAudience() {
         ...base,
         { label: "Search themes", value: String(aud.searchThemes.length) },
         { label: "Custom segments", value: String(aud.customSegmentKeywords.length + aud.customSegmentUrls.length) },
+        { label: "Device delivery", value: "Auto (Google AI)" },
       ];
     }
     if (isSearch) {
@@ -451,23 +545,38 @@ export function GoogleStepAudience() {
             </p>
           </div>
 
+          {!isShopping && !isApp && (
+            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                <span className="font-semibold text-foreground">Quick terms:</span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-muted-foreground">
+                  Signal
+                  <InfoTip text="A hint to guide Google AI toward likely converters. Signals are recommendations, not strict delivery limits." />
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-muted-foreground">
+                  Observation
+                  <InfoTip text="Track audience performance and adjust bids without restricting who can see your ads." />
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-muted-foreground">
+                  Targeting
+                  <InfoTip text="Restrict delivery to selected audiences only. Use when you intentionally want tighter reach." />
+                </span>
+              </div>
+            </div>
+          )}
+
+          <SectionGroupHeader
+            title="Required to launch"
+            description="Complete these basics first so your campaign can deliver."
+          />
+
           {/* ---- 1. Location (shared component — same UX as all platforms; maps to locationIds + cityIds) ---- */}
           <SectionCard>
             <LocationSelector
               value={{
                 countryCodes: aud.locationIds,
                 regions: [],
-                cities: (aud.cityIds ?? [])
-                  .map((id) => getCityById(id))
-                  .filter((c): c is NonNullable<typeof c> => c != null)
-                  .map((c) => ({
-                    id: c.id,
-                    name: c.name,
-                    countryCode: c.countryCode,
-                    lat: c.lat,
-                    lng: c.lng,
-                    radiusKm: aud.cityRadii?.[c.id] ?? c.radiusKm,
-                  })),
+                cities: selectedCities,
               }}
               onChange={(next) =>
                 updateNested("audience", {
@@ -480,7 +589,7 @@ export function GoogleStepAudience() {
               enableRadiusPerCity
               accent="primary"
               label="Location"
-              tooltipText="Choose countries and/or cities where your ads will be shown. Maps to CampaignCriterion geo_target_constant."
+              tooltipText="Choose where ads can run. Start broad (country-level), then narrow to priority cities only if needed."
             />
 
             {/* Location method (Google-specific) */}
@@ -503,6 +612,9 @@ export function GoogleStepAudience() {
                   </button>
                 ))}
               </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Simple rule: start with <strong>People in this location</strong>. Use <strong>People in or interested in</strong> only when you want broader reach.
+              </p>
             </div>
           </SectionCard>
 
@@ -523,8 +635,18 @@ export function GoogleStepAudience() {
             accent="primary"
             languageRequired={aud.locationIds.length > 1}
             headerTooltip={isPMax
-              ? "Demographic signals help Google focus on your most likely customers. The AI may still serve ads outside these groups."
-              : "Define who sees your ads by gender, age, and language."
+              ? "Use demographics as guidance, not hard limits. PMax can still expand if it predicts better conversions."
+              : "Set language, age, and gender to keep targeting relevant for your offer."
+            }
+          />
+
+          <SectionGroupHeader
+            title="Recommended for performance"
+            description={isPMax
+              ? "Add strong audience signals so PMax can learn faster."
+              : isSearch
+                ? "Build targeting quality to improve relevance and efficiency."
+                : "Add audience quality signals to improve delivery outcomes."
             }
           />
 
@@ -535,10 +657,10 @@ export function GoogleStepAudience() {
                 <Search className="size-4 text-primary" />
                 <Label className="text-sm font-semibold text-foreground">Keywords</Label>
                 <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">Search</Badge>
-                <InfoTip text="Keywords trigger your ads when people search for these terms on Google. Each keyword has a match type that controls how broadly it matches. Maps to AdGroupCriterion." />
+                <InfoTip text="These are the search terms that can trigger your ads. Use buyer-intent terms and a mix of match types for balanced reach and control." />
               </div>
               <p className="mb-3 mt-2 text-xs text-muted-foreground">
-                Add the search terms your customers use when looking for your products. Google recommends 10-20 keywords per ad group.
+                Add what customers type before buying. Start with 10-20 relevant keywords per ad group.
               </p>
 
               {/* Keyword input with match type */}
@@ -637,7 +759,7 @@ export function GoogleStepAudience() {
               <div className="mt-5 border-t border-border pt-4">
                 <div className="mb-2 flex items-center gap-2">
                   <Label className="text-xs font-semibold text-foreground">Negative Keywords</Label>
-                  <InfoTip text="Prevent your ads from showing for these search terms. Helps reduce wasted spend. Maps to CampaignCriterion with negative=true." />
+                  <InfoTip text="Block irrelevant searches so budget goes to better traffic. Add terms like free, jobs, tutorial, and other non-buying intent queries." />
                 </div>
                 <div className="mb-2 flex gap-2">
                   <Input
@@ -663,7 +785,7 @@ export function GoogleStepAudience() {
                     ))}
                   </div>
                 )}
-                <p className="mt-1 text-[10px] text-muted-foreground">{searchNegKeywords.length} negative keyword{searchNegKeywords.length !== 1 ? "s" : ""}</p>
+                <p className="mt-1 text-[10px] text-muted-foreground">{searchNegKeywords.length} negative keyword{searchNegKeywords.length !== 1 ? "s" : ""} added.</p>
               </div>
             </SectionCard>
           )}
@@ -672,23 +794,54 @@ export function GoogleStepAudience() {
           {!isShopping && !isApp && <SectionCard>
             <div className="mb-3 flex items-center gap-2">
               <Target className="size-4 text-primary" />
-              <Label className="text-sm font-semibold text-foreground">Interests & Audience Segments</Label>
+              <Label className="text-sm font-semibold text-foreground">Suggested Interests & Audience Segments</Label>
+              {isPMax && <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Prototype data</Badge>}
               {isSearch && <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Observation</Badge>}
               <InfoTip text={isPMax
-                ? "Audience signals help Google's AI find the right people faster. Maps to AssetGroupSignal audience segments."
+                ? "Audience signals help Google AI learn faster, but they do not strictly limit delivery."
                 : isSearch
-                  ? "Add audience segments in Observation mode to monitor performance and apply bid adjustments without restricting who sees your ads. Maps to AdGroupCriterion with bid_modifier."
-                  : "Target users based on their interests and purchase intent."
+                  ? "Add segments in Observation mode to measure audience performance and adjust bids without restricting reach."
+                  : "Reach people by interests and purchase intent. Keep segments focused on your category."
               } />
             </div>
             <p className="mb-3 text-xs text-muted-foreground">
               {isPMax
-                ? "Optional -- select segments to signal which audiences are most relevant. Google will expand beyond these automatically."
+                ? "Optional: select segments to signal which audiences are most relevant. Google can expand beyond these automatically."
                 : isSearch
-                  ? "Optional -- add audience segments to layer on top of your keywords. In Observation mode, ads still show to all searchers but you can bid higher for selected segments."
-                  : "Optional -- leave empty to reach all interests."
+                  ? "Optional: add audience segments on top of your keywords. In Observation mode, ads still show broadly while you optimize by segment."
+                  : "Optional: leave empty to keep broad interest reach."
               }
             </p>
+
+            {isPMax && (
+              <p className="mb-3 text-[11px] text-muted-foreground">
+                Sample list for prototype only. Full Google audience catalog will be connected at launch.
+              </p>
+            )}
+
+            {isPMax && (
+              <ObjectiveExplainer
+                className="mb-4"
+                cards={[
+                  {
+                    title: "In-Market = ready to buy now",
+                    description: "People actively comparing products or planning to purchase soon.",
+                    icon: <ShoppingBag className="size-3.5 text-primary" />,
+                  },
+                  {
+                    title: "Affinity = ongoing interests",
+                    description: "People with long-term interests (broader audience, good for discovery).",
+                    icon: <Heart className="size-3.5 text-primary" />,
+                  },
+                ]}
+                stepsTitle="Simple way to use this"
+                steps={[
+                  "Start with 3-6 In-Market segments most relevant to your products.",
+                  "Add 1-3 Affinity segments only if you want broader reach.",
+                  "Leave empty if you are testing broad discovery.",
+                ]}
+              />
+            )}
 
             {/* Audience mode selector (Search only) */}
             {isSearch && (
@@ -696,12 +849,21 @@ export function GoogleStepAudience() {
                 <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <Radio className="size-3 text-primary" />
                   Audience Mode
-                  <InfoTip text="Observation = monitor + bid adjust (recommended). Targeting = restrict delivery to this audience only. Maps to AdGroupTargetingSetting.target_restrictions." />
+                  <InfoTip text="Observation keeps reach broad and lets you optimize by audience. Targeting limits delivery to selected audiences only." />
                 </Label>
+                <ObjectiveExplainer
+                  className="mb-2"
+                  highlight={
+                    <>
+                      <span className="font-semibold text-primary">Simple rule:</span> start with <strong>Observation</strong>. Use{" "}
+                      <strong>Targeting</strong> only when you want ads to show to selected audiences only.
+                    </>
+                  }
+                />
                 <div className="grid grid-cols-2 gap-2">
                   {([
-                    { value: "OBSERVATION" as AudienceTargetingMode, label: "Observation", desc: "Recommended -- bid adjust only" },
-                    { value: "TARGETING" as AudienceTargetingMode, label: "Targeting", desc: "Restrict to audience only" },
+                    { value: "OBSERVATION" as AudienceTargetingMode, label: "Observation", desc: "Ads still show to all keyword searches; you can measure and adjust bids by audience." },
+                    { value: "TARGETING" as AudienceTargetingMode, label: "Targeting", desc: "Ads show only to selected audiences who also search your keywords." },
                   ]).map((mode) => {
                     const isSelected = aud.audienceTargetingMode === mode.value;
                     return (
@@ -726,6 +888,11 @@ export function GoogleStepAudience() {
                     <p className="text-[11px] text-amber-700">Targeting mode will only show ads to users in your selected audience segments. This significantly reduces reach for Search campaigns.</p>
                   </div>
                 )}
+                {aud.audienceTargetingMode === "OBSERVATION" && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Best for most stores: keep Observation and apply bid adjustments after you collect data.
+                  </p>
+                )}
               </div>
             )}
 
@@ -737,9 +904,9 @@ export function GoogleStepAudience() {
                 onChange={(ids) =>
                   updateNested("audience", { inMarketSegments: ids })
                 }
-                sectionLabel="In-Market Segments"
+                sectionLabel={isPMax ? "In-Market (People ready to buy now)" : "In-Market Segments"}
                 accent="primary"
-                searchPlaceholder="Search in-market segments..."
+                searchPlaceholder={isPMax ? "Choose high-intent audiences..." : "Search in-market segments..."}
                 showClearAll={false}
               />
             </div>
@@ -752,9 +919,9 @@ export function GoogleStepAudience() {
                 onChange={(ids) =>
                   updateNested("audience", { affinitySegments: ids })
                 }
-                sectionLabel="Affinity Segments"
+                sectionLabel={isPMax ? "Affinity (People with related interests)" : "Affinity Segments"}
                 accent="primary"
-                searchPlaceholder="Search affinity segments..."
+                searchPlaceholder={isPMax ? "Choose broader interest audiences..." : "Search affinity segments..."}
                 showClearAll={false}
               />
             </div>
@@ -765,6 +932,16 @@ export function GoogleStepAudience() {
                   {aud.inMarketSegments.length + aud.affinitySegments.length} segment{(aud.inMarketSegments.length + aud.affinitySegments.length) !== 1 ? "s" : ""} selected.{" "}
                   <button type="button" onClick={() => updateNested("audience", { inMarketSegments: [], affinitySegments: [] })} className="text-primary underline">Clear all</button>
                 </p>
+                {isPMax && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    These are <span className="font-semibold">signals</span>, not strict limits. Google can expand beyond them to find more converters.
+                  </p>
+                )}
+                {isPMax && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Data source: internal seed list (prototype).
+                  </p>
+                )}
 
                 {/* Bid adjustment for Search (Observation mode) */}
                 {isSearch && aud.audienceTargetingMode === "OBSERVATION" && (
@@ -772,7 +949,7 @@ export function GoogleStepAudience() {
                     <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                       <DollarSign className="size-3 text-primary" />
                       Audience Bid Adjustments
-                      <InfoTip text="Increase or decrease bids for users in these audience segments. Maps to AdGroupCriterion.bid_modifier. Example: +20% means you bid 20% more when a user in this segment searches your keyword." />
+                      <InfoTip text="Adjust bids by audience performance. Start small (+10% to +20%), then scale winners after data comes in." />
                     </Label>
                     <div className="flex flex-col gap-2">
                       {[...aud.inMarketSegments, ...aud.affinitySegments].map((segId) => {
@@ -808,6 +985,188 @@ export function GoogleStepAudience() {
             )}
           </SectionCard>}
 
+          {/* ---- 3a. PMax audience signals (moved from advanced to main flow) ---- */}
+          {isPMax && (
+            <>
+              <SectionCard>
+                <div className="mb-3 flex items-center gap-2">
+                  <Search className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">Search Themes</Label>
+                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">PMax</Badge>
+                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">Optional signal</Badge>
+                  <InfoTip text="Search themes are signals (not exact keywords). They help PMax understand your shopper intent faster. Up to 25." />
+                </div>
+                <ObjectiveExplainer
+                  className="mb-3"
+                  highlight={
+                    <>
+                      <span className="font-semibold text-primary">Simple rule:</span> add shopper-intent phrases (what people search before buying), not internal product codes.
+                    </>
+                  }
+                  secondary="Google uses these as signals to learn faster. It can still expand beyond these terms."
+                  stepsTitle="Starter setup"
+                  steps={[
+                    "Start with 8-15 high-intent themes.",
+                    "Use specific phrases (for example: buy abaya online, oud perfume delivery).",
+                    "Avoid very broad themes like clothes or gifts.",
+                  ]}
+                />
+                <div className="mb-3 flex gap-2">
+                  <Input
+                    placeholder="e.g. buy abaya online, oud perfume delivery"
+                    value={themeInput}
+                    onChange={(e) => setThemeInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSearchTheme())}
+                    className="h-9 flex-1 text-sm"
+                  />
+                  <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!themeInput.trim() || aud.searchThemes.length >= 25} onClick={addSearchTheme}>
+                    <Plus className="size-3" /> Add
+                  </Button>
+                </div>
+                {aud.searchThemes.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {aud.searchThemes.map((t) => (
+                      <TagPill key={t} label={t} onRemove={() => updateNested("audience", { searchThemes: aud.searchThemes.filter((s) => s !== t) })} />
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>{aud.searchThemes.length}/25 themes</span>
+                  <span>Press Enter to add (optional)</span>
+                </div>
+              </SectionCard>
+
+              <SectionCard>
+                <div className="mb-3 flex items-center gap-2">
+                  <Target className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">Custom Segments</Label>
+                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">PMax</Badge>
+                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">Optional signal</Badge>
+                  <InfoTip text="Add intent phrases and similar sites to guide who PMax should learn from first. Google can still expand beyond them." />
+                </div>
+                <ObjectiveExplainer
+                  className="mb-3"
+                  cards={[
+                    {
+                      title: "Search phrases = stronger intent",
+                      description: "Use phrases people search right before purchase.",
+                    },
+                    {
+                      title: "Similar sites = broader discovery",
+                      description: "Use competitor/category sites to expand reach.",
+                    },
+                  ]}
+                  stepsTitle="Starter setup"
+                  steps={[
+                    "Start with search phrases first.",
+                    "Add 3-5 similar sites only if you need more reach.",
+                    "Keep terms relevant to your exact category.",
+                  ]}
+                />
+
+                <div className="mb-4">
+                  <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
+                    <Tag className="size-3 text-muted-foreground" /> People searching these phrases
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input placeholder="e.g. buy oud fragrance" value={customKeywordInput} onChange={(e) => setCustomKeywordInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomKeyword())} className="h-9 flex-1 text-sm" />
+                    <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!customKeywordInput.trim()} onClick={addCustomKeyword}><Plus className="size-3" /> Add</Button>
+                  </div>
+                  {aud.customSegmentKeywords.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {aud.customSegmentKeywords.map((k) => (
+                        <TagPill key={k} label={k} onRemove={() => updateNested("audience", { customSegmentKeywords: aud.customSegmentKeywords.filter((s) => s !== k) })} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
+                    <Link2 className="size-3 text-muted-foreground" /> People visiting similar sites
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input placeholder="e.g. competitor.com" value={customUrlInput} onChange={(e) => setCustomUrlInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomUrl())} className="h-9 flex-1 text-sm" />
+                    <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!customUrlInput.trim()} onClick={addCustomUrl}><Plus className="size-3" /> Add</Button>
+                  </div>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Use competitor/category domains. Avoid generic sites (for example: google.com, youtube.com).
+                  </p>
+                  {aud.customSegmentUrls.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {aud.customSegmentUrls.map((u) => (
+                        <TagPill key={u} label={u} onRemove={() => updateNested("audience", { customSegmentUrls: aud.customSegmentUrls.filter((s) => s !== u) })} />
+                      ))}
+                    </div>
+                  )}
+                  {hasGenericSiteHint && (
+                    <p className="mt-1 text-[10px] text-amber-700">
+                      Some domains are too generic. Keep only category-relevant sites for better signal quality.
+                    </p>
+                  )}
+                </div>
+              </SectionCard>
+
+              <SectionCard>
+                <div className="mb-3 flex items-center gap-2">
+                  <UserPlus className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">Your Data (Remarketing)</Label>
+                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">Optional signal</Badge>
+                  <InfoTip text="Use your own customer lists as high-quality signals so PMax can find similar converters sooner." />
+                </div>
+                <ObjectiveExplainer
+                  className="mb-3"
+                  highlight={
+                    <>
+                      <span className="font-semibold text-primary">Simple setup:</span> start with <strong>Purchasers</strong> + <strong>Cart Abandoners</strong> if your budget is limited.
+                    </>
+                  }
+                  secondary="Use 2-3 high-intent lists at launch, then expand once conversion volume is stable."
+                />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {REMARKETING_AUDIENCES.map((rm) => {
+                    const selected = aud.audienceSignals.includes(rm.id);
+                    const meta = REMARKETING_AUDIENCE_META[rm.id];
+                    return (
+                      <label
+                        key={rm.id}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-all",
+                          selected ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/40"
+                        )}
+                      >
+                        <Checkbox checked={selected} onCheckedChange={() => updateNested("audience", { audienceSignals: toggleInArray(aud.audienceSignals, rm.id) })} />
+                        <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                          <span className={cn("truncate text-xs font-medium", selected ? "text-primary" : "text-foreground")}>{rm.name}</span>
+                          {meta && (
+                            <span className="flex shrink-0 items-center gap-1">
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "rounded-full px-1.5 py-0 text-[9px]",
+                                  meta.intent === "High intent" ? "border-emerald-300 text-emerald-700" :
+                                    meta.intent === "Mid intent" ? "border-amber-300 text-amber-700" :
+                                      "border-border text-muted-foreground"
+                                )}
+                              >
+                                {meta.intent}
+                              </Badge>
+                              <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">{meta.freshness}</Badge>
+                              {meta.starter && <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">Starter</Badge>}
+                            </span>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  PMax treats these lists as signals to guide learning, not strict delivery limits.
+                </p>
+              </SectionCard>
+            </>
+          )}
+
           {/* ---- 3b. Negative Keywords (Shopping only) ---- */}
           {isShopping && (
             <SectionCard>
@@ -815,10 +1174,10 @@ export function GoogleStepAudience() {
                 <Search className="size-4 text-primary" />
                 <Label className="text-sm font-semibold text-foreground">Negative Keywords</Label>
                 <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Shopping</Badge>
-                <InfoTip text="Prevent your Shopping ads from showing for specific search queries. Maps to CampaignCriterion with negative=true." />
+                <InfoTip text="Exclude irrelevant Shopping queries to reduce wasted spend and improve traffic quality." />
               </div>
               <p className="mb-3 text-xs text-muted-foreground">
-                Add search terms where you do not want your product ads to appear. This helps reduce wasted spend on irrelevant clicks.
+                Add terms where your products should not appear (for example: free, used, DIY, repair).
               </p>
               <div className="mb-3 flex gap-2">
                 <Input
@@ -879,10 +1238,10 @@ export function GoogleStepAudience() {
                 <Users className="size-4 text-primary" />
                 <Label className="text-sm font-semibold text-foreground">Lookalike Segments</Label>
                 <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Demand Gen</Badge>
-                <InfoTip text="Reach new users who share characteristics with your existing customers. Maps to SimilarUserListInfo in the Google Ads API." />
+                <InfoTip text="Find new users similar to your best customers. Strong source lists usually improve quality." />
               </div>
               <p className="mb-3 text-xs text-muted-foreground">
-                Build lookalike audiences from your first-party data. Google finds users who behave similarly to your existing customers.
+                Build lookalikes from your best first-party audiences to scale reach without losing relevance.
               </p>
 
               {/* Lookalike source segments */}
@@ -953,7 +1312,7 @@ export function GoogleStepAudience() {
               <div>
                 <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   Expansion Level
-                  <InfoTip text="Controls how similar the lookalike audience is to your source. Narrow = most similar but smaller reach. Broad = less similar but larger reach." />
+                  <InfoTip text="Narrow = highest similarity, lower reach. Broad = wider reach, lower similarity. Start with Balanced." />
                 </Label>
                 <div className="grid grid-cols-3 gap-2">
                   {([
@@ -989,10 +1348,10 @@ export function GoogleStepAudience() {
                 <UserPlus className="size-4 text-primary" />
                 <Label className="text-sm font-semibold text-foreground">Customer Match Lists</Label>
                 <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Demand Gen</Badge>
-                <InfoTip text="Upload first-party customer data (emails, phone numbers) to target or create lookalikes. Maps to CustomerMatchUserListInfo." />
+                <InfoTip text="Use first-party customer lists (for example buyers, VIPs, subscribers) to improve targeting quality and seed lookalikes." />
               </div>
               <p className="mb-3 text-xs text-muted-foreground">
-                Use your Salla customer data to reach existing customers or build lookalike audiences. Customer Match works across YouTube, Discover, and Gmail.
+                Add high-quality customer lists from Salla to retarget existing buyers and build stronger expansion audiences.
               </p>
               <div className="flex gap-2">
                 <Input
@@ -1031,8 +1390,8 @@ export function GoogleStepAudience() {
               <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2">
                 <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  <span className="font-semibold text-primary">Salla Tip:</span>{" "}
-                  Customer Match combined with Lookalike Segments is the most powerful targeting combination for Demand Gen. Upload your top 20% buyers to find similar high-value shoppers.
+                  <span className="font-semibold text-primary">Salla tip:</span>{" "}
+                  Customer Match + lookalike segments is a strong Demand Gen setup. Start with your top 20% buyers to find similar high-value shoppers.
                 </p>
               </div>
             </SectionCard>
@@ -1045,10 +1404,10 @@ export function GoogleStepAudience() {
                 <UserPlus className="size-4 text-primary" />
                 <Label className="text-sm font-semibold text-foreground">Remarketing Lists (RLSA)</Label>
                 <Badge className="rounded-full bg-primary/10 px-1.5 py-0 text-[10px] text-primary">Recommended</Badge>
-                <InfoTip text="Remarketing Lists for Search Ads (RLSA) let you bid higher on past visitors who are also searching your keywords. This is one of the most impactful targeting features for Search. Maps to CampaignCriterion user_list." />
+                <InfoTip text="RLSA lets you adjust bids for people who already visited your store and are searching again. High impact for Search efficiency." />
               </div>
               <p className="mb-3 text-xs text-muted-foreground">
-                Layer your remarketing lists on top of keywords. In Observation mode, your ads still show to everyone, but you can bid higher when past visitors search for your keywords.
+                Layer remarketing on top of keywords. In Observation mode, reach stays broad while you bid more for returning high-intent users.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {REMARKETING_AUDIENCES.map((rm) => {
@@ -1072,7 +1431,7 @@ export function GoogleStepAudience() {
                   <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                     <DollarSign className="size-3 text-primary" />
                     RLSA Bid Adjustments
-                    <InfoTip text="Increase bids for past visitors who search your keywords. Example: +50% for Cart Abandoners means you bid 50% more when they search." />
+                    <InfoTip text="Raise bids for strong audiences (for example cart abandoners), lower bids for weak audiences. Start gradually and review weekly." />
                   </Label>
                   <div className="flex flex-col gap-2">
                     {aud.audienceSignals.map((sigId) => {
@@ -1106,7 +1465,7 @@ export function GoogleStepAudience() {
               <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2">
                 <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  <span className="font-semibold text-primary">Best Practice:</span>{" "}
+                  <span className="font-semibold text-primary">Best practice:</span>{" "}
                   Add "Cart Abandoners" and "Product Page Viewers" with +30-50% bid adjustment. Past visitors convert 2-3x better when they re-search your keywords.
                 </p>
               </div>
@@ -1120,7 +1479,7 @@ export function GoogleStepAudience() {
                 <Target className="size-4 text-primary" />
                 <Label className="text-sm font-semibold text-foreground">Display content & placements</Label>
                 <Badge className="rounded-full bg-primary/10 px-1.5 py-0 text-[10px] text-primary">Display</Badge>
-                <InfoTip text="Content targeting controls which websites and pages on the Google Display Network show your ads. Combines contextual keywords, topic targeting, and managed placements. Maps to AdGroupCriterion." />
+                <InfoTip text="Choose where Display ads can appear using context keywords, topics, and placements. Use 1-2 methods to start, then refine." />
               </div>
               <p className="mb-4 text-xs text-muted-foreground">
                 Define where your Display ads should appear on the Google Display Network (3M+ websites and apps). Use contextual keywords, topics, or specific placements.
@@ -1131,7 +1490,7 @@ export function GoogleStepAudience() {
                 <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <Search className="size-3 text-primary" />
                   Contextual Keywords
-                  <InfoTip text="Your ads appear on pages whose content matches these keywords. Unlike Search keywords, Display contextual keywords use broad content matching. Maps to AdGroupCriterion.keyword." />
+                  <InfoTip text="Contextual keywords match page content (not search queries). Keep them tightly related to your products." />
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -1157,7 +1516,7 @@ export function GoogleStepAudience() {
                   </div>
                 )}
                 {displayContentKeywords.length === 0 && (
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">No keywords -- ads will rely on topic and audience targeting only.</p>
+                  <p className="mt-1.5 text-[10px] text-muted-foreground">No keywords selected. Ads will rely on topic and audience targeting only.</p>
                 )}
               </div>
 
@@ -1166,7 +1525,7 @@ export function GoogleStepAudience() {
                 <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <Tag className="size-3 text-primary" />
                   Topic Targeting
-                  <InfoTip text="Show ads on pages about specific topics. Google categorizes every page on the Display Network by topic. Maps to AdGroupCriterion.topic (TopicInfo)." />
+                  <InfoTip text="Topic targeting places ads on pages about selected topics. Use this for broad but relevant discovery." />
                 </Label>
                 <p className="mb-2 text-[11px] text-muted-foreground">Select topics relevant to your products. Your ads appear on pages about these topics.</p>
                 <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
@@ -1199,7 +1558,7 @@ export function GoogleStepAudience() {
                 <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <Link2 className="size-3 text-primary" />
                   Managed Placements
-                  <InfoTip text="Choose specific websites, apps, or YouTube channels where your ads should appear. Maps to AdGroupCriterion.placement." />
+                  <InfoTip text="Managed placements force delivery on specific sites/apps/channels you choose." />
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -1233,7 +1592,7 @@ export function GoogleStepAudience() {
                 <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <ShieldCheck className="size-3 text-red-500" />
                   Excluded Placements
-                  <InfoTip text="Block specific websites or apps where you don't want your ads to appear. Maps to AdGroupCriterion with negative=true." />
+                  <InfoTip text="Exclude low-quality or irrelevant placements to protect brand safety and spend quality." />
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -1286,12 +1645,17 @@ export function GoogleStepAudience() {
               <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2">
                 <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  <span className="font-semibold text-primary">Best Practice:</span>{" "}
+                  <span className="font-semibold text-primary">Best practice:</span>{" "}
                   Combine contextual keywords with topic targeting for best results. Add 15-20 keywords related to your products and select 3-5 relevant topics to maximize reach while maintaining relevance.
                 </p>
               </div>
             </SectionCard>
           )}
+
+          <SectionGroupHeader
+            title="Advanced controls"
+            description="Use these options after your core targeting is set."
+          />
 
           {/* ---- 4. Salla Smart Features (shared; hidden for App) ---- */}
           {!isApp && (
@@ -1326,7 +1690,7 @@ export function GoogleStepAudience() {
                     <div>
                       <p className="text-sm font-semibold text-foreground">Google Search Partners</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Extend your ads to search partner sites (non-Google search engines). Maps to Campaign.network_settings.target_search_network.
+                        Extend ads to Google Search partner inventory. Start Off for tighter control, then test On if you need extra reach.
                       </p>
                     </div>
                   </div>
@@ -1352,118 +1716,43 @@ export function GoogleStepAudience() {
               <span className="ml-auto text-xs text-muted-foreground">{
                 isShopping ? "Remarketing, device targeting" :
                 isSearch ? "Device bid adjustments, demographics" :
-                "Search themes, custom segments, remarketing"
+                isPMax ? "Expert options" : "Remarketing and device targeting"
               }</span>
             </button>
 
             {showAdvanced && (
               <div className="mt-3 flex flex-col gap-4">
 
-                {/* Search Themes (PMax) */}
-                {isPMax && (
-                  <SectionCard>
-                    <div className="mb-3 flex items-center gap-2">
-                      <Search className="size-4 text-primary" />
-                      <Label className="text-sm font-semibold text-foreground">Search Themes</Label>
-                      <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">PMax</Badge>
-                      <InfoTip text="Keywords describing what customers search for. Maps to AssetGroupSignal.search_theme. Up to 25 per asset group." />
-                    </div>
-                    <p className="mb-3 text-xs text-muted-foreground">
-                      Enter search terms your customers use when looking for your products.
-                    </p>
-                    <div className="mb-3 flex gap-2">
-                      <Input
-                        placeholder="e.g. buy perfume online, abaya fashion"
-                        value={themeInput}
-                        onChange={(e) => setThemeInput(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSearchTheme())}
-                        className="h-9 flex-1 text-sm"
-                      />
-                      <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!themeInput.trim() || aud.searchThemes.length >= 25} onClick={addSearchTheme}>
-                        <Plus className="size-3" /> Add
-                      </Button>
-                    </div>
-                    {aud.searchThemes.length > 0 && (
-                      <div className="mb-2 flex flex-wrap gap-1.5">
-                        {aud.searchThemes.map((t) => (
-                          <TagPill key={t} label={t} onRemove={() => updateNested("audience", { searchThemes: aud.searchThemes.filter((s) => s !== t) })} />
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span>{aud.searchThemes.length}/25 themes</span>
-                      <span>Press Enter to add</span>
-                    </div>
-                  </SectionCard>
-                )}
-
-                {/* Custom Segments (PMax) */}
-                {isPMax && (
-                  <SectionCard>
-                    <div className="mb-3 flex items-center gap-2">
-                      <Target className="size-4 text-primary" />
-                      <Label className="text-sm font-semibold text-foreground">Custom Segments</Label>
-                      <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">PMax</Badge>
-                      <InfoTip text="Define custom segments by keywords and websites. Maps to CustomAudienceInfo within AssetGroupSignal." />
-                    </div>
-
-                    {/* Keywords */}
-                    <div className="mb-4">
-                      <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
-                        <Tag className="size-3 text-muted-foreground" /> People who searched for these terms
-                      </Label>
-                      <div className="flex gap-2">
-                        <Input placeholder="e.g. buy oud fragrance" value={customKeywordInput} onChange={(e) => setCustomKeywordInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomKeyword())} className="h-9 flex-1 text-sm" />
-                        <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!customKeywordInput.trim()} onClick={addCustomKeyword}><Plus className="size-3" /> Add</Button>
-                      </div>
-                      {aud.customSegmentKeywords.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {aud.customSegmentKeywords.map((k) => (
-                            <TagPill key={k} label={k} onRemove={() => updateNested("audience", { customSegmentKeywords: aud.customSegmentKeywords.filter((s) => s !== k) })} />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* URLs */}
-                    <div>
-                      <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
-                        <Link2 className="size-3 text-muted-foreground" /> People who browse similar websites
-                      </Label>
-                      <div className="flex gap-2">
-                        <Input placeholder="e.g. competitor.com" value={customUrlInput} onChange={(e) => setCustomUrlInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomUrl())} className="h-9 flex-1 text-sm" />
-                        <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!customUrlInput.trim()} onClick={addCustomUrl}><Plus className="size-3" /> Add</Button>
-                      </div>
-                      {aud.customSegmentUrls.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {aud.customSegmentUrls.map((u) => (
-                            <TagPill key={u} label={u} onRemove={() => updateNested("audience", { customSegmentUrls: aud.customSegmentUrls.filter((s) => s !== u) })} />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </SectionCard>
-                )}
-
                 {/* Remarketing (hidden for Search -- promoted to main card above) */}
-                {!isSearch && <SectionCard>
+                {!isSearch && !isPMax && <SectionCard>
                   <div className="mb-3 flex items-center gap-2">
                     <UserPlus className="size-4 text-primary" />
                     <Label className="text-sm font-semibold text-foreground">Your Data (Remarketing)</Label>
+                    {isPMax && <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">Optional signal</Badge>}
                     <InfoTip text={isPMax
                       ? "Use your first-party data as signals. Maps to AssetGroupSignal.audience."
                       : "Retarget people who have interacted with your store."
                     } />
                   </div>
-                  <p className="mb-3 text-xs text-muted-foreground">
-                    {isPMax
-                      ? "Select audience lists to signal who your best customers are. Google will use these to find similar people."
-                      : "Select audiences to retarget with your ads."
-                    }
-                  </p>
+                  {isPMax ? (
+                    <ObjectiveExplainer
+                      className="mb-3"
+                      highlight={
+                        <>
+                          <span className="font-semibold text-primary">Simple setup:</span> start with <strong>Purchasers</strong> + <strong>Cart Abandoners</strong> if your budget is limited.
+                        </>
+                      }
+                      secondary="Use 2-3 high-intent lists at launch, then expand once conversion volume is stable."
+                    />
+                  ) : (
+                    <p className="mb-3 text-xs text-muted-foreground">
+                      Select audiences to retarget with your ads.
+                    </p>
+                  )}
                   <div className="grid gap-2 sm:grid-cols-2">
                     {REMARKETING_AUDIENCES.map((rm) => {
                       const selected = aud.audienceSignals.includes(rm.id);
+                      const meta = REMARKETING_AUDIENCE_META[rm.id];
                       return (
                         <label
                           key={rm.id}
@@ -1473,11 +1762,35 @@ export function GoogleStepAudience() {
                           )}
                         >
                           <Checkbox checked={selected} onCheckedChange={() => updateNested("audience", { audienceSignals: toggleInArray(aud.audienceSignals, rm.id) })} />
-                          <span className={cn("text-xs font-medium", selected ? "text-primary" : "text-foreground")}>{rm.name}</span>
+                          <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                            <span className={cn("truncate text-xs font-medium", selected ? "text-primary" : "text-foreground")}>{rm.name}</span>
+                            {meta && (
+                              <span className="flex shrink-0 items-center gap-1">
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    "rounded-full px-1.5 py-0 text-[9px]",
+                                    meta.intent === "High intent" ? "border-emerald-300 text-emerald-700" :
+                                      meta.intent === "Mid intent" ? "border-amber-300 text-amber-700" :
+                                        "border-border text-muted-foreground"
+                                  )}
+                                >
+                                  {meta.intent}
+                                </Badge>
+                                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">{meta.freshness}</Badge>
+                                {meta.starter && <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">Starter</Badge>}
+                              </span>
+                            )}
+                          </div>
                         </label>
                       );
                     })}
                   </div>
+                  {isPMax && (
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      PMax treats these lists as signals to guide learning, not strict delivery limits.
+                    </p>
+                  )}
                 </SectionCard>}
 
                 {/* Device Targeting (Search: Desktop/Mobile/Tablet with bid adjustments) */}
@@ -1486,10 +1799,10 @@ export function GoogleStepAudience() {
                     <div className="mb-3 flex items-center gap-2">
                       <Smartphone className="size-4 text-primary" />
                       <Label className="text-sm font-semibold text-foreground">Device Bid Adjustments</Label>
-                      <InfoTip text="Adjust bids per device type. -100% disables that device. Maps to CampaignCriterion with device bid modifiers." />
+                      <InfoTip text="Tune bids by device performance. Use small changes first, and avoid large swings without enough data." />
                     </div>
                     <p className="mb-3 text-xs text-muted-foreground">
-                      Fine-tune how much you bid on each device type. Default 0% uses your base bid.
+                      0% keeps default bids. Increase top-performing devices; reduce weak ones.
                     </p>
                     <div className="flex flex-col gap-2">
                       {([
@@ -1526,7 +1839,7 @@ export function GoogleStepAudience() {
                     </div>
                     <p className="mt-2 text-[10px] text-muted-foreground">-100% disables the device. Range: -100% to +900%.</p>
                   </SectionCard>
-                ) : (
+                ) : !isPMax ? (
                   /* Non-Search: OS-level Device Targeting (unified) */
                   <DeviceTargetingCard
                     value={aud.operatingSystems ?? []}
@@ -1536,7 +1849,7 @@ export function GoogleStepAudience() {
                     accent="primary"
                     infoTipText="Choose which devices to target. Both selected is recommended."
                   />
-                )}
+                ) : null}
 
                 {/* Household Income & Parental Status (Search) */}
                 {isSearch && (
@@ -1544,7 +1857,7 @@ export function GoogleStepAudience() {
                     <div className="mb-3 flex items-center gap-2">
                       <Users className="size-4 text-primary" />
                       <Label className="text-sm font-semibold text-foreground">Advanced Demographics</Label>
-                      <InfoTip text="Additional demographic targeting for Search. Household income maps to CampaignCriterion.income_range. Parental status maps to CampaignCriterion.parental_status." />
+                      <InfoTip text="Optional filters for Search only. Use after baseline performance is stable to avoid over-restricting reach." />
                     </div>
 
                     {/* Household Income */}
@@ -1553,7 +1866,7 @@ export function GoogleStepAudience() {
                         <DollarSign className="size-3 text-primary" />
                         Household Income
                       </Label>
-                      <p className="mb-2 text-[11px] text-muted-foreground">Target by estimated household income tier. Useful for premium product targeting.</p>
+                      <p className="mb-2 text-[11px] text-muted-foreground">Use this only if your product clearly matches specific income tiers.</p>
                       <div className="flex flex-wrap gap-1.5">
                         {HOUSEHOLD_INCOME_TIERS.map((tier) => {
                           const selected = aud.householdIncome.includes(tier.id);
@@ -1575,7 +1888,7 @@ export function GoogleStepAudience() {
                         })}
                       </div>
                       {aud.householdIncome.length === 0 && (
-                        <p className="mt-1 text-[10px] text-muted-foreground">None selected -- all income levels targeted.</p>
+                        <p className="mt-1 text-[10px] text-muted-foreground">None selected. All income levels are targeted.</p>
                       )}
                     </div>
 
@@ -1605,7 +1918,7 @@ export function GoogleStepAudience() {
                         })}
                       </div>
                       {aud.parentalStatus.length === 0 && (
-                        <p className="mt-1 text-[10px] text-muted-foreground">None selected -- all parental statuses targeted.</p>
+                        <p className="mt-1 text-[10px] text-muted-foreground">None selected. All parental statuses are targeted.</p>
                       )}
                     </div>
                   </SectionCard>
@@ -1622,33 +1935,18 @@ export function GoogleStepAudience() {
         <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
           <div className="sticky top-20 flex flex-col gap-4">
 
-            {/* Reach in selected locations (shared, location-only) */}
-            <LocationReachCard
-              countryCount={aud.locationIds.length}
-              countries={aud.locationIds}
-              cityCount={(aud.cityIds ?? []).length}
-              accent="primary"
-            />
-
             {/* Delivery Check (shared) */}
             <DeliveryCheckCard
-              issues={(() => {
-                const issues: { message: string }[] = [];
-                if (!hasLocation) issues.push({ message: "No location selected" });
-                if (aud.languages.length === 0) issues.push({ message: "No language set" });
-                if (aud.ageMin >= aud.ageMax) issues.push({ message: "Invalid age range" });
-                if (isSearch && searchKeywords.length === 0) issues.push({ message: "Add at least one keyword for Search campaigns" });
-                if (isApp && !campaign.objective.appSettings.appId.trim()) issues.push({ message: "App ID is required for App campaigns" });
-                return issues;
-              })()}
+              issues={deliveryIssues}
               cityCount={(aud.cityIds ?? []).length}
               accent="primary"
             />
 
             <AudienceReadinessChecklist
-              checks={readinessChecks}
+              checks={bestPracticeChecks}
+              title="Best-practice checklist"
               accent="primary"
-              successMessage="All checks passed. Ready to proceed."
+              successMessage="Best-practice checks look good for launch."
             />
 
             {/* Targeting Summary (shared) */}
@@ -1657,6 +1955,18 @@ export function GoogleStepAudience() {
               accent="primary"
               rows={targetingSummaryRows}
             />
+
+            {/* Location Preview (map-based visual confirmation) */}
+            <SectionCard className="p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <MapPin className="size-4 text-primary" />
+                <Label className="text-sm font-semibold text-foreground">Location Preview</Label>
+              </div>
+              <LocationMapPreview countryCodes={aud.locationIds} cities={selectedCities} />
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Visual preview only. Real reach depends on targeting depth, budget, bidding, and creative strength.
+              </p>
+            </SectionCard>
 
             {/* ---- Campaign-type specific cards (after summary) ---- */}
 
@@ -1729,11 +2039,11 @@ export function GoogleStepAudience() {
                   )}
                   <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5">
                     <Target className="size-3 shrink-0 text-primary" />
-                    <span className="text-xs text-primary">Optimized targeting: {aud.optimizedTargeting ? "ON" : "OFF"}</span>
+                    <span className="text-xs text-primary">Optimized targeting: {aud.optimizedTargeting ? "On" : "Off"}</span>
                   </div>
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  Demand Gen reaches users across YouTube, Discover, and Gmail. Add lookalike segments for best results.
+                  Demand Gen reaches users across YouTube, Discover, and Gmail. Add lookalike segments for better scaling.
                 </p>
               </SectionCard>
             )}
@@ -1802,7 +2112,7 @@ export function GoogleStepAudience() {
                   <p className={cn("text-xs font-medium", signalColor)}>{signalStrength}</p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {signalCount} signal{signalCount !== 1 ? "s" : ""} added. More signals = faster AI optimization.
+                  {signalCount} signal{signalCount !== 1 ? "s" : ""} added. Internal guidance score: more quality signals usually help PMax learn faster.
                 </p>
               </SectionCard>
             )}
