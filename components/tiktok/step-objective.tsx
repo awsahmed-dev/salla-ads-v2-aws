@@ -146,7 +146,8 @@ const FUNNEL_LABELS: Record<string, { label: string; color: string; icon: React.
 /* ------------------------------------------------------------------ */
 
 export function TikTokStepObjective() {
-  const { campaign, setStep, updateNested } = useTikTokCampaign();
+  const { campaign, setStep, updateNested, adAccountStatus } = useTikTokCampaign();
+  const catalogReady = adAccountStatus === null ? null : (adAccountStatus.exists && adAccountStatus.catalogSynced);
   const obj = campaign.objective;
   const cr = campaign.creative;
   const identity = cr.identity ?? {
@@ -487,46 +488,6 @@ export function TikTokStepObjective() {
                 </div>
               </div>
 
-              {/* ---- Campaign Budget Optimization (CBO) ---- */}
-              <div className="mb-6 rounded-xl border border-border bg-card p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <TrendingUp className="size-5 text-primary" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-foreground">
-                          Campaign Budget Optimization
-                        </p>
-                        <Badge variant="outline" className="rounded-full px-2 text-[10px] font-medium">
-                          CBO
-                        </Badge>
-                      </div>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        Let TikTok automatically distribute your campaign budget across ad groups to maximize overall results.
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={obj.budgetOptimizeOn}
-                    onCheckedChange={(checked) =>
-                      updateNested("objective", { budgetOptimizeOn: checked })
-                    }
-                  />
-                </div>
-                {obj.budgetOptimizeOn && (
-                  <div className="mt-3 rounded-lg border border-primary/20 bg-primary/[0.03] px-4 py-3">
-                    <p className="text-xs leading-relaxed text-muted-foreground">
-                      <span className="font-medium text-foreground">How it works:</span> TikTok
-                      will automatically allocate more budget to higher-performing ad groups
-                      and reduce spend on underperformers. All ad groups must share the same
-                      optimization goal. Recommended for campaigns with 3+ ad groups.
-                    </p>
-                  </div>
-                )}
-              </div>
-
               {/* ---- Salla Product Catalog (only for catalog-capable objectives) ---- */}
               {config.catalogAvailable && (
               <div className="mb-6 flex flex-col gap-4">
@@ -545,35 +506,78 @@ export function TikTokStepObjective() {
                         </p>
                       </div>
                     </div>
-                    <Switch
-                      checked={obj.catalogEnabled}
-                      onCheckedChange={handleCatalogToggle}
-                    />
+                    {/* Loading state while checking ad account */}
+                    {catalogReady === null ? (
+                      <div className="flex size-9 items-center justify-center">
+                        <span className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      </div>
+                    ) : (
+                      <Switch
+                        checked={obj.catalogEnabled}
+                        onCheckedChange={handleCatalogToggle}
+                        disabled={!catalogReady}
+                      />
+                    )}
                   </div>
 
-                    {obj.catalogEnabled && (
-                      <div className="mt-4 border-t border-border pt-4">
-                        <Label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                          Connected Catalog
-                        </Label>
-                        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
-                          <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
-                            <Store className="size-4 text-primary" />
+                  {/* New advertiser: ad account not initialized yet */}
+                  {catalogReady === false && (
+                    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                        <div>
+                          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                            Catalog Sales not available yet
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
+                            Your TikTok ad account is being set up. To activate Catalog Sales, you need to create and launch your first campaign with any objective (e.g., Traffic or Reach). This initializes your ad account and syncs your product catalog automatically.
+                          </p>
+                          <div className="mt-3 flex flex-col gap-2">
+                            <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                              <span className="flex size-5 items-center justify-center rounded-full bg-amber-200 text-[10px] font-bold text-amber-800 dark:bg-amber-800 dark:text-amber-200">1</span>
+                              Create a campaign with Traffic, Reach, or any other objective
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                              <span className="flex size-5 items-center justify-center rounded-full bg-amber-200 text-[10px] font-bold text-amber-800 dark:bg-amber-800 dark:text-amber-200">2</span>
+                              Your ad account and catalog will sync automatically
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                              <span className="flex size-5 items-center justify-center rounded-full bg-amber-200 text-[10px] font-bold text-amber-800 dark:bg-amber-800 dark:text-amber-200">3</span>
+                              Come back and enable Catalog Sales for future campaigns
+                            </div>
                           </div>
-                          <div className="flex-1">
-                            <p className="text-xs font-medium text-foreground">My Salla Store</p>
-                            <p className="text-xs text-muted-foreground">Auto-synced from your Salla product catalog</p>
-                          </div>
-                          <Badge variant="outline" className="gap-1 rounded-full px-2 text-xs">
-                            <CheckCircle2 className="size-2.5 text-primary" />
-                            Connected
-                          </Badge>
+                          <p className="mt-3 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                            You can still create a Sales campaign without the catalog — just keep this toggle off and set up your ads manually.
+                          </p>
                         </div>
-                        <p className="mt-1.5 text-xs text-muted-foreground">
-                          Your products are automatically synced. No manual setup needed.
-                        </p>
                       </div>
-                    )}
+                    </div>
+                  )}
+
+                  {/* Catalog ready and enabled */}
+                  {catalogReady && obj.catalogEnabled && (
+                    <div className="mt-4 border-t border-border pt-4">
+                      <Label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                        Connected Catalog
+                      </Label>
+                      <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+                          <Store className="size-4 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-foreground">My Salla Store</p>
+                          <p className="text-xs text-muted-foreground">Auto-synced from your Salla product catalog</p>
+                        </div>
+                        <Badge variant="outline" className="gap-1 rounded-full px-2 text-xs">
+                          <CheckCircle2 className="size-2.5 text-primary" />
+                          Connected
+                        </Badge>
+                      </div>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Your products are automatically synced. No manual setup needed.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
               )}

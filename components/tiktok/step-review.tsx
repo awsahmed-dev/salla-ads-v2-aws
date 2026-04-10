@@ -377,7 +377,6 @@ export function TikTokStepReview() {
         objective_type: objective.objective,
         ...(isSales && { promotion_type: "WEBSITE" }),
         operation_status: "ENABLE",
-        ...(objective.budgetOptimizeOn && { budget_optimize_on: true }),
       },
       adgroup: {
         advertiser_id: "<ADVERTISER_ID>",
@@ -644,7 +643,6 @@ export function TikTokStepReview() {
                   </>
                 )}
                 <ReviewRow label="Campaign Name" value={objective.campaignName || "Not set"} warn={!objective.campaignName} />
-                <ReviewRow label="Budget Optimization" value={objective.budgetOptimizeOn ? "CBO Enabled" : "Manual"} />
                 {!isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo && (
                   <ReviewRow label="TikTok Pixel" value={
                     objective.pixelMode === "salla_managed"

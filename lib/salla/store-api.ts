@@ -105,6 +105,22 @@ export interface SnapPixelInfo {
   lastEventAt: string;
 }
 
+/**
+ * TikTok Ad Account status within our Business Center.
+ * New advertisers won't have an ad account until their first campaign is created,
+ * which means catalog sync hasn't happened yet.
+ */
+export interface TikTokAdAccountStatus {
+  /** Whether an ad account exists under our BC for this merchant */
+  exists: boolean;
+  /** Ad account ID (if exists) */
+  adAccountId?: string;
+  /** Whether the product catalog has been synced to this ad account */
+  catalogSynced: boolean;
+  /** Number of products synced (0 if not synced) */
+  syncedProductCount: number;
+}
+
 export interface ProductFetchOptions {
   query?: string;
   category?: string;
@@ -262,6 +278,27 @@ export async function getSnapPublicProfile(): Promise<SnapPublicProfile | null> 
  */
 export async function getSnapPixel(): Promise<SnapPixelInfo | null> {
   return MOCK_SNAP_PIXEL;
+}
+
+/**
+ * Check if this merchant has a TikTok ad account initialized under our Business Center.
+ * Returns false for brand-new advertisers who haven't created any campaign yet.
+ *
+ * Toggle MOCK_TIKTOK_AD_ACCOUNT_EXISTS below to test the new-advertiser flow.
+ */
+const MOCK_TIKTOK_AD_ACCOUNT_EXISTS = true;
+
+export async function getTikTokAdAccountStatus(): Promise<TikTokAdAccountStatus> {
+  await new Promise((r) => setTimeout(r, 300)); // simulate API latency
+  if (!MOCK_TIKTOK_AD_ACCOUNT_EXISTS) {
+    return { exists: false, catalogSynced: false, syncedProductCount: 0 };
+  }
+  return {
+    exists: true,
+    adAccountId: "tiktok_ad_acct_001",
+    catalogSynced: true,
+    syncedProductCount: MOCK_PRODUCTS.length,
+  };
 }
 
 /** Get catalog sync status */

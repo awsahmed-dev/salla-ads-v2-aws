@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { defaultTikTokCampaign, type TikTokCampaignData } from "@/lib/tiktok/campaign-types";
+import { getTikTokAdAccountStatus, type TikTokAdAccountStatus } from "@/lib/salla/store-api";
 
 const DRAFT_KEY = "salla_tiktok_campaign_draft";
 const DRAFT_STEP_KEY = "salla_tiktok_campaign_step";
@@ -56,6 +57,8 @@ interface TikTokCampaignContextValue {
     partial: Partial<TikTokCampaignData[K]>
   ) => void;
   reset: () => void;
+  /** TikTok ad account status -- null while loading */
+  adAccountStatus: TikTokAdAccountStatus | null;
 }
 
 const TikTokCampaignContext = createContext<TikTokCampaignContextValue | null>(null);
@@ -63,7 +66,13 @@ const TikTokCampaignContext = createContext<TikTokCampaignContextValue | null>(n
 export function TikTokCampaignProvider({ children }: { children: ReactNode }) {
   const [campaign, setCampaign] = useState<TikTokCampaignData>(defaultTikTokCampaign);
   const [step, setStep] = useState(0);
+  const [adAccountStatus, setAdAccountStatus] = useState<TikTokAdAccountStatus | null>(null);
   const initialized = useRef(false);
+
+  // Check ad account status on mount
+  useEffect(() => {
+    getTikTokAdAccountStatus().then(setAdAccountStatus);
+  }, []);
 
   useEffect(() => {
     if (initialized.current) return;
@@ -131,7 +140,7 @@ export function TikTokCampaignProvider({ children }: { children: ReactNode }) {
 
   return (
     <TikTokCampaignContext.Provider
-      value={{ campaign, step, setStep, updateNested, reset }}
+      value={{ campaign, step, setStep, updateNested, reset, adAccountStatus }}
     >
       {children}
     </TikTokCampaignContext.Provider>
