@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useCampaign } from "@/lib/snapchat/campaign-context";
 import { StepIndicator } from "./step-indicator";
 import { StepObjective } from "./step-objective";
@@ -10,6 +11,8 @@ import { StepReview } from "./step-review";
 
 export function CampaignWizard({ onBackToPlatforms }: { onBackToPlatforms?: () => void }) {
   const { step } = useCampaign();
+
+  useEffect(() => { window.scrollTo(0, 0); }, [step]);
 
   return (
     <div className="min-h-screen bg-background">

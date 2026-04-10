@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useGoogleCampaign } from "@/lib/google/campaign-context";
 import { GoogleStepIndicator } from "./step-indicator";
 import { GoogleStepObjective } from "./step-objective";
@@ -10,6 +11,8 @@ import { GoogleStepReview } from "./step-review";
 
 export function GoogleCampaignWizard({ onBackToPlatforms }: { onBackToPlatforms?: () => void }) {
   const { step } = useGoogleCampaign();
+
+  useEffect(() => { window.scrollTo(0, 0); }, [step]);
 
   return (
     <div className="min-h-screen bg-background">

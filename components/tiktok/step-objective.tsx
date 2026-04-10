@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useTikTokCampaign } from "@/lib/tiktok/campaign-context";
 import { cn } from "@/lib/utils";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
-import { StepZeroHeader } from "@/components/shared/step-zero-header";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -159,19 +159,8 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
     tiktokUsername: "",
     linkStatus: "not_started" as const,
   };
-  const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [showHowToConnect, setShowHowToConnect] = useState(false);
   const [showPixelHelp, setShowPixelHelp] = useState(false);
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Auto-save indicator
-  useEffect(() => {
-    if (!obj.campaignName && obj.promotionType === "WEBSITE") return;
-    setAutoSaveState("saving");
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => setAutoSaveState("saved"), 800);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [obj.campaignName, obj.promotionType, obj.catalogEnabled, obj.pixelMode, obj.pixelId, obj.pixelLinkStatus]);
 
   const handleCatalogToggle = (enabled: boolean) => {
     updateNested("objective", {
@@ -299,13 +288,6 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
         {/*  MAIN CONTENT                                                */}
         {/* ============================================================ */}
         <div className="flex flex-1 flex-col">
-
-          <StepZeroHeader
-            platform="tiktok"
-            title="Create TikTok Campaign"
-            subtitle="Salla Ads"
-            saveState={autoSaveState}
-          />
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
@@ -1745,24 +1727,23 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
 
             </div>
           </div>
+          <WizardStepFooter
+            previousLabel="Cancel"
+            onPrevious={onCancel ?? (() => {})}
+            onNext={() => setStep(1)}
+            nextLabel="Next"
+            nextDisabled={!canProceed}
+            secondaryAction={{
+              label: "Discard draft",
+              onClick: () => {
+                if (window.confirm("Discard this campaign draft? All unsaved changes will be lost.")) {
+                  window.location.href = "/";
+                }
+              },
+            }}
+          />
         </div>
-
       </div>
-      <WizardStepFooter
-        previousLabel="Cancel"
-        onPrevious={onCancel ?? (() => {})}
-        onNext={() => setStep(1)}
-        nextLabel="Next"
-        nextDisabled={!canProceed}
-        secondaryAction={{
-          label: "Discard draft",
-          onClick: () => {
-            if (window.confirm("Discard this campaign draft? All unsaved changes will be lost.")) {
-              window.location.href = "/";
-            }
-          },
-        }}
-      />
     </TooltipProvider>
   );
 }

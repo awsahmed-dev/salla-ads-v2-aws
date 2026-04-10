@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useTikTokCampaign } from "@/lib/tiktok/campaign-context";
 import { TikTokStepIndicator } from "./step-indicator";
 import { TikTokStepObjective } from "./step-objective";
@@ -10,6 +11,8 @@ import { TikTokStepReview } from "./step-review";
 
 export function TikTokCampaignWizard({ onBackToPlatforms }: { onBackToPlatforms?: () => void }) {
   const { step } = useTikTokCampaign();
+
+  useEffect(() => { window.scrollTo(0, 0); }, [step]);
 
   return (
     <div className="min-h-screen bg-background">

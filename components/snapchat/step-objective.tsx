@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useCampaign } from "@/lib/snapchat/campaign-context";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import {
   ShoppingBag,
   Globe,
@@ -32,7 +39,7 @@ import {
 import { OBJECTIVE_CONFIGS, type CampaignObjective, type AppPlatform, makeDefaultLeadForm, makeDefaultAppSettings } from "@/lib/snapchat/campaign-types";
 import { getSnapPixel, getSnapPublicProfile, type SnapPixelInfo, type SnapPublicProfile } from "@/lib/salla/store-api";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
-import { StepZeroHeader } from "@/components/shared/step-zero-header";
+
 
 /* ------------------------------------------------------------------ */
 /*  Objectives data                                                   */
@@ -125,8 +132,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested } = useCampaign();
   const obj = campaign.objective;
   const selectedObj = OBJECTIVES.find((o) => o.value === obj.objective)!;
-  const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved">("idle");
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [objectiveSheetOpen, setObjectiveSheetOpen] = useState(false);
   const [connectedPixel, setConnectedPixel] = useState<SnapPixelInfo | null>(null);
   const [snapProfile, setSnapProfile] = useState<SnapPublicProfile | null>(null);
 
@@ -146,13 +152,6 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!obj.campaignName && obj.objective === "SALES") return;
-    setAutoSaveState("saving");
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => setAutoSaveState("saved"), 800);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [obj.campaignName, obj.objective, obj.catalogEnabled, obj.pixelMode, obj.pixelId]);
 
   const handleObjectiveChange = (value: CampaignObjective) => {
     const config = OBJECTIVE_CONFIGS[value];
@@ -193,196 +192,287 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
     <TooltipProvider delayDuration={200}>
       <div className="flex min-h-screen bg-background">
         <div className="flex flex-1 flex-col">
-          <StepZeroHeader
-            platform="snapchat"
-            title="Create Snapchat Campaign"
-            subtitle="Salla Ads"
-            saveState={autoSaveState}
-          />
-
           <div className="flex-1 overflow-y-auto">
             <div className={cn("mx-auto w-full max-w-3xl px-6 py-8", WIZARD_FOOTER_PADDING_BOTTOM)}>
 
-              {/* ---- Campaign Goal ---- */}
-              <div className="mb-6">
-                <h2 className="text-base font-bold text-foreground">Choose your goal</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  What do you want to achieve? We&apos;ll optimize your ads for the best results.
-                </p>
-              </div>
+              {/* ── Goal Selection ── */}
+              <div className="mb-10 overflow-hidden rounded-2xl bg-card">
+                {/* Header */}
+                <div className="px-8 pt-8 pb-6">
+                  <h2 className="text-xl font-bold text-foreground">What&apos;s your campaign goal?</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Pick one — we&apos;ll optimize everything for the best results.
+                  </p>
 
-              {/* Funnel guide (compact) */}
-              <div className="mb-6 flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-4 py-2.5">
-                {(["awareness", "consideration", "conversion"] as const).map((stage, i) => {
-                  const f = FUNNEL_LABELS[stage];
-                  const FIcon = f.icon;
-                  const isActive = selectedObj.funnelStage === stage;
-                  return (
-                    <div key={stage} className="flex items-center gap-2">
-                      {i > 0 && <ArrowRight className="size-3 text-border" />}
-                      <div className={cn(
-                        "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all",
-                        isActive ? f.color : "border-transparent text-muted-foreground"
-                      )}>
-                        <FIcon className="size-3" />
-                        {f.label}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Objective Cards */}
-              <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {OBJECTIVES.map((o) => {
-                  const selected = obj.objective === o.value;
-                  const funnel = FUNNEL_LABELS[o.funnelStage];
-                  const OIcon = o.icon;
-                  return (
-                    <button
-                      key={o.value}
-                      type="button"
-                      disabled={o.disabled}
-                      onClick={() => !o.disabled && handleObjectiveChange(o.value)}
-                      className={cn(
-                        "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all duration-200",
-                        o.disabled
-                          ? "cursor-not-allowed border-border bg-muted/50 opacity-60"
-                          : selected
-                            ? "border-primary bg-primary/[0.04] shadow-sm shadow-primary/10"
-                            : "border-border bg-card hover:border-primary/40 hover:shadow-sm"
-                      )}
-                    >
-                      {/* Top badges */}
-                      {o.recommended && (
-                        <div className="absolute -top-2.5 right-3">
-                          <Badge className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-sm">
-                            Recommended
-                          </Badge>
+                  {/* Funnel stage indicator */}
+                  <div className="mt-5 inline-flex items-center rounded-full bg-[#f4f4f4] p-1">
+                    {(["awareness", "consideration", "conversion"] as const).map((stage) => {
+                      const f = FUNNEL_LABELS[stage];
+                      const FIcon = f.icon;
+                      const isActive = selectedObj.funnelStage === stage;
+                      return (
+                        <div
+                          key={stage}
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all",
+                            isActive
+                              ? "bg-white shadow-sm text-foreground"
+                              : "text-muted-foreground"
+                          )}
+                        >
+                          <FIcon className="size-3.5" />
+                          {f.label}
                         </div>
-                      )}
-                      {!o.recommended && (o.badge || o.disabledReason) && (
-                        <div className="absolute -top-2.5 right-3">
-                          <Badge variant={o.disabled ? "outline" : "secondary"} className={cn(
-                            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                            !o.disabled && "bg-emerald-100 text-emerald-700"
-                          )}>
-                            {o.disabledReason || o.badge}
-                          </Badge>
-                        </div>
-                      )}
+                      );
+                    })}
+                  </div>
+                </div>
 
-                      {/* Icon + checkmark */}
-                      <div className="mb-3 flex items-center justify-between">
-                        <div className={cn(
-                          "flex size-10 items-center justify-center rounded-xl transition-colors",
+                {/* 3x2 Objective Grid */}
+                <div className="grid grid-cols-3 gap-3 px-8 pb-8">
+                  {OBJECTIVES.map((o) => {
+                    const selected = obj.objective === o.value;
+                    const OIcon = o.icon;
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        disabled={o.disabled}
+                        onClick={() => !o.disabled && handleObjectiveChange(o.value)}
+                        className={cn(
+                          "group relative flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-all",
                           o.disabled
-                            ? "bg-muted text-muted-foreground"
+                            ? "cursor-not-allowed opacity-40 border-border"
                             : selected
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                              ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                              : "border-border bg-white hover:border-[#a4ffe5] hover:shadow-sm"
+                        )}
+                      >
+                        <div className={cn(
+                          "flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors",
+                          selected ? "bg-[#004956] text-white" : "bg-[#f4f4f4] text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
                         )}>
                           <OIcon className="size-5" />
                         </div>
-                        {selected && <CheckCircle2 className="size-5 text-primary" />}
-                      </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn("text-sm font-bold", selected ? "text-[#004956]" : "text-foreground")}>{o.label}</span>
+                            {o.recommended && (
+                              <span className="rounded-full bg-[#a4ffe5] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#004956]">Best</span>
+                            )}
+                            {!o.recommended && o.badge && (
+                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-bold uppercase text-emerald-700">{o.badge}</span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2">{o.desc}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
 
-                      {/* Title */}
-                      <p className={cn(
-                        "text-sm font-semibold transition-colors",
-                        o.disabled ? "text-muted-foreground" : selected ? "text-primary" : "text-foreground"
-                      )}>
-                        {o.label}
+                {/* Selected objective detail bar */}
+                <div className="border-t border-border bg-[#f4f4f4] px-8 py-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-bold text-foreground">{selectedObj.label}</span> — {selectedObj.kpis.join(", ")}
                       </p>
-
-                      {/* Description */}
-                      <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground line-clamp-2">
-                        {o.desc}
-                      </p>
-
-                      {/* KPIs (always visible, compact) */}
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {o.kpis.map((kpi) => (
-                          <span key={kpi} className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            {kpi}
-                          </span>
-                        ))}
-                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setObjectiveSheetOpen(true)}
+                      className="shrink-0 text-xs font-bold text-[#004956] underline decoration-[#a4ffe5] decoration-2 underline-offset-2 hover:decoration-[#004956]"
+                    >
+                      Learn more
                     </button>
-                  );
-                })}
-              </div>
-
-              {/* ---- Selected Objective Summary ---- */}
-              <div className="mb-8 rounded-xl border border-primary/20 bg-primary/[0.02] overflow-hidden">
-                <div className="flex items-center gap-3 px-5 py-3.5 border-b border-primary/10">
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                    <selectedObj.icon className="size-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground">{selectedObj.label}</p>
-                    <p className="text-[11px] text-muted-foreground">{selectedObj.desc}</p>
-                  </div>
-                  <Badge variant="outline" className={cn("rounded-full border text-[10px] font-semibold", FUNNEL_LABELS[selectedObj.funnelStage].color)}>
-                    {FUNNEL_LABELS[selectedObj.funnelStage].label}
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-3 divide-x divide-primary/10 px-1 py-3">
-                  <div className="px-4 text-center">
-                    <p className="text-[10px] text-muted-foreground">Best for</p>
-                    <p className="mt-0.5 text-[11px] font-medium text-foreground">{selectedObj.bestFor}</p>
-                  </div>
-                  <div className="px-4 text-center">
-                    <p className="text-[10px] text-muted-foreground">Key metrics</p>
-                    <p className="mt-0.5 text-[11px] font-medium text-foreground">{selectedObj.kpis.join(", ")}</p>
-                  </div>
-                  <div className="px-4 text-center">
-                    <p className="text-[10px] text-muted-foreground">Ad formats</p>
-                    <p className="mt-0.5 text-[11px] font-medium text-foreground">{currentConfig.allowedFormats.length} available</p>
                   </div>
                 </div>
               </div>
 
-              {/* ---- Step 2: Campaign Setup ---- */}
-              <div className="mb-6">
-                <h2 className="text-base font-bold text-foreground">Campaign Setup</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Name your campaign and configure tracking.
-                </p>
-              </div>
+              {/* Objective Details Sheet */}
+              <Sheet open={objectiveSheetOpen} onOpenChange={setObjectiveSheetOpen}>
+                <SheetContent side="right" className="flex w-full flex-col sm:max-w-[420px] bg-white p-0">
+                  {/* Header */}
+                  <div className="bg-[#004956] px-6 py-6">
+                    <div className="flex items-center gap-4">
+                      <div className="flex size-12 items-center justify-center rounded-2xl bg-white/15">
+                        <selectedObj.icon className="size-6 text-white" />
+                      </div>
+                      <div>
+                        <SheetTitle className="text-lg font-bold text-white">{selectedObj.label}</SheetTitle>
+                        <Badge className="mt-1 rounded-full border-0 bg-[#a4ffe5] px-2 py-0.5 text-[10px] font-medium text-[#004956]">
+                          {FUNNEL_LABELS[selectedObj.funnelStage].label}
+                        </Badge>
+                      </div>
+                    </div>
+                    <SheetDescription className="mt-3 text-sm text-white/70">
+                      {selectedObj.desc}
+                    </SheetDescription>
+                  </div>
 
-              {/* Campaign Name */}
-              <div className="mb-4 rounded-xl border border-border bg-card p-5">
-                <Label className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                  Campaign Name
-                  <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  placeholder="e.g. Summer Collection - Snap Sales"
-                  value={obj.campaignName}
-                  onChange={(e) => updateNested("objective", { campaignName: e.target.value.slice(0, 375) })}
-                  className="h-11 text-sm"
-                />
-                <div className="mt-1.5 flex items-center justify-between">
-                  <p className="text-[11px] text-muted-foreground">
-                    A descriptive name helps you identify this campaign in your dashboard.
+                  {/* Content */}
+                  <div className="flex-1 overflow-y-auto">
+                    {/* Tutorial Video Placeholder */}
+                    <div className="mx-6 mt-6 flex h-[180px] items-center justify-center rounded-2xl bg-gradient-to-br from-[#004956] to-[#006d7a]">
+                      <div className="text-center">
+                        <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-white/20">
+                          <svg viewBox="0 0 24 24" className="ml-0.5 size-5 text-white" fill="currentColor">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </div>
+                        <p className="text-sm font-bold text-white">Tutorial Video</p>
+                        <p className="text-xs text-white/60">45 seconds — how to set up your campaign</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6 px-6 py-6">
+                      {/* Quick Stats Row */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                          <p className="text-lg font-bold text-[#004956]">{currentConfig.allowedFormats.length}</p>
+                          <p className="text-[10px] font-medium text-muted-foreground">Ad Formats</p>
+                        </div>
+                        <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                          <p className="text-lg font-bold text-[#004956]">SAR 150</p>
+                          <p className="text-[10px] font-medium text-muted-foreground">Min Budget/day</p>
+                        </div>
+                        <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                          <p className="text-lg font-bold text-[#004956]">7+</p>
+                          <p className="text-[10px] font-medium text-muted-foreground">Days Recommended</p>
+                        </div>
+                      </div>
+
+                      {/* Best for */}
+                      <div>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Best for</p>
+                        <p className="text-sm font-bold text-foreground">{selectedObj.bestFor}</p>
+                      </div>
+
+                      {/* Key Metrics */}
+                      <div>
+                        <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Metrics</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedObj.kpis.map((kpi) => (
+                            <span key={kpi} className="rounded-full border border-[#a4ffe5] bg-[#e6fff9] px-4 py-1.5 text-xs font-medium text-[#004956]">{kpi}</span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Step-by-step guide */}
+                      <div>
+                        <p className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Step-by-step guide</p>
+                        <div className="space-y-4">
+                          {[
+                            { title: "Set up tracking", desc: "Connect your Snap Pixel or use Salla's automatic pixel." },
+                            { title: "Define your audience", desc: "Choose locations, demographics, and interests." },
+                            { title: "Set budget & schedule", desc: "Set daily budget and campaign duration." },
+                            { title: "Create your ad", desc: "Upload creatives. Snap recommends 3-5 variations." },
+                            { title: "Launch & optimize", desc: "Review, launch, and monitor after 3-5 days." },
+                          ].map((s, i) => (
+                            <div key={i} className="flex items-start gap-3">
+                              <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#004956] text-xs font-bold text-white">
+                                {i + 1}
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-foreground">{s.title}</p>
+                                <p className="text-xs text-muted-foreground">{s.desc}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Pro tip */}
+                      <div className="rounded-xl bg-[#e6fff9] p-4">
+                        <div className="mb-1 flex items-center gap-2">
+                          <Sparkles className="size-3.5 text-[#004956]" />
+                          <p className="text-xs font-bold text-[#004956]">Pro Tip</p>
+                        </div>
+                        <p className="text-xs leading-relaxed text-[#004956]/80">
+                          {selectedObj.funnelStage === "conversion"
+                            ? "Start broad and let Snapchat's algorithm find your best customers. Narrow down after the learning phase."
+                            : selectedObj.funnelStage === "consideration"
+                              ? "Use video creatives — they drive 2x more engagement than static images."
+                              : "Maximize reach by selecting Automatic placement and keeping your audience broad."
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer — Start Campaign CTA */}
+                  <div className="border-t border-border p-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setObjectiveSheetOpen(false);
+                        // Scroll to campaign name
+                        setTimeout(() => {
+                          const input = document.querySelector('input[placeholder*="Summer"]') as HTMLInputElement;
+                          if (input) { input.scrollIntoView({ behavior: 'smooth', block: 'center' }); input.focus(); }
+                        }, 300);
+                      }}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#004956] py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#003a44]"
+                    >
+                      <ArrowRight className="size-4" />
+                      Start Campaign
+                    </button>
+                    <p className="mt-2 text-center text-[10px] text-muted-foreground">
+                      You can change your objective at any time before launching.
+                    </p>
+                  </div>
+                </SheetContent>
+              </Sheet>
+
+              {/* ── Campaign Setup ── */}
+              <div className="overflow-hidden rounded-2xl bg-card">
+                <div className="px-8 pt-8 pb-6">
+                  <h2 className="text-xl font-bold text-foreground">Campaign Setup</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Name your campaign and configure tracking.
                   </p>
-                  <span className={cn(
-                    "text-[11px] tabular-nums",
-                    obj.campaignName.length > 350 ? "text-amber-600" : "text-muted-foreground"
-                  )}>
-                    {obj.campaignName.length}/375
-                  </span>
                 </div>
-              </div>
+
+                {/* Campaign Name */}
+                <div className="px-8 pb-6">
+                  <div className="mb-2 flex items-center justify-between">
+                    <Label className="text-sm font-medium text-foreground">
+                      Campaign Name <span className="text-red-500">*</span>
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const date = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                        const autoName = `${selectedObj.label} - Snapchat - ${date}`;
+                        updateNested("objective", { campaignName: autoName });
+                      }}
+                      className="flex items-center gap-1 text-xs font-medium text-[#004956] hover:underline"
+                    >
+                      <Sparkles className="size-3" />
+                      Auto-generate
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      placeholder="e.g. Summer Collection - Snap Sales"
+                      value={obj.campaignName}
+                      onChange={(e) => updateNested("objective", { campaignName: e.target.value.slice(0, 375) })}
+                      className="h-10 pr-14 text-sm"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                      {obj.campaignName.length}/375
+                    </span>
+                  </div>
+                </div>
 
               {/* Catalog Toggle */}
               {currentConfig.catalogAvailable && (
-                <div className="mb-4 rounded-xl border border-border bg-card p-5">
+                <div className="border-t border-border px-8 py-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <Tag className="size-4 text-primary" />
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                        <Tag className="size-4 text-[#004956]" />
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-foreground">Product Catalog</p>
@@ -423,11 +513,11 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
               )}
 
-              {/* ── Snapchat Connection (Pixel + Public Profile merged) ── */}
+              {/* Pixel section inside same card */}
               {currentConfig.pixelRequirement !== "none" && (
-                <div className="mb-4 rounded-xl border border-border bg-card p-5">
+                <div className="border-t border-border px-8 py-5">
                   <div className="mb-4 flex items-start gap-3">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
                       <Scan className="size-4 text-primary" />
                     </div>
                     <div>
@@ -444,32 +534,32 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {/* Salla managed (recommended, shown first) */}
+                    {/* Salla managed (recommended) */}
                     <button
                       type="button"
                       onClick={() => updateNested("objective", { pixelMode: "salla_managed" })}
                       className={cn(
-                        "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all",
+                        "group relative flex flex-col rounded-xl border p-4 text-left transition-all",
                         obj.pixelMode === "salla_managed"
-                          ? "border-primary bg-primary/[0.04] shadow-sm"
-                          : "border-border bg-background hover:border-primary/40"
+                          ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                          : "border-border bg-white hover:border-[#a4ffe5]"
                       )}
                     >
                       <div className="absolute -top-2.5 right-3">
-                        <Badge className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-sm">
+                        <Badge className="rounded-full bg-[#004956] px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
                           Recommended
                         </Badge>
                       </div>
                       <div className="mb-2.5 flex items-center justify-between">
                         <div className={cn(
                           "flex size-8 items-center justify-center rounded-lg transition-colors",
-                          obj.pixelMode === "salla_managed" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                          obj.pixelMode === "salla_managed" ? "bg-[#004956] text-white" : "bg-muted text-muted-foreground"
                         )}>
                           <Zap className="size-4" />
                         </div>
-                        {obj.pixelMode === "salla_managed" && <CheckCircle2 className="size-4 text-primary" />}
+                        {obj.pixelMode === "salla_managed" && <CheckCircle2 className="size-4 text-[#004956]" />}
                       </div>
-                      <p className={cn("text-xs font-semibold", obj.pixelMode === "salla_managed" ? "text-primary" : "text-foreground")}>
+                      <p className={cn("text-xs font-semibold", obj.pixelMode === "salla_managed" ? "text-[#004956]" : "text-foreground")}>
                         Automatic (Salla)
                       </p>
                       <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
@@ -492,22 +582,22 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                         }
                       }}
                       className={cn(
-                        "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all",
+                        "group relative flex flex-col rounded-xl border p-4 text-left transition-all",
                         obj.pixelMode === "existing"
-                          ? "border-primary bg-primary/[0.04] shadow-sm"
-                          : "border-border bg-background hover:border-primary/40"
+                          ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                          : "border-border bg-white hover:border-[#a4ffe5]"
                       )}
                     >
                       <div className="mb-2.5 flex items-center justify-between">
                         <div className={cn(
                           "flex size-8 items-center justify-center rounded-lg transition-colors",
-                          obj.pixelMode === "existing" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                          obj.pixelMode === "existing" ? "bg-[#004956] text-white" : "bg-muted text-muted-foreground"
                         )}>
                           <Link2 className="size-4" />
                         </div>
-                        {obj.pixelMode === "existing" && <CheckCircle2 className="size-4 text-primary" />}
+                        {obj.pixelMode === "existing" && <CheckCircle2 className="size-4 text-[#004956]" />}
                       </div>
-                      <p className={cn("text-xs font-semibold", obj.pixelMode === "existing" ? "text-primary" : "text-foreground")}>
+                      <p className={cn("text-xs font-semibold", obj.pixelMode === "existing" ? "text-[#004956]" : "text-foreground")}>
                         Connect Existing
                       </p>
                       <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
@@ -700,16 +790,15 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
               )}
 
-              {/* ---- Snapchat Public Profile (simplified) ---- */}
-              <div className="mb-6 overflow-hidden rounded-xl border border-border bg-card">
-                <div className="px-6 py-5">
-                  <h3 className="text-base font-bold text-foreground">Snapchat Public Profile</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Your public profile appears on all your ads. It&apos;s auto-detected from your Salla account.
-                  </p>
-                </div>
+              {/* Public Profile inside same card */}
+              <div className="border-t border-border px-8 py-5">
+                <p className="text-sm font-bold text-foreground">Snapchat Public Profile</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Auto-detected from your Salla account. Appears on all your ads.
+                </p>
+              </div>
                 {snapProfile ? (
-                  <div className="border-t border-border px-6 py-4">
+                  <div className="px-8 pb-8">
                     <div className="flex items-center gap-3 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-4 py-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -799,32 +888,32 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
 
             </div>
           </div>
+          <WizardStepFooter
+            previousLabel="Cancel"
+            onPrevious={onCancel ?? (() => {})}
+            onNext={() => setStep(1)}
+            nextLabel="Next"
+            nextDisabled={
+              !obj.campaignName.trim() ||
+              (currentConfig.pixelRequirement === "required" &&
+                (obj.pixelMode === "none" || (obj.pixelMode === "existing" && !obj.pixelId.trim()))) ||
+              (obj.objective === "APP_PROMOTION" && obj.appSettings != null && (
+                !obj.appSettings.appName.trim() ||
+                (obj.appSettings.appPlatform !== "ANDROID" && !obj.appSettings.iosAppId.trim()) ||
+                (obj.appSettings.appPlatform !== "IOS" && !obj.appSettings.androidAppUrl.trim())
+              ))
+            }
+            secondaryAction={{
+              label: "Discard draft",
+              onClick: () => {
+                if (window.confirm("Discard this campaign draft? All unsaved changes will be lost.")) {
+                  window.location.href = "/";
+                }
+              },
+            }}
+          />
         </div>
       </div>
-      <WizardStepFooter
-        previousLabel="Cancel"
-        onPrevious={onCancel ?? (() => {})}
-        onNext={() => setStep(1)}
-        nextLabel="Next"
-        nextDisabled={
-          !obj.campaignName.trim() ||
-          (currentConfig.pixelRequirement === "required" &&
-            (obj.pixelMode === "none" || (obj.pixelMode === "existing" && !obj.pixelId.trim()))) ||
-          (obj.objective === "APP_PROMOTION" && obj.appSettings != null && (
-            !obj.appSettings.appName.trim() ||
-            (obj.appSettings.appPlatform !== "ANDROID" && !obj.appSettings.iosAppId.trim()) ||
-            (obj.appSettings.appPlatform !== "IOS" && !obj.appSettings.androidAppUrl.trim())
-          ))
-        }
-        secondaryAction={{
-          label: "Discard draft",
-          onClick: () => {
-            if (window.confirm("Discard this campaign draft? All unsaved changes will be lost.")) {
-              window.location.href = "/";
-            }
-          },
-        }}
-      />
     </TooltipProvider>
   );
 }

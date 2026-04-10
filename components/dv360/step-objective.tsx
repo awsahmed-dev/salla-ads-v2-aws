@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useDV360Campaign } from "@/lib/dv360/campaign-context";
 import { DV360_OBJECTIVE_CONFIGS, type DV360Objective } from "@/lib/dv360/campaign-types";
 import { cn } from "@/lib/utils";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
-import { StepZeroHeader } from "@/components/shared/step-zero-header";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -97,20 +97,8 @@ const FUNNEL_LABELS: Record<string, { label: string; color: string; icon: React.
 export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested } = useDV360Campaign();
   const obj = campaign.objective;
-  const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved">("idle");
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
-
   const config = DV360_OBJECTIVE_CONFIGS[obj.objective];
   const needsConversionTracking = config.conversionTrackingRequired;
-
-  // Auto-save indicator
-  useEffect(() => {
-    if (!obj.campaignName) return;
-    setAutoSaveState("saving");
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => setAutoSaveState("saved"), 800);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [obj.campaignName, obj.objective]);
 
   const handleObjectiveChange = (value: DV360Objective) => {
     if (value === obj.objective) return;
@@ -143,13 +131,6 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
         {/*  MAIN CONTENT                                                */}
         {/* ============================================================ */}
         <div className="flex flex-1 flex-col">
-
-          <StepZeroHeader
-            platform="dv360"
-            title="Create YouTube Ads Campaign"
-            subtitle="Salla Ads — DV360"
-            saveState={autoSaveState}
-          />
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
@@ -502,17 +483,16 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
 
             </div>
           </div>
+          <WizardStepFooter
+            previousLabel="Cancel"
+            onPrevious={onCancel ?? (() => {})}
+            onNext={() => setStep(1)}
+            nextLabel="Next"
+            nextDisabled={!canProceed}
+            accent="dv360"
+          />
         </div>
-
       </div>
-      <WizardStepFooter
-        previousLabel="Cancel"
-        onPrevious={onCancel ?? (() => {})}
-        onNext={() => setStep(1)}
-        nextLabel="Next"
-        nextDisabled={!canProceed}
-        accent="dv360"
-      />
     </TooltipProvider>
   );
 }

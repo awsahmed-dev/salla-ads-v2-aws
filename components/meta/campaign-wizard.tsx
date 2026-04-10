@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useMetaCampaign } from "@/lib/meta/campaign-context";
 import { MetaStepIndicator } from "./step-indicator";
 import { MetaStepObjective } from "./step-objective";
@@ -10,6 +11,8 @@ import { MetaStepReview } from "./step-review";
 
 export function MetaCampaignWizard({ onBackToPlatforms }: { onBackToPlatforms?: () => void }) {
   const { step } = useMetaCampaign();
+
+  useEffect(() => { window.scrollTo(0, 0); }, [step]);
 
   return (
     <div className="min-h-screen bg-background">

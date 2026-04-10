@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useDV360Campaign } from "@/lib/dv360/campaign-context";
 import { DV360StepIndicator } from "./step-indicator";
 import { DV360StepObjective } from "./step-objective";
@@ -10,6 +11,8 @@ import { DV360StepReview } from "./step-review";
 
 export function DV360CampaignWizard({ onBackToPlatforms }: { onBackToPlatforms?: () => void }) {
   const { step } = useDV360Campaign();
+
+  useEffect(() => { window.scrollTo(0, 0); }, [step]);
 
   return (
     <div className="min-h-screen bg-background">

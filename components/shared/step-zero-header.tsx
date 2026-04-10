@@ -1,7 +1,5 @@
 "use client";
 
-import { Save } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { SnapchatLogo } from "@/components/shared/snapchat-logo";
 
@@ -68,20 +66,17 @@ const PLATFORM_CONFIG: Record<
   },
 };
 
-export type StepZeroSaveState = "idle" | "saving" | "saved";
-
 interface StepZeroHeaderProps {
   platform: StepZeroPlatform;
   title: string;
   subtitle: string;
-  saveState: StepZeroSaveState;
 }
 
 /**
  * Unified Step 0 (Objective) header for all ad platforms.
  * Aligns with the platform switcher and provides consistent campaign-creation UX.
  */
-export function StepZeroHeader({ platform, title, subtitle, saveState }: StepZeroHeaderProps) {
+export function StepZeroHeader({ platform, title, subtitle }: StepZeroHeaderProps) {
   const config = PLATFORM_CONFIG[platform];
 
   return (
@@ -104,27 +99,6 @@ export function StepZeroHeader({ platform, title, subtitle, saveState }: StepZer
             <p className="mt-0.5 truncate text-sm text-muted-foreground">{subtitle}</p>
           </div>
         </div>
-        <Badge
-          variant="outline"
-          className="shrink-0 gap-1.5 rounded-full border-border px-3 py-1.5 text-xs font-medium"
-        >
-          {saveState === "saving" ? (
-            <>
-              <span className="size-2 animate-pulse rounded-full bg-amber-500" />
-              Saving…
-            </>
-          ) : saveState === "saved" ? (
-            <>
-              <Save className={cn("size-3.5", config.saveColor)} />
-              Draft saved
-            </>
-          ) : (
-            <>
-              <span className={cn("size-2 rounded-full", config.dotColor)} />
-              Draft
-            </>
-          )}
-        </Badge>
       </div>
     </header>
   );

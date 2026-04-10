@@ -56,9 +56,8 @@ export function WizardStepFooter({
           </button>
         )}
 
-        {/* Center: message or spacer */}
-        <div className="flex flex-1 items-center justify-end gap-4">
-          {/* Validation message */}
+        {/* Center: validation message */}
+        <div className="flex flex-1 items-center justify-center">
           {message && (
             <span
               className={cn(
@@ -73,8 +72,10 @@ export function WizardStepFooter({
               {message.text}
             </span>
           )}
+        </div>
 
-          {/* Auto-save status */}
+        {/* Right: Auto-save + Next */}
+        <div className="flex shrink-0 items-center gap-4">
           <span className="flex items-center gap-1 text-sm font-medium text-foreground">
             Auto save
             {saveStatus === "saving" ? (
@@ -84,7 +85,6 @@ export function WizardStepFooter({
             )}
           </span>
 
-          {/* Next button */}
           <button
             type="button"
             onClick={onNext}

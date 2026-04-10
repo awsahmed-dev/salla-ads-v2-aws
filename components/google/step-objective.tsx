@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useGoogleCampaign } from "@/lib/google/campaign-context";
 import { OBJECTIVE_CONFIGS, APP_GOAL_MMP_REQUIRED, type AppStore, type AppCampaignGoalType } from "@/lib/google/campaign-types";
 import { generateCampaignName } from "@/lib/google/search-ai-generator";
 import { getStoreInfo, getCategories } from "@/lib/salla/store-api";
 import { cn } from "@/lib/utils";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
-import { StepZeroHeader } from "@/components/shared/step-zero-header";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -137,9 +137,6 @@ const FUNNEL_LABELS: Record<string, { label: string; color: string; icon: React.
 export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested } = useGoogleCampaign();
   const obj = campaign.objective;
-  const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved">("idle");
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
-
   const config = OBJECTIVE_CONFIGS[obj.objective] ?? OBJECTIVE_CONFIGS.PERFORMANCE_MAX;
   const selectedObj = CAMPAIGN_OBJECTIVES.find((o) => o.value === obj.objective)!;
   const needsConversionTag = config.conversionTrackingRequired;
@@ -148,15 +145,6 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
   const supportsCatalogMode = isPMax;
   const requiresCatalogConnection =
     obj.objective === "SHOPPING" || (isPMax && obj.feedEnabled);
-
-  // Auto-save indicator
-  useEffect(() => {
-    if (!obj.campaignName && obj.tagMode === "none") return;
-    setAutoSaveState("saving");
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => setAutoSaveState("saved"), 800);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [obj.campaignName, obj.tagMode, obj.objective]);
 
   // Auto-fill campaign name from store data on mount (skip if draft recovery)
   useEffect(() => {
@@ -216,13 +204,6 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
         {/*  MAIN CONTENT                                                */}
         {/* ============================================================ */}
         <div className="flex flex-1 flex-col">
-
-          <StepZeroHeader
-            platform="google"
-            title="Create Google Ads Campaign"
-            subtitle="Salla Ads"
-            saveState={autoSaveState}
-          />
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
@@ -902,24 +883,23 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
 
             </div>
           </div>
+          <WizardStepFooter
+            previousLabel="Cancel"
+            onPrevious={onCancel ?? (() => {})}
+            onNext={() => setStep(1)}
+            nextLabel="Next"
+            nextDisabled={!canProceed}
+            secondaryAction={{
+              label: "Discard draft",
+              onClick: () => {
+                if (window.confirm("Discard this campaign draft? All unsaved changes will be lost.")) {
+                  window.location.href = "/";
+                }
+              },
+            }}
+          />
         </div>
-
       </div>
-      <WizardStepFooter
-        previousLabel="Cancel"
-        onPrevious={onCancel ?? (() => {})}
-        onNext={() => setStep(1)}
-        nextLabel="Next"
-        nextDisabled={!canProceed}
-        secondaryAction={{
-          label: "Discard draft",
-          onClick: () => {
-            if (window.confirm("Discard this campaign draft? All unsaved changes will be lost.")) {
-              window.location.href = "/";
-            }
-          },
-        }}
-      />
     </TooltipProvider>
   );
 }
