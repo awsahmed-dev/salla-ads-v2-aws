@@ -17,11 +17,11 @@ import {
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   ShoppingBag,
   Info,
@@ -1275,162 +1275,184 @@ export function TikTokStepObjective() {
                     )}
                   </div>
 
-                  {/* ---- How to Connect: Help Dialog ---- */}
-                  <Dialog open={showHowToConnect} onOpenChange={setShowHowToConnect}>
-                    <DialogContent className="max-w-lg">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                          <Smartphone className="size-4 text-primary" />
-                          How to connect your TikTok account
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="flex flex-col gap-5">
-                        {/* Video/GIF placeholder */}
-                        <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-foreground to-foreground/80">
-                          <div className="flex flex-col items-center gap-3 text-background/80">
-                            <div className="flex size-14 items-center justify-center rounded-full bg-background/20 backdrop-blur-sm">
-                              <PlayCircle className="size-8 text-background" />
+                  {/* ---- How to Connect: Slide-in Sheet ---- */}
+                  <Sheet open={showHowToConnect} onOpenChange={setShowHowToConnect}>
+                    <SheetContent side="right" className="flex w-full flex-col gap-0 border-l p-0 sm:max-w-md">
+                      {/* Fixed header */}
+                      <div className="border-b border-border px-6 py-5">
+                        <SheetHeader>
+                          <SheetTitle className="flex items-center gap-2.5 text-base">
+                            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+                              <Smartphone className="size-4 text-primary" />
                             </div>
-                            <div className="text-center">
-                              <p className="text-sm font-semibold text-background">Tutorial Video</p>
-                              <p className="text-xs text-background/60">30 seconds — how to scan and connect</p>
-                            </div>
-                          </div>
-                          <div className="absolute bottom-3 right-3 opacity-30">
-                            <svg viewBox="0 0 24 24" className="size-6 text-background" fill="currentColor">
-                              <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.75a8.18 8.18 0 0 0 4.76 1.52V6.84a4.83 4.83 0 0 1-1-.15z"/>
-                            </svg>
-                          </div>
-                        </div>
+                            How to connect your TikTok account
+                          </SheetTitle>
+                        </SheetHeader>
+                      </div>
 
-                        {/* Step-by-step text guide */}
-                        <div className="flex flex-col gap-3">
-                          <p className="text-xs font-semibold text-foreground">Step-by-step guide</p>
-                          {[
-                            { step: 1, title: "Enter your TikTok display name", desc: "This is the name shown at the top of your TikTok profile (e.g. \"My Salla Store\") — not your @handle." },
-                            { step: 2, title: "Click \"Generate QR Code\"", desc: "A unique QR code will appear — this is your connection link." },
-                            { step: 3, title: "Open TikTok on your phone", desc: "Go to your Profile page in the TikTok app." },
-                            { step: 4, title: "Open the QR scanner", desc: "Tap the menu at the top right, then Settings and privacy, then QR code. Or tap the QR icon next to your username." },
-                            { step: 5, title: "Scan & approve", desc: "Point your camera at the QR code on this screen. TikTok will ask you to approve the connection from Salla — tap \"Confirm\"." },
-                          ].map((s) => (
-                            <div key={s.step} className="flex items-start gap-3">
-                              <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                                {s.step}
+                      {/* Scrollable content */}
+                      <div className="flex-1 overflow-y-auto px-6 py-5">
+                        <div className="flex flex-col gap-6">
+                          {/* Video/GIF placeholder */}
+                          <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-foreground to-foreground/80">
+                            <div className="flex flex-col items-center gap-3 text-background/80">
+                              <div className="flex size-14 items-center justify-center rounded-full bg-background/20 backdrop-blur-sm">
+                                <PlayCircle className="size-8 text-background" />
                               </div>
+                              <div className="text-center">
+                                <p className="text-sm font-semibold text-background">Tutorial Video</p>
+                                <p className="text-xs text-background/60">30 seconds — how to scan and connect</p>
+                              </div>
+                            </div>
+                            <div className="absolute bottom-3 right-3 opacity-30">
+                              <svg viewBox="0 0 24 24" className="size-6 text-background" fill="currentColor">
+                                <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.75a8.18 8.18 0 0 0 4.76 1.52V6.84a4.83 4.83 0 0 1-1-.15z"/>
+                              </svg>
+                            </div>
+                          </div>
+
+                          {/* Step-by-step text guide */}
+                          <div>
+                            <p className="mb-3 text-sm font-semibold text-foreground">Step-by-step guide</p>
+                            <div className="flex flex-col gap-4">
+                              {[
+                                { step: 1, title: "Enter your TikTok display name", desc: "This is the name shown at the top of your TikTok profile (e.g. \"My Salla Store\") — not your @handle." },
+                                { step: 2, title: "Click \"Generate QR Code\"", desc: "A unique QR code will appear — this is your connection link." },
+                                { step: 3, title: "Open TikTok on your phone", desc: "Go to your Profile page in the TikTok app." },
+                                { step: 4, title: "Open the QR scanner", desc: "Tap the menu at the top right, then Settings and privacy, then QR code. Or tap the QR icon next to your username." },
+                                { step: 5, title: "Scan & approve", desc: "Point your camera at the QR code on this screen. TikTok will ask you to approve the connection from Salla — tap \"Confirm\"." },
+                              ].map((s) => (
+                                <div key={s.step} className="flex items-start gap-3">
+                                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                                    {s.step}
+                                  </div>
+                                  <div className="pt-0.5">
+                                    <p className="text-sm font-medium text-foreground">{s.title}</p>
+                                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{s.desc}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* FAQ */}
+                          <div className="rounded-xl border border-border bg-muted/20 p-4">
+                            <p className="mb-3 text-sm font-semibold text-foreground">Common questions</p>
+                            <div className="flex flex-col gap-3">
                               <div>
-                                <p className="text-xs font-medium text-foreground">{s.title}</p>
-                                <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{s.desc}</p>
+                                <p className="text-xs font-medium text-foreground">Do I need a TikTok Business Account?</p>
+                                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">Yes — you can switch to a Business Account for free in TikTok Settings, Manage account, Switch to Business Account.</p>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* FAQ */}
-                        <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
-                          <p className="mb-2 text-xs font-semibold text-foreground">Common questions</p>
-                          <div className="flex flex-col gap-2">
-                            <div>
-                              <p className="text-[11px] font-medium text-foreground">Do I need a TikTok Business Account?</p>
-                              <p className="text-[10px] text-muted-foreground">Yes — you can switch to a Business Account for free in TikTok Settings, Manage account, Switch to Business Account.</p>
-                            </div>
-                            <div>
-                              <p className="text-[11px] font-medium text-foreground">What happens after I connect?</p>
-                              <p className="text-[10px] text-muted-foreground">Your TikTok profile name and avatar will appear on your ads. You can also promote your organic posts as Spark Ads.</p>
-                            </div>
-                            <div>
-                              <p className="text-[11px] font-medium text-foreground">Can I disconnect later?</p>
-                              <p className="text-[10px] text-muted-foreground">Yes — you can disconnect anytime from this page or from TikTok&apos;s Business Center settings.</p>
+                              <div className="border-t border-border pt-3">
+                                <p className="text-xs font-medium text-foreground">What happens after I connect?</p>
+                                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">Your TikTok profile name and avatar will appear on your ads. You can also promote your organic posts as Spark Ads.</p>
+                              </div>
+                              <div className="border-t border-border pt-3">
+                                <p className="text-xs font-medium text-foreground">Can I disconnect later?</p>
+                                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">Yes — you can disconnect anytime from this page or from TikTok&apos;s Business Center settings.</p>
+                              </div>
                             </div>
                           </div>
                         </div>
+                      </div>
 
-                        <Button
-                          onClick={() => setShowHowToConnect(false)}
-                          className="w-full"
-                        >
+                      {/* Fixed footer */}
+                      <div className="border-t border-border px-6 py-4">
+                        <Button onClick={() => setShowHowToConnect(false)} className="w-full">
                           Got it
                         </Button>
                       </div>
-                    </DialogContent>
-                  </Dialog>
+                    </SheetContent>
+                  </Sheet>
 
-                  {/* ---- How to Share Pixel: Help Dialog ---- */}
-                  <Dialog open={showPixelHelp} onOpenChange={setShowPixelHelp}>
-                    <DialogContent className="max-w-lg">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                          <Scan className="size-4 text-primary" />
-                          How to share your TikTok Pixel
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="flex flex-col gap-5">
-                        {/* Video/GIF placeholder */}
-                        <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-foreground to-foreground/80">
-                          <div className="flex flex-col items-center gap-3 text-background/80">
-                            <div className="flex size-14 items-center justify-center rounded-full bg-background/20 backdrop-blur-sm">
-                              <PlayCircle className="size-8 text-background" />
+                  {/* ---- How to Share Pixel: Slide-in Sheet ---- */}
+                  <Sheet open={showPixelHelp} onOpenChange={setShowPixelHelp}>
+                    <SheetContent side="right" className="flex w-full flex-col gap-0 border-l p-0 sm:max-w-md">
+                      {/* Fixed header */}
+                      <div className="border-b border-border px-6 py-5">
+                        <SheetHeader>
+                          <SheetTitle className="flex items-center gap-2.5 text-base">
+                            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+                              <Scan className="size-4 text-primary" />
                             </div>
-                            <div className="text-center">
-                              <p className="text-sm font-semibold text-background">Tutorial Video</p>
-                              <p className="text-xs text-background/60">45 seconds — how to share your pixel</p>
+                            How to share your TikTok Pixel
+                          </SheetTitle>
+                        </SheetHeader>
+                      </div>
+
+                      {/* Scrollable content */}
+                      <div className="flex-1 overflow-y-auto px-6 py-5">
+                        <div className="flex flex-col gap-6">
+                          {/* Video/GIF placeholder */}
+                          <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-foreground to-foreground/80">
+                            <div className="flex flex-col items-center gap-3 text-background/80">
+                              <div className="flex size-14 items-center justify-center rounded-full bg-background/20 backdrop-blur-sm">
+                                <PlayCircle className="size-8 text-background" />
+                              </div>
+                              <div className="text-center">
+                                <p className="text-sm font-semibold text-background">Tutorial Video</p>
+                                <p className="text-xs text-background/60">45 seconds — how to share your pixel</p>
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        {/* Step-by-step text guide */}
-                        <div className="flex flex-col gap-3">
-                          <p className="text-xs font-semibold text-foreground">Step-by-step guide</p>
-                          {[
-                            { step: 1, title: "Open your TikTok Business Center", desc: "Go to business.tiktok.com and log in. If you don't have a Business Center, you can create one for free." },
-                            { step: 2, title: "Navigate to your Pixel", desc: "Go to Assets → Pixels in the left sidebar. Select the pixel you want to share." },
-                            { step: 3, title: "Add Salla as a Partner", desc: "Click on \"Partners\" tab → \"Add Partner\" → paste Salla's Business Center ID: BC_SALLA_001" },
-                            { step: 4, title: "Confirm the sharing", desc: "Review the permissions and click \"Confirm\". Salla will receive access to your pixel." },
-                            { step: 5, title: "Enter your Pixel ID here", desc: "Come back to this page and enter your Pixel ID. Click \"Verify\" — we'll confirm it's connected." },
-                          ].map((s) => (
-                            <div key={s.step} className="flex items-start gap-3">
-                              <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                                {s.step}
-                              </div>
+                          {/* Step-by-step text guide */}
+                          <div>
+                            <p className="mb-3 text-sm font-semibold text-foreground">Step-by-step guide</p>
+                            <div className="flex flex-col gap-4">
+                              {[
+                                { step: 1, title: "Open your TikTok Business Center", desc: "Go to business.tiktok.com and log in. If you don't have a Business Center, you can create one for free." },
+                                { step: 2, title: "Navigate to your Pixel", desc: "Go to Assets → Pixels in the left sidebar. Select the pixel you want to share." },
+                                { step: 3, title: "Add Salla as a Partner", desc: "Click on \"Partners\" tab → \"Add Partner\" → paste Salla's Business Center ID: BC_SALLA_001" },
+                                { step: 4, title: "Confirm the sharing", desc: "Review the permissions and click \"Confirm\". Salla will receive access to your pixel." },
+                                { step: 5, title: "Enter your Pixel ID here", desc: "Come back to this page and enter your Pixel ID. Click \"Verify\" — we'll confirm it's connected." },
+                              ].map((s) => (
+                                <div key={s.step} className="flex items-start gap-3">
+                                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                                    {s.step}
+                                  </div>
+                                  <div className="pt-0.5">
+                                    <p className="text-sm font-medium text-foreground">{s.title}</p>
+                                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{s.desc}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* FAQ */}
+                          <div className="rounded-xl border border-border bg-muted/20 p-4">
+                            <p className="mb-3 text-sm font-semibold text-foreground">Common questions</p>
+                            <div className="flex flex-col gap-3">
                               <div>
-                                <p className="text-xs font-medium text-foreground">{s.title}</p>
-                                <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{s.desc}</p>
+                                <p className="text-xs font-medium text-foreground">Do I need a TikTok Business Center?</p>
+                                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">Yes — you need a Business Center to share pixels. You can create one for free at business.tiktok.com.</p>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* FAQ */}
-                        <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
-                          <p className="mb-2 text-xs font-semibold text-foreground">Common questions</p>
-                          <div className="flex flex-col gap-2">
-                            <div>
-                              <p className="text-[11px] font-medium text-foreground">Do I need a TikTok Business Center?</p>
-                              <p className="text-[10px] text-muted-foreground">Yes — you need a Business Center to share pixels. You can create one for free at business.tiktok.com.</p>
-                            </div>
-                            <div>
-                              <p className="text-[11px] font-medium text-foreground">Will Salla see my ad spend?</p>
-                              <p className="text-[10px] text-muted-foreground">No — sharing a pixel only gives Salla access to the pixel events (purchases, page views). Your ad spend and campaign data remain private in your Business Center.</p>
-                            </div>
-                            <div>
-                              <p className="text-[11px] font-medium text-foreground">Can I revoke access later?</p>
-                              <p className="text-[10px] text-muted-foreground">Yes — you can remove Salla as a partner anytime from your Business Center settings. The pixel will be disconnected.</p>
-                            </div>
-                            <div>
-                              <p className="text-[11px] font-medium text-foreground">Why not just enter the Pixel ID?</p>
-                              <p className="text-[10px] text-muted-foreground">TikTok requires Business Center-level sharing for security. A Pixel ID alone doesn&apos;t grant access — the partner sharing flow ensures both parties consent.</p>
+                              <div className="border-t border-border pt-3">
+                                <p className="text-xs font-medium text-foreground">Will Salla see my ad spend?</p>
+                                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">No — sharing a pixel only gives Salla access to the pixel events (purchases, page views). Your ad spend and campaign data remain private in your Business Center.</p>
+                              </div>
+                              <div className="border-t border-border pt-3">
+                                <p className="text-xs font-medium text-foreground">Can I revoke access later?</p>
+                                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">Yes — you can remove Salla as a partner anytime from your Business Center settings. The pixel will be disconnected.</p>
+                              </div>
+                              <div className="border-t border-border pt-3">
+                                <p className="text-xs font-medium text-foreground">Why not just enter the Pixel ID?</p>
+                                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">TikTok requires Business Center-level sharing for security. A Pixel ID alone doesn&apos;t grant access — the partner sharing flow ensures both parties consent.</p>
+                              </div>
                             </div>
                           </div>
                         </div>
+                      </div>
 
-                        <Button
-                          onClick={() => setShowPixelHelp(false)}
-                          className="w-full"
-                        >
+                      {/* Fixed footer */}
+                      <div className="border-t border-border px-6 py-4">
+                        <Button onClick={() => setShowPixelHelp(false)} className="w-full">
                           Got it
                         </Button>
                       </div>
-                    </DialogContent>
-                  </Dialog>
+                    </SheetContent>
+                  </Sheet>
 
                   {/* Advertiser ID (read-only) */}
                   <div className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
