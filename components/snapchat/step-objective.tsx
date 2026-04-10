@@ -203,13 +203,10 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
           <div className="flex-1 overflow-y-auto">
             <div className={cn("mx-auto w-full max-w-3xl px-6 py-8", WIZARD_FOOTER_PADDING_BOTTOM)}>
 
-              {/* ---- Step 1: Campaign Goal ---- */}
-              <div className="mb-8">
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">1</span>
-                  <h2 className="text-lg font-bold text-foreground">Choose your goal</h2>
-                </div>
-                <p className="ml-9 text-sm text-muted-foreground">
+              {/* ---- Campaign Goal ---- */}
+              <div className="mb-6">
+                <h2 className="text-base font-bold text-foreground">Choose your goal</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
                   What do you want to achieve? We&apos;ll optimize your ads for the best results.
                 </p>
               </div>
@@ -348,11 +345,8 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
 
               {/* ---- Step 2: Campaign Setup ---- */}
               <div className="mb-6">
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">2</span>
-                  <h2 className="text-lg font-bold text-foreground">Campaign setup</h2>
-                </div>
-                <p className="ml-9 text-sm text-muted-foreground">
+                <h2 className="text-base font-bold text-foreground">Campaign Setup</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
                   Name your campaign and configure tracking.
                 </p>
               </div>
@@ -708,14 +702,9 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
 
               {/* ---- Step 3: Snapchat Account ---- */}
               <div className="mb-6">
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                    {obj.objective === "APP_PROMOTION" ? "4" : currentConfig.pixelRequirement !== "none" ? "4" : "3"}
-                  </span>
-                  <h2 className="text-lg font-bold text-foreground">Snapchat Account</h2>
-                </div>
-                <p className="ml-9 text-sm text-muted-foreground">
-                  Your Snapchat Public Profile is shown on all your ads. Enter your Public Profile ID from Snapchat Ads Manager.
+                <h2 className="text-base font-bold text-foreground">Snapchat Account</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Your Snapchat Public Profile is shown on all your ads.
                 </p>
               </div>
 

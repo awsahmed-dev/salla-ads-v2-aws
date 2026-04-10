@@ -13,38 +13,52 @@ import { DV360CampaignWizard } from "@/components/dv360/campaign-wizard";
 import { MetaCampaignProvider } from "@/lib/meta/campaign-context";
 import { MetaCampaignWizard } from "@/components/meta/campaign-wizard";
 
+interface ActiveState {
+  platform: Platform;
+  draftId?: string;
+}
+
 export function PlatformSwitcher() {
-  const [activePlatform, setActivePlatform] = useState<Platform | null>(null);
+  const [active, setActive] = useState<ActiveState | null>(null);
 
-  const handleBack = () => setActivePlatform(null);
+  const handleBack = () => setActive(null);
+  const handleSelect = (platform: Platform) => setActive({ platform });
+  const handleResumeDraft = (platform: Platform, draftId: string) => setActive({ platform, draftId });
+  const handleTemplate = (platform: Platform) => setActive({ platform });
 
-  if (!activePlatform) {
-    return <PlatformSelectionPage onSelect={setActivePlatform} />;
+  if (!active) {
+    return (
+      <PlatformSelectionPage
+        onSelect={handleSelect}
+        onResumeDraft={handleResumeDraft}
+        onTemplate={handleTemplate}
+      />
+    );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      {activePlatform === "snapchat" && (
-        <CampaignProvider>
+      {active.platform === "snapchat" && (
+        <CampaignProvider draftId={active.draftId}>
           <CampaignWizard onBackToPlatforms={handleBack} />
         </CampaignProvider>
       )}
-      {activePlatform === "tiktok" && (
+      {active.platform === "tiktok" && (
         <TikTokCampaignProvider>
           <TikTokCampaignWizard onBackToPlatforms={handleBack} />
         </TikTokCampaignProvider>
       )}
-      {activePlatform === "google" && (
+      {active.platform === "google" && (
         <GoogleCampaignProvider>
           <GoogleCampaignWizard onBackToPlatforms={handleBack} />
         </GoogleCampaignProvider>
       )}
-      {activePlatform === "dv360" && (
+      {active.platform === "dv360" && (
         <DV360CampaignProvider>
           <DV360CampaignWizard onBackToPlatforms={handleBack} />
         </DV360CampaignProvider>
       )}
-      {activePlatform === "meta" && (
+      {active.platform === "meta" && (
         <MetaCampaignProvider>
           <MetaCampaignWizard onBackToPlatforms={handleBack} />
         </MetaCampaignProvider>

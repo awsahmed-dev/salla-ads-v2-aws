@@ -903,29 +903,41 @@ export function StepCreative() {
                 </Button>
               </div>
             ) : ads.length === 0 ? (
-              <div className="flex flex-col items-center gap-5 rounded-xl border-2 border-dashed border-border py-12">
-                <div className="flex size-14 items-center justify-center rounded-2xl bg-muted/60">
-                  <ImagePlus className="size-7 text-muted-foreground" />
+              <div className="overflow-hidden rounded-xl border border-border bg-card">
+                {/* Header */}
+                <div className="px-6 py-5">
+                  <h3 className="text-xs font-bold text-foreground">Ad Type</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Choose a format for this ad. You can add more ads in different formats.
+                  </p>
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium text-foreground">No ads yet</p>
-                  <p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">Create your first ad by selecting a format below. Each ad can have multiple creative variations.</p>
-                </div>
-                <div className="grid w-full max-w-lg gap-2 px-4 sm:grid-cols-2">
-                  {FILTERED_AD_FORMATS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => addAd(opt.value)}
-                      className="flex items-start gap-2.5 rounded-lg border border-border px-3 py-2.5 text-left transition-all hover:border-primary/40 hover:bg-primary/[0.02]"
-                    >
-                      <span className="mt-0.5 shrink-0 text-muted-foreground [&>svg]:size-4">{opt.icon}</span>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-foreground">{opt.label}</p>
-                        <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground">{opt.desc}</p>
-                      </div>
-                    </button>
-                  ))}
+                {/* Format cards */}
+                <div className="flex gap-6 px-6 pb-6">
+                  {FILTERED_AD_FORMATS.map((opt, i) => {
+                    const isFirst = i === 0;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => addAd(opt.value)}
+                        className={cn(
+                          "flex flex-1 flex-col items-center gap-2 rounded-xl border px-5 py-4 text-center transition-all",
+                          isFirst
+                            ? "border-[#a4ffe5] bg-[#e6fff9]"
+                            : "border-border bg-card hover:border-[#a4ffe5] hover:bg-[#e6fff9]"
+                        )}
+                      >
+                        <div className={cn(
+                          "flex size-10 items-center justify-center rounded-full",
+                          isFirst ? "bg-[#a4ffe5]" : "bg-muted/60"
+                        )}>
+                          <span className={cn("[&>svg]:size-5", isFirst ? "text-[#004956]" : "text-muted-foreground")}>{opt.icon}</span>
+                        </div>
+                        <p className={cn("text-xs font-bold", isFirst ? "text-[#004956]" : "text-foreground")}>{opt.label}</p>
+                        <p className="text-[10px] leading-snug text-muted-foreground">{opt.desc}</p>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ) : (

@@ -10,11 +10,12 @@ import {
   type ReactNode,
 } from "react";
 import { defaultCampaign, type CampaignData } from "@/lib/snapchat/campaign-types";
+import { upsertDraftMeta, removeDraftMeta, getDraftKey, getDraftStepKey, generateDraftId } from "@/lib/draft-index";
 
-const DRAFT_KEY = "salla_snap_campaign_draft";
-const DRAFT_STEP_KEY = "salla_snap_campaign_step";
+// Legacy keys (for backward compat — migrate on first load)
+const LEGACY_DRAFT_KEY = "salla_snap_campaign_draft";
+const LEGACY_STEP_KEY = "salla_snap_campaign_step";
 
-/** Safely get default dates (client-only) */
 function getClientDates() {
   const today = new Date();
   const end = new Date(today);
@@ -25,7 +26,6 @@ function getClientDates() {
   };
 }
 
-/** Ensure every asset/tile in the draft has a unique id */
 function deduplicateIds(campaign: CampaignData): CampaignData {
   const seen = new Set<string>();
   const freshId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -33,36 +33,42 @@ function deduplicateIds(campaign: CampaignData): CampaignData {
   const creative = { ...campaign.creative };
   creative.ads = creative.ads.map((ad) => {
     const assets = ad.assets.map((a) => {
-      if (!a.id || seen.has(a.id)) {
-        return { ...a, id: freshId("asset") };
-      }
+      if (!a.id || seen.has(a.id)) return { ...a, id: freshId("asset") };
       seen.add(a.id);
       return a;
     });
     const collectionTiles = ad.collectionTiles.map((t) => {
-      if (!t.id || seen.has(t.id)) {
-        return { ...t, id: freshId("tile") };
-      }
+      if (!t.id || seen.has(t.id)) return { ...t, id: freshId("tile") };
       seen.add(t.id);
       return t;
     });
-    if (!ad.id || seen.has(ad.id)) {
-      ad = { ...ad, id: freshId("ad") };
-    }
+    if (!ad.id || seen.has(ad.id)) ad = { ...ad, id: freshId("ad") };
     seen.add(ad.id);
     return { ...ad, assets, collectionTiles };
   });
   return { ...campaign, creative };
 }
 
-/** Try to restore draft from localStorage */
-function loadDraft(): { campaign: CampaignData; step: number } | null {
+function loadDraft(draftId: string): { campaign: CampaignData; step: number } | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    const rawStep = localStorage.getItem(DRAFT_STEP_KEY);
+    const raw = localStorage.getItem(getDraftKey(draftId));
+    const rawStep = localStorage.getItem(getDraftStepKey(draftId));
     if (raw) {
       return { campaign: deduplicateIds(JSON.parse(raw)), step: rawStep ? parseInt(rawStep, 10) : 0 };
+    }
+    // Try legacy keys for backward compat
+    const legacyRaw = localStorage.getItem(LEGACY_DRAFT_KEY);
+    const legacyStep = localStorage.getItem(LEGACY_STEP_KEY);
+    if (legacyRaw) {
+      // Migrate legacy draft to new system
+      const campaign = deduplicateIds(JSON.parse(legacyRaw));
+      const step = legacyStep ? parseInt(legacyStep, 10) : 0;
+      localStorage.setItem(getDraftKey(draftId), legacyRaw);
+      localStorage.setItem(getDraftStepKey(draftId), String(step));
+      localStorage.removeItem(LEGACY_DRAFT_KEY);
+      localStorage.removeItem(LEGACY_STEP_KEY);
+      return { campaign, step };
     }
   } catch { /* ignore */ }
   return null;
@@ -71,6 +77,7 @@ function loadDraft(): { campaign: CampaignData; step: number } | null {
 interface CampaignContextValue {
   campaign: CampaignData;
   step: number;
+  draftId: string;
   setStep: (s: number) => void;
   updateNested: <K extends keyof CampaignData>(
     key: K,
@@ -81,7 +88,8 @@ interface CampaignContextValue {
 
 const CampaignContext = createContext<CampaignContextValue | null>(null);
 
-export function CampaignProvider({ children }: { children: ReactNode }) {
+export function CampaignProvider({ children, draftId: propDraftId }: { children: ReactNode; draftId?: string }) {
+  const [draftId] = useState(() => propDraftId || generateDraftId());
   const [campaign, setCampaign] = useState<CampaignData>(defaultCampaign);
   const [step, setStep] = useState(0);
   const initialized = useRef(false);
@@ -91,7 +99,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     if (initialized.current) return;
     initialized.current = true;
 
-    const draft = loadDraft();
+    const draft = loadDraft(draftId);
     if (draft) {
       setCampaign(draft.campaign);
       setStep(draft.step);
@@ -102,21 +110,32 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
         budget: { ...prev.budget, startDate: dates.start, endDate: dates.end },
       }));
     }
-  }, []);
+  }, [draftId]);
 
-  // Auto-save draft to localStorage on every change (debounced)
+  // Auto-save draft + update draft index on every change (debounced)
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
     if (!initialized.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(campaign));
-        localStorage.setItem(DRAFT_STEP_KEY, String(step));
+        localStorage.setItem(getDraftKey(draftId), JSON.stringify(campaign));
+        localStorage.setItem(getDraftStepKey(draftId), String(step));
+        // Update draft index
+        upsertDraftMeta({
+          id: draftId,
+          platform: "snapchat",
+          campaignName: campaign.objective.campaignName || "Untitled Campaign",
+          objective: campaign.objective.objective || "",
+          step,
+          totalSteps: 4,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
       } catch { /* storage full -- ignore */ }
     }, 500);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [campaign, step]);
+  }, [campaign, step, draftId]);
 
   const updateNested = useCallback(
     <K extends keyof CampaignData>(key: K, partial: Partial<CampaignData[K]>) =>
@@ -131,14 +150,15 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     setCampaign(defaultCampaign);
     setStep(0);
     try {
-      localStorage.removeItem(DRAFT_KEY);
-      localStorage.removeItem(DRAFT_STEP_KEY);
+      localStorage.removeItem(getDraftKey(draftId));
+      localStorage.removeItem(getDraftStepKey(draftId));
+      removeDraftMeta(draftId);
     } catch { /* ignore */ }
-  }, []);
+  }, [draftId]);
 
   return (
     <CampaignContext.Provider
-      value={{ campaign, step, setStep, updateNested, reset }}
+      value={{ campaign, step, draftId, setStep, updateNested, reset }}
     >
       {children}
     </CampaignContext.Provider>

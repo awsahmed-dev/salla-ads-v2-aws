@@ -7,15 +7,13 @@ import { cn } from "@/lib/utils";
 import { getCityById, getCountryByCode, REGIONS } from "@/lib/locations";
 import { LocationSelector } from "@/components/shared/location-selector";
 import { LocationReachCard } from "@/components/shared/location-reach-card";
-import { DeliveryCheckCard } from "@/components/shared/delivery-check-card";
 import { DemographicsCard } from "@/components/shared/demographics-card";
 import { SallaSmartFeaturesCard } from "@/components/shared/salla-smart-features-card";
 import { CustomAudiencesCard } from "@/components/shared/custom-audiences-card";
 import { DeviceTargetingCard } from "@/components/shared/device-targeting-card";
 import { InterestTargetingCard } from "@/components/shared/interest-targeting-card";
 import { TargetingSummaryCard } from "@/components/shared/targeting-summary-card";
-import { AudienceReadinessChecklist } from "@/components/shared/audience-readiness-checklist";
-import { LocationMapPreview } from "@/components/shared/location-map-preview";
+import { CampaignReadinessCard } from "@/components/shared/campaign-readiness-card";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
@@ -74,14 +72,6 @@ export function StepAudience() {
         {/* LEFT COLUMN                                                   */}
         {/* ============================================================ */}
         <div className="flex flex-1 flex-col gap-5">
-          {/* Step header: title + description (align with other platforms) */}
-          <div className="mb-1">
-            <h2 className="text-xl font-bold tracking-tight text-foreground">Audience & targeting</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Define who sees your Snap Ads by location, age, language, and interests.
-            </p>
-          </div>
-
           {/* ---- 1. Location (unified shared component) ---- */}
           <SectionCard>
             <LocationSelector
@@ -267,21 +257,16 @@ export function StepAudience() {
               objective={campaign.objective.objective}
             />
 
-            {/* ---- Delivery Eligibility (shared) ---- */}
-            <DeliveryCheckCard
-              issues={(() => {
-                const issues: { message: string }[] = [];
-                if (aud.countries.length === 0) issues.push({ message: "No country selected" });
-                if (aud.genders.length === 0) issues.push({ message: "No gender selected" });
-                if (aud.countries.length > 1 && aud.languages.length === 0) issues.push({ message: "Multi-country requires language" });
-                if (aud.ageMin >= aud.ageMax) issues.push({ message: "Invalid age range" });
-                return issues;
-              })()}
-              cityCount={aud.cities.length}
-              accent="primary"
+            {/* ---- Campaign Readiness ---- */}
+            <CampaignReadinessCard
+              checks={[
+                { label: "Define a clear geographic location for the campaign.", done: aud.countries.length > 0 },
+                { label: "Select an appropriate age range for the target audience.", done: aud.ageMin < aud.ageMax },
+                { label: "Exclude recent buyers to acquire new customers.", done: aud.excludeRecentPurchasers },
+                { label: "Use lookalike audiences to reach new customers.", done: aud.sallaAudienceEnabled },
+                { label: "Use custom audiences for targeting or exclusion.", done: aud.customAudiencesInclude.length > 0 || aud.customAudiencesExclude.length > 0 },
+              ]}
             />
-
-            <AudienceReadinessChecklist checks={readinessChecks} accent="primary" />
 
             {/* ---- Targeting Summary (shared) ---- */}
             <TargetingSummaryCard
