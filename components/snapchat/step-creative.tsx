@@ -6,7 +6,6 @@ import { getCatalogStatus, getSnapPublicProfile, type SallaCatalogStatus, type S
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -19,7 +18,6 @@ import {
 import {
   Plus,
   AlertCircle,
-  User,
   LayoutGrid,
   ShieldCheck,
   Layers,
@@ -66,7 +64,6 @@ export function StepCreative() {
   const [previewAssetIdx, setPreviewAssetIdx] = useState(0);
   const [catalogStatus, setCatalogStatus] = useState<SallaCatalogStatus | null>(null);
   const [snapProfile, setSnapProfile] = useState<SnapPublicProfile | null>(null);
-  const [profileEnabled, setProfileEnabled] = useState(true);
   const [showNewAdPicker, setShowNewAdPicker] = useState(false);
   const [placementExpanded, setPlacementExpanded] = useState(true);
 
@@ -313,131 +310,59 @@ export function StepCreative() {
       <div className={cn("flex flex-col gap-6 lg:flex-row", WIZARD_FOOTER_PADDING_BOTTOM)}>
         {/* ============ LEFT COLUMN ============ */}
         <div className="flex flex-1 flex-col gap-5">
-          {/* ---- Snapchat Public Profile ---- */}
+          {/* ---- Snapchat Public Profile (compact — configured in Step 0) ---- */}
           <SectionCard>
-            {snapProfile ? (
-              /* ══ STATE 2: Authenticated via Salla — profile auto-linked ══ */
-              <div className="flex flex-col gap-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors",
-                      profileEnabled ? "bg-emerald-100" : "bg-muted"
-                    )}>
-                      {profileEnabled
-                        ? <CheckCircle2 className="size-5 text-emerald-600" />
-                        : <User className="size-5 text-muted-foreground" />}
-                    </div>
-                    <div>
-                      <Label className="text-sm font-semibold text-foreground">Snapchat Public Profile</Label>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        Your public profile will appear in the advertisement, and it is advisable to match it with your store name.
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={profileEnabled}
-                    onCheckedChange={(checked) => {
-                      setProfileEnabled(checked);
-                      updateNested("creative", { publicProfileId: checked ? snapProfile.profileId : "" });
-                    }}
-                  />
+            {hasValidProfile ? (
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                  <CheckCircle2 className="size-4 text-emerald-600" />
                 </div>
-
-                {profileEnabled && (
-                  <div className="mt-3 flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-3.5 py-2.5">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={snapProfile.avatarUrl}
-                      alt={snapProfile.displayName}
-                      className="size-8 rounded-lg object-cover"
-                      crossOrigin="anonymous"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {snapProfile.displayName}
-                        {snapProfile.displayNameAr && (
-                          <span className="ml-1 text-muted-foreground"> - {snapProfile.displayNameAr}</span>
-                        )}
-                      </p>
-                    </div>
-                    {snapProfile.verified && (
-                      <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
-                    )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground">Public Profile</p>
+                    <Badge variant="outline" className="gap-1 rounded-full border-emerald-200 bg-emerald-50 px-2 py-0 text-[10px] font-medium text-emerald-700">
+                      <CheckCircle2 className="size-2.5" /> Connected
+                    </Badge>
                   </div>
-                )}
+                  {snapProfile ? (
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {snapProfile.displayName}
+                      {snapProfile.displayNameAr && <span> - {snapProfile.displayNameAr}</span>}
+                    </p>
+                  ) : (
+                    <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{creative.publicProfileId}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStep(0)}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Change
+                </button>
               </div>
             ) : (
-              /* ══ STATE 1: Not authenticated — manual UUID entry ══ */
-              (() => {
-                const profileId = creative.publicProfileId ?? "";
-                const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId);
-                const hasValue = profileId.length > 0;
-                return (
-                  <div className="flex items-start gap-3.5">
-                    <div className={cn(
-                      "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors",
-                      hasValue && isValidUUID ? "bg-emerald-100" : hasValue ? "bg-red-100" : "bg-primary/10"
-                    )}>
-                      {hasValue && isValidUUID
-                        ? <CheckCircle2 className="size-5 text-emerald-600" />
-                        : hasValue
-                          ? <AlertCircle className="size-5 text-red-500" />
-                          : <User className="size-5 text-primary" />
-                      }
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Label className="text-sm font-semibold text-foreground">Public Profile</Label>
-                        {!hasValue && (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Required</span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        Your brand name and profile picture shown on every ad.
-                      </p>
-
-                      <div className="mt-3 flex flex-col gap-1">
-                        <div className="relative">
-                          <Input
-                            placeholder="e.g. 72cf5c50-8343-48d3-a0a7-3ed45b75faaa"
-                            value={profileId}
-                            onChange={(e) => updateNested("creative", { publicProfileId: e.target.value.trim() })}
-                            className={cn(
-                              "h-9 pr-8 font-mono text-xs transition-colors",
-                              hasValue && isValidUUID ? "border-emerald-300 focus-visible:ring-emerald-200" :
-                              hasValue ? "border-red-300 focus-visible:ring-red-200" : ""
-                            )}
-                          />
-                          {hasValue && isValidUUID && (
-                            <CheckCircle2 className="absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-emerald-500" />
-                          )}
-                          {hasValue && !isValidUUID && (
-                            <AlertCircle className="absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-red-400" />
-                          )}
-                        </div>
-                        {hasValue && !isValidUUID ? (
-                          <p className="text-[11px] text-red-600">
-                            This doesn't look like a valid Profile ID. It should be a UUID (e.g. 72cf5c50-8343-48d3-a0a7-3ed45b75faaa).
-                          </p>
-                        ) : (
-                          <p className="text-[11px] text-muted-foreground">
-                            Find it in <span className="font-medium text-foreground">Snapchat Business Manager</span> → Public Profiles
-                          </p>
-                        )}
-                      </div>
-
-                      {!hasValue && (
-                        <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
-                          <AlertCircle className="size-3.5 shrink-0 text-amber-500" />
-                          <p className="text-xs text-amber-700">Required to publish ads on Snapchat</p>
-                        </div>
-                      )}
-                    </div>
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                  <AlertCircle className="size-4 text-amber-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground">Public Profile</p>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Required</span>
                   </div>
-                );
-              })()
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    No Public Profile configured. Set it up in Campaign Settings.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStep(0)}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Set up
+                </button>
+              </div>
             )}
           </SectionCard>
 

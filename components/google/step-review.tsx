@@ -223,8 +223,8 @@ export function GoogleStepReview() {
     list.push({
       id: "conversion",
       label: "Conversion tracking configured",
-      ok: objective.tagMode !== "none",
-      detail: objective.tagMode === "salla_managed" ? "Salla Managed" : objective.conversionId ? "Connected" : "Not set",
+      ok: objective.tagMode === "salla_managed",
+      detail: objective.tagMode === "salla_managed" ? "Salla Managed (Auto)" : "Not configured",
       step: 0,
     });
 
@@ -565,7 +565,7 @@ export function GoogleStepReview() {
   const objectiveChips = [
     objConfig.label,
     objective.campaignName || "Unnamed",
-    objective.tagMode === "none" ? "Tracking missing" : "Tracking ready",
+    objective.tagMode === "salla_managed" ? "Tracking ready" : "Tracking missing",
     isPMax ? (objective.feedEnabled ? "Retail PMax" : "Standard PMax") : undefined,
   ].filter(Boolean);
   const audienceChips = [
@@ -626,9 +626,7 @@ export function GoogleStepReview() {
             value={
               objective.tagMode === "salla_managed"
                 ? "Salla Managed (Auto)"
-                : objective.conversionId
-                  ? `ID: ${objective.conversionId}`
-                  : "Not configured"
+                : "Not configured"
             }
             warn={objective.tagMode === "none"}
           />
@@ -763,9 +761,7 @@ export function GoogleStepReview() {
               value={
                 objective.tagMode === "salla_managed"
                   ? "Salla Managed (Auto)"
-                  : objective.conversionId
-                    ? `ID: ${objective.conversionId}`
-                    : "Not configured"
+                  : "Not configured"
               }
               warn={objective.tagMode === "none"}
             />
@@ -796,12 +792,7 @@ export function GoogleStepReview() {
                 ? `${audience.audienceSignals.length} list${audience.audienceSignals.length !== 1 ? "s" : ""}`
                 : "None"
             } />
-            <ReviewRow label="Search Partners" value={audience.searchPartners !== false ? "Enabled" : "Disabled"} />
-            <ReviewRow label="Ad Schedule" value={
-              audience.adScheduleEntries?.length > 0
-                ? `${audience.adScheduleEntries.length} entr${audience.adScheduleEntries.length !== 1 ? "ies" : "y"}`
-                : "24/7 (all day)"
-            } />
+            <ReviewRow label="Search Partners" value={creative.searchPartners !== false ? "Enabled" : "Disabled"} />
             {audience.householdIncome?.length > 0 && (
               <ReviewRow label="Household Income" value={`${audience.householdIncome.length} tier${audience.householdIncome.length !== 1 ? "s" : ""}`} />
             )}
@@ -947,7 +938,7 @@ export function GoogleStepReview() {
         <>
           <ReviewRow label="Campaign Type" value="Shopping" />
           <ReviewRow label="Campaign Name" value={objective.campaignName || "Not set"} warn={!objective.campaignName} />
-          <ReviewRow label="Conversion Tracking" value={objective.tagMode === "salla_managed" ? "Salla Managed (Auto)" : objective.conversionId ? `ID: ${objective.conversionId}` : "Not configured"} warn={objective.tagMode === "none"} />
+          <ReviewRow label="Conversion Tracking" value={objective.tagMode === "salla_managed" ? "Salla Managed (Auto)" : "Not configured"} warn={objective.tagMode !== "salla_managed"} />
           <ReviewRow label="Merchant Center" value={objective.merchantCenterConnected || objective.merchantCenterId ? "Connected" : "Not connected"} warn={!objective.merchantCenterConnected && !objective.merchantCenterId} />
           <ReviewRow label="Campaign Priority" value={objective.shoppingSettings?.campaignPriority === 2 ? "High" : objective.shoppingSettings?.campaignPriority === 1 ? "Medium" : "Low"} />
           {objective.shoppingSettings?.feedLabel && <ReviewRow label="Feed Label" value={objective.shoppingSettings.feedLabel} />}
@@ -1045,7 +1036,7 @@ export function GoogleStepReview() {
       title: "Objective & Tracking",
       step: 0,
       warn: warnObjective,
-      chips: ["Display", objective.campaignName || "Unnamed", objective.tagMode === "none" ? "Tracking missing" : "Tracking ready"],
+      chips: ["Display", objective.campaignName || "Unnamed", objective.tagMode === "salla_managed" ? "Tracking ready" : "Tracking missing"],
       rows: (
         <>
           <ReviewRow label="Campaign Type" value="Display" />
@@ -1055,9 +1046,7 @@ export function GoogleStepReview() {
             value={
               objective.tagMode === "salla_managed"
                 ? "Salla Managed (Auto)"
-                : objective.conversionId
-                  ? `ID: ${objective.conversionId}`
-                  : "Not configured"
+                : "Not configured"
             }
             warn={objective.tagMode === "none"}
           />
@@ -1184,7 +1173,7 @@ export function GoogleStepReview() {
       title: "Objective & Tracking",
       step: 0,
       warn: warnObjective,
-      chips: ["Demand Gen", objective.campaignName || "Unnamed", objective.tagMode === "none" ? "Tracking missing" : "Tracking ready"],
+      chips: ["Demand Gen", objective.campaignName || "Unnamed", objective.tagMode === "salla_managed" ? "Tracking ready" : "Tracking missing"],
       rows: (
         <>
           <ReviewRow label="Campaign Type" value="Demand Gen" />
@@ -1194,9 +1183,7 @@ export function GoogleStepReview() {
             value={
               objective.tagMode === "salla_managed"
                 ? "Salla Managed (Auto)"
-                : objective.conversionId
-                  ? `ID: ${objective.conversionId}`
-                  : "Not configured"
+                : "Not configured"
             }
             warn={objective.tagMode === "none"}
           />
@@ -1803,10 +1790,8 @@ export function GoogleStepReview() {
                 <ReviewRow label="Conversion Tracking" value={
                   objective.tagMode === "salla_managed"
                     ? "Salla Managed (Auto)"
-                    : objective.conversionId
-                      ? `ID: ${objective.conversionId}`
-                      : "Not configured"
-                } warn={objective.tagMode === "none"} />
+                    : "Not configured"
+                } warn={objective.tagMode !== "salla_managed"} />
                 {(objective.merchantCenterConnected || objective.merchantCenterId) && (
                   <ReviewRow label="Merchant Center" value={objective.merchantCenterId ? `ID: ${objective.merchantCenterId}` : "Connected"} />
                 )}

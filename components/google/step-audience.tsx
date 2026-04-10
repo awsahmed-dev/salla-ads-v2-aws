@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { getCountryByCode, getCityById } from "@/lib/locations";
 import { LocationSelector } from "@/components/shared/location-selector";
 import { LocationMapPreview } from "@/components/shared/location-map-preview";
+import { LocationReachCard } from "@/components/shared/location-reach-card";
 import { DeliveryCheckCard } from "@/components/shared/delivery-check-card";
 import { DemographicsCard } from "@/components/shared/demographics-card";
 import { SallaSmartFeaturesCard } from "@/components/shared/salla-smart-features-card";
@@ -526,8 +527,6 @@ export function GoogleStepAudience() {
         { label: "Audience mode", value: aud.audienceTargetingMode === "OBSERVATION" ? "Observation" : "Targeting" },
         { label: "RLSA lists", value: String(aud.audienceSignals.length) },
         { label: "Audience segments", value: String(aud.inMarketSegments.length + aud.affinitySegments.length) },
-        { label: "Search Partners", value: aud.searchPartners ? "On" : "Off" },
-        { label: "Ad schedule", value: aud.adScheduleEntries.length > 0 ? `${aud.adScheduleEntries.length} entries` : "24/7" },
       ];
     }
     if (isDisplay) {
@@ -1147,17 +1146,38 @@ export function GoogleStepAudience() {
                   <Label className="text-sm font-semibold text-foreground">Search Themes & Audience Signals</Label>
                   <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">PMax</Badge>
                 </div>
-                <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-950/20">
-                  <div className="flex items-start gap-2.5">
-                    <Info className="mt-0.5 size-4 shrink-0 text-blue-600 dark:text-blue-400" />
-                    <div>
-                      <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Configured per asset group in Step 3</p>
-                      <p className="mt-0.5 text-[11px] text-blue-700 dark:text-blue-400">
-                        In Google Ads API v23, search themes and audience signals are set per asset group (not at campaign level). You&apos;ll configure these in the Creative step for each asset group individually.
-                      </p>
-                    </div>
-                  </div>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Add up to 25 search themes that describe what your ideal customer searches for. These help Google find the right audience across all channels.
+                </p>
+                <div className="flex gap-2">
+                  <Input placeholder="e.g. buy abayas online" value={themeInput} onChange={(e) => setThemeInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSearchTheme())} className="h-9 flex-1 text-sm" />
+                  <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!themeInput.trim() || aud.searchThemes.length >= 25} onClick={addSearchTheme}><Plus className="size-3" /> Add</Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-9 gap-1 text-xs text-primary"
+                    onClick={async () => {
+                      try {
+                        const { getStoreSnapshot, generateSearchThemes } = await import("@/lib/google/search-ai-generator");
+                        const snapshot = await getStoreSnapshot();
+                        const themes = generateSearchThemes(snapshot);
+                        const existing = new Set(aud.searchThemes.map(t => t.toLowerCase()));
+                        const newThemes = themes.filter(t => !existing.has(t.toLowerCase()));
+                        updateNested("audience", { searchThemes: [...aud.searchThemes, ...newThemes].slice(0, 25) });
+                      } catch { /* silent */ }
+                    }}
+                  >
+                    <Sparkles className="size-3" /> Auto-fill
+                  </Button>
                 </div>
+                <p className="mt-1 text-[10px] text-muted-foreground">{aud.searchThemes.length}/25 themes</p>
+                {aud.searchThemes.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {aud.searchThemes.map((t) => (
+                      <TagPill key={t} label={t} onRemove={() => updateNested("audience", { searchThemes: aud.searchThemes.filter((s) => s !== t) })} />
+                    ))}
+                  </div>
+                )}
               </SectionCard>
 
               <SectionCard>
@@ -1195,6 +1215,23 @@ export function GoogleStepAudience() {
                   <div className="flex gap-2">
                     <Input placeholder="e.g. buy oud fragrance" value={customKeywordInput} onChange={(e) => setCustomKeywordInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomKeyword())} className="h-9 flex-1 text-sm" />
                     <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!customKeywordInput.trim()} onClick={addCustomKeyword}><Plus className="size-3" /> Add</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-1 text-xs text-primary"
+                      onClick={async () => {
+                        try {
+                          const { getStoreSnapshot, generateCustomSegmentKeywords } = await import("@/lib/google/search-ai-generator");
+                          const snapshot = await getStoreSnapshot();
+                          const keywords = generateCustomSegmentKeywords(snapshot);
+                          const existing = new Set(aud.customSegmentKeywords.map(k => k.toLowerCase()));
+                          const newKws = keywords.filter(k => !existing.has(k.toLowerCase()));
+                          updateNested("audience", { customSegmentKeywords: [...aud.customSegmentKeywords, ...newKws] });
+                        } catch { /* silent */ }
+                      }}
+                    >
+                      <Sparkles className="size-3" /> Auto-fill from Store
+                    </Button>
                   </div>
                   {aud.customSegmentKeywords.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1212,6 +1249,23 @@ export function GoogleStepAudience() {
                   <div className="flex gap-2">
                     <Input placeholder="e.g. competitor.com" value={customUrlInput} onChange={(e) => setCustomUrlInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCustomUrl())} className="h-9 flex-1 text-sm" />
                     <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!customUrlInput.trim()} onClick={addCustomUrl}><Plus className="size-3" /> Add</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 gap-1 text-xs text-primary"
+                      onClick={async () => {
+                        try {
+                          const { getStoreSnapshot, generateCustomSegmentUrls } = await import("@/lib/google/search-ai-generator");
+                          const snapshot = await getStoreSnapshot();
+                          const urls = generateCustomSegmentUrls(snapshot);
+                          const existing = new Set(aud.customSegmentUrls.map(u => u.toLowerCase()));
+                          const newUrls = urls.filter(u => !existing.has(u.toLowerCase()));
+                          updateNested("audience", { customSegmentUrls: [...aud.customSegmentUrls, ...newUrls] });
+                        } catch { /* silent */ }
+                      }}
+                    >
+                      <Sparkles className="size-3" /> Auto-fill
+                    </Button>
                   </div>
                   <p className="mt-1 text-[10px] text-muted-foreground">
                     Use competitor/category domains. Avoid generic sites (for example: google.com, youtube.com).
@@ -1674,31 +1728,10 @@ export function GoogleStepAudience() {
             showLookalike={!isSearch}
           />
 
-            {/* Search Partners toggle (Search only) */}
-            {isSearch && (
-              <div className="rounded-lg border border-primary/10 bg-background p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-2.5">
-                    <Globe className="mt-0.5 size-4 text-primary" />
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Google Search Partners</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        Extend ads to Google Search partner inventory. Start Off for tighter control, then test On if you need extra reach.
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={aud.searchPartners}
-                    onCheckedChange={(v) => updateNested("audience", { searchPartners: v })}
-                    className="mt-0.5"
-                  />
-                </div>
-              </div>
-            )}
           </>)}
 
-          {/* ---- 5. Advanced Settings (collapsible) ---- */}
-          <div>
+          {/* ---- 5. Advanced Settings (collapsible, hidden for PMax) ---- */}
+          {!isPMax && (<div>
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
@@ -1709,7 +1742,7 @@ export function GoogleStepAudience() {
               <span className="ml-auto text-xs text-muted-foreground">{
                 isShopping ? "Remarketing, device targeting" :
                 isSearch ? "Device bid adjustments, demographics" :
-                isPMax ? "Expert options" : "Remarketing and device targeting"
+                "Remarketing and device targeting"
               }</span>
             </button>
 
@@ -1918,7 +1951,7 @@ export function GoogleStepAudience() {
                 )}
               </div>
             )}
-          </div>
+          </div>)}
           </>)}
 
         </div>
@@ -1928,6 +1961,14 @@ export function GoogleStepAudience() {
         {/* ============================================================ */}
         <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
           <div className="sticky top-20 flex flex-col gap-4">
+
+            {/* Location Reach (shared) */}
+            <LocationReachCard
+              countryCount={aud.locationIds.length}
+              countries={aud.locationIds}
+              cityCount={(aud.cityIds ?? []).length}
+              accent="primary"
+            />
 
             {/* Delivery Check (shared) */}
             <DeliveryCheckCard

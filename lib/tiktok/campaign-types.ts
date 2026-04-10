@@ -285,6 +285,13 @@ export interface AppSettings {
 
 export type PixelMode = "existing" | "salla_managed" | "none";
 
+/** Pixel sharing status — tracks the BC partner sharing flow for merchant-owned pixels */
+export type PixelLinkStatus =
+  | "not_started"     // User hasn't begun the sharing flow
+  | "pending"         // Sharing request sent, waiting for merchant to share from their BC
+  | "shared"          // Pixel successfully shared and linked
+  | "error";          // Sharing failed
+
 /** Maps to API shopping_ads_type at the ad-group level */
 export type ShoppingAdsType =
   | "VIDEO_SHOPPING"       // Video Shopping Ads (with catalog)
@@ -306,6 +313,8 @@ export interface ObjectiveSettings {
   pixelMode: PixelMode;
   pixelId: string;
   pixelName: string;
+  /** Tracks the BC partner pixel sharing flow (used when pixelMode === "existing") */
+  pixelLinkStatus: PixelLinkStatus;
   /** ---- Catalog fields (used when promotionType === "CATALOG") ---- */
   /** Whether to use a product catalog. Maps to presence of catalog_id on ad group. */
   catalogEnabled: boolean;
@@ -555,20 +564,48 @@ export interface TikTokAd {
   aigcDisclosureType?: "NOT_DECLARED" | "DECLARED";
 }
 
-/** Identity type for ads. Maps to API identity_type. */
-export type IdentityType = "CUSTOMIZED_USER" | "AUTH_CODE" | "TT_USER";
+/** Identity type for ads. Maps to API identity_type.
+ *
+ *  BC_AUTH_TT (primary): Merchant's TikTok account authorized via Salla's Business Center QR code.
+ *    Salla owns the BC, generates a QR → merchant scans in TikTok app → account linked for ad delivery.
+ *    Enables Spark Ads from the merchant's own organic posts. Requires identity_authorized_bc_id.
+ *
+ *  AUTH_CODE (secondary): Creator generates a per-video Spark code (7/30/60/365 days).
+ *    Used for promoting third-party creator/influencer content as Spark Ads.
+ *
+ *  CUSTOMIZED_USER (deprecated): Synthetic identity with custom name + avatar. No real TikTok account.
+ *    Being deprecated by TikTok (early 2026). Kept as fallback only.
+ *
+ *  TT_USER: Not used in Salla — requires merchant to have direct access to the TikTok ad account.
+ */
+export type IdentityType = "BC_AUTH_TT" | "AUTH_CODE" | "CUSTOMIZED_USER" | "TT_USER";
+
+/** Connection status for the BC_AUTH_TT QR code linking flow */
+export type TikTokAccountLinkStatus = "not_started" | "qr_generated" | "scanned" | "confirmed" | "expired" | "error";
 
 /** Identity settings shared across all ads in the campaign */
 export interface IdentitySettings {
   /** Maps to API identity_type */
   identityType: IdentityType;
-  /** Maps to API identity_id (advertiser_id for CUSTOMIZED_USER) */
+  /** Maps to API identity_id.
+   *  BC_AUTH_TT: the linked TikTok account's identity ID (returned after QR scan confirmation).
+   *  AUTH_CODE: the creator's authorization code.
+   *  CUSTOMIZED_USER: the advertiser_id. */
   identityId: string;
-  /** Display name for CUSTOMIZED_USER identity. Maps to API display_name at identity level. */
+  /** Display name for CUSTOMIZED_USER identity. Maps to API display_name at identity level.
+   *  For BC_AUTH_TT, this is auto-filled from the linked TikTok profile. */
   displayName: string;
   /** Brand avatar image. Maps to API avatar_icon_web_uri (not profile_image_url). */
   avatarFile?: File;
   avatarPreviewUrl: string;
+  /** Salla's Business Center ID. Required when identityType is BC_AUTH_TT.
+   *  Maps to API identity_authorized_bc_id. Auto-filled by Salla backend. */
+  businessCenterId: string;
+  /** The linked TikTok username (e.g. @storename). Displayed in UI after linking.
+   *  Populated from the BC account linking response. */
+  tiktokUsername: string;
+  /** Current status of the QR code linking flow */
+  linkStatus: TikTokAccountLinkStatus;
 }
 
 export interface CreativeSettings {
@@ -602,6 +639,7 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
     pixelMode: "none",
     pixelId: "",
     pixelName: "",
+    pixelLinkStatus: "not_started",
     catalogEnabled: false,
     catalogId: "",
     shoppingAdsType: "VIDEO_SHOPPING",
@@ -686,10 +724,13 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
     ads: [],
     placementType: "PLACEMENT_TYPE_AUTOMATIC",
     identity: {
-      identityType: "CUSTOMIZED_USER",
+      identityType: "BC_AUTH_TT",
       identityId: "",
       displayName: "",
       avatarPreviewUrl: "",
+      businessCenterId: "",
+      tiktokUsername: "",
+      linkStatus: "not_started",
     },
     brandSafetyType: "NO_BRAND_SAFETY",
     contentControls: {

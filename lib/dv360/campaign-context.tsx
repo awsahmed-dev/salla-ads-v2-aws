@@ -13,7 +13,7 @@ import { defaultDV360Campaign, createVideoAd, type DV360CampaignData } from "@/l
 
 const DRAFT_KEY = "salla_dv360_campaign_draft";
 const DRAFT_STEP_KEY = "salla_dv360_campaign_step";
-const DRAFT_VERSION = 1;
+const DRAFT_VERSION = 2;
 const DRAFT_VERSION_KEY = "salla_dv360_draft_version";
 
 function getClientDates() {

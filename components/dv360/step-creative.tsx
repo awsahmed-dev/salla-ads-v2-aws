@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { useDV360Campaign } from "@/lib/dv360/campaign-context";
-import { DV360_OBJECTIVE_CONFIGS, createVideoAd, type DV360VideoFormat, type DV360VideoAd } from "@/lib/dv360/campaign-types";
+import { DV360_OBJECTIVE_CONFIGS, createVideoAd, type DV360VideoFormat, type DV360VideoAd, type DV360InventorySource } from "@/lib/dv360/campaign-types";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +42,12 @@ import {
   Target,
   TrendingUp,
   Zap,
+  Radio,
+  Globe,
+  Tv,
+  Shield,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
@@ -49,6 +55,15 @@ import { InfoTip } from "@/components/shared/info-tip";
 /* ================================================================== */
 /*  Helpers                                                           */
 /* ================================================================== */
+
+const toggleArrayItem = <T,>(arr: T[], item: T): T[] =>
+  arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item];
+
+const INVENTORY_OPTIONS: { value: DV360InventorySource; label: string; desc: string; icon: React.ReactNode }[] = [
+  { value: "YOUTUBE", label: "YouTube", desc: "In-stream, in-feed, Shorts, and masthead placements", icon: <svg viewBox="0 0 24 24" className="size-4" fill="currentColor"><path d="M23.5 6.19a3.02 3.02 0 0 0-2.12-2.14C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.38.55A3.02 3.02 0 0 0 .5 6.19 31.76 31.76 0 0 0 0 12a31.76 31.76 0 0 0 .5 5.81 3.02 3.02 0 0 0 2.12 2.14c1.88.55 9.38.55 9.38.55s7.5 0 9.38-.55a3.02 3.02 0 0 0 2.12-2.14A31.76 31.76 0 0 0 24 12a31.76 31.76 0 0 0-.5-5.81ZM9.75 15.02V8.98L15.5 12l-5.75 3.02Z" /></svg> },
+  { value: "GOOGLE_TV", label: "Google TV", desc: "Connected TV ads on Google TV devices", icon: <Tv className="size-4" /> },
+  { value: "VIDEO_PARTNERS", label: "Video Partners", desc: "Premium video sites and apps in Google's network", icon: <Globe className="size-4" /> },
+];
 
 /* ================================================================== */
 /*  Video format metadata                                             */
@@ -495,6 +510,72 @@ export function DV360StepCreative() {
               </SectionCard>
             </div>
           )}
+          {/* ---- Inventory Sources & Brand Safety ---- */}
+          <SectionCard>
+            <div className="mb-4 flex items-center gap-2.5">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-red-600/10">
+                <Radio className="size-4 text-red-600" />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold text-foreground">Inventory Sources</Label>
+                <p className="text-[11px] text-muted-foreground">
+                  Where your video ads appear. Maps to <code className="rounded bg-muted px-1 text-[10px]">youtubeAndPartnersSettings.inventorySourceSettings</code>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {INVENTORY_OPTIONS.map((inv) => {
+                const isSelected = campaign.audience.inventorySources.includes(inv.value);
+                return (
+                  <div
+                    key={inv.value}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg border px-4 py-3 transition-all",
+                      isSelected ? "border-red-600/30 bg-red-600/[0.03]" : "border-border bg-background"
+                    )}
+                  >
+                    <div className={cn("flex size-8 items-center justify-center rounded-lg", isSelected ? "bg-red-600/10 text-red-600" : "bg-muted text-muted-foreground")}>
+                      {inv.icon}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-foreground">{inv.label}</p>
+                      <p className="text-[10px] text-muted-foreground">{inv.desc}</p>
+                    </div>
+                    <Switch
+                      checked={isSelected}
+                      onCheckedChange={() => updateNested("audience", { inventorySources: toggleArrayItem(campaign.audience.inventorySources, inv.value) as DV360InventorySource[] })}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Content category / Brand Safety */}
+            <div className="mt-4">
+              <div className="mb-1.5 flex items-center gap-2">
+                <Shield className="size-3.5 text-red-600" />
+                <Label className="text-xs font-semibold text-foreground">
+                  Content Category / Brand Safety
+                </Label>
+                <InfoTip text="Controls what type of video content your ads appear alongside. Maps to contentFilterType in youtubeAndPartnersSettings." />
+              </div>
+              <Select
+                value={campaign.audience.contentCategory}
+                onValueChange={(v) => updateNested("audience", { contentCategory: v as typeof campaign.audience.contentCategory })}
+              >
+                <SelectTrigger className="h-9 w-full text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CONTENT_FILTER_TYPE_EXPANDED">Expanded Inventory (maximum reach)</SelectItem>
+                  <SelectItem value="CONTENT_FILTER_TYPE_STANDARD">Standard Inventory (recommended)</SelectItem>
+                  <SelectItem value="CONTENT_FILTER_TYPE_LIMITED">Limited Inventory (brand-safe only)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </SectionCard>
+
         </div>
 
         {/* ============ RIGHT SIDEBAR -- Preview ============ */}
@@ -658,6 +739,60 @@ export function DV360StepCreative() {
                 </div>
               </div>
             </div>
+
+            {/* Creative Checklist */}
+            {(() => {
+              const checks = [
+                { label: "YouTube video URL set", ok: !!activeAd && !!extractYouTubeId(activeAd.youtubeVideoUrl) },
+                { label: "Video format selected", ok: !!activeAd?.videoFormat },
+                { label: "Call-to-action set", ok: !!activeAd?.callToAction },
+                { label: "Landing page URL set", ok: !!activeAd?.landingPageUrl },
+                ...(activeAd?.videoFormat === "IN_FEED" || activeAd?.videoFormat === "SHORTS"
+                  ? [{ label: "Headline set", ok: !!activeAd?.headline?.trim() }]
+                  : []),
+                { label: "At least 1 video ad", ok: ads.length >= 1 },
+              ];
+              const passing = checks.filter((c) => c.ok).length;
+              return (
+                <div className="mt-4 rounded-xl border border-border bg-card p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Checklist</h3>
+                    <span className={cn(
+                      "text-xs font-semibold tabular-nums",
+                      passing === checks.length ? "text-emerald-600" : "text-muted-foreground"
+                    )}>
+                      {passing}/{checks.length}
+                    </span>
+                  </div>
+                  <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        passing === checks.length ? "bg-emerald-500" : passing > 0 ? "bg-red-500" : "bg-muted-foreground/30"
+                      )}
+                      style={{ width: checks.length > 0 ? `${(passing / checks.length) * 100}%` : "0%" }}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    {checks.map((c, i) => (
+                      <div key={i} className="flex items-center gap-2 py-0.5">
+                        {c.ok
+                          ? <CheckCircle2 className="size-3 shrink-0 text-emerald-500" />
+                          : <AlertCircle className="size-3 shrink-0 text-amber-500" />
+                        }
+                        <span className={cn("text-xs", c.ok ? "text-muted-foreground" : "font-medium text-foreground")}>{c.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {passing === checks.length && checks.length > 0 && (
+                    <div className="mt-2.5 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                      <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
+                      <p className="text-xs font-medium text-emerald-700">All checks passed. Ready to review.</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </aside>
       </div>

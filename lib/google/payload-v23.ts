@@ -154,8 +154,8 @@ export function buildGoogleCampaignPayloadV23(campaign: GoogleCampaignData) {
       ...(isSearch ? {
         network_settings: {
           target_google_search: true,
-          target_search_network: audience.searchPartners,
-          target_content_network: audience.targetContentNetwork ?? true,
+          target_search_network: creative.searchPartners,
+          target_content_network: creative.targetContentNetwork ?? true,
           target_partner_search_network: false,
         }
       } : {}),
@@ -179,13 +179,10 @@ export function buildGoogleCampaignPayloadV23(campaign: GoogleCampaignData) {
       optimized_targeting: audience.optimizedTargeting,
       ...(isSearch
         ? {
-            search_partners: audience.searchPartners,
+            search_partners: creative.searchPartners,
             audience_targeting_mode: audience.audienceTargetingMode,
           }
         : {}),
-      ...((isSearch || isPMax) ? {
-        ad_schedule_entries: audience.adScheduleEntries,
-      } : {}),
     },
   };
 

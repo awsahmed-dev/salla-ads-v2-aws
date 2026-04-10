@@ -57,7 +57,6 @@ import {
 } from "lucide-react";
 import { FrequencyCapCard } from "@/components/shared/frequency-cap-card";
 import { BudgetDurationCard } from "@/components/shared/budget-duration-card";
-import { AdSchedulingCard } from "@/components/shared/ad-scheduling-card";
 import { PerformanceBoostCard } from "@/components/shared/performance-boost-card";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
@@ -342,7 +341,6 @@ export function TikTokStepBudget() {
 
   /* Local UI state */
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showScheduling, setShowScheduling] = useState(budget.schedule === "custom");
 
   const endDateRequired = budget.paymentMethod === "prepaid";
 
@@ -896,16 +894,6 @@ export function TikTokStepBudget() {
             />
           )}
 
-              {/* -- Ad Scheduling (Dayparting) -- */}
-              <AdSchedulingCard
-                enabled={showScheduling}
-                onToggle={(checked) => {
-                  setShowScheduling(checked);
-                  updateNested("budget", { schedule: checked ? "custom" : "all_day" });
-                }}
-                infoTipText="Choose specific days and hours when your ads should run. Maps to TikTok ad group dayparting. Times are in Saudi Arabia time (AST, UTC+3)."
-              />
-
               {/* -- Delivery pacing -- */}
               <DeliveryPacingCard
                 layout="cards"
@@ -1047,7 +1035,7 @@ export function TikTokStepBudget() {
                 { label: "Goal", value: goalLabel },
                 { label: "Budget mode", value: budget.budgetMode === "BUDGET_MODE_TOTAL" ? "Lifetime" : "Daily" },
                 { label: "Bid", value: budget.bidType === "BID_TYPE_NO_BID" ? "Maximum Delivery" : `${budget.bidStrategy === "BID_CAP" ? "Bid Cap" : "Cost Cap"}: SAR ${budget.bidAmount}` },
-                { label: "Schedule", value: showScheduling ? "Custom hours" : "24/7" },
+                { label: "Schedule", value: budget.schedule === "custom" ? "Custom hours" : "24/7" },
                 ...(budget.searchResultEnabled ? [{ label: "Search ads", value: "Enabled" }] : []),
                 ...(autoIncrease.enabled ? [{ label: "Auto-increase", value: `+${autoIncrease.pct}% / ${autoIncrease.intervalDays}d` }] : []),
               ]}

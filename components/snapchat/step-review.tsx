@@ -35,6 +35,7 @@ import {
   ArrowRight,
   Sparkles,
   Bell,
+  Code2,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -101,6 +102,8 @@ export function StepReview() {
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [launched, setLaunched] = useState(false);
   const [launching, setLaunching] = useState(false);
+  const [showApiJson, setShowApiJson] = useState(false);
+  const [jsonCopied, setJsonCopied] = useState(false);
   const [savedAsDraft, setSavedAsDraft] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"wallet" | "credit">("wallet");
   const [topUpOpen, setTopUpOpen] = useState(false);
@@ -712,6 +715,86 @@ export function StepReview() {
                   </Button>
                 </div>
               )}
+            </div>
+
+            {/* API JSON */}
+            <div className="border-t border-border px-5 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Code2 className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">Snap API Payload</Label>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowApiJson(!showApiJson)}
+                  className="text-xs"
+                >
+                  {showApiJson ? "Hide" : "Show JSON"}
+                </Button>
+              </div>
+              {showApiJson && (() => {
+                const apiJson = {
+                  campaign: {
+                    name: objective.campaignName,
+                    objective: objective.objective,
+                    status: "PAUSED",
+                    ...(objective.pixelMode !== "none" && { pixel_id: objective.pixelId }),
+                  },
+                  ad_squad: {
+                    name: `${objective.campaignName} - Ad Squad`,
+                    optimization_goal: budget.optimizationGoal,
+                    bid_strategy: budget.bidStrategy,
+                    ...(budget.bidAmount > 0 && { bid_micro: budget.bidAmount * 1_000_000 }),
+                    daily_budget_micro: budget.type === "daily" ? budget.amount * 1_000_000 : undefined,
+                    lifetime_budget_micro: budget.type === "lifetime" ? budget.amount * 1_000_000 : undefined,
+                    start_time: budget.startDate,
+                    end_time: budget.endDate || undefined,
+                    targeting: {
+                      geos: audience.countries.map((c: string) => ({ country_code: c })),
+                      demographics: [{ age_groups: [`${audience.ageMin}-${audience.ageMax}`], genders: audience.genders }],
+                      ...(audience.languages.length > 0 && { languages: { values: audience.languages } }),
+                      ...(audience.interests.length > 0 && { interests: audience.interests }),
+                      devices: audience.deviceOS,
+                    },
+                    placement_v2: {
+                      config: creative.placement,
+                      ...(creative.placement === "CUSTOM" && { platforms: creative.customPositions }),
+                    },
+                    ...(budget.conversionWindow && { conversion_window: budget.conversionWindow }),
+                    pacing_type: budget.pacingType,
+                    billing_event: "IMPRESSION",
+                  },
+                  creatives: creative.ads.map((ad: any, i: number) => ({
+                    name: ad.name || `Creative ${i + 1}`,
+                    type: ad.creativeType,
+                    format: ad.format,
+                    ...(ad.assets?.[0] && { top_snap_media_id: `<upload:${ad.assets[0].name}>` }),
+                    headline: ad.assets?.[0]?.headline,
+                    brand_name: ad.assets?.[0]?.brandName,
+                    call_to_action: ad.assets?.[0]?.callToAction,
+                    shareable: ad.assets?.[0]?.shareable,
+                  })),
+                };
+                return (
+                  <div className="relative mt-3">
+                    <pre className="max-h-[300px] overflow-auto rounded-lg bg-muted p-4 text-xs leading-relaxed text-foreground">
+                      {JSON.stringify(apiJson, null, 2)}
+                    </pre>
+                    <button
+                      type="button"
+                      className="absolute right-2 top-2 rounded-md border bg-background p-1.5 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(apiJson, null, 2));
+                        setJsonCopied(true);
+                        setTimeout(() => setJsonCopied(false), 2000);
+                      }}
+                    >
+                      {jsonCopied ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Coupon */}

@@ -232,16 +232,14 @@ export const OBJECTIVE_CONFIGS: Record<string, GoogleObjectiveConfig> = {
 
 /* ---- Step: Objective ---- */
 
-/** Google Ads conversion tag setup mode */
-export type TagMode = "existing" | "salla_managed" | "none";
+/** Google Ads conversion tag setup mode — platform-managed only (external tags not supported by Google Ads API across MCC boundaries) */
+export type TagMode = "salla_managed" | "none";
 
 export interface GoogleObjectiveSettings {
   campaignName: string;
   objective: GoogleObjective;
-  /** Google Ads conversion tag setup */
+  /** Google Ads conversion tag setup — always Salla-managed */
   tagMode: TagMode;
-  conversionId: string;
-  conversionLabel: string;
   /** Merchant Center connection (for Shopping / PMax with feed) */
   merchantCenterConnected: boolean;
   merchantCenterId: string;
@@ -345,12 +343,6 @@ export interface GoogleAudienceSettings {
   /** Ad schedule entries for dayparting.
    *  Maps to CampaignCriterion.ad_schedule. */
   adScheduleEntries: AdScheduleEntry[];
-  /** Whether to include Google Search Partners network.
-   *  Maps to Campaign.network_settings.target_search_network. */
-  searchPartners: boolean;
-  /** Display Expansion on Search. When true, ads may show on GDN from Search campaigns.
-   *  Maps to Campaign.network_settings.target_content_network. Default true. */
-  targetContentNetwork: boolean;
   /** Household income targeting tiers.
    *  Maps to CampaignCriterion.income_range. */
   householdIncome: string[];
@@ -1160,6 +1152,12 @@ export interface GoogleCreativeSettings {
   priceExtensions: SearchPriceAsset[];
   /** Campaign-level promotion extensions. Maps to CampaignAsset with PromotionAsset */
   promotionExtensions: SearchPromotionAsset[];
+  /** Whether to include Google Search Partners network.
+   *  Maps to Campaign.network_settings.target_search_network. */
+  searchPartners: boolean;
+  /** Display Expansion on Search. When true, ads may show on GDN from Search campaigns.
+   *  Maps to Campaign.network_settings.target_content_network. Default true. */
+  targetContentNetwork: boolean;
 }
 
 /* ---- Full Campaign ---- */
@@ -1175,9 +1173,7 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
   objective: {
     campaignName: "",
     objective: "PERFORMANCE_MAX",
-    tagMode: "none",
-    conversionId: "",
-    conversionLabel: "",
+    tagMode: "salla_managed",
     merchantCenterConnected: false,
     merchantCenterId: "",
     feedEnabled: false,
@@ -1241,8 +1237,6 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
     searchDeviceBidAdjustments: { MOBILE: 0, DESKTOP: 0, TABLET: 0 },
     audienceBidAdjustments: {},
     adScheduleEntries: [],
-    searchPartners: true,
-    targetContentNetwork: true,
     householdIncome: [],
     parentalStatus: [],
   },
@@ -1359,5 +1353,7 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
     structuredSnippetExtensions: [],
     priceExtensions: [],
     promotionExtensions: [],
+    searchPartners: true,
+    targetContentNetwork: true,
   },
 };

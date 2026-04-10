@@ -413,8 +413,11 @@ export function TikTokStepReview() {
         }),
         pacing: budget.pacing,
         skip_learning_phase: budget.skipLearningPhase ? 1 : 0,
-        identity_type: creative.identity?.identityType ?? "CUSTOMIZED_USER",
-        identity_id: creative.identity?.identityId || "<ADVERTISER_ID>",
+        identity_type: creative.identity?.identityType ?? "BC_AUTH_TT",
+        identity_id: creative.identity?.identityId || "<IDENTITY_ID>",
+        ...(creative.identity?.identityType === "BC_AUTH_TT" && {
+          identity_authorized_bc_id: creative.identity?.businessCenterId || "<BC_ID>",
+        }),
         schedule_start_time: toApiDateTime(budget.startDate),
         ...(budget.endDate && !budget.endDateOptional && { schedule_end_time: toApiDateTime(budget.endDate, true) }),
         ...(!isReach && !isVideoViews && !isLeadGen && !isAppPromo && !(isTraffic && objective.pixelMode === "none") && {
@@ -474,13 +477,16 @@ export function TikTokStepReview() {
       ads: isCatalogListing
         ? []
         : creative.ads.map((ad) => ({
-          advertiser_id: creative.identity?.identityId || "<ADVERTISER_ID>",
+          advertiser_id: "<ADVERTISER_ID>",
           adgroup_id: "<ADGROUP_ID>",
           creatives: [{
             ad_name: ad.name,
             ad_format: ad.sparkAdEnabled ? "SINGLE_VIDEO" : ad.adFormat,
-            identity_type: creative.identity?.identityType ?? "CUSTOMIZED_USER",
-            identity_id: creative.identity?.identityId || "<ADVERTISER_ID>",
+            identity_type: creative.identity?.identityType ?? "BC_AUTH_TT",
+            identity_id: creative.identity?.identityId || "<IDENTITY_ID>",
+            ...(creative.identity?.identityType === "BC_AUTH_TT" && {
+              identity_authorized_bc_id: creative.identity?.businessCenterId || "<BC_ID>",
+            }),
             ...(creative.identity?.avatarPreviewUrl && { avatar_icon_web_uri: "<UPLOADED_AVATAR_URI>" }),
             ...(ad.sparkAdEnabled
               ? { tiktok_item_id: `<RESOLVED_ITEM_ID:${ad.sparkAdAuthCode || "pending"}>` }
@@ -789,7 +795,19 @@ export function TikTokStepReview() {
               {/* ---- Creative ---- */}
               <SectionCard>
                 <SectionHeader icon={ImagePlus} title="Ad Creative" step={3} setStep={setStep} />
-                <ReviewRow label="Identity" value={`${creative.identity?.identityType ?? "CUSTOMIZED_USER"} -- ${creative.identity?.displayName || "(not set)"}`} />
+                <ReviewRow label="Identity" value={
+                  creative.identity?.identityType === "BC_AUTH_TT"
+                    ? `TikTok Account${creative.identity?.tiktokUsername ? ` (${creative.identity.tiktokUsername})` : ""}`
+                    : creative.identity?.identityType === "AUTH_CODE"
+                      ? `Creator Spark Code${creative.identity?.identityId ? " (provided)" : " (missing)"}`
+                      : `Custom Identity${creative.identity?.displayName ? ` — ${creative.identity.displayName}` : ""}`
+                } warn={
+                  creative.identity?.identityType === "BC_AUTH_TT"
+                    ? creative.identity?.linkStatus !== "confirmed"
+                    : creative.identity?.identityType === "CUSTOMIZED_USER"
+                      ? !creative.identity?.displayName
+                      : !creative.identity?.identityId
+                } />
                 <ReviewRow label="Avatar" value={creative.identity?.avatarPreviewUrl ? "Uploaded" : "Not set"} />
                 <ReviewRow label="Total Ads" value={creative.ads.length} />
                 <ReviewRow label="Placement" value={creative.placementType === "PLACEMENT_TYPE_AUTOMATIC" ? "Automatic" : "Manual"} />

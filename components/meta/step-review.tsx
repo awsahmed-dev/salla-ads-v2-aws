@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/tooltip";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { SectionCard } from "@/components/shared/section-card";
+import { CouponCodeCard } from "@/components/shared/coupon-code-card";
 import {
   Dialog,
   DialogContent,
@@ -506,24 +507,14 @@ export function MetaStepReview() {
                 </div>
               </div>
 
-              {/* Coupon */}
-              <div className="mt-4 flex gap-2">
-                <Input
-                  value={coupon}
-                  onChange={(e) => setCoupon(e.target.value)}
-                  placeholder="Promo code"
-                  className="h-8 text-xs"
-                  disabled={couponApplied}
+              {/* Coupon (shared) */}
+              <div className="mt-4">
+                <CouponCodeCard
+                  appliedCode={couponApplied ? coupon : null}
+                  appliedDiscount={couponApplied ? 50 : undefined}
+                  onApply={(code) => { setCoupon(code); setCouponApplied(true); }}
+                  onRemove={() => { setCoupon(""); setCouponApplied(false); }}
                 />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!coupon || couponApplied}
-                  onClick={() => setCouponApplied(true)}
-                  className="h-8 text-xs"
-                >
-                  {couponApplied ? "Applied" : "Apply"}
-                </Button>
               </div>
             </SectionCard>
 

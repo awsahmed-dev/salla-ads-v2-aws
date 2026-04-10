@@ -402,6 +402,137 @@ export function generateSnippets(snapshot: StoreSnapshot): SearchStructuredSnipp
 }
 
 /* ------------------------------------------------------------------ */
+/*  PMax Search Themes Generator                                       */
+/* ------------------------------------------------------------------ */
+
+/** Generate search themes for PMax asset groups.
+ *  Search themes tell Google what queries matter for this asset group.
+ *  Best practice: 8-15 themes per asset group, derived from products/categories. */
+export function generateSearchThemes(snapshot: StoreSnapshot, category?: string): string[] {
+  const { store, bestSellers, categories } = snapshot;
+  const themes: string[] = [];
+  const cat = category ?? categories[0];
+
+  // Brand themes
+  themes.push(store.name.toLowerCase());
+  themes.push(`${store.name.toLowerCase()} store`);
+  themes.push(`shop ${store.name.toLowerCase()}`);
+
+  // Category themes
+  if (cat) {
+    themes.push(cat.toLowerCase());
+    themes.push(`buy ${cat.toLowerCase()}`);
+    themes.push(`${cat.toLowerCase()} online`);
+    themes.push(`best ${cat.toLowerCase()}`);
+    themes.push(`${cat.toLowerCase()} saudi`);
+  }
+
+  // Other categories
+  for (const c of categories.slice(1, 4)) {
+    themes.push(c.toLowerCase());
+    themes.push(`buy ${c.toLowerCase()} online`);
+  }
+
+  // Product themes (from best sellers)
+  for (const p of bestSellers.slice(0, 4)) {
+    const name = p.name.toLowerCase();
+    if (name.length <= 50) themes.push(name);
+  }
+
+  // Intent themes
+  themes.push("online shopping");
+  themes.push("free shipping");
+  themes.push("best deals");
+
+  // Deduplicate and limit to 25
+  return [...new Set(themes)].slice(0, 25);
+}
+
+/* ------------------------------------------------------------------ */
+/*  PMax Custom Segment Keywords Generator                             */
+/* ------------------------------------------------------------------ */
+
+/** Generate custom segment keywords for PMax audience signals.
+ *  These are search terms your ideal customers would use. */
+export function generateCustomSegmentKeywords(snapshot: StoreSnapshot): string[] {
+  const { store, bestSellers, categories } = snapshot;
+  const keywords: string[] = [];
+
+  // Category intent keywords
+  for (const cat of categories.slice(0, 6)) {
+    keywords.push(`buy ${cat.toLowerCase()} online`);
+    keywords.push(`best ${cat.toLowerCase()} store`);
+    keywords.push(`${cat.toLowerCase()} free shipping`);
+  }
+
+  // Product keywords
+  for (const p of bestSellers.slice(0, 6)) {
+    keywords.push(p.name.toLowerCase());
+  }
+
+  // Generic e-commerce intent
+  keywords.push("online shopping saudi");
+  keywords.push("buy online");
+  keywords.push("best deals online");
+  keywords.push("free delivery");
+  keywords.push("cash on delivery");
+
+  return [...new Set(keywords)].slice(0, 20);
+}
+
+/** Generate custom segment URLs for PMax audience signals.
+ *  URLs of sites your ideal customers would visit. */
+export function generateCustomSegmentUrls(snapshot: StoreSnapshot): string[] {
+  const { store } = snapshot;
+  const domain = store.domain.startsWith("http") ? store.domain : `https://${store.domain}`;
+  return [
+    domain,
+    "https://www.noon.com",
+    "https://www.amazon.sa",
+    "https://www.namshi.com",
+  ];
+}
+
+/* ------------------------------------------------------------------ */
+/*  PMax Audience Signal Recommendations                               */
+/* ------------------------------------------------------------------ */
+
+export interface AudienceSignalRecommendation {
+  id: string;
+  name: string;
+  description: string;
+  type: "remarketing" | "customer_match" | "custom_segment";
+  priority: "high" | "medium" | "low";
+}
+
+/** Generate audience signal recommendations based on store maturity. */
+export function generateAudienceRecommendations(snapshot: StoreSnapshot): AudienceSignalRecommendation[] {
+  const { bestSellers } = snapshot;
+  const totalSales = bestSellers.reduce((s, p) => s + (p.soldCount ?? 0), 0);
+
+  const recommendations: AudienceSignalRecommendation[] = [
+    { id: "all_purchasers", name: "All Purchasers (90 days)", description: "Customers who purchased in the last 90 days", type: "remarketing", priority: "high" },
+    { id: "cart_abandoners", name: "Cart Abandoners", description: "Users who added to cart but didn't purchase", type: "remarketing", priority: "high" },
+    { id: "product_viewers", name: "Product Page Viewers", description: "Users who viewed products but didn't add to cart", type: "remarketing", priority: "medium" },
+  ];
+
+  if (totalSales > 100) {
+    recommendations.push(
+      { id: "repeat_buyers", name: "Repeat Buyers", description: "Customers with 2+ purchases", type: "customer_match", priority: "high" },
+      { id: "high_value", name: "High-Value Customers (Top 20%)", description: "Your top spenders by lifetime value", type: "customer_match", priority: "high" },
+    );
+  }
+
+  if (totalSales > 500) {
+    recommendations.push(
+      { id: "lapsed_customers", name: "Lapsed Customers (90+ days)", description: "Previous buyers who haven't purchased recently", type: "customer_match", priority: "medium" },
+    );
+  }
+
+  return recommendations;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Display Path Generator                                             */
 /* ------------------------------------------------------------------ */
 

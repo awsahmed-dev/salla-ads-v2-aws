@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { getCountryByCode, getCityById } from "@/lib/locations";
 import { LocationSelector } from "@/components/shared/location-selector";
 import { LocationReachCard } from "@/components/shared/location-reach-card";
+import { LocationMapPreview } from "@/components/shared/location-map-preview";
 import { DeliveryCheckCard } from "@/components/shared/delivery-check-card";
 import { DemographicsCard } from "@/components/shared/demographics-card";
 import { SallaSmartFeaturesCard } from "@/components/shared/salla-smart-features-card";
@@ -363,6 +364,22 @@ export function MetaStepAudience() {
               countries={aud.countries}
               cityCount={aud.cities.length}
               accent="meta"
+            />
+
+            {/* Location Map Preview */}
+            <LocationMapPreview
+              countryCodes={aud.countries}
+              cities={(aud.cities ?? [])
+                .map((id) => getCityById(id))
+                .filter((c): c is NonNullable<typeof c> => c != null)
+                .map((c) => ({
+                  id: c.id,
+                  name: c.name,
+                  countryCode: c.countryCode,
+                  lat: c.lat,
+                  lng: c.lng,
+                  radiusKm: aud.cityRadii?.[c.id] ?? 0,
+                }))}
             />
 
             {/* Delivery Check (shared) */}

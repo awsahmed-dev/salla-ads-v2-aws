@@ -28,11 +28,9 @@ import {
   Search,
   LayoutGrid,
   Smartphone,
-  Link2,
   Plus,
   ShieldCheck,
   AlertCircle,
-  Radio,
   Store,
   Lock,
   Scan,
@@ -158,7 +156,7 @@ export function GoogleStepObjective() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => setAutoSaveState("saved"), 800);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [obj.campaignName, obj.tagMode, obj.conversionId, obj.objective]);
+  }, [obj.campaignName, obj.tagMode, obj.objective]);
 
   // Auto-fill campaign name from store data on mount (skip if draft recovery)
   useEffect(() => {
@@ -183,12 +181,8 @@ export function GoogleStepObjective() {
     const supportsCatalogOnNextObjective = value === "PERFORMANCE_MAX" || value === "SHOPPING";
     updateNested("objective", {
       objective: value as typeof obj.objective,
-      // Reset tag/conversion for non-tracking objectives
-      ...(!newConfig.conversionTrackingRequired && {
-        tagMode: "none" as const,
-        conversionId: "",
-        conversionLabel: "",
-      }),
+      // Reset tag for non-tracking objectives, auto-enable for tracking objectives
+      tagMode: newConfig.conversionTrackingRequired ? "salla_managed" as const : "none" as const,
       // Reset catalog/merchant center only when objective doesn't support catalog mode
       ...(!supportsCatalogOnNextObjective && {
         merchantCenterConnected: false,
@@ -210,7 +204,7 @@ export function GoogleStepObjective() {
   const isApp = obj.objective === "APP";
   const canProceed =
     obj.campaignName.trim().length > 0 &&
-    (needsConversionTag ? (obj.tagMode !== "none" || !!obj.conversionId) : true) &&
+    (needsConversionTag ? obj.tagMode === "salla_managed" : true) &&
     (requiresCatalogConnection ? obj.merchantCenterConnected : true) &&
     (!isApp || !!obj.appSettings?.appId?.trim());
 
@@ -840,187 +834,41 @@ export function GoogleStepObjective() {
                 </div>
               )}
 
-              {/* ---- Google Ads Conversion Tag (required for conversion-based objectives) ---- */}
+              {/* ---- Google Ads Conversion Tracking (auto-managed by Salla) ---- */}
               {needsConversionTag && (
-                <div className="mb-6 rounded-xl border border-border bg-card p-6">
-                  <div className="mb-4 flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <Scan className="size-5 text-primary" />
+                <div className="mb-6 rounded-xl border border-primary/20 bg-primary/[0.02] p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                      <ShieldCheck className="size-5 text-primary" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-foreground">
                           Conversion Tracking
                         </p>
-                        <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs">
-                          Required
+                        <Badge className="rounded-full bg-primary/10 px-1.5 py-0 text-xs font-medium text-primary">
+                          Auto
                         </Badge>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="size-3.5 cursor-help text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs text-xs">
-                            Google Ads conversion tracking measures customer actions like purchases and add-to-carts on your store.
-                          </TooltipContent>
-                        </Tooltip>
                       </div>
                       <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        Track visitor actions on your store to measure and optimize campaign performance.
+                        Salla automatically sets up and manages Google Ads conversion tracking on your store.
                       </p>
+
+                      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                        {[
+                          "Purchase tracking",
+                          "Add-to-cart events",
+                          "Global site tag (gtag.js)",
+                          "Pre-launch verification",
+                        ].map((item) => (
+                          <div key={item} className="flex items-center gap-1.5">
+                            <CheckCircle2 className="size-3 shrink-0 text-primary" />
+                            <span className="text-xs text-muted-foreground">{item}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-
-                  {/* Tag options */}
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {/* Option 1: Connect Existing Tag */}
-                    <button
-                      type="button"
-                      onClick={() => updateNested("objective", { tagMode: "existing" })}
-                      className={cn(
-                        "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all",
-                        obj.tagMode === "existing"
-                          ? "border-primary bg-primary/[0.04] shadow-sm"
-                          : "border-border bg-background hover:border-primary/40"
-                      )}
-                    >
-                      <div className="mb-3 flex items-center justify-between">
-                        <div className={cn(
-                          "flex size-9 items-center justify-center rounded-lg transition-colors",
-                          obj.tagMode === "existing"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
-                        )}>
-                          <Link2 className="size-4" />
-                        </div>
-                        {obj.tagMode === "existing" && (
-                          <CheckCircle2 className="size-4 text-primary" />
-                        )}
-                      </div>
-                      <p className={cn(
-                        "text-sm font-semibold",
-                        obj.tagMode === "existing" ? "text-primary" : "text-foreground"
-                      )}>
-                        Connect Existing Tag
-                      </p>
-                      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                        Use a Google Ads conversion tag you already have set up in your account.
-                      </p>
-                    </button>
-
-                    {/* Option 2: Create with Salla */}
-                    <button
-                      type="button"
-                      onClick={() => updateNested("objective", { tagMode: "salla_managed" })}
-                      className={cn(
-                        "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all",
-                        obj.tagMode === "salla_managed"
-                          ? "border-primary bg-primary/[0.04] shadow-sm"
-                          : "border-border bg-background hover:border-primary/40"
-                      )}
-                    >
-                      {/* Recommended badge */}
-                      <div className="absolute -top-2.5 right-3">
-                        <Badge className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground shadow-sm">
-                          Recommended
-                        </Badge>
-                      </div>
-                      <div className="mb-3 flex items-center justify-between">
-                        <div className={cn(
-                          "flex size-9 items-center justify-center rounded-lg transition-colors",
-                          obj.tagMode === "salla_managed"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
-                        )}>
-                          <Plus className="size-4" />
-                        </div>
-                        {obj.tagMode === "salla_managed" && (
-                          <CheckCircle2 className="size-4 text-primary" />
-                        )}
-                      </div>
-                      <p className={cn(
-                        "text-sm font-semibold",
-                        obj.tagMode === "salla_managed" ? "text-primary" : "text-foreground"
-                      )}>
-                        Create New Tag (Salla)
-                      </p>
-                      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                        Salla will create and install Google conversion tracking on your store automatically.
-                      </p>
-                    </button>
-                  </div>
-
-                  {/* Existing tag -- input */}
-                  {obj.tagMode === "existing" && (
-                    <div className="mt-4 rounded-lg border border-border bg-muted/20 p-4">
-                      <Label className="mb-1.5 block text-xs font-medium text-foreground">
-                        Conversion ID
-                      </Label>
-                      <Input
-                        placeholder="e.g. AW-123456789"
-                        value={obj.conversionId}
-                        onChange={(e) =>
-                          updateNested("objective", { conversionId: e.target.value })
-                        }
-                        className="h-10 font-mono text-xs"
-                      />
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        {"Find your Conversion ID in Google Ads > Tools > Conversions."}
-                      </p>
-
-                      {obj.conversionId && (
-                        <div className="mt-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                          <ShieldCheck className="size-3.5 shrink-0 text-emerald-600" />
-                          <p className="text-xs text-emerald-700">
-                            Conversion tag will be verified before your campaign goes live.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Salla managed tag */}
-                  {obj.tagMode === "salla_managed" && (
-                    <div className="mt-4 rounded-lg border border-primary/20 bg-primary/[0.03] p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                          <ShieldCheck className="size-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-foreground">Salla will handle everything</p>
-                          <ul className="mt-2 flex flex-col gap-1.5">
-                            {[
-                              "Create Google Ads conversion tracking for your store",
-                              "Automatically install the global site tag (gtag.js)",
-                              "Track purchases, add-to-cart, and page views",
-                              "Verify everything works before campaign launch",
-                            ].map((item) => (
-                              <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
-                                <CheckCircle2 className="mt-0.5 size-3 shrink-0 text-primary" />
-                                {item}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex items-center gap-2 rounded-lg bg-primary/5 px-3 py-2">
-                        <Radio className="size-3.5 text-primary" />
-                        <p className="text-xs font-medium text-primary">
-                          Conversion tag will be created when you launch the campaign
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Warning if no tag selected */}
-                  {obj.tagMode === "none" && (
-                    <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-                      <AlertCircle className="size-3.5 shrink-0 text-amber-600" />
-                      <p className="text-xs text-amber-700">
-                        Conversion tracking is required for {config.label} campaigns. Select an option above to continue.
-                      </p>
-                    </div>
-                  )}
                 </div>
               )}
 

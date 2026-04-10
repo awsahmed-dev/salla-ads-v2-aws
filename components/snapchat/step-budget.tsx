@@ -53,8 +53,10 @@ import {
 import { InfoTip } from "@/components/shared/info-tip";
 import { BudgetDurationCard } from "@/components/shared/budget-duration-card";
 import { PerformanceBoostCard } from "@/components/shared/performance-boost-card";
-import { CampaignEstimateCard } from "@/components/shared/campaign-estimate-card";
-import { DeliveryReadinessCard } from "@/components/shared/delivery-readiness-card";
+import { CostSummaryCard } from "@/components/shared/cost-summary-card";
+import { EstimatedResultsCard } from "@/components/shared/estimated-results-card";
+import { ConfigCheckCard } from "@/components/shared/config-check-card";
+import { fmt } from "@/components/shared/fmt";
 import { BidStrategyCard } from "@/components/shared/bid-strategy-card";
 import { OptimizationGoalCard } from "@/components/shared/optimization-goal-card";
 import {
@@ -66,6 +68,7 @@ import {
 } from "@/lib/snapchat/campaign-types";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { DeliveryPacingCard } from "@/components/shared/delivery-pacing-card";
+import { AttributionWindowCard } from "@/components/shared/attribution-window-card";
 
 /* ================================================================== */
 /*  Static config                                                     */
@@ -732,123 +735,32 @@ export function StepBudget() {
 
             <CollapsibleContent className="flex flex-col gap-5 pt-5">
 
-              {/* -- Attribution Window -- */}
-              {/* Snap API: conversion_window applies when optimizing for pixel-based goals,
-                  regardless of the objective. Show attribution window for any pixel goal
-                  (PIXEL_PURCHASE, PIXEL_ADD_TO_CART, PIXEL_PAGE_VIEW, PIXEL_SIGNUP)
-                  or when the objective config explicitly says so (e.g. APP_PROMOTION). */}
-              {(objectiveConfig.hasConversionWindow || budget.optimizationGoal.startsWith("PIXEL_")) && (() => {
-                const goalTip =
-                  budget.optimizationGoal === "PIXEL_PURCHASE"
-                    ? "Purchases often happen days after the first ad — use the wider window."
-                    : budget.optimizationGoal === "PIXEL_ADD_TO_CART"
-                      ? "Add-to-cart events can be delayed — the wider window captures more."
-                      : undefined;
-                return (
-                  <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                    <div className="mb-4 flex items-center gap-2">
-                      <Clock className="size-4 text-primary" />
-                      <Label className="text-sm font-semibold text-foreground">Attribution Window</Label>
-                      <InfoTip text="How long after seeing or clicking your ad should a conversion count? A wider window gives Snap more data to optimize." />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      {CONVERSION_WINDOWS.map((w) => {
-                        const isLocked = !!w.requiresEligibility && !pixelEligibleFor7Day;
-                        const isSelected = !isLocked && budget.conversionWindow === w.value;
-                        return (
-                          <button
-                            key={w.value}
-                            type="button"
-                            disabled={isLocked}
-                            onClick={() => { if (!isLocked) updateNested("budget", { conversionWindow: w.value as ConversionWindow }); }}
-                            className={cn(
-                              "relative flex flex-col rounded-xl border p-4 text-left transition-all",
-                              isLocked
-                                ? "cursor-not-allowed border-border bg-muted/30 opacity-60"
-                                : isSelected
-                                  ? "border-primary bg-primary/5 shadow-sm"
-                                  : "border-border bg-background hover:border-primary/40"
-                            )}
-                          >
-                            {w.recommended && !isLocked && (
-                              <span className="absolute -top-2 right-3 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
-                                Recommended
-                              </span>
-                            )}
-                            {isLocked && (
-                              <span className="absolute -top-2 right-3 flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[9px] font-semibold text-muted-foreground">
-                                <Lock className="size-2.5" /> Locked
-                              </span>
-                            )}
-
-                            <span className={cn(
-                              "text-sm font-semibold",
-                              isLocked ? "text-muted-foreground" : isSelected ? "text-primary" : "text-foreground"
-                            )}>
-                              {w.label}
-                            </span>
-
-                            {/* Visual breakdown */}
-                            <div className="mt-2.5 flex items-center gap-2">
-                              <div className="flex items-center gap-1 rounded-md bg-muted/60 px-2 py-1">
-                                <MousePointerClick className={cn("size-3", isLocked ? "text-muted-foreground/40" : "text-muted-foreground")} />
-                                <span className={cn("text-[11px] font-medium", isLocked ? "text-muted-foreground" : "text-foreground")}>{w.clickWindow}</span>
-                              </div>
-                              {w.viewWindow !== "None" ? (
-                                <>
-                                  <span className="text-[10px] text-muted-foreground">+</span>
-                                  <div className="flex items-center gap-1 rounded-md bg-muted/60 px-2 py-1">
-                                    <Eye className={cn("size-3", isLocked ? "text-muted-foreground/40" : "text-muted-foreground")} />
-                                    <span className={cn("text-[11px] font-medium", isLocked ? "text-muted-foreground" : "text-foreground")}>{w.viewWindow}</span>
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-[10px] text-muted-foreground">+</span>
-                                  <div className="flex items-center gap-1 rounded-md bg-muted/60 px-2 py-1">
-                                    <Eye className="size-3 text-muted-foreground/40" />
-                                    <span className="text-[11px] text-muted-foreground">No view</span>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-
-                            {isLocked ? (
-                              <p className="mt-2 flex items-start gap-1 text-[11px] leading-snug text-amber-600">
-                                <Lock className="mt-0.5 size-3 shrink-0" />
-                                Your pixel needs more conversion data — keep running ads to unlock.
-                              </p>
-                            ) : (
-                              <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-                                {w.desc}
-                              </p>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Compact explanation */}
-                    <div className="mt-3 rounded-lg bg-muted/30 px-3 py-2">
-                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <MousePointerClick className="size-3" />
-                        <span><span className="font-medium text-foreground">Click</span> = user swipes up, then buys later</span>
-                        <span className="mx-1">·</span>
-                        <Eye className="size-3" />
-                        <span><span className="font-medium text-foreground">View</span> = user only sees ad, then buys later</span>
-                      </div>
-                    </div>
-
-                    {goalTip && (
-                      <p className="mt-2 flex items-start gap-1.5 text-[11px] text-primary">
-                        <Sparkles className="mt-0.5 size-3 shrink-0" />
-                        {goalTip}
-                      </p>
-                    )}
-                  </div>
-                );
-              })()}
+              {/* -- Attribution Window (shared component) -- */}
+              {(objectiveConfig.hasConversionWindow || budget.optimizationGoal.startsWith("PIXEL_")) && (
+                <AttributionWindowCard
+                  mode="combined"
+                  combinedOptions={CONVERSION_WINDOWS.map((w) => ({
+                    value: w.value,
+                    label: w.label,
+                    desc: w.desc,
+                    clickWindow: w.clickWindow,
+                    viewWindow: w.viewWindow,
+                    recommended: w.recommended,
+                    requiresEligibility: w.requiresEligibility,
+                  }))}
+                  combinedValue={budget.conversionWindow}
+                  onCombinedChange={(v) => updateNested("budget", { conversionWindow: v as ConversionWindow })}
+                  apiBadge="conversion_window"
+                  infoTipText="How long after seeing or clicking your ad should a conversion count? A wider window gives Snap more data to optimize."
+                  goalContext={
+                    budget.optimizationGoal === "PIXEL_PURCHASE"
+                      ? "Purchases often happen days after the first ad — use the wider window."
+                      : budget.optimizationGoal === "PIXEL_ADD_TO_CART"
+                        ? "Add-to-cart events can be delayed — the wider window captures more."
+                        : undefined
+                  }
+                />
+              )}
 
               {/* -- Delivery Pacing -- */}
               {/* Only show when ACCELERATED is actually available (awareness/engagement goals).
@@ -1007,54 +919,76 @@ export function StepBudget() {
         <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
           <div className="lg:sticky lg:top-20 flex flex-col gap-4">
 
-            {/* Card A: Budget Summary (cost-only) */}
-            <CampaignEstimateCard
-              dailyBudget={budget.amount}
+            {/* Card A: Cost Summary (shared) */}
+            <CostSummaryCard
+              budgetLabel={budget.type === "lifetime" ? "Lifetime budget" : "Daily budget"}
+              budgetAmount={dailyAmount}
               durationDays={durationDays}
               isOngoing={budget.endDateOptional}
               totalBudget={totalBudget}
+              autoIncreaseEnabled={autoIncrease.enabled}
               boostEnabled={budget.performanceBoost}
               boostAmount={299}
               startDate={budget.startDate}
               endDate={budget.endDate}
             />
 
-            {/* Card B: Delivery Readiness (checklist only) */}
-            <DeliveryReadinessCard
-              items={[
-                { label: "Budget", status: budget.amount >= 150 ? "ok" : "error", text: budget.amount >= 150 ? `SAR ${budget.amount}/day meets minimum` : "Below SAR 150/day minimum" },
-                { label: "Schedule", status: budget.startDate ? "ok" : "warning", text: budget.startDate ? `Starts ${budget.startDate}${budget.endDateOptional ? " · Ongoing" : budget.endDate ? ` · Ends ${budget.endDate}` : ""}` : "No start date set" },
-                { label: "Goal", status: (() => {
-                  if (!budget.optimizationGoal) return "warning" as const;
-                  const goalEntry = goalsWithLocked.find((g) => g.value === budget.optimizationGoal);
-                  if (goalEntry?.locked) return "error" as const;
-                  return "ok" as const;
-                })(), text: (() => {
-                  if (!budget.optimizationGoal) return "Not set";
-                  const goalEntry = goalsWithLocked.find((g) => g.value === budget.optimizationGoal);
-                  if (goalEntry?.locked) return "Requires pixel — connect in Objective step";
-                  return goalEntry?.label ?? "Selected";
-                })() },
-                { label: "Bid", status: (() => {
+            {/* Card B: Estimated Results (shared) */}
+            <EstimatedResultsCard
+              badge="Predicted"
+              rows={
+                budget.optimizationGoal.startsWith("PIXEL_") ? [
+                  { label: `Daily ${goalLabel}`, value: `${fmt(Math.round(dailyAmount / suggestedBid.max))} - ${fmt(Math.round(dailyAmount / suggestedBid.min))}` },
+                  { label: "Daily reach", value: `${fmt(dailyAmount * 40)} - ${fmt(dailyAmount * 120)}` },
+                  { label: "Est. cost per result", value: `SAR ${suggestedBid.min.toFixed(2)} - ${suggestedBid.max.toFixed(2)}` },
+                ] : budget.optimizationGoal === "IMPRESSIONS" || budget.optimizationGoal === "STORY_OPENS" ? [
+                  { label: "Daily impressions", value: `${fmt(Math.round(dailyAmount / suggestedBid.min * 1000))} - ${fmt(Math.round(dailyAmount / suggestedBid.max * 1000 * 3))}` },
+                  { label: "Daily reach", value: `${fmt(dailyAmount * 60)} - ${fmt(dailyAmount * 200)}` },
+                  { label: "Est. CPM", value: `SAR ${suggestedBid.min.toFixed(2)} - ${suggestedBid.max.toFixed(2)}` },
+                ] : budget.optimizationGoal === "SWIPES" || budget.optimizationGoal === "LANDING_PAGE_VIEW" ? [
+                  { label: `Daily ${budget.optimizationGoal === "LANDING_PAGE_VIEW" ? "page views" : "swipe-ups"}`, value: `${fmt(Math.round(dailyAmount / suggestedBid.max))} - ${fmt(Math.round(dailyAmount / suggestedBid.min))}` },
+                  { label: "Daily reach", value: `${fmt(dailyAmount * 30)} - ${fmt(dailyAmount * 100)}` },
+                  { label: "Est. cost per swipe", value: `SAR ${suggestedBid.min.toFixed(2)} - ${suggestedBid.max.toFixed(2)}` },
+                ] : budget.optimizationGoal === "VIDEO_VIEWS" || budget.optimizationGoal === "VIDEO_VIEWS_15_SEC" ? [
+                  { label: `Daily ${budget.optimizationGoal === "VIDEO_VIEWS_15_SEC" ? "15s views" : "video views"}`, value: `${fmt(Math.round(dailyAmount / suggestedBid.max))} - ${fmt(Math.round(dailyAmount / suggestedBid.min))}` },
+                  { label: "Daily reach", value: `${fmt(dailyAmount * 50)} - ${fmt(dailyAmount * 150)}` },
+                  { label: "Est. CPV", value: `SAR ${suggestedBid.min.toFixed(3)} - ${suggestedBid.max.toFixed(3)}` },
+                ] : budget.optimizationGoal === "APP_INSTALLS" ? [
+                  { label: "Daily installs", value: `${fmt(Math.round(dailyAmount / suggestedBid.max))} - ${fmt(Math.round(dailyAmount / suggestedBid.min))}` },
+                  { label: "Daily reach", value: `${fmt(dailyAmount * 30)} - ${fmt(dailyAmount * 80)}` },
+                  { label: "Est. cost per install", value: `SAR ${suggestedBid.min.toFixed(0)} - ${suggestedBid.max.toFixed(0)}` },
+                ] : budget.optimizationGoal === "LEAD_FORM_SUBMISSIONS" ? [
+                  { label: "Daily leads", value: `${fmt(Math.round(dailyAmount / suggestedBid.max))} - ${fmt(Math.round(dailyAmount / suggestedBid.min))}` },
+                  { label: "Daily reach", value: `${fmt(dailyAmount * 20)} - ${fmt(dailyAmount * 60)}` },
+                  { label: "Est. cost per lead", value: `SAR ${suggestedBid.min.toFixed(0)} - ${suggestedBid.max.toFixed(0)}` },
+                ] : [
+                  { label: `Daily ${goalLabel}`, value: `${fmt(Math.round(dailyAmount * 0.8))} - ${fmt(Math.round(dailyAmount * 2.5))}` },
+                  { label: "Daily reach", value: `${fmt(dailyAmount * 40)} - ${fmt(dailyAmount * 120)}` },
+                  { label: "Est. cost per result", value: `SAR ${suggestedBid.min.toFixed(2)} - ${suggestedBid.max.toFixed(2)}` },
+                ]
+              }
+              disclaimer="Estimates based on similar Snapchat campaigns. Actual results may vary based on creative quality and competition."
+            />
+
+            {/* Card C: Configuration Check (shared) */}
+            <ConfigCheckCard
+              configRows={[
+                { label: "Budget type", value: budget.type === "lifetime" ? "Lifetime" : "Daily" },
+                { label: "End date", value: budget.endDateOptional ? "Continuous" : budget.endDate || "Not set" },
+                { label: "Goal", value: goalLabel },
+                { label: "Bid", value: budget.bidStrategy === "AUTO_BID" ? "Auto Bid" : `${budget.bidStrategy === "TARGET_COST" ? "Target Cost" : "Max Bid"}: SAR ${budget.bidAmount}` },
+                ...(objectiveConfig.hasConversionWindow ? [{ label: "Attribution", value: CONVERSION_WINDOWS.find((w) => w.value === budget.conversionWindow)?.label ?? "Set" }] : []),
+                ...(budget.frequencyCapEnabled ? [{ label: "Frequency cap", value: `${budget.frequencyCapCount}× / ${budget.frequencyCapInterval}h` }] : []),
+              ]}
+              checkItems={[
+                { label: "Budget", status: (budget.amount >= 150 ? "ok" : "error") as "ok" | "warning" | "error", text: budget.amount >= 150 ? `SAR ${budget.amount}/day meets minimum` : "Below SAR 150/day minimum" },
+                { label: "Duration", status: ((durationDays >= 7 || budget.endDateOptional) ? "ok" : "warning") as "ok" | "warning" | "error", text: (durationDays >= 7 || budget.endDateOptional) ? "Sufficient learning time" : "Below 7 days — limited optimization" },
+                { label: "Bid strategy", status: (() => {
                   if (budget.bidStrategy === "AUTO_BID") return "ok" as const;
                   if (!budget.bidAmount || budget.bidAmount <= 0) return "error" as const;
-                  if (budget.bidAmount < suggestedBid.min) return "warning" as const;
-                  if (budget.bidAmount > budget.amount) return "warning" as const;
                   return "ok" as const;
-                })(), text: (() => {
-                  if (budget.bidStrategy === "AUTO_BID") return "Auto-optimized by Snap";
-                  if (!budget.bidAmount || budget.bidAmount <= 0) return "No bid amount set";
-                  if (budget.bidAmount < suggestedBid.min) return `SAR ${budget.bidAmount.toFixed(2)} — below suggested range`;
-                  if (budget.bidAmount > budget.amount) return `SAR ${budget.bidAmount.toFixed(2)} — exceeds daily budget`;
-                  return `SAR ${budget.bidAmount.toFixed(2)} per ${goalLabel.replace(/s$/, "")}`;
-                })() },
-                ...(objectiveConfig.hasConversionWindow ? [{
-                  label: "Attribution",
-                  status: (budget.conversionWindow === "SWIPE_7DAY" && !pixelEligibleFor7Day ? "warning" : "ok") as "ok" | "warning" | "error",
-                  text: budget.conversionWindow === "SWIPE_7DAY" && !pixelEligibleFor7Day
-                    ? "7-Day Click requires pixel eligibility"
-                    : CONVERSION_WINDOWS.find((w) => w.value === budget.conversionWindow)?.label ?? "Set",
-                }] : []),
+                })(), text: budget.bidStrategy === "AUTO_BID" ? "Auto-optimized by Snap" : `SAR ${budget.bidAmount?.toFixed(2) ?? "0"} per ${goalLabel.replace(/s$/, "")}` },
+                { label: "Billing", status: "ok" as const, text: "Impression-based (CPM)" },
                 ...(budget.frequencyCapEnabled && campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1
                   ? [{ label: "Frequency Cap", status: "error" as const, text: "Mixed ad formats — disable cap or unify formats" }]
                   : []),

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { getCountryByCode, getCityById } from "@/lib/locations";
 import { LocationSelector } from "@/components/shared/location-selector";
 import { LocationReachCard } from "@/components/shared/location-reach-card";
+import { LocationMapPreview } from "@/components/shared/location-map-preview";
 import { DeliveryCheckCard } from "@/components/shared/delivery-check-card";
 import { DemographicsCard } from "@/components/shared/demographics-card";
 import { SallaSmartFeaturesCard } from "@/components/shared/salla-smart-features-card";
@@ -235,6 +236,24 @@ export function DV360StepAudience() {
                 accent="dv360"
                 label="Geographic Targeting"
                 tooltipText="Maps to TARGETING_TYPE_GEO_REGION. Choose countries and/or cities where your ads will be shown."
+              />
+
+              {/* ---- Map Preview ---- */}
+              <LocationMapPreview
+                countryCodes={audience.geoTargets.filter((g) => g.type === "country").map((g) => g.id)}
+                cities={audience.geoTargets
+                  .filter((g) => g.type === "city")
+                  .map((g) => {
+                    const meta = getCityById(g.id);
+                    return {
+                      id: g.id,
+                      name: g.name,
+                      countryCode: meta?.countryCode ?? "",
+                      lat: meta?.lat ?? 0,
+                      lng: meta?.lng ?? 0,
+                      radiusKm: g.radiusKm ?? 0,
+                    };
+                  })}
               />
             </SectionCard>
 
@@ -485,68 +504,6 @@ export function DV360StepAudience() {
               )}
             </SectionCard>
 
-            {/* ---- 7. YouTube & Partners Inventory ---- */}
-            <SectionCard>
-              <div className="mb-4 flex items-center gap-2.5">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-red-600/10">
-                  <Radio className="size-4 text-red-600" />
-                </div>
-                <div>
-                  <Label className="text-sm font-semibold text-foreground">Inventory Sources</Label>
-                  <p className="text-[11px] text-muted-foreground">
-                    Where your video ads appear. Maps to <code className="rounded bg-muted px-1 text-[10px]">youtubeAndPartnersSettings.inventorySourceSettings</code>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                {INVENTORY_OPTIONS.map((inv) => {
-                  const isSelected = audience.inventorySources.includes(inv.value);
-                  return (
-                    <div
-                      key={inv.value}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg border px-4 py-3 transition-all",
-                        isSelected ? "border-red-600/30 bg-red-600/[0.03]" : "border-border bg-background"
-                      )}
-                    >
-                      <div className={cn("flex size-8 items-center justify-center rounded-lg", isSelected ? "bg-red-600/10 text-red-600" : "bg-muted text-muted-foreground")}>
-                        {inv.icon}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold text-foreground">{inv.label}</p>
-                        <p className="text-[10px] text-muted-foreground">{inv.desc}</p>
-                      </div>
-                      <Switch
-                        checked={isSelected}
-                        onCheckedChange={() => updateNested("audience", { inventorySources: toggleArrayItem(audience.inventorySources, inv.value) as DV360InventorySource[] })}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Content category */}
-              <div className="mt-4">
-                <Label className="mb-1.5 text-xs font-semibold text-foreground">
-                  Content Category / Brand Safety
-                  <InfoTip text="Controls what type of video content your ads appear alongside. Maps to contentFilterType in youtubeAndPartnersSettings." />
-                </Label>
-                <Select
-                  value={audience.contentCategory}
-                  onValueChange={(v) => updateNested("audience", { contentCategory: v as typeof audience.contentCategory })}
-                >
-                  <SelectTrigger className="h-9 w-full text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CONTENT_FILTER_TYPE_EXPANDED">Expanded Inventory (maximum reach)</SelectItem>
-                    <SelectItem value="CONTENT_FILTER_TYPE_STANDARD">Standard Inventory (recommended)</SelectItem>
-                    <SelectItem value="CONTENT_FILTER_TYPE_LIMITED">Limited Inventory (brand-safe only)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </SectionCard>
 
             {/* ---- 8. Device Targeting ---- */}
             <SectionCard>
@@ -1015,7 +972,6 @@ export function DV360StepAudience() {
                 { label: "Genders", value: audience.genders.length === 3 ? "All" : audience.genders.join(", ") },
                 { label: "Interests", value: audience.interests.length ? String(audience.interests.length) : "None" },
                 { label: "Keywords", value: audience.keywords.length + audience.excludeKeywords.length ? String(audience.keywords.length + audience.excludeKeywords.length) : "None" },
-                { label: "Inventory", value: audience.inventorySources.join(", ") || "None" },
                 { label: "Devices", value: audience.deviceTypes.length === 4 ? "All devices" : `${audience.deviceTypes.length} selected` },
                 { label: "Optimized Targeting", value: audience.optimizedTargeting ? "On" : "Off", highlight: audience.optimizedTargeting },
                 ...(isAwareness && audience.targetFrequency.enabled

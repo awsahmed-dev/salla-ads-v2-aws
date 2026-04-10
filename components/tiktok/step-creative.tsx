@@ -878,7 +878,7 @@ function AdPanel({
                   <p className="text-xs font-semibold text-foreground">Spark Ad Authorization</p>
                 </div>
                 <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-                  Spark Ads promote an existing organic TikTok post. The display name, caption, video, and profile image all come from the original post. Identity must use <code className="rounded bg-muted px-1 text-[10px]">TT_USER</code> or <code className="rounded bg-muted px-1 text-[10px]">AUTH_CODE</code>.
+                  Spark Ads promote an existing organic TikTok post. The display name, caption, video, and profile image all come from the original post. Enter the per-video authorization code below.
                 </p>
 
                 {/* Authorization method */}
@@ -2659,13 +2659,7 @@ export function TikTokStepCreative() {
 
   /* Validation */
   const allChecks: { label: string; ok: boolean }[] = [];
-  if (identity.identityType === "CUSTOMIZED_USER") {
-    allChecks.push({ label: "Identity: display name", ok: identity.displayName.length > 0 });
-  } else if (identity.identityType === "AUTH_CODE") {
-    allChecks.push({ label: "Identity: auth code", ok: identity.identityId.length > 0 });
-  } else {
-    allChecks.push({ label: "Identity: TikTok account linked", ok: true /* mock: always connected */ });
-  }
+  allChecks.push({ label: "Identity: TikTok account linked", ok: identity.linkStatus === "confirmed" && !!identity.identityId });
 
   if (isCatalogListing) {
     // Catalog Listing: creatives are auto-generated, only need basic settings
@@ -2726,296 +2720,87 @@ export function TikTokStepCreative() {
         {/* ============ LEFT COLUMN ============ */}
         <div className="flex flex-1 flex-col gap-5">
 
-          {/* ---- TikTok Identity ---- */}
+          {/* ---- Connected Identity (configured in Step 0) ---- */}
           <SectionCard>
             <div className="mb-1 flex items-center gap-2">
               <User className="size-4 text-primary" />
               <Label className="text-sm font-semibold text-foreground">TikTok Identity</Label>
-              <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs font-normal">Required</Badge>
-              <InfoTip text="Choose how your business appears on ads. Connect your TikTok account for Spark Ads, or use Custom Identity for standard ads. Maps to API identity_type + identity_id." />
+              {identity.linkStatus === "confirmed" && identity.identityId ? (
+                <Badge variant="outline" className="gap-1 rounded-full border-emerald-300 bg-emerald-50 px-2 text-[10px] text-emerald-700">
+                  <CheckCircle2 className="size-2.5" />
+                  Connected
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="gap-1 rounded-full border-amber-300 bg-amber-50 px-2 text-[10px] text-amber-700">
+                  <AlertCircle className="size-2.5" />
+                  Not Connected
+                </Badge>
+              )}
             </div>
-            <p className="mb-5 text-xs text-muted-foreground">
-              Your brand identity shown on every ad. This is shared across all ads in the campaign.
-            </p>
 
-            <div className="flex flex-col gap-5">
-              {/* ---- Step 1: Ad Account Connection ---- */}
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-semibold text-foreground">Ad Account</Label>
-                {/* Mock: Connected account selector */}
-                <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/[0.02] px-4 py-3">
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
-                    <CheckCircle2 className="size-4 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value="acc_demo_001"
-                        onValueChange={() => {
-                          /* In production: switch advertiser context */
-                        }}
-                      >
-                        <SelectTrigger className="h-7 w-auto gap-1.5 border-0 bg-transparent p-0 text-xs font-semibold text-foreground shadow-none focus:ring-0">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="acc_demo_001">
-                            <div className="flex items-center gap-2">
-                              <span>My Salla Store</span>
-                              <span className="font-mono text-muted-foreground">ID: 7298...4521</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="acc_demo_002">
-                            <div className="flex items-center gap-2">
-                              <span>Brand Campaign Account</span>
-                              <span className="font-mono text-muted-foreground">ID: 7301...8832</span>
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <p className="mt-0.5 text-[10px] text-muted-foreground">
-                      Connected via OAuth. Advertiser ID auto-detected.
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="gap-1 rounded-full px-2 text-[10px]">
-                    <CheckCircle2 className="size-2.5 text-primary" />
-                    Connected
-                  </Badge>
-                </div>
-              </div>
-
-              {/* ---- Step 2: Identity Type Selection ---- */}
-              <div className="flex flex-col gap-2">
-                <Label className="text-xs font-semibold text-foreground">Identity Type</Label>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  {([
-                    {
-                      value: "TT_USER" as const,
-                      label: "Your TikTok Account",
-                      desc: "Use your linked TikTok Business Account. Required for Spark Ads.",
-                      badge: "Recommended",
-                    },
-                    {
-                      value: "AUTH_CODE" as const,
-                      label: "Authorized Account",
-                      desc: "Use another creator's authorized TikTok posts in your ads.",
-                      badge: null,
-                    },
-                    {
-                      value: "CUSTOMIZED_USER" as const,
-                      label: "Custom Identity",
-                      desc: "Set a custom name and avatar without a TikTok account.",
-                      badge: "Default",
-                    },
-                  ] as const).map((opt) => {
-                    const sel = identity.identityType === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() =>
-                          updateNested("creative", {
-                            identity: { ...identity, identityType: opt.value },
-                          })
-                        }
-                        className={cn(
-                          "relative flex flex-col items-start rounded-lg border-2 p-3 text-left transition-all",
-                          sel
-                            ? "border-primary bg-primary/[0.04]"
-                            : "border-border bg-card hover:border-primary/40"
-                        )}
-                      >
-                        {opt.badge && (
-                          <Badge
-                            variant={opt.badge === "Recommended" ? "default" : "secondary"}
-                            className={cn(
-                              "absolute -top-2 right-2 rounded-full px-1.5 py-0 text-[9px]",
-                              opt.badge === "Recommended"
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted text-muted-foreground"
-                            )}
-                          >
-                            {opt.badge}
-                          </Badge>
-                        )}
-                        <p className={cn("text-[11px] font-semibold", sel ? "text-primary" : "text-foreground")}>
-                          {opt.label}
-                        </p>
-                        <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">{opt.desc}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* ---- Step 3: Identity Details (depends on type) ---- */}
-
-              {/* TT_USER: Linked TikTok account */}
-              {identity.identityType === "TT_USER" && (
-                <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-full bg-foreground">
+            {identity.linkStatus === "confirmed" && identity.identityId ? (
+              /* ======== Connected: show account card ======== */
+              <div className="mt-3 flex flex-col gap-3">
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3">
+                  <div className="flex size-10 items-center justify-center rounded-full bg-foreground">
+                    {identity.avatarPreviewUrl ? (
+                      <img src={identity.avatarPreviewUrl} alt="" className="size-10 rounded-full object-cover" />
+                    ) : (
                       <svg viewBox="0 0 24 24" className="size-5 text-background" fill="currentColor">
                         <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.75a8.18 8.18 0 0 0 4.76 1.52V6.84a4.83 4.83 0 0 1-1-.15z"/>
                       </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs font-semibold text-foreground">@yoursallastore</p>
-                      <p className="text-[10px] text-muted-foreground">TikTok Business Account -- Linked</p>
-                    </div>
-                    <Badge variant="outline" className="gap-1 rounded-full px-2 text-[10px]">
-                      <CheckCircle2 className="size-2.5 text-primary" />
-                      Linked
-                    </Badge>
+                    )}
                   </div>
-                  <p className="text-[10px] leading-relaxed text-muted-foreground">
-                    Ads will show your TikTok profile name and avatar. This enables Spark Ads and improves ad trust and engagement.
-                  </p>
-                </div>
-              )}
-
-              {/* AUTH_CODE: Authorized account/post */}
-              {identity.identityType === "AUTH_CODE" && (
-                <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-4">
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-medium text-foreground">Authorization Code</Label>
-                    <Input
-                      placeholder="Enter auth code from creator"
-                      value={identity.identityId}
-                      onChange={(e) =>
-                        updateNested("creative", {
-                          identity: { ...identity, identityId: e.target.value },
-                        })
-                      }
-                      className="h-8 font-mono text-xs"
-                    />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-foreground truncate">{identity.tiktokUsername || identity.displayName}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      The creator must authorize their post/account in TikTok Business Center first. Enter the authorization code they provide.
+                      {identity.identityType === "BC_AUTH_TT" ? "Linked via Business Center" : identity.identityType === "AUTH_CODE" ? "Creator Auth Code" : "Custom Identity"}
                     </p>
                   </div>
+                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px] font-medium">
+                    {identity.identityType === "BC_AUTH_TT" ? "BC Auth" : identity.identityType === "AUTH_CODE" ? "Auth Code" : "Custom"}
+                  </Badge>
                 </div>
-              )}
-
-              {/* CUSTOMIZED_USER: Custom identity */}
-              {identity.identityType === "CUSTOMIZED_USER" && (
-                <div className="flex flex-col gap-4 rounded-lg border border-border bg-muted/20 p-4">
-                  <div className="flex items-start gap-4">
-                    {/* Avatar upload */}
-                    <div className="flex flex-col items-center gap-1.5">
-                      <div className="relative">
-                        {identity.avatarPreviewUrl ? (
-                          <div className="group relative">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={identity.avatarPreviewUrl}
-                              alt="Brand avatar"
-                              className="size-14 rounded-full border-2 border-primary/30 object-cover"
-                              crossOrigin="anonymous"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const input = document.createElement("input");
-                                  input.type = "file";
-                                  input.accept = "image/jpeg,image/png";
-                                  input.onchange = (e) => {
-                                    const file = (e.target as HTMLInputElement).files?.[0];
-                                    if (file) {
-                                      if (file.size > 50 * 1024) {
-                                        alert("Avatar must be under 50KB");
-                                        return;
-                                      }
-                                      updateNested("creative", {
-                                        identity: {
-                                          ...identity,
-                                          avatarFile: file,
-                                          avatarPreviewUrl: URL.createObjectURL(file),
-                                        },
-                                      });
-                                    }
-                                  };
-                                  input.click();
-                                }}
-                                className="rounded-full bg-white/90 p-1.5"
-                              >
-                                <Pencil className="size-3 text-foreground" />
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const input = document.createElement("input");
-                              input.type = "file";
-                              input.accept = "image/jpeg,image/png";
-                              input.onchange = (e) => {
-                                const file = (e.target as HTMLInputElement).files?.[0];
-                                if (file) {
-                                  if (file.size > 50 * 1024) {
-                                    alert("Avatar must be under 50KB");
-                                    return;
-                                  }
-                                  updateNested("creative", {
-                                    identity: {
-                                      ...identity,
-                                      avatarFile: file,
-                                      avatarPreviewUrl: URL.createObjectURL(file),
-                                    },
-                                  });
-                                }
-                              };
-                              input.click();
-                            }}
-                            className="flex size-14 items-center justify-center rounded-full border-2 border-dashed border-border bg-card transition-colors hover:border-primary/40"
-                          >
-                            <Upload className="size-4 text-muted-foreground" />
-                          </button>
-                        )}
-                      </div>
-                      <span className="text-[9px] text-muted-foreground">98x98 JPG/PNG</span>
-                    </div>
-
-                    {/* Display name */}
-                    <div className="flex flex-1 flex-col gap-1">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs font-medium text-foreground">Brand Display Name</Label>
-                        <CharCounter current={identity.displayName.length} max={20} />
-                      </div>
-                      <Input
-                        placeholder="Your store name"
-                        value={identity.displayName}
-                        maxLength={20}
-                        onChange={(e) =>
-                          updateNested("creative", {
-                            identity: { ...identity, displayName: e.target.value.slice(0, 20) },
-                          })
-                        }
-                        className={cn("h-8 text-xs", identity.displayName.length >= 20 && "border-amber-400")}
-                      />
-                      <p className="text-[10px] text-muted-foreground">
-                        Shown as your brand name on all ads.
-                      </p>
-                    </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                    {identity.identityId && (
+                      <span>ID: <span className="font-mono">{identity.identityId}</span></span>
+                    )}
+                    {identity.businessCenterId && (
+                      <span>BC: <span className="font-mono">{identity.businessCenterId}</span></span>
+                    )}
                   </div>
-
-                  <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2">
-                    <AlertCircle className="mt-0.5 size-3 shrink-0 text-amber-500" />
-                    <p className="text-[10px] leading-relaxed text-amber-700">
-                      Custom Identity is being deprecated by TikTok (June 2025). We recommend linking your TikTok Business Account for better ad performance and to unlock Spark Ads.
-                    </p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep(0)}
+                    className="flex items-center gap-1 text-[10px] font-medium text-primary hover:underline"
+                  >
+                    <Pencil className="size-2.5" />
+                    Change
+                  </button>
                 </div>
-              )}
-
-              {/* Advertiser ID (always shown, read-only) */}
-              <div className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
-                <span className="text-[10px] text-muted-foreground">Advertiser ID</span>
-                <span className="font-mono text-[10px] text-muted-foreground">{identity.identityId || "Auto-detected from connection"}</span>
               </div>
-            </div>
+            ) : (
+              /* ======== Not connected: prompt to go back ======== */
+              <div className="mt-3 flex flex-col gap-3">
+                <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3">
+                  <AlertCircle className="size-4 shrink-0 text-amber-600" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-amber-900">TikTok account not connected</p>
+                    <p className="mt-0.5 text-[10px] text-amber-700">
+                      Go back to Campaign Setup to link your TikTok account via QR code. This is required for ad delivery.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep(0)}
+                    className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-[10px] font-medium text-amber-800 transition-colors hover:bg-amber-50"
+                  >
+                    Connect Now
+                  </button>
+                </div>
+              </div>
+            )}
           </SectionCard>
 
           {/* ---- Catalog Active Banner (when catalog enabled in step 0) ---- */}
@@ -3439,7 +3224,7 @@ export function TikTokStepCreative() {
                   <div className="flex flex-col items-center rounded-lg border border-border bg-muted/20 px-2 py-2">
                     <User className="mb-1 size-3 text-primary" />
                     <span className="text-xs text-muted-foreground">Identity</span>
-                    {(identity.identityType === "CUSTOMIZED_USER" ? identity.displayName.length > 0 : identity.identityType === "AUTH_CODE" ? identity.identityId.length > 0 : true) ? (
+                    {identity.linkStatus === "confirmed" ? (
                       <CheckCircle2 className="mt-0.5 size-3 text-emerald-500" />
                     ) : (
                       <AlertCircle className="mt-0.5 size-3 text-amber-500" />

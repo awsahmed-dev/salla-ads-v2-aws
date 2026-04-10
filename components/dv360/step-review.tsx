@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { SectionCard } from "@/components/shared/section-card";
+import { CouponCodeCard } from "@/components/shared/coupon-code-card";
 import { InfoTip } from "@/components/shared/info-tip";
 import {
   Dialog,
@@ -718,26 +719,14 @@ export function DV360StepReview() {
                 </div>
               </div>
 
-              {/* Coupon */}
-              <div className="mt-4 flex gap-2">
-                <div className="relative flex-1">
-                  <Tag className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Promo code"
-                    value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
-                    className="h-9 pl-9 text-sm"
-                    disabled={couponApplied}
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!coupon.trim() || couponApplied}
-                  onClick={() => setCouponApplied(true)}
-                >
-                  {couponApplied ? "Applied" : "Apply"}
-                </Button>
+              {/* Coupon (shared) */}
+              <div className="mt-4">
+                <CouponCodeCard
+                  appliedCode={couponApplied ? coupon : null}
+                  appliedDiscount={couponApplied ? 50 : undefined}
+                  onApply={(code) => { setCoupon(code); setCouponApplied(true); }}
+                  onRemove={() => { setCoupon(""); setCouponApplied(false); }}
+                />
               </div>
             </SectionCard>
 
