@@ -75,7 +75,13 @@ export function StepCreative() {
   const defaultCTA = getDefaultCTA(campaign.objective.objective);
   const objectiveConfig = OBJECTIVE_CONFIGS[campaign.objective.objective];
 
-  const sponsoredAdConfig = { chatMessage: "", autoResponseMessage: "", autoResponseEnabled: false, wallpaperUrl: "", ...(creative.sponsoredAdConfig ?? {}) };
+  const sponsoredAdConfig = {
+    chatMessage: "",
+    autoResponseMessage: "",
+    responseInteractionSetting: "NO_USER_INPUT" as "NO_USER_INPUT" | "SEND_DEFAULT_UNLIMITED",
+    wallpaperUrl: "",
+    ...creative.sponsoredAdConfig,
+  };
   const catalogEnabled = campaign.objective.catalogEnabled === true;
 
   // Load catalog status when catalog is enabled
@@ -84,6 +90,23 @@ export function StepCreative() {
       getCatalogStatus().then(setCatalogStatus);
     }
   }, [catalogEnabled]);
+
+  // Snap API: SPONSORED_CHAT must always include CHAT_FEED in placements.
+  // Safety net — ensures data is correct even if user navigates directly to this step.
+  useEffect(() => {
+    if (campaign.objective.objective === "SPONSORED_CHAT") {
+      const positions = creative.customPositions ?? [];
+      if (creative.placement !== "CUSTOM" || !positions.includes("CHAT_FEED")) {
+        updateNested("creative", {
+          placement: "CUSTOM" as PlacementConfig,
+          customPositions: positions.includes("CHAT_FEED")
+            ? positions
+            : ["CHAT_FEED", ...(positions.length > 0 ? positions : ["INTERSTITIAL_CONTENT"])],
+        });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaign.objective.objective]);
 
   // Load Snap Public Profile from Salla
   useEffect(() => {
@@ -507,18 +530,18 @@ export function StepCreative() {
                       </p>
                     </div>
                     <Switch
-                      checked={sponsoredAdConfig.autoResponseEnabled}
+                      checked={sponsoredAdConfig.responseInteractionSetting === "SEND_DEFAULT_UNLIMITED"}
                       onCheckedChange={(checked) => updateNested("creative", {
                         sponsoredAdConfig: {
                           ...sponsoredAdConfig,
-                          autoResponseEnabled: checked,
+                          responseInteractionSetting: checked ? "SEND_DEFAULT_UNLIMITED" : "NO_USER_INPUT",
                           ...(!checked && { autoResponseMessage: "" }),
                         }
                       })}
                     />
                   </div>
 
-                  {sponsoredAdConfig.autoResponseEnabled && (
+                  {sponsoredAdConfig.responseInteractionSetting === "SEND_DEFAULT_UNLIMITED" && (
                     <div className="flex flex-col gap-1.5 border-t border-border pt-2">
                       <div className="flex items-center justify-between">
                         <Label className="text-xs font-medium text-foreground">Response Text</Label>

@@ -129,7 +129,8 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     snapObjectiveV2: "APP_PROMOTION",
     conversionLocation: "APP",
     label: "App Promotion",
-    allowedGoals: ["APP_INSTALLS", "APP_PURCHASE", "APP_SIGNUP", "APP_ADD_TO_CART", "SWIPES"],
+    // IMPRESSIONS and SWIPES do not require MMP. APP_PURCHASE/SIGNUP/ADD_TO_CART require MMP.
+    allowedGoals: ["APP_INSTALLS", "IMPRESSIONS", "APP_PURCHASE", "APP_SIGNUP", "APP_ADD_TO_CART", "SWIPES"],
     defaultGoal: "APP_INSTALLS",
     pixelRequirement: "none",
     catalogAvailable: false,
@@ -144,7 +145,9 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     snapObjectiveV2: "LEADS",
     conversionLocation: "LEAD_FORM",
     label: "Lead Generation",
-    allowedGoals: ["LEAD_FORM_SUBMISSIONS", "SWIPES", "IMPRESSIONS"],
+    // Snap API only allows LEAD_FORM_SUBMISSIONS and SWIPES for LEADS/LEAD_FORM.
+    // IMPRESSIONS is NOT valid per the API objective-to-goal mapping.
+    allowedGoals: ["LEAD_FORM_SUBMISSIONS", "SWIPES"],
     defaultGoal: "LEAD_FORM_SUBMISSIONS",
     pixelRequirement: "none",
     catalogAvailable: false,
@@ -165,6 +168,30 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
 export type ConversionWindow =
   | "SWIPE_28DAY_VIEW_1DAY"  // 28-day click + 1-day view (default, always available)
   | "SWIPE_7DAY";            // 7-day click only (requires pixel eligibility check)
+
+/**
+ * Snap API: Smart Targeting (auto_expansion_type = SMART_TARGETING) is NOT available
+ * for these optimization goals. The API will reject ad squads with smart targeting
+ * enabled when using these goals.
+ */
+export const SMART_TARGETING_INCOMPATIBLE_GOALS: OptimizationGoal[] = [
+  "IMPRESSIONS",
+  "STORY_OPENS",
+  "SWIPES",
+  "USES",
+  "VIDEO_VIEWS",
+  "VIDEO_VIEWS_15_SEC",
+];
+
+/**
+ * Maps to API billing_event.
+ * Snap API only supports IMPRESSION — this is the only valid value.
+ * Required on every Ad Squad payload.
+ */
+export type BillingEvent = "IMPRESSION";
+
+/** The only valid billing event per Snap API */
+export const BILLING_EVENT: BillingEvent = "IMPRESSION";
 
 /** Maps to API bid_strategy */
 export type BidStrategy =
@@ -318,6 +345,15 @@ export type AdFormat = "SINGLE" | "COLLECTION" | "STORY" | "DYNAMIC" | "INFLUENC
 
 /** UI-level destination (where swipe-up goes) */
 export type AdDestination = "WEBSITE" | "DEEP_LINK" | "APP_INSTALL" | "NO_CTA" | "LEAD_FORM";
+
+/**
+ * Snap API constraint: COLLECTION creatives must have call_to_action = null.
+ * The interaction zone headline is used instead. This helper should be used when
+ * building the API payload to ensure compliance.
+ */
+export function shouldNullCTA(format: AdFormat): boolean {
+  return format === "COLLECTION";
+}
 
 /** Derive Snap API creative type from UI format + destination */
 export function deriveCreativeType(format: AdFormat, destination: AdDestination): SnapCreativeType {
@@ -585,8 +621,9 @@ export interface LeadGenerationForm {
   form_fields: LeadFormField[];
   /** Privacy policy URL */
   privacy_policy_url: string;
-  /** Optional legal disclosures */
-  legal_disclosures?: LeadFormLegalDisclosure;
+  /** Optional legal disclosures — Snap API expects an array.
+   *  Each disclosure: title (max 35 chars), description (max 80 chars), up to 2 consent fields. */
+  legal_disclosures?: LeadFormLegalDisclosure[];
   /** Optional banner image media ID (750x230 min, 1875x575 max, 75:23 ratio) */
   banner_media_id?: string;
   /** Local preview for banner */
@@ -669,7 +706,10 @@ export interface CreativeAsset {
   creatorPartnershipType?: CreatorPartnershipType;
   /** Snap API: profile_tagged_in_headline -- brand's profile ID tagged in the headline */
   profileTaggedInHeadline?: string;
-  /** Snap API: brand_name -- max 32 chars */
+  /**
+   * Snap API: brand_name -- max 32 chars.
+   * Optional when profile_properties.profile_id is set (Public Profile name is used instead).
+   */
   brandName: string;
   /** Snap API: headline -- max 34 chars */
   headline: string;
@@ -876,8 +916,12 @@ export interface CreativeSettings {
     chatMessage: string;
     /** chat_properties.default_responses[0].text -- auto-reply when user sends a message (max 500) */
     autoResponseMessage: string;
-    /** Whether auto-response is enabled -- maps to response_interaction_setting */
-    autoResponseEnabled: boolean;
+    /**
+     * Maps to Snap API: response_interaction_setting.
+     * NO_USER_INPUT = user cannot reply (auto-response disabled).
+     * SEND_DEFAULT_UNLIMITED = auto-reply is sent every time user messages.
+     */
+    responseInteractionSetting: "NO_USER_INPUT" | "SEND_DEFAULT_UNLIMITED";
     /** chat_properties.wallpaper_media_id -- branded chat background image 1080x1920 */
     wallpaperUrl: string;
   };
@@ -961,7 +1005,7 @@ export const defaultCampaign: CampaignData = {
     sponsoredAdConfig: {
       chatMessage: "",
       autoResponseMessage: "",
-      autoResponseEnabled: false,
+      responseInteractionSetting: "NO_USER_INPUT",
       wallpaperUrl: "",
     },
   },

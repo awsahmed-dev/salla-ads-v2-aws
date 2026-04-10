@@ -148,6 +148,13 @@ export function StepReview() {
     list.push({ id: "name", label: "Campaign name", ok: !!objective.campaignName.trim(), step: 0 });
     list.push({ id: "country", label: "Target country", ok: audience.countries.length > 0, step: 1 });
     list.push({ id: "gender", label: "Gender targeting", ok: audience.genders.length > 0, step: 1 });
+    // Snap API: max 500 circles for point-radius targeting, min 96m radius
+    if (audience.cities.length > 500) {
+      list.push({ id: "circles_max", label: "Location circles ≤ 500", ok: false, step: 1 });
+    }
+    if (audience.cities.some((c) => c.radius < 96)) {
+      list.push({ id: "circles_min_radius", label: "Location radius ≥ 96 meters", ok: false, step: 1 });
+    }
     if (audience.countries.length > 1) list.push({ id: "language", label: "Language", ok: audience.languages.length > 0, step: 1 });
     if (objConfig.pixelRequirement === "required") {
       list.push({ id: "pixel", label: "Snap Pixel", ok: objective.pixelMode !== "none" && (objective.pixelMode === "salla_managed" || !!objective.pixelId), step: 0 });
@@ -158,6 +165,18 @@ export function StepReview() {
       const ft = lf?.form_fields?.map((f) => f.type) ?? [];
       list.push({ id: "lead_form", label: "Lead form fields", ok: ft.includes("FIRST_NAME") && ft.includes("LAST_NAME") && (ft.includes("EMAIL") || ft.includes("PHONE_NUMBER")), step: 3 });
       list.push({ id: "lead_privacy", label: "Privacy policy URL", ok: !!lf?.privacy_policy_url?.startsWith("https://"), step: 3 });
+      // Snap API: ADDRESS and POSTAL_CODE cannot both be included
+      if (ft.includes("ADDRESS") && ft.includes("POSTAL_CODE")) {
+        list.push({ id: "lead_addr_zip", label: "Lead form: ADDRESS and POSTAL_CODE cannot both be included", ok: false, step: 3 });
+      }
+      // Snap API: form title max 25 chars
+      if (lf && lf.title.length > 25) {
+        list.push({ id: "lead_title_len", label: "Lead form title ≤ 25 characters", ok: false, step: 3 });
+      }
+      // Snap API: form description max 180 chars
+      if (lf && lf.description.length > 180) {
+        list.push({ id: "lead_desc_len", label: "Lead form description ≤ 180 characters", ok: false, step: 3 });
+      }
     }
     if (objective.objective === "APP_PROMOTION") {
       const app = objective.appSettings;
@@ -174,9 +193,27 @@ export function StepReview() {
     list.push({ id: "budget", label: budgetLabel, ok: budgetMinOk, step: 2 });
     list.push({ id: "dates", label: "Schedule dates", ok: !!budget.startDate, step: 2 });
     if (budget.bidStrategy !== "AUTO_BID") list.push({ id: "bid", label: "Bid amount", ok: budget.bidAmount > 0, step: 2 });
+    // Snap API: ACCELERATED pacing requires LOWEST_COST_WITH_MAX_BID + bid_micro > 0
+    if (budget.pacingType === "ACCELERATED") {
+      list.push({ id: "accel_bid", label: "Accelerated pacing: Max Bid strategy with bid amount", ok: budget.bidStrategy === "LOWEST_COST_WITH_MAX_BID" && budget.bidAmount > 0, step: 2 });
+    }
     if (budget.frequencyCapEnabled && creative.ads.length > 1) {
       const adFormats = new Set(creative.ads.map((a) => a.adFormat ?? "SINGLE"));
       list.push({ id: "freq_cap_format", label: "Frequency cap: same ad format", ok: adFormats.size === 1, step: 3 });
+    }
+    // Snap API: Commercials cannot mix with non-commercials in the same ad squad
+    if (creative.ads.length > 1) {
+      const hasCommercial = creative.ads.some((a) => a.commercialConfig?.enabled);
+      const hasNonCommercial = creative.ads.some((a) => !a.commercialConfig?.enabled);
+      if (hasCommercial && hasNonCommercial) {
+        list.push({ id: "mix_commercial", label: "Commercials cannot mix with non-commercial ads", ok: false, step: 3 });
+      }
+      // Dynamic ads cannot mix with non-dynamic in same ad squad
+      const hasDynamic = creative.ads.some((a) => (a.adFormat ?? "SINGLE") === "DYNAMIC");
+      const hasNonDynamic = creative.ads.some((a) => (a.adFormat ?? "SINGLE") !== "DYNAMIC");
+      if (hasDynamic && hasNonDynamic) {
+        list.push({ id: "mix_dynamic", label: "Dynamic ads cannot mix with standard ads", ok: false, step: 3 });
+      }
     }
     if (objective.catalogEnabled) {
       list.push({

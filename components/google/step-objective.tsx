@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useGoogleCampaign } from "@/lib/google/campaign-context";
-import { OBJECTIVE_CONFIGS, type AppStore, type AppCampaignGoalType } from "@/lib/google/campaign-types";
+import { OBJECTIVE_CONFIGS, APP_GOAL_MMP_REQUIRED, type AppStore, type AppCampaignGoalType } from "@/lib/google/campaign-types";
+import { generateCampaignName } from "@/lib/google/search-ai-generator";
+import { getStoreInfo, getCategories } from "@/lib/salla/store-api";
 import { cn } from "@/lib/utils";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { StepZeroHeader } from "@/components/shared/step-zero-header";
@@ -157,6 +159,21 @@ export function GoogleStepObjective() {
     saveTimerRef.current = setTimeout(() => setAutoSaveState("saved"), 800);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   }, [obj.campaignName, obj.tagMode, obj.conversionId, obj.objective]);
+
+  // Auto-fill campaign name from store data on mount (skip if draft recovery)
+  useEffect(() => {
+    if (obj.campaignName.trim()) return;
+    (async () => {
+      try {
+        const [store, categories] = await Promise.all([getStoreInfo(), getCategories()]);
+        const name = generateCampaignName(store, categories);
+        updateNested("objective", { campaignName: name });
+      } catch {
+        /* silently fail — merchant can type manually */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleObjectiveChange = (value: string) => {
     if (value === obj.objective) return;
@@ -389,7 +406,7 @@ export function GoogleStepObjective() {
                       <Info className="size-3.5 cursor-help text-muted-foreground" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs text-xs">
-                      This name is for your reference and appears in your Salla dashboard and Google Ads account.
+                      A descriptive name helps you find this campaign later. Include the objective, target, and date — e.g. &apos;Search - Perfume - Apr 2026&apos;.
                     </TooltipContent>
                   </Tooltip>
                 </Label>
@@ -517,40 +534,66 @@ export function GoogleStepObjective() {
                         </TooltipContent>
                       </Tooltip>
                     </Label>
+                    {/* MMP warning banner */}
+                    <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
+                      <div className="flex items-start gap-2.5">
+                        <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <div>
+                          <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">No MMP integration detected</p>
+                          <p className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
+                            Without an MMP (AppsFlyer, Adjust, or Firebase), only install-optimized campaigns are available. In-app conversion and ROAS goals require MMP integration.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {([
-                        { value: "OPTIMIZE_INSTALLS_TARGET_INSTALL_COST" as AppCampaignGoalType, label: "App Installs", desc: "Maximize installs at target CPI", icon: Plus },
+                        { value: "OPTIMIZE_INSTALLS_TARGET_INSTALL_COST" as AppCampaignGoalType, label: "App Installs (Target CPI)", desc: "Maximize installs at target cost-per-install", icon: Plus },
+                        { value: "OPTIMIZE_INSTALLS_WITHOUT_TARGET_INSTALL_COST" as AppCampaignGoalType, label: "App Installs (Auto)", desc: "Maximize installs without a target CPI", icon: Zap },
+                        { value: "OPTIMIZE_PRE_REGISTRATION_CONVERSION_VOLUME" as AppCampaignGoalType, label: "Pre-Registration", desc: "Maximize pre-registrations on Google Play", icon: Scan },
                         { value: "OPTIMIZE_IN_APP_CONVERSIONS_TARGET_INSTALL_COST" as AppCampaignGoalType, label: "In-App Actions (Install Cost)", desc: "Drive actions, bid on install cost", icon: Target },
                         { value: "OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST" as AppCampaignGoalType, label: "In-App Actions (CPA)", desc: "Drive actions at target CPA", icon: TrendingUp },
-                        { value: "OPTIMIZE_RETURN_ON_ADVERTISING_SPEND" as AppCampaignGoalType, label: "ROAS", desc: "Maximize return on ad spend", icon: DollarSign },
                         { value: "OPTIMIZE_IN_APP_CONVERSIONS_WITHOUT_TARGET_CPA" as AppCampaignGoalType, label: "In-App Actions (No CPA)", desc: "Scale in-app conversions without a fixed CPA target", icon: Zap },
+                        { value: "OPTIMIZE_RETURN_ON_ADVERTISING_SPEND" as AppCampaignGoalType, label: "ROAS", desc: "Maximize return on ad spend", icon: DollarSign },
                         { value: "OPTIMIZE_TOTAL_VALUE_WITHOUT_TARGET_ROAS" as AppCampaignGoalType, label: "Value (No ROAS)", desc: "Scale total conversion value without fixed ROAS", icon: TrendingUp },
-                      ]).map((goal) => (
+                      ]).map((goal) => {
+                        const needsMmp = APP_GOAL_MMP_REQUIRED[goal.value];
+                        const isDisabled = needsMmp; // Disabled until MMP is connected
+                        return (
                         <label
                           key={goal.value}
                           className={cn(
-                            "flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-all",
-                            obj.appSettings.biddingStrategyGoalType === goal.value
+                            "flex items-start gap-2.5 rounded-lg border p-3 transition-all",
+                            isDisabled
+                              ? "cursor-not-allowed border-border bg-muted/50 opacity-60"
+                              : "cursor-pointer",
+                            !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value
                               ? "border-primary bg-primary/5"
-                              : "border-border bg-background hover:border-primary/40"
+                              : !isDisabled ? "border-border bg-background hover:border-primary/40" : ""
                           )}
                         >
                           <input
                             type="radio"
                             name="appGoal"
+                            disabled={isDisabled}
                             checked={obj.appSettings.biddingStrategyGoalType === goal.value}
-                            onChange={() => updateNested("objective", { appSettings: { ...obj.appSettings, biddingStrategyGoalType: goal.value } })}
+                            onChange={() => !isDisabled && updateNested("objective", { appSettings: { ...obj.appSettings, biddingStrategyGoalType: goal.value } })}
                             className="sr-only"
                           />
-                          <div className={cn("mt-0.5 flex size-6 items-center justify-center rounded", obj.appSettings.biddingStrategyGoalType === goal.value ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-                            <goal.icon className="size-3.5" />
+                          <div className={cn("mt-0.5 flex size-6 items-center justify-center rounded", !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                            {isDisabled ? <Lock className="size-3.5" /> : <goal.icon className="size-3.5" />}
                           </div>
-                          <div>
-                            <p className={cn("text-[11px] font-semibold", obj.appSettings.biddingStrategyGoalType === goal.value ? "text-primary" : "text-foreground")}>{goal.label}</p>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <p className={cn("text-[11px] font-semibold", !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value ? "text-primary" : "text-foreground")}>{goal.label}</p>
+                              {needsMmp && <Badge variant="outline" className="h-4 px-1 text-[9px] font-medium text-amber-600">Requires MMP</Badge>}
+                            </div>
                             <p className="text-[10px] text-muted-foreground">{goal.desc}</p>
                           </div>
                         </label>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -628,7 +671,7 @@ export function GoogleStepObjective() {
                           </Badge>
                         </div>
                         <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                          Connect your product feed to enable catalog-driven delivery.
+                          Connect your Google Merchant Center account to sync your product catalog. Salla automatically manages your product feed — prices, stock, and images stay in sync.
                         </p>
                       </div>
                     </div>
@@ -697,9 +740,9 @@ export function GoogleStepObjective() {
                     </Label>
                     <div className="grid grid-cols-3 gap-2.5">
                       {([
-                        { value: 0, label: "Low", desc: "Default. Catch-all for remaining products." },
-                        { value: 1, label: "Medium", desc: "Standard campaigns with normal bidding." },
-                        { value: 2, label: "High", desc: "Sales & promotions. Bids first." },
+                        { value: 0, label: "Low", desc: "Default priority. Use when this is your only Shopping campaign for these products." },
+                        { value: 1, label: "Medium", desc: "Use when running multiple Shopping campaigns. Medium priority bids before Low." },
+                        { value: 2, label: "High", desc: "Bids first before Medium and Low campaigns. Use for flash sales, promotions, or high-margin products." },
                       ] as const).map((p) => {
                         const isSelected = obj.shoppingSettings.campaignPriority === p.value;
                         return (
@@ -746,7 +789,7 @@ export function GoogleStepObjective() {
                           <Info className="size-3.5 cursor-help text-muted-foreground" />
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs text-xs">
-                          Filter your product feed to only include products with this label. Useful for running campaigns targeting specific product groups.
+                          Filter which products from your Merchant Center feed this campaign advertises. Leave empty to include all products. Use labels like &apos;bestsellers&apos; or &apos;clearance&apos; to segment.
                         </TooltipContent>
                       </Tooltip>
                     </Label>
@@ -761,7 +804,7 @@ export function GoogleStepObjective() {
                       className="h-10 text-xs"
                     />
                     <p className="mt-1 text-[11px] text-muted-foreground">
-                      Maps to <code className="rounded bg-muted px-1 text-[10px]">ShoppingSetting.feed_label</code>. Leave empty to include all products.
+                      Filters products by label from your Merchant Center feed. Leave empty to include all products.
                     </p>
                   </div>
 
@@ -772,7 +815,7 @@ export function GoogleStepObjective() {
                       <div>
                         <p className="text-xs font-medium text-foreground">Enable Local Inventory Ads</p>
                         <p className="text-[11px] text-muted-foreground">
-                          Show product availability for nearby shoppers using local inventory feeds.
+                          Enable to show local product availability for customers near your physical stores. Only relevant if you have physical retail locations.
                         </p>
                       </div>
                     </div>

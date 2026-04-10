@@ -161,6 +161,17 @@ export function StepObjective() {
     } else if (value !== "APP_PROMOTION") {
       updateNested("objective", { appSettings: undefined });
     }
+    // Snap API enforces CHAT_FEED placement for Sponsored Chat ads (Nov 2025).
+    // CHAT_FEED cannot be the sole placement — must be combined with at least one other position.
+    if (value === "SPONSORED_CHAT") {
+      updateNested("creative", {
+        placement: "CUSTOM" as const,
+        customPositions: ["CHAT_FEED", "INTERSTITIAL_CONTENT"],
+      });
+    } else if (campaign.objective.objective === "SPONSORED_CHAT") {
+      // Switching away from SPONSORED_CHAT — reset to automatic placement
+      updateNested("creative", { placement: "AUTOMATIC" as const, customPositions: ["INTERSTITIAL_USER", "INTERSTITIAL_CONTENT", "INTERSTITIAL_SPOTLIGHT", "FEED", "INSTREAM", "PUBLIC_STORIES_INSTREAM", "CAMERA"] });
+    }
   };
 
   const currentConfig = OBJECTIVE_CONFIGS[obj.objective];

@@ -14,7 +14,7 @@ import { defaultTikTokCampaign, type TikTokCampaignData } from "@/lib/tiktok/cam
 const DRAFT_KEY = "salla_tiktok_campaign_draft";
 const DRAFT_STEP_KEY = "salla_tiktok_campaign_step";
 /** Bump this when adding new fields to force stale drafts to reset */
-const DRAFT_VERSION = 6;
+const DRAFT_VERSION = 7;
 const DRAFT_VERSION_KEY = "salla_tiktok_draft_version";
 
 function getClientDates() {
@@ -83,6 +83,7 @@ export function TikTokCampaignProvider({ children }: { children: ReactNode }) {
           ...defaultTikTokCampaign.creative,
           ...(dc.creative ?? {}),
           identity: { ...defaultTikTokCampaign.creative.identity, ...((dc.creative ?? {}).identity ?? {}) },
+          contentControls: { ...defaultTikTokCampaign.creative.contentControls, ...((dc.creative ?? {}).contentControls ?? {}) },
         },
       };
       setCampaign(merged);

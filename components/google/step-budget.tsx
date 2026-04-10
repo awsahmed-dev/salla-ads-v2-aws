@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useGoogleCampaign } from "@/lib/google/campaign-context";
 import { OBJECTIVE_CONFIGS } from "@/lib/google/campaign-types";
-import type { BiddingStrategy, ConversionGoal, PaymentMethod, AssetAutomationType, AssetAutomationStatus, AssetAutomationEntry, AdScheduleEntry } from "@/lib/google/campaign-types";
+import { generateBudgetRecommendation, getStoreSnapshot, type BudgetRecommendation } from "@/lib/google/search-ai-generator";
+import type { BiddingStrategy, ConversionGoal, PaymentMethod, AssetAutomationType, AssetAutomationStatus, AssetAutomationEntry } from "@/lib/google/campaign-types";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -160,12 +161,30 @@ const BIDDING_STRATEGIES: {
     supportedObjectives: ["PERFORMANCE_MAX", "SHOPPING", "DEMAND_GEN", "SEARCH"],
   },
   {
+    value: "TARGET_SPEND",
+    label: "Maximize Clicks",
+    apiLabel: "Maximize Clicks",
+    desc: "Get as many clicks as possible within your budget.",
+    bestFor: "Best for driving traffic when you want maximum click volume at the lowest cost.",
+    icon: <MousePointerClick className="size-4" />,
+    supportedObjectives: ["SEARCH", "DISPLAY"],
+  },
+  {
     value: "MANUAL_CPC",
     label: "Manual CPC",
     apiLabel: "Manual CPC",
     desc: "Set your own maximum cost-per-click bids for each product group. Full control over individual bid amounts.",
     bestFor: "Best for experienced advertisers who want granular control over Shopping bids per product group.",
     icon: <Settings2 className="size-4" />,
+    supportedObjectives: ["SHOPPING", "SEARCH", "DISPLAY"],
+  },
+  {
+    value: "ENHANCED_CPC",
+    label: "Enhanced CPC",
+    apiLabel: "Enhanced CPC",
+    desc: "Automatically adjusts manual bids for clicks more likely to convert.",
+    bestFor: "Best for advertisers who want manual bid control with automated adjustments for higher-converting clicks.",
+    icon: <TrendingUp className="size-4" />,
     supportedObjectives: ["SHOPPING", "SEARCH", "DISPLAY"],
   },
 ];
@@ -229,12 +248,6 @@ const CONVERSION_GOALS: {
     icon: <CreditCard className="size-3.5" />,
   },
 ];
-
-const DAYS_OF_WEEK = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
-const DAY_SHORT: Record<string, string> = {
-  MONDAY: "Mon", TUESDAY: "Tue", WEDNESDAY: "Wed", THURSDAY: "Thu",
-  FRIDAY: "Fri", SATURDAY: "Sat", SUNDAY: "Sun",
-};
 
 function SectionPriorityHeader({
   step,
@@ -332,9 +345,20 @@ export function GoogleStepBudget() {
 
   const dailyAmount = budget.amount;
 
-  /* Suggested budget range */
-  const suggestedDaily = isPMax ? 200 : isShopping ? 150 : isDemandGen ? 250 : 150;
-  const suggestedBid = isPMax ? { min: 15, max: 30 } : isShopping ? { min: 5, max: 20 } : isDemandGen ? { min: 20, max: 40 } : { min: 10, max: 25 };
+  /* Smart budget recommendation from store data */
+  const [budgetRec, setBudgetRec] = useState<BudgetRecommendation | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const snapshot = await getStoreSnapshot();
+        setBudgetRec(generateBudgetRecommendation(snapshot));
+      } catch { /* fail silently */ }
+    })();
+  }, []);
+
+  /* Suggested budget range (enhanced with store data when available) */
+  const suggestedDaily = budgetRec?.dailyBudget ?? (isPMax ? 200 : isShopping ? 150 : isDemandGen ? 250 : 150);
+  const suggestedBid = isPMax ? { min: 15, max: 30 } : isShopping ? { min: 5, max: 20 } : isDemandGen ? { min: 20, max: 40 } : { min: budgetRec?.targetCpa ? Math.max(5, budgetRec.targetCpa - 5) : 10, max: budgetRec?.targetCpa ? budgetRec.targetCpa + 5 : 25 };
 
   /* Budget strength */
   const goalMultiplier = isPMax ? 1.2 : 1;
@@ -461,6 +485,8 @@ export function GoogleStepBudget() {
     ADD_TO_CART: "Daily add-to-carts",
     PAGE_VIEW: "Daily product views",
     LEAD: "Daily leads",
+    SIGN_UP: "Daily sign-ups",
+    CONTACT: "Daily contacts",
     APP_INSTALL: "Daily installs",
     IN_APP_PURCHASE: "Daily in-app purchases",
   };
@@ -499,6 +525,33 @@ export function GoogleStepBudget() {
             title="Campaign budget setup (required)"
             description="Set daily budget, run dates, and base campaign spend controls first."
           />
+
+          {/* Smart Budget Recommendation from Store Data */}
+          {budgetRec && (
+            <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/[0.03] to-primary/[0.06] p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <Sparkles className="size-4.5 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center gap-2">
+                    <p className="text-xs font-semibold text-foreground">Smart Budget Recommendation</p>
+                    <Badge variant="outline" className="h-4 px-1.5 text-[9px]">{budgetRec.storeMaturity === "new" ? "New Store" : budgetRec.storeMaturity === "growing" ? "Growing Store" : "Established Store"}</Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">{budgetRec.reasoning}</p>
+                  <button
+                    type="button"
+                    className="mt-2 inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10"
+                    onClick={() => {
+                      updateNested("budget", { amount: budgetRec.dailyBudget, biddingStrategy: budgetRec.biddingStrategy as BiddingStrategy });
+                    }}
+                  >
+                    Apply: SAR {budgetRec.dailyBudget}/day + {budgetRec.biddingStrategy === "TARGET_SPEND" ? "Maximize Clicks" : budgetRec.biddingStrategy === "MAXIMIZE_CONVERSIONS" ? "Maximize Conversions" : "Target ROAS"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ======================================================= */}
           {/* SECTION 1: Budget, Duration & Payment (shared card)      */}
@@ -606,7 +659,7 @@ export function GoogleStepBudget() {
                   : {}),
               });
             }}
-            infoTipText="The specific e-commerce action Google will optimize for. This must match a conversion action configured in your Google Ads account via the Salla pixel."
+            infoTipText="The action you want customers to take. Purchase is recommended for e-commerce. Use Add to Cart if you have fewer than 30 purchases per month."
             tip={
               isApp
                 ? "We auto-align bid strategy to your selected goal. Start with App Install, then move to In-App Purchase."
@@ -646,25 +699,11 @@ export function GoogleStepBudget() {
               isPMax
                 ? "PMax uses two core strategies: Maximize Conversions or Maximize Conversion Value. Optional CPA/ROAS targets can guide delivery."
                 : isShopping
-                  ? "Shopping campaigns support Smart Bidding (recommended) or Manual CPC. Smart Bidding uses Google's AI to optimize for conversions or revenue."
+                  ? "Shopping supports Smart Bidding (recommended) or Manual CPC. Use Manual CPC for precise per-product-group control; use Smart Bidding to let Google optimize bids automatically."
                   : "Choose how Google should bid in the ad auction. Each strategy optimizes for different outcomes."
             }
             bidInputs={googleBidInputs}
           >
-            {effectiveBiddingStrategy === "MANUAL_CPC" && (
-              <div className="mt-4 flex items-start justify-between gap-4 rounded-lg border border-border bg-background px-3 py-3">
-                <div>
-                  <p className="text-xs font-semibold text-foreground">Enhanced CPC (eCPC)</p>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-                    Let Google adjust your manual bids up or down to maximize conversions. Recommended for Shopping campaigns.
-                  </p>
-                </div>
-                <Switch
-                  checked={budget.enhancedCpc}
-                  onCheckedChange={(checked) => updateNested("budget", { enhancedCpc: checked })}
-                />
-              </div>
-            )}
 
             {isDemandGen && (
               <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
@@ -680,9 +719,49 @@ export function GoogleStepBudget() {
               <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
                 <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  <span className="font-semibold text-primary">Salla Tip for best ROAS:</span>{" "}
-                  Start with <strong>Maximize Conversion Value</strong> for 2-3 weeks. Once you have 15+ conversions in 30 days, switch to <strong>Target ROAS</strong> to lock in your ideal return.
+                  <span className="font-semibold text-primary">Shopping bidding guide:</span>{" "}
+                  Start with <strong>Manual CPC</strong> if you have fewer than 30 conversions/month for precise bid control per product group. Switch to <strong>Target ROAS</strong> once you have 50+ monthly conversions. Most Salla stores see best results with Target ROAS at 300-500%.
                 </p>
+              </div>
+            )}
+
+            {isSearch && (
+              <div className="mt-3 rounded-lg border border-primary/20 bg-primary/[0.03] p-3">
+                <div className="flex items-start gap-2.5">
+                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                  <div>
+                    <p className="text-[11px] font-semibold text-primary">Search bidding guide for e-commerce</p>
+                    <div className="mt-1.5 space-y-1">
+                      <p className="text-[10px] text-muted-foreground"><strong>New store (&lt;50 conversions/month):</strong> Start with Maximize Clicks to build traffic data, then switch to Maximize Conversions.</p>
+                      <p className="text-[10px] text-muted-foreground"><strong>Growing store (50-200 conversions):</strong> Use Maximize Conversions. Optionally add a Target CPA once your CPA stabilizes over 2-3 weeks.</p>
+                      <p className="text-[10px] text-muted-foreground"><strong>Established store (200+ conversions):</strong> Use Target ROAS or Maximize Conversion Value for maximum revenue efficiency.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {(budget.biddingStrategy === "TARGET_CPA" || budget.biddingStrategy === "TARGET_ROAS" || budget.biddingStrategy === "MAXIMIZE_CONVERSION_VALUE") && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div>
+                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Learning period required</p>
+                    <p className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
+                      {budget.biddingStrategy === "TARGET_ROAS"
+                        ? "Target ROAS needs 50+ conversions per month to optimize effectively. We recommend starting with Maximize Conversions until you have enough data, then switching to Target ROAS."
+                        : budget.biddingStrategy === "TARGET_CPA"
+                        ? "Target CPA needs 30+ conversions per month to optimize. Start without a target CPA to let Google learn, then add a target once your CPA stabilizes."
+                        : "Maximize Conversion Value works best with 50+ conversions per month. Consider starting with Maximize Conversions if your store is new."}
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Sparkles className="size-3 text-amber-600" />
+                      <p className="text-[10px] font-medium text-amber-700">
+                        Salla Tip: Most stores need 2-4 weeks of data collection before smart bidding stabilizes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </BidStrategyCard>
@@ -899,9 +978,9 @@ export function GoogleStepBudget() {
           {/* ======================================================= */}
           {isSearch && (() => {
             const SEARCH_AUTOMATION_TYPES: { type: AssetAutomationType; label: string; desc: string; icon: React.ReactNode }[] = [
-              { type: "TEXT_ASSET_AUTOMATION", label: "Text Asset Automation", desc: "Auto-generate text for your responsive search ads from landing pages.", icon: <Type className="size-3.5" /> },
-              { type: "FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION", label: "Final URL Text Automation", desc: "Auto-generate text assets for expanded URL destinations.", icon: <FileText className="size-3.5" /> },
-              { type: "GENERATE_IMAGE_ENHANCEMENT", label: "Image Enhancement", desc: "AI-enhance images used in search ad extensions.", icon: <ImagePlus className="size-3.5" /> },
+              { type: "TEXT_ASSET_AUTOMATION", label: "Text Asset Automation", desc: "Let Google AI create additional headline and description variations from your landing page content.", icon: <Type className="size-3.5" /> },
+              { type: "FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION", label: "Final URL Text Automation", desc: "Generate text assets optimized for expanded landing page destinations.", icon: <FileText className="size-3.5" /> },
+              { type: "GENERATE_IMAGE_ENHANCEMENT", label: "Image Enhancement", desc: "AI-enhance images used in search ad extensions for better visual quality.", icon: <ImagePlus className="size-3.5" /> },
             ];
             const automationTypes = SEARCH_AUTOMATION_TYPES;
             const getStatus = (type: AssetAutomationType): AssetAutomationStatus => {
@@ -1165,6 +1244,240 @@ export function GoogleStepBudget() {
             onToggle={(checked) => updateNested("budget", { performanceBoost: checked })}
           />
 
+          {/* ======================================================= */}
+          {/* AI Max for Search (promoted to main flow)                 */}
+          {/* ======================================================= */}
+          {isSearch && (() => {
+            const aiMax = budget.aiMaxSettings;
+
+            const updateAiMax = (patch: Partial<typeof aiMax>) =>
+              updateNested("budget", { aiMaxSettings: { ...aiMax, ...patch } });
+
+            const addTag = (
+              field: "brandInclusions" | "brandExclusions" | "urlInclusions",
+              value: string,
+              setter: (v: string) => void
+            ) => {
+              const trimmed = value.trim();
+              if (!trimmed || aiMax[field].includes(trimmed)) return;
+              updateAiMax({ [field]: [...aiMax[field], trimmed] });
+              setter("");
+            };
+            const removeTag = (
+              field: "brandInclusions" | "brandExclusions" | "urlInclusions",
+              idx: number
+            ) => {
+              updateAiMax({ [field]: aiMax[field].filter((_: string, i: number) => i !== idx) });
+            };
+
+            return (
+              <SectionCard
+                className={aiMax.enableAiMax ? "border-amber-400/40 bg-amber-50/30 dark:bg-amber-950/10" : ""}
+              >
+                <div className="mb-4 flex items-center gap-3">
+                  <div
+                    className={cn(
+                      "flex size-9 items-center justify-center rounded-xl",
+                      aiMax.enableAiMax ? "bg-amber-100 dark:bg-amber-900/30" : "bg-muted"
+                    )}
+                  >
+                    <Bot className={cn("size-5", aiMax.enableAiMax ? "text-amber-600" : "text-muted-foreground")} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-semibold text-foreground">AI Max for Search</Label>
+                      <Badge className="rounded-full border-0 bg-green-100 px-1.5 py-0 text-[9px] font-bold text-green-700 dark:bg-green-900/40 dark:text-green-400">
+                        Recommended by Google
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Google&apos;s AI enhancement that automatically expands your keyword reach, generates ad copy variations, and routes users to the best landing page. Average improvement: 14% more conversions at similar cost.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={aiMax.enableAiMax}
+                    onCheckedChange={(checked) => updateAiMax({ enableAiMax: checked })}
+                  />
+                </div>
+
+                {!aiMax.enableAiMax && (
+                  <div className="mt-2 rounded-lg border border-border bg-muted/20 p-3">
+                    <p className="text-[11px] text-muted-foreground">
+                      When enabled, AI Max adds three powerful capabilities:
+                    </p>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      <div className="rounded-md bg-background p-2 text-center">
+                        <p className="text-[10px] font-medium">Keyword Expansion</p>
+                        <p className="text-[9px] text-muted-foreground">Finds searches beyond your keywords</p>
+                      </div>
+                      <div className="rounded-md bg-background p-2 text-center">
+                        <p className="text-[10px] font-medium">Text Customization</p>
+                        <p className="text-[9px] text-muted-foreground">Auto-writes ad copy per query</p>
+                      </div>
+                      <div className="rounded-md bg-background p-2 text-center">
+                        <p className="text-[10px] font-medium">URL Expansion</p>
+                        <p className="text-[9px] text-muted-foreground">Sends users to best page</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {aiMax.enableAiMax && (
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-start gap-2 rounded-lg border border-green-300/50 bg-green-50 px-3 py-2 dark:border-green-800/50 dark:bg-green-950/20">
+                      <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-green-600" />
+                      <p className="text-[10px] leading-relaxed text-green-800 dark:text-green-300">
+                        AI Max is active. Use the controls below to set brand boundaries and URL restrictions.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: "Keyword Expansion", desc: "AI finds new search terms beyond your keywords" },
+                        { label: "Text Customization", desc: "Auto-generates relevant ad copy per query" },
+                        { label: "URL Expansion", desc: "Redirects to most relevant landing page" },
+                      ].map((f) => (
+                        <div
+                          key={f.label}
+                          className="rounded-lg border border-amber-200/50 bg-background px-2.5 py-2 dark:border-amber-800/30"
+                        >
+                          <p className="text-[10px] font-semibold text-foreground">{f.label}</p>
+                          <p className="text-[9px] text-muted-foreground">{f.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div>
+                      <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <Shield className="size-3 text-primary" /> Brand Inclusions
+                        <InfoTip text="Brand names to keep your ads on-brand. Google will prioritize these brands." />
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={newBrandIncl}
+                          onChange={(e) => setNewBrandIncl(e.target.value)}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" &&
+                            (e.preventDefault(), addTag("brandInclusions", newBrandIncl, setNewBrandIncl))
+                          }
+                          placeholder="Your brand name"
+                          className="h-8 flex-1 text-xs"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-[10px]"
+                          onClick={() => addTag("brandInclusions", newBrandIncl, setNewBrandIncl)}
+                        >
+                          <Plus className="size-3" />
+                        </Button>
+                      </div>
+                      {aiMax.brandInclusions.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {aiMax.brandInclusions.map((b: string, i: number) => (
+                            <Badge key={i} variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[10px]">
+                              {b}{" "}
+                              <button type="button" onClick={() => removeTag("brandInclusions", i)}>
+                                <X className="size-2.5" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <Shield className="size-3 text-red-500" /> Brand Exclusions
+                        <InfoTip text="Exclude competitor brands to avoid wasted spend on irrelevant brand terms." />
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={newBrandExcl}
+                          onChange={(e) => setNewBrandExcl(e.target.value)}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" &&
+                            (e.preventDefault(), addTag("brandExclusions", newBrandExcl, setNewBrandExcl))
+                          }
+                          placeholder="Competitor brand name"
+                          className="h-8 flex-1 text-xs"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-[10px]"
+                          onClick={() => addTag("brandExclusions", newBrandExcl, setNewBrandExcl)}
+                        >
+                          <Plus className="size-3" />
+                        </Button>
+                      </div>
+                      {aiMax.brandExclusions.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {aiMax.brandExclusions.map((b: string, i: number) => (
+                            <Badge
+                              key={i}
+                              variant="secondary"
+                              className="gap-1 rounded-full border-red-200 bg-red-50 px-2 py-0.5 text-[10px] text-red-700 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400"
+                            >
+                              {b}{" "}
+                              <button type="button" onClick={() => removeTag("brandExclusions", i)}>
+                                <X className="size-2.5" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <Link2 className="size-3 text-primary" /> URL Restrictions
+                        <InfoTip text="Restrict URL expansion to selected URL patterns only." />
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={newUrlIncl}
+                          onChange={(e) => setNewUrlIncl(e.target.value)}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" &&
+                            (e.preventDefault(), addTag("urlInclusions", newUrlIncl, setNewUrlIncl))
+                          }
+                          placeholder="https://store.salla.sa/products/*"
+                          className="h-8 flex-1 font-mono text-xs"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-[10px]"
+                          onClick={() => addTag("urlInclusions", newUrlIncl, setNewUrlIncl)}
+                        >
+                          <Plus className="size-3" />
+                        </Button>
+                      </div>
+                      {aiMax.urlInclusions.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {aiMax.urlInclusions.map((u: string, i: number) => (
+                            <Badge key={i} variant="secondary" className="gap-1 rounded-full px-2 py-0.5 font-mono text-[10px]">
+                              {u}{" "}
+                              <button type="button" onClick={() => removeTag("urlInclusions", i)}>
+                                <X className="size-2.5" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      {aiMax.urlInclusions.length === 0 && (
+                        <p className="mt-1 text-[10px] text-muted-foreground">
+                          No restrictions - Google can send traffic to any page on your site.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </SectionCard>
+            );
+          })()}
+
           {!isPMax && (
             <>
               <SectionPriorityHeader
@@ -1192,215 +1505,6 @@ export function GoogleStepBudget() {
                 </CollapsibleTrigger>
 
                 <CollapsibleContent className="flex flex-col gap-5 pt-5">
-              {/* -- AI Max for Search -- */}
-              {isSearch && (() => {
-                const aiMax = budget.aiMaxSettings;
-
-                const updateAiMax = (patch: Partial<typeof aiMax>) =>
-                  updateNested("budget", { aiMaxSettings: { ...aiMax, ...patch } });
-
-                const addTag = (
-                  field: "brandInclusions" | "brandExclusions" | "urlInclusions",
-                  value: string,
-                  setter: (v: string) => void
-                ) => {
-                  const trimmed = value.trim();
-                  if (!trimmed || aiMax[field].includes(trimmed)) return;
-                  updateAiMax({ [field]: [...aiMax[field], trimmed] });
-                  setter("");
-                };
-                const removeTag = (
-                  field: "brandInclusions" | "brandExclusions" | "urlInclusions",
-                  idx: number
-                ) => {
-                  updateAiMax({ [field]: aiMax[field].filter((_: string, i: number) => i !== idx) });
-                };
-
-                return (
-                  <SectionCard
-                    className={aiMax.enableAiMax ? "border-amber-400/40 bg-amber-50/30 dark:bg-amber-950/10" : ""}
-                  >
-                    <div className="mb-4 flex items-center gap-3">
-                      <div
-                        className={cn(
-                          "flex size-9 items-center justify-center rounded-xl",
-                          aiMax.enableAiMax ? "bg-amber-100 dark:bg-amber-900/30" : "bg-muted"
-                        )}
-                      >
-                        <Bot className={cn("size-5", aiMax.enableAiMax ? "text-amber-600" : "text-muted-foreground")} />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm font-semibold text-foreground">AI Max for Search</Label>
-                          <Badge className="rounded-full border-0 bg-amber-100 px-1.5 py-0 text-[9px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-                            Beta
-                          </Badge>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          Optional expansion mode for Search. Enable only when tracking and budget are stable.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={aiMax.enableAiMax}
-                        onCheckedChange={(checked) => updateAiMax({ enableAiMax: checked })}
-                      />
-                    </div>
-
-                    {aiMax.enableAiMax && (
-                      <div className="flex flex-col gap-4">
-                        <div className="flex items-start gap-2 rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 dark:border-amber-800/50 dark:bg-amber-950/20">
-                          <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-                          <p className="text-[10px] leading-relaxed text-amber-800 dark:text-amber-300">
-                            AI Max expands search coverage and changes ad delivery behavior.
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { label: "Keyword Expansion", desc: "AI finds new search terms beyond your keywords" },
-                            { label: "Text Customization", desc: "Auto-generates relevant ad copy per query" },
-                            { label: "URL Expansion", desc: "Redirects to most relevant landing page" },
-                          ].map((f) => (
-                            <div
-                              key={f.label}
-                              className="rounded-lg border border-amber-200/50 bg-background px-2.5 py-2 dark:border-amber-800/30"
-                            >
-                              <p className="text-[10px] font-semibold text-foreground">{f.label}</p>
-                              <p className="text-[9px] text-muted-foreground">{f.desc}</p>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div>
-                          <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                            <Shield className="size-3 text-primary" /> Brand Inclusions
-                            <InfoTip text="Brand names to keep your ads on-brand. Google will prioritize these brands." />
-                          </Label>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={newBrandIncl}
-                              onChange={(e) => setNewBrandIncl(e.target.value)}
-                              onKeyDown={(e) =>
-                                e.key === "Enter" &&
-                                (e.preventDefault(), addTag("brandInclusions", newBrandIncl, setNewBrandIncl))
-                              }
-                              placeholder="Your brand name"
-                              className="h-8 flex-1 text-xs"
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-[10px]"
-                              onClick={() => addTag("brandInclusions", newBrandIncl, setNewBrandIncl)}
-                            >
-                              <Plus className="size-3" />
-                            </Button>
-                          </div>
-                          {aiMax.brandInclusions.length > 0 && (
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              {aiMax.brandInclusions.map((b: string, i: number) => (
-                                <Badge key={i} variant="secondary" className="gap-1 rounded-full px-2 py-0.5 text-[10px]">
-                                  {b}{" "}
-                                  <button type="button" onClick={() => removeTag("brandInclusions", i)}>
-                                    <X className="size-2.5" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                            <Shield className="size-3 text-red-500" /> Brand Exclusions
-                            <InfoTip text="Exclude competitor brands to avoid wasted spend on irrelevant brand terms." />
-                          </Label>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={newBrandExcl}
-                              onChange={(e) => setNewBrandExcl(e.target.value)}
-                              onKeyDown={(e) =>
-                                e.key === "Enter" &&
-                                (e.preventDefault(), addTag("brandExclusions", newBrandExcl, setNewBrandExcl))
-                              }
-                              placeholder="Competitor brand name"
-                              className="h-8 flex-1 text-xs"
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-[10px]"
-                              onClick={() => addTag("brandExclusions", newBrandExcl, setNewBrandExcl)}
-                            >
-                              <Plus className="size-3" />
-                            </Button>
-                          </div>
-                          {aiMax.brandExclusions.length > 0 && (
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              {aiMax.brandExclusions.map((b: string, i: number) => (
-                                <Badge
-                                  key={i}
-                                  variant="secondary"
-                                  className="gap-1 rounded-full border-red-200 bg-red-50 px-2 py-0.5 text-[10px] text-red-700 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400"
-                                >
-                                  {b}{" "}
-                                  <button type="button" onClick={() => removeTag("brandExclusions", i)}>
-                                    <X className="size-2.5" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                            <Link2 className="size-3 text-primary" /> URL Restrictions
-                            <InfoTip text="Restrict URL expansion to selected URL patterns only." />
-                          </Label>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={newUrlIncl}
-                              onChange={(e) => setNewUrlIncl(e.target.value)}
-                              onKeyDown={(e) =>
-                                e.key === "Enter" &&
-                                (e.preventDefault(), addTag("urlInclusions", newUrlIncl, setNewUrlIncl))
-                              }
-                              placeholder="https://store.salla.sa/products/*"
-                              className="h-8 flex-1 font-mono text-xs"
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-[10px]"
-                              onClick={() => addTag("urlInclusions", newUrlIncl, setNewUrlIncl)}
-                            >
-                              <Plus className="size-3" />
-                            </Button>
-                          </div>
-                          {aiMax.urlInclusions.length > 0 && (
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              {aiMax.urlInclusions.map((u: string, i: number) => (
-                                <Badge key={i} variant="secondary" className="gap-1 rounded-full px-2 py-0.5 font-mono text-[10px]">
-                                  {u}{" "}
-                                  <button type="button" onClick={() => removeTag("urlInclusions", i)}>
-                                    <X className="size-2.5" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                          {aiMax.urlInclusions.length === 0 && (
-                            <p className="mt-1 text-[10px] text-muted-foreground">
-                              No restrictions - Google can send traffic to any page on your site.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </SectionCard>
-                );
-              })()}
 
               {/* -- Ad Scheduling -- */}
               {!isPMax && !isSearch && (
@@ -1415,76 +1519,6 @@ export function GoogleStepBudget() {
               )}
 
 
-              {/* -- Ad Schedule Entries (Search only) -- */}
-
-          {/* ======================================================= */}
-          {/* Ad Schedule (Search only) — when ads run; moved from Step 1 (Audience) */}
-          {/* ======================================================= */}
-          {isSearch && (
-            <SectionCard>
-              <div className="mb-3 flex items-center gap-2">
-                <Clock className="size-4 text-primary" />
-                <Label className="text-sm font-semibold text-foreground">Ad schedule</Label>
-                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Search</Badge>
-                <InfoTip text="Set specific days and hours when your ads should run. Useful for showing ads only during business hours. Maps to CampaignCriterion.ad_schedule." />
-              </div>
-              <p className="mb-3 text-xs text-muted-foreground">
-                Choose when your ads should appear. Leave empty to run ads all day, every day.
-              </p>
-              {aud.adScheduleEntries.length > 0 && (
-                <div className="mb-3 flex flex-col gap-1.5">
-                  {aud.adScheduleEntries.map((entry) => (
-                    <div key={entry.id} className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
-                      <span className="text-xs font-medium text-foreground">{DAY_SHORT[entry.dayOfWeek]} {String(entry.startHour).padStart(2, "0")}:00 - {String(entry.endHour).padStart(2, "0")}:00</span>
-                      <button
-                        type="button"
-                        onClick={() => updateNested("audience", { adScheduleEntries: aud.adScheduleEntries.filter((e) => e.id !== entry.id) })}
-                        className="rounded-full p-1 hover:bg-muted"
-                      >
-                        <X className="size-3 text-muted-foreground" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { label: "Weekdays 9-17", days: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"] as const, start: 9, end: 17 },
-                  { label: "Evenings 18-23", days: DAYS_OF_WEEK, start: 18, end: 23 },
-                  { label: "Weekends only", days: ["SATURDAY", "SUNDAY"] as const, start: 0, end: 24 },
-                ].map((preset) => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => {
-                      const newEntries: AdScheduleEntry[] = preset.days.map((day) => ({
-                        id: `sched-${Date.now()}-${day}`,
-                        dayOfWeek: day,
-                        startHour: preset.start,
-                        endHour: preset.end,
-                      }));
-                      updateNested("audience", { adScheduleEntries: [...aud.adScheduleEntries, ...newEntries] });
-                    }}
-                    className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:border-primary/40 transition-colors"
-                  >
-                    <Plus className="mr-1 inline size-3" />{preset.label}
-                  </button>
-                ))}
-                {aud.adScheduleEntries.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => updateNested("audience", { adScheduleEntries: [] })}
-                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors"
-                  >
-                    Clear all
-                  </button>
-                )}
-              </div>
-              {aud.adScheduleEntries.length === 0 && (
-                <p className="mt-2 text-[10px] text-muted-foreground">No schedule set — ads run 24/7.</p>
-              )}
-            </SectionCard>
-          )}
 
                 </CollapsibleContent>
               </Collapsible>

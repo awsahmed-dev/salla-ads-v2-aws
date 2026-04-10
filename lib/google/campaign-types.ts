@@ -17,15 +17,18 @@ export type GoogleObjective =
   | "DISPLAY"
   | "APP";
 
-/** Maps to Google Ads API BiddingStrategyType */
+/** Maps to Google Ads API BiddingStrategyType.
+ *  Reference: https://developers.google.com/google-ads/api/reference/rpc/v23/BiddingStrategyTypeEnum.BiddingStrategyType */
 export type BiddingStrategy =
   | "MAXIMIZE_CONVERSIONS"
   | "MAXIMIZE_CONVERSION_VALUE"
   | "TARGET_CPA"
   | "TARGET_CPC"
   | "TARGET_ROAS"
+  | "TARGET_SPEND"           // Maximize Clicks — maximize clicks within budget
   | "TARGET_IMPRESSION_SHARE"
   | "MANUAL_CPC"
+  | "ENHANCED_CPC"           // Standalone strategy (enum 2) — NOT a toggle on MANUAL_CPC
   | "MANUAL_CPM"
   | "TARGET_CPM";
 
@@ -44,8 +47,9 @@ export type ConversionGoal =
 /** Maps to Google Ads API BudgetDeliveryMethod */
 export type DeliveryMethod = "STANDARD" | "ACCELERATED";
 
-/** Maps to Google Ads API Budget period */
-export type BudgetPeriod = "DAILY";
+/** Maps to Google Ads API BudgetPeriodEnum.BudgetPeriod.
+ *  Reference: https://developers.google.com/google-ads/api/reference/rpc/v23/BudgetPeriodEnum.BudgetPeriod */
+export type BudgetPeriod = "DAILY" | "CUSTOM_PERIOD";
 
 /** Maps to Google Ads API CampaignStatus */
 export type CampaignStatus = "ENABLED" | "PAUSED";
@@ -87,16 +91,24 @@ export type AudienceTargetingMode = "OBSERVATION" | "TARGETING";
  *  Maps to CampaignCriterion with device bid modifiers. */
 export type SearchDeviceType = "MOBILE" | "DESKTOP" | "TABLET";
 
+/** Minute precision for ad schedule. Maps to MinuteOfHourEnum.MinuteOfHour. */
+export type ScheduleMinute = "ZERO" | "FIFTEEN" | "THIRTY" | "FORTY_FIVE";
+
 /** Ad schedule entry for dayparting.
- *  Maps to CampaignCriterion.ad_schedule. */
+ *  Maps to CampaignCriterion.ad_schedule.
+ *  Supported by Search + PMax campaigns. */
 export interface AdScheduleEntry {
   id: string;
   /** Day of week: MONDAY..SUNDAY */
   dayOfWeek: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
   /** Start hour 0-23 */
   startHour: number;
+  /** Start minute granularity (15-min intervals). Maps to AdScheduleInfo.start_minute */
+  startMinute: ScheduleMinute;
   /** End hour 0-23 */
   endHour: number;
+  /** End minute granularity (15-min intervals). Maps to AdScheduleInfo.end_minute */
+  endMinute: ScheduleMinute;
 }
 
 /** Budget type: how the budget is consumed over the campaign lifetime */
@@ -150,7 +162,7 @@ export const OBJECTIVE_CONFIGS: Record<string, GoogleObjectiveConfig> = {
     apiChannelType: "SHOPPING",
     label: "Shopping",
     description: "Showcase your products with rich product listings across Google Shopping, Search, and partner sites",
-    allowedBiddingStrategies: ["MAXIMIZE_CONVERSIONS", "TARGET_ROAS", "MANUAL_CPC", "MAXIMIZE_CONVERSION_VALUE"],
+    allowedBiddingStrategies: ["MAXIMIZE_CONVERSIONS", "TARGET_ROAS", "MANUAL_CPC", "ENHANCED_CPC", "TARGET_SPEND", "MAXIMIZE_CONVERSION_VALUE"],
     defaultBiddingStrategy: "MAXIMIZE_CONVERSIONS",
     conversionTrackingRequired: true,
     merchantCenterRequired: true,
@@ -164,11 +176,11 @@ export const OBJECTIVE_CONFIGS: Record<string, GoogleObjectiveConfig> = {
     apiChannelType: "DEMAND_GEN",
     label: "Demand Gen",
     description: "Engage audiences on YouTube, Discover, and Gmail with visually rich image and video ads",
-    allowedBiddingStrategies: ["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE", "TARGET_CPA", "TARGET_CPC", "TARGET_ROAS"],
+    allowedBiddingStrategies: ["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE", "TARGET_CPA", "TARGET_CPC", "TARGET_ROAS", "TARGET_SPEND", "MANUAL_CPC"],
     defaultBiddingStrategy: "MAXIMIZE_CONVERSIONS",
     conversionTrackingRequired: true,
     merchantCenterRequired: false,
-    usesAssetGroups: true,
+    usesAssetGroups: false, // Demand Gen uses AdGroups, NOT AssetGroups
     allowedAdFormats: ["DEMAND_GEN_AD", "VIDEO_AD"],
     audienceSignalsSupported: true,
     keywordsSupported: false,
@@ -178,7 +190,7 @@ export const OBJECTIVE_CONFIGS: Record<string, GoogleObjectiveConfig> = {
     apiChannelType: "SEARCH",
     label: "Search",
     description: "Reach people actively searching on Google with text ads that appear above search results",
-    allowedBiddingStrategies: ["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE", "TARGET_CPA", "TARGET_ROAS", "TARGET_IMPRESSION_SHARE", "MANUAL_CPC"],
+    allowedBiddingStrategies: ["MAXIMIZE_CONVERSIONS", "MAXIMIZE_CONVERSION_VALUE", "TARGET_CPA", "TARGET_ROAS", "TARGET_SPEND", "TARGET_IMPRESSION_SHARE", "MANUAL_CPC", "ENHANCED_CPC"],
     defaultBiddingStrategy: "MAXIMIZE_CONVERSIONS",
     conversionTrackingRequired: true,
     merchantCenterRequired: false,
@@ -192,7 +204,7 @@ export const OBJECTIVE_CONFIGS: Record<string, GoogleObjectiveConfig> = {
     apiChannelType: "DISPLAY",
     label: "Display",
     description: "Show visual ads across 3 million+ websites and apps in the Google Display Network",
-    allowedBiddingStrategies: ["MAXIMIZE_CONVERSIONS", "TARGET_CPA", "MAXIMIZE_CONVERSION_VALUE", "TARGET_ROAS", "MANUAL_CPC", "TARGET_CPM"],
+    allowedBiddingStrategies: ["MAXIMIZE_CONVERSIONS", "TARGET_CPA", "MAXIMIZE_CONVERSION_VALUE", "TARGET_ROAS", "MANUAL_CPC", "ENHANCED_CPC", "TARGET_CPM"],
     defaultBiddingStrategy: "MAXIMIZE_CONVERSIONS",
     conversionTrackingRequired: false,
     merchantCenterRequired: false,
@@ -258,14 +270,19 @@ export interface GoogleObjectiveSettings {
 /* ---- Step: Audience ---- */
 
 export interface GoogleAudienceSettings {
-  /** Geographic targeting (country codes; maps to geo_target_constant) */
+  /** Geographic targeting (country codes; maps to geo_target_constant via lib/google/geo-constants.ts) */
   locationIds: string[];
   /** Selected city ids from shared location list (same UX as other platforms; map to locationIds when sending to API) */
   cityIds: string[];
   /** Per-city radius in km for proximity targeting (ProximityInfo). Keys = city id. */
   cityRadii?: Record<string, number>;
-  /** Location targeting method */
+  /** Excluded locations (negative targeting). Maps to CampaignCriterion with negative=true.
+   *  e.g. Target SA but exclude specific cities. */
+  excludedLocationIds: string[];
+  /** Positive location targeting method. Maps to GeoTargetTypeSetting.positive_geo_target_type */
   locationTargetingMethod: "PRESENCE" | "PRESENCE_OR_INTEREST";
+  /** Negative location targeting method. Maps to GeoTargetTypeSetting.negative_geo_target_type */
+  negativeLocationTargetingMethod: "PRESENCE" | "PRESENCE_OR_INTEREST";
   /** Language codes */
   languages: string[];
   /** Age range */
@@ -331,6 +348,9 @@ export interface GoogleAudienceSettings {
   /** Whether to include Google Search Partners network.
    *  Maps to Campaign.network_settings.target_search_network. */
   searchPartners: boolean;
+  /** Display Expansion on Search. When true, ads may show on GDN from Search campaigns.
+   *  Maps to Campaign.network_settings.target_content_network. Default true. */
+  targetContentNetwork: boolean;
   /** Household income targeting tiers.
    *  Maps to CampaignCriterion.income_range. */
   householdIncome: string[];
@@ -356,8 +376,6 @@ export interface GoogleBudgetSettings {
   targetRoas: number;
   /** Maximum CPC bid limit (when using MANUAL_CPC) */
   maxCpcBid: number;
-  /** Enhanced CPC toggle (for MANUAL_CPC) */
-  enhancedCpc: boolean;
   /** Target impression share percentage (for SEARCH with TARGET_IMPRESSION_SHARE) */
   targetImpressionShare: number;
   /** Where to show ads for impression share (ANYWHERE_ON_PAGE, TOP_OF_PAGE, ABSOLUTE_TOP_OF_PAGE) */
@@ -492,9 +510,12 @@ export interface DemandGenAd {
   adType: DemandGenAdType;
 
   /* ---- TEXT ASSETS (Multi-Asset + Video Responsive) ---- */
-  /** Headlines: max 5, max display width 30 chars (Multi-Asset/VideoResponsive). */
+  /** Headlines: max 5, max 40 chars input (30 display width).
+   *  API ref says "display width 30" but Help Center confirms 40 char input limit.
+   *  Reference: https://support.google.com/google-ads/answer/13704860 */
   headlines: { text: string }[];
-  /** Long headlines: max 5, 90 chars. Only VideoResponsive. */
+  /** Long headlines: max 5, 90 chars. Only used for VIDEO_RESPONSIVE format.
+   *  Do NOT send for MULTI_ASSET or CAROUSEL ads. */
   longHeadlines: { text: string }[];
   /** Descriptions: max 5, max display width 90 chars. */
   descriptions: { text: string }[];
@@ -742,6 +763,60 @@ export const STRUCTURED_SNIPPET_HEADERS = [
   "Service catalog", "Shows", "Styles", "Types",
 ] as const;
 
+/** Price extension asset. Maps to PriceAsset in the Google Ads API.
+ *  Shows product/service prices directly in the ad. */
+export interface SearchPriceAsset {
+  id: string;
+  /** Price asset type. Maps to PriceExtensionType. */
+  type: "BRANDS" | "EVENTS" | "LOCATIONS" | "NEIGHBORHOODS" | "PRODUCT_CATEGORIES" | "PRODUCT_TIERS" | "SERVICES" | "SERVICE_CATEGORIES" | "SERVICE_TIERS";
+  /** Price qualifier. Maps to PriceExtensionPriceQualifier. */
+  priceQualifier: "FROM" | "UP_TO" | "AVERAGE" | "NONE";
+  /** Language code for the price assets. */
+  languageCode: string;
+  /** Price offerings (3-8 items). Maps to PriceOffering. */
+  offerings: {
+    id: string;
+    /** Header text. Max 25 chars. */
+    header: string;
+    /** Description. Max 25 chars. */
+    description: string;
+    /** Price in micros (e.g., 99_000_000 = 99 SAR). */
+    priceMicros: number;
+    /** Price unit. Maps to PriceExtensionPriceUnit. */
+    unit: "PER_HOUR" | "PER_DAY" | "PER_WEEK" | "PER_MONTH" | "PER_YEAR" | "NONE";
+    /** Final URL for this offering. */
+    finalUrl: string;
+  }[];
+}
+
+/** Promotion extension asset. Maps to PromotionAsset in the Google Ads API.
+ *  Shows promotional offers with optional discount details and countdown. */
+export interface SearchPromotionAsset {
+  id: string;
+  /** Promotion target. What's being promoted. Max 20 chars. */
+  promotionTarget: string;
+  /** Discount modifier. Maps to PromotionExtensionDiscountModifier. */
+  discountModifier: "UP_TO" | "NONE";
+  /** Discount type: monetary or percentage. */
+  discountType: "MONETARY" | "PERCENT_OFF" | "NONE";
+  /** Monetary discount in micros (when discountType = MONETARY). */
+  moneyAmountMicros: number;
+  /** Percentage discount (when discountType = PERCENT_OFF, e.g. 20 = 20%). */
+  percentOff: number;
+  /** Promotion occasion. Maps to PromotionExtensionOccasion. */
+  occasion: "NEW_YEARS" | "VALENTINES_DAY" | "EASTER" | "MOTHERS_DAY" | "FATHERS_DAY"
+    | "LABOR_DAY" | "BACK_TO_SCHOOL" | "HALLOWEEN" | "BLACK_FRIDAY" | "CYBER_MONDAY"
+    | "CHRISTMAS" | "BOXING_DAY" | "INDEPENDENCE_DAY" | "NATIONAL_DAY" | "END_OF_SEASON"
+    | "WINTER_SALE" | "SUMMER_SALE" | "FALL_SALE" | "SPRING_SALE" | "RAMADAN" | "EID_AL_FITR"
+    | "EID_AL_ADHA" | "SINGLES_DAY" | "WOMENS_DAY" | "NONE";
+  /** Final URL for the promotion landing page. */
+  finalUrl: string;
+  /** Promotion start date (YYYY-MM-DD). Optional. */
+  startDate: string;
+  /** Promotion end date (YYYY-MM-DD). Optional. */
+  endDate: string;
+}
+
 /** A Search ad group. Contains keywords + RSAs.
  *  Maps to AdGroup (type = SEARCH_STANDARD) */
 export interface SearchAdGroup {
@@ -761,12 +836,12 @@ export function createSearchAd(index: number): GoogleSearchAd {
   return {
     id: `rsa-${ts}-${index}`,
     name: `Responsive Search Ad ${index}`,
-    headlines: Array.from({ length: 3 }, (_, i) => ({
+    headlines: Array.from({ length: 15 }, (_, i) => ({
       id: `h-${ts}-${i}`,
       text: "",
       pinnedPosition: null,
     })),
-    descriptions: Array.from({ length: 2 }, (_, i) => ({
+    descriptions: Array.from({ length: 4 }, (_, i) => ({
       id: `d-${ts}-${i}`,
       text: "",
       pinnedPosition: null,
@@ -809,28 +884,49 @@ export interface GoogleCreativeAsset {
 /* ---- App Campaign Types ---- */
 
 /** App campaign bidding strategy goal type.
- *  Maps to AppCampaignBiddingStrategyGoalType. */
+ *  Maps to AppCampaignBiddingStrategyGoalTypeEnum.AppCampaignBiddingStrategyGoalType.
+ *  Reference: https://developers.google.com/google-ads/api/reference/rpc/v23/AppCampaignBiddingStrategyGoalTypeEnum */
 export type AppCampaignGoalType =
   | "OPTIMIZE_INSTALLS_TARGET_INSTALL_COST"
+  | "OPTIMIZE_INSTALLS_WITHOUT_TARGET_INSTALL_COST"
   | "OPTIMIZE_IN_APP_CONVERSIONS_TARGET_INSTALL_COST"
   | "OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST"
-  | "OPTIMIZE_RETURN_ON_ADVERTISING_SPEND"
   | "OPTIMIZE_IN_APP_CONVERSIONS_WITHOUT_TARGET_CPA"
-  | "OPTIMIZE_TOTAL_VALUE_WITHOUT_TARGET_ROAS";
+  | "OPTIMIZE_RETURN_ON_ADVERTISING_SPEND"
+  | "OPTIMIZE_TOTAL_VALUE_WITHOUT_TARGET_ROAS"
+  | "OPTIMIZE_PRE_REGISTRATION_CONVERSION_VOLUME";
+
+/** Whether a given App campaign goal type requires MMP (Mobile Measurement Partner)
+ *  integration (e.g. AppsFlyer, Adjust, Firebase) for post-install event tracking. */
+export const APP_GOAL_MMP_REQUIRED: Record<AppCampaignGoalType, boolean> = {
+  OPTIMIZE_INSTALLS_TARGET_INSTALL_COST: false,
+  OPTIMIZE_INSTALLS_WITHOUT_TARGET_INSTALL_COST: false,
+  OPTIMIZE_PRE_REGISTRATION_CONVERSION_VOLUME: false,
+  OPTIMIZE_IN_APP_CONVERSIONS_TARGET_INSTALL_COST: true,
+  OPTIMIZE_IN_APP_CONVERSIONS_TARGET_CONVERSION_COST: true,
+  OPTIMIZE_IN_APP_CONVERSIONS_WITHOUT_TARGET_CPA: true,
+  OPTIMIZE_RETURN_ON_ADVERTISING_SPEND: true,
+  OPTIMIZE_TOTAL_VALUE_WITHOUT_TARGET_ROAS: true,
+};
 
 /** App store type. Maps to AppCampaignAppStore. */
 export type AppStore = "APPLE_APP_STORE" | "GOOGLE_APP_STORE";
 
-/** App campaign settings. Maps to AppCampaignSetting. */
+/** App campaign settings. Maps to AppCampaignSetting.
+ *  Reference: https://developers.google.com/google-ads/api/reference/rpc/v23/Campaign.AppCampaignSetting */
 export interface AppCampaignSettings {
   /** App store platform */
   appStore: AppStore;
-  /** App package name (Android) or app ID (iOS). Maps to app_id */
+  /** App package name (Android) or app ID (iOS). Maps to app_id. Immutable after creation. */
   appId: string;
   /** App display name (informational, not in API) */
   appName: string;
   /** Bidding strategy goal. Maps to bidding_strategy_goal_type */
   biddingStrategyGoalType: AppCampaignGoalType;
+  /** Required sub-type. Maps to Campaign.advertising_channel_sub_type.
+   *  APP_CAMPAIGN = install, APP_CAMPAIGN_FOR_ENGAGEMENT = re-engagement,
+   *  APP_CAMPAIGN_FOR_PRE_REGISTRATION = pre-reg. */
+  advertisingChannelSubType: "APP_CAMPAIGN" | "APP_CAMPAIGN_FOR_ENGAGEMENT" | "APP_CAMPAIGN_FOR_PRE_REGISTRATION";
 }
 
 /** App ad creative. Maps to AppAdInfo in the Google Ads API.
@@ -872,31 +968,48 @@ export function createAppAd(index: number): GoogleAppAd {
   };
 }
 
-/** Asset group for PMax / Demand Gen */
+/** Asset group for PMax campaigns.
+ *  Maps to AssetGroup + AssetGroupAsset resources.
+ *  Reference: https://developers.google.com/google-ads/api/docs/performance-max/asset-groups
+ *
+ *  Minimum requirements per asset group:
+ *  - 3 headlines (30 chars), 1 long headline (90 chars), 2 descriptions (90 chars)
+ *  - 1 landscape image (1.91:1), 1 square image (1:1), 1 logo (1:1)
+ *  - 1 business name (25 chars) */
 export interface GoogleAssetGroup {
   id: string;
   name: string;
-  /** Final URL (landing page) */
+  /** Final URL (landing page). Required. */
   finalUrl: string;
-  /** Headlines (up to 15 for PMax, 5 for Demand Gen) */
+  /** Mobile-specific landing page. Maps to AssetGroup.final_mobile_urls. Optional. */
+  finalMobileUrl: string;
+  /** Headlines: min 3, max 15, 30 chars each. Maps to AssetFieldType.HEADLINE */
   headlines: GoogleCreativeAsset[];
-  /** Long headlines (up to 5) */
+  /** Long headlines: min 1, max 5, 90 chars each. Maps to AssetFieldType.LONG_HEADLINE */
   longHeadlines: GoogleCreativeAsset[];
-  /** Descriptions (up to 5) */
+  /** Descriptions: min 2, max 5, 90 chars each. Maps to AssetFieldType.DESCRIPTION */
   descriptions: GoogleCreativeAsset[];
-  /** Images (up to 20 for PMax) */
+  /** Images: max 20 combined. Maps to MARKETING_IMAGE (1.91:1) + SQUARE_MARKETING_IMAGE (1:1) + PORTRAIT_MARKETING_IMAGE (4:5) */
   images: GoogleCreativeAsset[];
-  /** Logos (up to 5) */
+  /** Square logos: min 1, max 5, 1:1 ratio, min 128x128. Maps to AssetFieldType.LOGO */
   logos: GoogleCreativeAsset[];
-  /** YouTube videos (up to 5) */
+  /** Landscape logos: max 20, 4:1 ratio, min 512x128. Maps to AssetFieldType.LANDSCAPE_LOGO. Optional. */
+  landscapeLogos: GoogleCreativeAsset[];
+  /** YouTube videos: max 15, min 10 seconds, 16:9 or 1:1 or 9:16. Maps to AssetFieldType.YOUTUBE_VIDEO */
   videos: GoogleCreativeAsset[];
-  /** Business name */
+  /** Business name: max 25 chars. Maps to AssetFieldType.BUSINESS_NAME */
   businessName: string;
-  /** Call to action */
+  /** Call to action. Maps to AssetFieldType.CALL_TO_ACTION_SELECTION */
   callToAction: string;
   /** Display path */
   displayPath1: string;
   displayPath2: string;
+  /** Search themes for this asset group (up to 25). Maps to AssetGroupSignal.search_theme.
+   *  Each theme is a keyword/phrase that helps Google understand what the asset group is about. */
+  searchThemes: string[];
+  /** Audience signal IDs for this asset group. Maps to AssetGroupSignal.audience.
+   *  References existing Audience resources. */
+  audienceSignals: string[];
 }
 
 /** Display content targeting type.
@@ -969,10 +1082,16 @@ export function createDisplayAd(index = 1): GoogleDisplayAd {
       { id: `dh_${Date.now()}_1`, type: "HEADLINE", text: "" },
       { id: `dh_${Date.now()}_2`, type: "HEADLINE", text: "" },
       { id: `dh_${Date.now()}_3`, type: "HEADLINE", text: "" },
+      { id: `dh_${Date.now()}_4`, type: "HEADLINE", text: "" },
+      { id: `dh_${Date.now()}_5`, type: "HEADLINE", text: "" },
     ],
     longHeadline: "",
     descriptions: [
       { id: `dd_${Date.now()}_1`, type: "DESCRIPTION", text: "" },
+      { id: `dd_${Date.now()}_2`, type: "DESCRIPTION", text: "" },
+      { id: `dd_${Date.now()}_3`, type: "DESCRIPTION", text: "" },
+      { id: `dd_${Date.now()}_4`, type: "DESCRIPTION", text: "" },
+      { id: `dd_${Date.now()}_5`, type: "DESCRIPTION", text: "" },
     ],
     images: [],
     squareImages: [],
@@ -1037,6 +1156,10 @@ export interface GoogleCreativeSettings {
   calloutExtensions: SearchCalloutAsset[];
   /** Campaign-level structured snippet extensions. Maps to CampaignAsset with StructuredSnippetAsset */
   structuredSnippetExtensions: SearchStructuredSnippet[];
+  /** Campaign-level price extensions. Maps to CampaignAsset with PriceAsset */
+  priceExtensions: SearchPriceAsset[];
+  /** Campaign-level promotion extensions. Maps to CampaignAsset with PromotionAsset */
+  promotionExtensions: SearchPromotionAsset[];
 }
 
 /* ---- Full Campaign ---- */
@@ -1080,13 +1203,16 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
       appId: "",
       appName: "",
       biddingStrategyGoalType: "OPTIMIZE_INSTALLS_TARGET_INSTALL_COST",
+      advertisingChannelSubType: "APP_CAMPAIGN",
     },
     containsEuPoliticalAdvertising: "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
   },
   audience: {
     locationIds: ["SA"],
     cityIds: [],
+    excludedLocationIds: [],
     locationTargetingMethod: "PRESENCE",
+    negativeLocationTargetingMethod: "PRESENCE_OR_INTEREST",
     languages: ["ar"],
     ageMin: 18,
     ageMax: 65,
@@ -1116,6 +1242,7 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
     audienceBidAdjustments: {},
     adScheduleEntries: [],
     searchPartners: true,
+    targetContentNetwork: true,
     householdIncome: [],
     parentalStatus: [],
   },
@@ -1127,7 +1254,6 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
     targetCpc: 0,
     targetRoas: 400,
     maxCpcBid: 0,
-    enhancedCpc: true,
     targetImpressionShare: 50,
     impressionShareLocation: "ANYWHERE_ON_PAGE",
     impressionShareMaxCpc: 0,
@@ -1218,12 +1344,20 @@ export const defaultGoogleCampaign: GoogleCampaignData = {
     displayAdGroups: [createDisplayAdGroup(1)],
     appAds: [createAppAd(1)],
   displayAds: [],
-    productGroupRoot: null,
+    productGroupRoot: {
+      id: "root",
+      dimensionType: "PRODUCT_CATEGORY",
+      dimensionValue: "",
+      type: "UNIT_INCLUDED",
+      children: [],
+    },
     retailListingMode: "ALL",
     retailListingValues: [],
     negativeKeywords: [],
     sitelinkExtensions: [],
     calloutExtensions: [],
     structuredSnippetExtensions: [],
+    priceExtensions: [],
+    promotionExtensions: [],
   },
 };

@@ -11,10 +11,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   ChevronDown,
   Info,
   Sparkles,
+  Search,
+  ShoppingCart,
+  X,
+  Plus,
 } from "lucide-react";
 import { getCountryByCode, getCityById } from "@/lib/locations";
 import { LocationSelector } from "@/components/shared/location-selector";
@@ -67,6 +73,9 @@ export function TikTokStepAudience() {
   const isAppPromo = campaign.objective.objective === "APP_PROMOTION";
   
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [interestKeywordInput, setInterestKeywordInput] = useState("");
+  const [purchaseIntentInput, setPurchaseIntentInput] = useState("");
+  const isSales = campaign.objective.objective === "PRODUCT_SALES";
 
   /* Readiness checklist */
   const hasLocation = (aud.locationIds?.length ?? 0) > 0 || (aud.cities?.length ?? 0) > 0;
@@ -169,7 +178,156 @@ export function TikTokStepAudience() {
             accent="primary"
           />
 
-          {/* ---- 4. Salla Smart Features (shared) ---- */}
+          {/* ---- 4. Interest Keywords (granular keyword-level targeting) ---- */}
+          <SectionCard>
+            <Label className="mb-1 flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Search className="size-4 text-primary" />
+              Interest Keywords
+              <InfoTip text="Target users interested in specific topics or products. More granular than interest categories -- maps to TikTok's interest_keyword_ids for precise audience matching." />
+            </Label>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Add specific keywords to target users with precise interests. These are more granular than category-level interest targeting.
+            </p>
+            <div className="flex gap-2">
+              <Input
+                placeholder="e.g. skincare routine, running shoes, home decor..."
+                value={interestKeywordInput}
+                onChange={(e) => setInterestKeywordInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && interestKeywordInput.trim()) {
+                    e.preventDefault();
+                    const kw = interestKeywordInput.trim();
+                    if (!aud.interestKeywordIds.includes(kw)) {
+                      updateNested("audience", {
+                        interestKeywordIds: [...aud.interestKeywordIds, kw],
+                      });
+                    }
+                    setInterestKeywordInput("");
+                  }
+                }}
+                className="h-9 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const kw = interestKeywordInput.trim();
+                  if (kw && !aud.interestKeywordIds.includes(kw)) {
+                    updateNested("audience", {
+                      interestKeywordIds: [...aud.interestKeywordIds, kw],
+                    });
+                  }
+                  setInterestKeywordInput("");
+                }}
+                disabled={!interestKeywordInput.trim()}
+                className="flex h-9 items-center gap-1 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40"
+              >
+                <Plus className="size-3" />
+                Add
+              </button>
+            </div>
+            {aud.interestKeywordIds.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {aud.interestKeywordIds.map((kw) => (
+                  <Badge key={kw} variant="secondary" className="gap-1 rounded-full px-2.5 py-1 text-xs">
+                    {kw}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateNested("audience", {
+                          interestKeywordIds: aud.interestKeywordIds.filter((k) => k !== kw),
+                        })
+                      }
+                      className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
+                    >
+                      <X className="size-2.5" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <p className="mt-2 text-[10px] text-muted-foreground">
+              In production, keywords are resolved to TikTok interest_keyword_ids via the Interest Keyword API.
+            </p>
+          </SectionCard>
+
+          {/* ---- 5. Purchase Intent Keywords (e-commerce specific) ---- */}
+          {(isSales || isTraffic) && (
+            <SectionCard>
+              <Label className="mb-1 flex items-center gap-2 text-sm font-semibold text-foreground">
+                <ShoppingCart className="size-4 text-primary" />
+                Purchase Intent Keywords
+                <Badge variant="outline" className="rounded-full px-2 text-[10px] font-medium text-primary">
+                  E-commerce
+                </Badge>
+                <InfoTip text="Target users actively searching for or engaging with specific product categories on TikTok. Maps to purchase_intention_keyword_ids -- highly effective for driving sales." />
+              </Label>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Reach users who are actively looking to buy. These keywords target shopping intent signals, not just interest.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. buy perfume, abaya online, gaming laptop..."
+                  value={purchaseIntentInput}
+                  onChange={(e) => setPurchaseIntentInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && purchaseIntentInput.trim()) {
+                      e.preventDefault();
+                      const kw = purchaseIntentInput.trim();
+                      if (!aud.purchaseIntentKeywordIds.includes(kw)) {
+                        updateNested("audience", {
+                          purchaseIntentKeywordIds: [...aud.purchaseIntentKeywordIds, kw],
+                        });
+                      }
+                      setPurchaseIntentInput("");
+                    }
+                  }}
+                  className="h-9 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const kw = purchaseIntentInput.trim();
+                    if (kw && !aud.purchaseIntentKeywordIds.includes(kw)) {
+                      updateNested("audience", {
+                        purchaseIntentKeywordIds: [...aud.purchaseIntentKeywordIds, kw],
+                      });
+                    }
+                    setPurchaseIntentInput("");
+                  }}
+                  disabled={!purchaseIntentInput.trim()}
+                  className="flex h-9 items-center gap-1 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                >
+                  <Plus className="size-3" />
+                  Add
+                </button>
+              </div>
+              {aud.purchaseIntentKeywordIds.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {aud.purchaseIntentKeywordIds.map((kw) => (
+                    <Badge key={kw} variant="secondary" className="gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs text-primary">
+                      {kw}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateNested("audience", {
+                            purchaseIntentKeywordIds: aud.purchaseIntentKeywordIds.filter((k) => k !== kw),
+                          })
+                        }
+                        className="ml-0.5 rounded-full p-0.5 hover:bg-primary/20"
+                      >
+                        <X className="size-2.5" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <p className="mt-2 text-[10px] text-muted-foreground">
+                In production, keywords are resolved to TikTok purchase_intention_keyword_ids via the Keyword API.
+              </p>
+            </SectionCard>
+          )}
+
+          {/* ---- 6. Salla Smart Features (shared) ---- */}
           <SallaSmartFeaturesCard
             excludeRecentPurchasers={aud.excludeRecentPurchasers}
             onExcludeRecentPurchasersChange={(v) =>
@@ -338,7 +496,9 @@ export function TikTokStepAudience() {
                 { label: "Gender", value: aud.gender === "GENDER_UNLIMITED" ? "All" : aud.gender === "GENDER_MALE" ? "Male" : "Female" },
                 { label: "Age", value: `${aud.ageMin} - ${aud.ageMax === 55 ? "55+" : aud.ageMax}` },
                 { label: "Languages", value: aud.languages.length > 0 ? aud.languages.map((l) => SUPPORTED_LANGUAGES.find((x) => x.code === l)?.label || l).join(", ") : "All" },
-                { label: "Interests", value: aud.interests.length > 0 ? `${aud.interests.length} selected` : "All" },
+                { label: "Interests", value: aud.interests.length > 0 ? `${aud.interests.length} categories` : "All" },
+                ...(aud.interestKeywordIds.length > 0 ? [{ label: "Interest Keywords", value: `${aud.interestKeywordIds.length} keywords` }] : []),
+                ...(aud.purchaseIntentKeywordIds.length > 0 ? [{ label: "Purchase Intent", value: `${aud.purchaseIntentKeywordIds.length} keywords`, highlight: true }] : []),
                 { label: "Devices", value: aud.operatingSystems.length === 2 ? "All" : aud.operatingSystems.join(", ") || "All" },
                 ...(aud.excludeRecentPurchasers ? [{ label: "Exclude buyers", value: `Last ${aud.excludeRecentPurchasersDays}d`, highlight: true }] : []),
               ]}

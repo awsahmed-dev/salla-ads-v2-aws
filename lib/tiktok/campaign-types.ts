@@ -1,11 +1,11 @@
 /* ================================================================
    Campaign Types -- aligned to TikTok Marketing API v1.3
-   Objectives: PRODUCT_SALES, REACH
+   All 6 objectives fully supported with complete API field coverage.
    ================================================================ */
 
 /* ---- Enums ---- */
 
-/** Maps to API objective_type. PRODUCT_SALES and REACH are active; others are planned. */
+/** Maps to API objective_type. */
 export type TikTokObjective =
   | "PRODUCT_SALES"
   | "REACH"
@@ -45,14 +45,19 @@ export type BidType =
   | "BID_TYPE_NO_BID"      // Lowest Cost (auto, recommended for SMB)
   | "BID_TYPE_CUSTOM";     // Cost Cap or Bid Cap
 
+/** Distinguishes Cost Cap vs Bid Cap when bidType is BID_TYPE_CUSTOM.
+ *  Cost Cap: TikTok averages around your bid, may exceed per-auction.
+ *  Bid Cap: Hard ceiling per auction, never exceeds your bid. */
+export type BidStrategy = "COST_CAP" | "BID_CAP";
+
 /** Maps to API billing_event */
 export type BillingEvent = "CPC" | "OCPM" | "CPM" | "CPV";
 
 /** Maps to API budget_mode */
-export type BudgetMode = "BUDGET_MODE_DAY";
+export type BudgetMode = "BUDGET_MODE_DAY" | "BUDGET_MODE_TOTAL";
 
-/** Maps to API deep_bid_type -- used when optimizationGoal is VALUE (Web VBO) */
-export type DeepBidType = "VO_MIN_ROAS" | "PACING" | "DEFAULT";
+/** Maps to API deep_bid_type -- used when optimizationGoal is VALUE (Web/App VBO) */
+export type DeepBidType = "VO_MIN_ROAS" | "VO_HIGHEST_VALUE" | "PACING" | "DEFAULT";
 
 /** Maps to API click_attribution_window / view_attribution_window */
 export type ClickAttributionWindow = "1" | "7" | "14" | "28";
@@ -80,6 +85,23 @@ export type Gender = "GENDER_MALE" | "GENDER_FEMALE" | "GENDER_UNLIMITED";
 
 /** Budget type: how the budget is consumed over the campaign lifetime */
 export type PaymentMethod = "prepaid" | "pay_as_you_go";
+
+/** Maps to API brand_safety_type on ad group */
+export type BrandSafetyType =
+  | "NO_BRAND_SAFETY"     // No filtering (default)
+  | "EXPANDED_INVENTORY"  // Exclude explicitly inappropriate content
+  | "STANDARD_INVENTORY"  // Appropriate for most brands (recommended)
+  | "LIMITED_INVENTORY";  // Most restrictive, no mature themes
+
+/** Content interaction controls at ad group level */
+export interface ContentControls {
+  /** Maps to API comment_disabled. Disables comments on ads. */
+  commentDisabled: boolean;
+  /** Maps to API share_disabled. Disables sharing of ads. */
+  shareDisabled: boolean;
+  /** Maps to API video_download_disabled. Disables video download. */
+  videoDownloadDisabled: boolean;
+}
 
 /* ---- Objective Config ---- */
 
@@ -120,7 +142,7 @@ export const OBJECTIVE_CONFIGS: Record<string, ObjectiveConfig> = {
     apiObjective: "REACH",
     label: "Reach",
     description: "Show your ad to the maximum number of people",
-    allowedGoals: ["REACH"],
+    allowedGoals: ["REACH", "SHOW"],
     defaultGoal: "REACH",
     pixelRequirement: "none",
     catalogAvailable: false,
@@ -164,7 +186,7 @@ export const OBJECTIVE_CONFIGS: Record<string, ObjectiveConfig> = {
     apiObjective: "APP_PROMOTION",
     label: "App Promotion",
     description: "Drive app installs and grow your mobile user base",
-    allowedGoals: ["INSTALL", "IN_APP_EVENT", "CLICK"],
+    allowedGoals: ["INSTALL", "IN_APP_EVENT", "CLICK", "VALUE"],
     defaultGoal: "INSTALL",
     pixelRequirement: "none",  // Uses TikTok SDK, not pixel
     catalogAvailable: false,
@@ -277,6 +299,9 @@ export interface ObjectiveSettings {
   objective: TikTokObjective;
   /** Website or Catalog-based product sales */
   promotionType: PromotionType;
+  /** Campaign Budget Optimization. Maps to API budget_optimize_on.
+   *  When enabled, campaign budget is distributed across all ad groups automatically. */
+  budgetOptimizeOn: boolean;
   /** TikTok Pixel setup */
   pixelMode: PixelMode;
   pixelId: string;
@@ -322,15 +347,21 @@ export interface AudienceSettings {
   gender: Gender;
   /** Language codes */
   languages: string[];
-  /** Interest category IDs */
+  /** Interest category IDs. Maps to API interest_category_ids. */
   interests: string[];
+  /** Interest keyword IDs for granular interest targeting. Maps to API interest_keyword_ids.
+   *  More specific than categories -- targets users interested in specific topics/products. */
+  interestKeywordIds: string[];
+  /** Purchase intent keyword IDs. Maps to API purchase_intention_keyword_ids.
+   *  Targets users actively searching/engaging with specific product categories. Critical for e-commerce. */
+  purchaseIntentKeywordIds: string[];
   /** Device operating systems */
   operatingSystems: string[];
   /** Custom audience IDs to include */
   customAudienceIds: string[];
   /** Custom audience IDs to exclude */
   excludedAudienceIds: string[];
-  /** Enable automatic targeting expansion */
+  /** Enable automatic targeting expansion. Maps to API smart_interest_behavior_enabled. */
   autoTargetingEnabled: boolean;
   /** Exclude recent purchasers via Salla segment */
   excludeRecentPurchasers: boolean;
@@ -342,22 +373,28 @@ export interface AudienceSettings {
 /* ---- Step: Budget ---- */
 
 export interface BudgetSettings {
-  /** Always daily for Salla */
+  /** Daily or Lifetime budget. Maps to API budget_mode. */
   budgetMode: BudgetMode;
-  /** Daily budget in SAR */
+  /** Daily budget in SAR (when budgetMode is BUDGET_MODE_DAY) */
   amount: number;
+  /** Total/lifetime budget in SAR (when budgetMode is BUDGET_MODE_TOTAL).
+   *  The entire amount is spent over the campaign duration. */
+  lifetimeAmount: number;
   /** Optimization goal */
   optimizationGoal: OptimizationGoal;
   /** Specific conversion event (when goal is CONVERSION or VALUE) */
   optimizationEvent: OptimizationEvent;
   /** Bid strategy */
   bidType: BidType;
+  /** Cost Cap vs Bid Cap -- only applies when bidType is BID_TYPE_CUSTOM.
+   *  Cost Cap: average cost around target. Bid Cap: hard max per auction. */
+  bidStrategy: BidStrategy;
   /** Manual bid amount (only when bidType is BID_TYPE_CUSTOM).
    *  Maps to conversion_bid_price for CONVERSION, bid_price for CLICK */
   bidAmount: number;
   /** Billing event -- auto-derived from optimizationGoal (OCPM for CONVERSION/VALUE, CPC for CLICK) */
   billingEvent: BillingEvent;
-  /** Deep bid type -- required when optimizationGoal is VALUE (Web VBO) */
+  /** Deep bid type -- required when optimizationGoal is VALUE (Web/App VBO) */
   deepBidType: DeepBidType;
   /** Minimum ROAS target -- required when deepBidType is VO_MIN_ROAS */
   roasBid: number;
@@ -380,6 +417,9 @@ export interface BudgetSettings {
   performanceBoost: boolean;
   /** Frequency cap (Reach objective only). Controls max impressions per user. */
   frequencyCap?: FrequencyCap;
+  /** Enable ads in TikTok search results. Maps to API search_result_enabled.
+   *  Available for PRODUCT_SALES and TRAFFIC objectives. */
+  searchResultEnabled: boolean;
   /** Salla auto-increase configuration */
   autoIncrease: {
     enabled: boolean;
@@ -538,6 +578,10 @@ export interface CreativeSettings {
   placementType: PlacementType;
   /** Identity settings shared across all ads */
   identity: IdentitySettings;
+  /** Brand safety inventory filter. Maps to API brand_safety_type on ad group. */
+  brandSafetyType: BrandSafetyType;
+  /** Content interaction controls. Maps to API comment_disabled, share_disabled, video_download_disabled. */
+  contentControls: ContentControls;
 }
 
 /* ---- Full Campaign ---- */
@@ -554,6 +598,7 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
     campaignName: "",
     objective: "PRODUCT_SALES",
     promotionType: "WEBSITE",
+    budgetOptimizeOn: false,
     pixelMode: "none",
     pixelId: "",
     pixelName: "",
@@ -597,6 +642,8 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
     gender: "GENDER_UNLIMITED",
     languages: ["ar"],
     interests: [],
+    interestKeywordIds: [],
+    purchaseIntentKeywordIds: [],
     operatingSystems: ["IOS", "ANDROID"],
     customAudienceIds: [],
     excludedAudienceIds: [],
@@ -606,40 +653,49 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
     sallaAudienceCategory: "",
   },
   budget: {
-  budgetMode: "BUDGET_MODE_DAY",
-  amount: 200,
-  optimizationGoal: "CONVERSION",
-  optimizationEvent: "COMPLETE_PAYMENT",
-  bidType: "BID_TYPE_NO_BID",
-  bidAmount: 0,
-  billingEvent: "OCPM",
-  deepBidType: "DEFAULT",
-  roasBid: 1.0,
-  clickAttributionWindow: "7",
-  viewAttributionWindow: "1",
-  pacing: "PACING_MODE_SMOOTH",
-  startDate: "",
-  endDate: "",
-  endDateOptional: false,
-  schedule: "all_day",
-  skipLearningPhase: false,
-  paymentMethod: "prepaid",
-  performanceBoost: true,
-  autoIncrease: {
-    enabled: false,
-    pct: 20,
-    intervalDays: 7,
-    maxDailyBudget: 600,
-  },
+    budgetMode: "BUDGET_MODE_DAY",
+    amount: 200,
+    lifetimeAmount: 0,
+    optimizationGoal: "CONVERSION",
+    optimizationEvent: "COMPLETE_PAYMENT",
+    bidType: "BID_TYPE_NO_BID",
+    bidStrategy: "COST_CAP",
+    bidAmount: 0,
+    billingEvent: "OCPM",
+    deepBidType: "DEFAULT",
+    roasBid: 1.0,
+    clickAttributionWindow: "7",
+    viewAttributionWindow: "1",
+    pacing: "PACING_MODE_SMOOTH",
+    startDate: "",
+    endDate: "",
+    endDateOptional: false,
+    schedule: "all_day",
+    skipLearningPhase: false,
+    paymentMethod: "prepaid",
+    performanceBoost: true,
+    searchResultEnabled: false,
+    autoIncrease: {
+      enabled: false,
+      pct: 20,
+      intervalDays: 7,
+      maxDailyBudget: 600,
+    },
   },
   creative: {
-  ads: [],
-  placementType: "PLACEMENT_TYPE_AUTOMATIC",
-  identity: {
-    identityType: "CUSTOMIZED_USER",
-    identityId: "",
-    displayName: "",
-    avatarPreviewUrl: "",
-  },
+    ads: [],
+    placementType: "PLACEMENT_TYPE_AUTOMATIC",
+    identity: {
+      identityType: "CUSTOMIZED_USER",
+      identityId: "",
+      displayName: "",
+      avatarPreviewUrl: "",
+    },
+    brandSafetyType: "NO_BRAND_SAFETY",
+    contentControls: {
+      commentDisabled: false,
+      shareDisabled: false,
+      videoDownloadDisabled: false,
+    },
   },
 };

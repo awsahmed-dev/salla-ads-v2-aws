@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, type ElementType } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, type ElementType } from "react";
 import { useGoogleCampaign } from "@/lib/google/campaign-context";
 import { OBJECTIVE_CONFIGS, type GoogleAssetGroup, type GoogleCreativeAsset, type ProductGroupNode, type ProductDimensionType, type RetailListingMode, type DemandGenAd, type DemandGenAdGroup, createDemandGenAd, createDemandGenAdGroup, type GoogleSearchAd, type SearchAdGroup, type RSAHeadline, type RSADescription, type HeadlinePinPosition, type DescriptionPinPosition, type SearchSitelinkAsset, type SearchCalloutAsset, type SearchStructuredSnippet, STRUCTURED_SNIPPET_HEADERS, createSearchAd, createSearchAdGroup, type DisplayAdGroup, type GoogleDisplayAd, createDisplayAd, createDisplayAdGroup, type GoogleAppAd, createAppAd, type DemandGenAdAutomationType, type AssetAutomationStatus } from "@/lib/google/campaign-types";
 import { Switch } from "@/components/ui/switch";
@@ -93,6 +93,9 @@ import {
   Hash,
   Megaphone,
   ListChecks,
+  Loader2,
+  DollarSign,
+  ShieldCheck,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/section-card";
 import { ObjectiveExplainer } from "@/components/shared/objective-explainer";
@@ -110,6 +113,7 @@ import {
   formatSAR,
   type SallaStoreInfo,
 } from "@/lib/salla/store-api";
+import { generateSearchDraft, generateCallouts, generateSitelinks, generateSnippets, getStoreSnapshot, scoreHeadlineDiversity, type SearchAiDraft, type HeadlineDiversityScore } from "@/lib/google/search-ai-generator";
 
 /* ================================================================== */
 /*  Constants -- Asset Requirements per Google Ads API                 */
@@ -157,16 +161,20 @@ function newAssetGroup(): GoogleAssetGroup {
     id: `ag_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     name: "",
     finalUrl: "",
+    finalMobileUrl: "",
     headlines: [newTextAsset("HEADLINE"), newTextAsset("HEADLINE"), newTextAsset("HEADLINE")],
     longHeadlines: [newTextAsset("LONG_HEADLINE")],
     descriptions: [newTextAsset("DESCRIPTION"), newTextAsset("DESCRIPTION")],
     images: [],
     logos: [],
+    landscapeLogos: [],
     videos: [],
     businessName: "",
     callToAction: "AUTOMATED",
     displayPath1: "",
     displayPath2: "",
+    searchThemes: [],
+    audienceSignals: [],
   };
 }
 
@@ -332,11 +340,11 @@ function ReadinessRing({ percent, size = 44, stroke = 4 }: { percent: number; si
 /*  DEMAND GEN: Constants                                              */
 /* ================================================================== */
 
-/** Google Ads API v21 limits per DemandGen*AdInfo */
+/** Google Ads API v23 limits per DemandGen*AdInfo */
 const DG_LIMITS = {
   /* ---- Multi-Asset ---- */
   multiAsset: {
-    headlines: { min: 1, max: 5, charLimit: 30 },        // AdTextAsset, max display width 30
+    headlines: { min: 1, max: 5, charLimit: 40 },        // AdTextAsset, max display width 40
     descriptions: { min: 1, max: 5, charLimit: 90 },     // AdTextAsset, max display width 90
     businessName: { charLimit: 25 },
     images: { combinedMax: 20 },                          // All 4 aspect ratios combined
@@ -344,16 +352,16 @@ const DG_LIMITS = {
   },
   /* ---- Carousel ---- */
   carousel: {
-    headline: { charLimit: 30 },                          // Single headline
+    headline: { charLimit: 40 },                          // Single headline
     description: { charLimit: 90 },                       // Single description
     businessName: { charLimit: 25 },
     cards: { min: 2, max: 10 },
-    cardHeadline: { charLimit: 30 },
+    cardHeadline: { charLimit: 40 },
     logos: { min: 1, max: 1 },                            // Single logo_image
   },
   /* ---- Video Responsive ---- */
   videoResponsive: {
-    headlines: { min: 1, max: 5, charLimit: 30 },        // short headline
+    headlines: { min: 1, max: 5, charLimit: 40 },        // short headline
     longHeadlines: { min: 1, max: 5, charLimit: 90 },
     descriptions: { min: 1, max: 5, charLimit: 90 },
     businessName: { charLimit: 25 },
@@ -561,13 +569,13 @@ function DgAdEditor({
           {/* ============================================================ */}
           {isMultiAsset && (
             <>
-              {/* Headlines (max 5, 30 chars) */}
+              {/* Headlines (max 5, 40 chars) */}
               <div className="mb-4">
                 <div className="mb-2 flex items-center gap-2">
                   <Type className="size-3.5 text-primary" />
                   <Label className="text-xs font-semibold text-foreground">Headlines</Label>
                   <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{ad.headlines.filter((h) => h.text.trim()).length}/{DG_LIMITS.multiAsset.headlines.max}</Badge>
-                  <InfoTip text="Max display width 30 chars. Google tests combinations. At least 1 required, 5 recommended for Excellent ad strength." />
+                  <InfoTip text="Max display width 40 chars. Google tests combinations. At least 1 required, 5 recommended for Excellent ad strength." />
                 </div>
                 <DgTextRows items={ad.headlines} max={DG_LIMITS.multiAsset.headlines.max} charLimit={DG_LIMITS.multiAsset.headlines.charLimit} labelPrefix="Headline" onUpdate={(next) => onUpdate({ headlines: next })} />
               </div>
@@ -584,31 +592,48 @@ function DgAdEditor({
 
               {/* Images: 4 aspect ratios, combined max 20 */}
               <div className="mb-4">
-                <div className="mb-2 flex items-center gap-2">
+                <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                   <ImageIcon className="size-3.5 text-primary" />
-                  <Label className="text-xs font-semibold text-foreground">Marketing Images</Label>
-                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{ad.images.length}/{DG_LIMITS.multiAsset.images.combinedMax}</Badge>
+                  Images
+                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">{ad.images.length}/20 total</Badge>
                   <InfoTip text="All 4 aspect ratios share a combined maximum of 20 images. At least 1 landscape or square is required." />
-                </div>
-                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                  {DG_LIMITS.imageSpecs.map((spec) => {
-                    const count = ad.images.filter((img) => img.aspectRatio === spec.ratio).length;
+                </Label>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {[
+                    { ratio: "LANDSCAPE" as const, label: "Landscape", aspect: "1.91:1", min: "600x314" },
+                    { ratio: "SQUARE" as const, label: "Square", aspect: "1:1", min: "300x300" },
+                    { ratio: "PORTRAIT" as const, label: "Portrait", aspect: "4:5", min: "480x600" },
+                    { ratio: "TALL_PORTRAIT" as const, label: "Tall", aspect: "9:16", min: "600x1067" },
+                  ].map((spec) => {
+                    const specImages = ad.images.filter(i => i.aspectRatio === spec.ratio);
                     return (
-                      <div key={spec.ratio} className="flex flex-col items-center gap-1.5">
-                        <div className={cn(
-                          "flex w-full items-center justify-center rounded-xl border-2 border-dashed bg-muted/20 transition-colors hover:border-primary/40",
-                          spec.ratio === "TALL_PORTRAIT" ? "aspect-[9/16]" : spec.ratio === "PORTRAIT" ? "aspect-[4/5]" : spec.ratio === "SQUARE" ? "aspect-square" : "aspect-video"
-                        )}>
-                          <div className="text-center">
-                            <Plus className="mx-auto size-5 text-muted-foreground/30" />
-                            {count > 0 && <p className="mt-0.5 text-[9px] font-medium text-primary">{count} added</p>}
+                      <div key={spec.ratio} className="rounded-lg border border-border bg-muted/10 p-2.5">
+                        <p className="mb-1 text-[10px] font-semibold text-foreground">{spec.label} ({spec.aspect})</p>
+                        <p className="mb-2 text-[9px] text-muted-foreground">Min {spec.min}</p>
+                        <UploadZone
+                          accept="image/png,image/jpeg,image/gif"
+                          label={`Upload ${spec.label.toLowerCase()}`}
+                          sublabel={`JPG/PNG \u00b7 ${spec.aspect}`}
+                          onFile={(file) => {
+                            const url = URL.createObjectURL(file);
+                            onUpdate({ images: [...ad.images, { id: `img-${Date.now()}`, url, aspectRatio: spec.ratio }] });
+                          }}
+                          compact
+                        />
+                        {specImages.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {specImages.map((img) => (
+                              <div key={img.id} className="group relative size-10 overflow-hidden rounded border border-border bg-muted">
+                                <img src={img.url} alt="" className="size-full object-cover" />
+                                <button type="button" onClick={() => onUpdate({ images: ad.images.filter(x => x.id !== img.id) })}
+                                  className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                                  <X className="size-3 text-white" />
+                                </button>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[10px] font-medium text-foreground">{spec.label}</p>
-                          <p className="text-[8px] text-muted-foreground">{spec.aspect} | min {spec.minSize}</p>
-                          <p className="text-[8px] text-muted-foreground">Rec: {spec.recommended}</p>
-                        </div>
+                        )}
+                        <p className="mt-1 text-[9px] text-muted-foreground">{specImages.length} added</p>
                       </div>
                     );
                   })}
@@ -646,7 +671,7 @@ function DgAdEditor({
                   <Type className="size-3.5 text-primary" />
                   <Label className="text-xs font-semibold text-foreground">Headline</Label>
                   <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">Required</Badge>
-                  <InfoTip text="Single headline for the carousel ad. Max display width 30 chars." />
+                  <InfoTip text="Single headline for the carousel ad. Max display width 40 chars." />
                 </div>
                 <div className="flex items-center gap-2">
                   <Input placeholder="Your carousel headline" value={ad.carouselHeadline} onChange={(e) => onUpdate({ carouselHeadline: e.target.value.slice(0, DG_LIMITS.carousel.headline.charLimit) })} className="h-9 flex-1 text-sm" />
@@ -685,64 +710,99 @@ function DgAdEditor({
 
               {/* Carousel Cards (2-10) */}
               <div className="mb-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="mb-3 flex items-center justify-between">
+                  <Label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                     <GalleryHorizontal className="size-3.5 text-primary" />
-                    <Label className="text-xs font-semibold text-foreground">Carousel Cards</Label>
-                    <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{ad.carouselCards.length}/{DG_LIMITS.carousel.cards.max}</Badge>
-                  </div>
-                  {ad.carouselCards.length < DG_LIMITS.carousel.cards.max && (
-                    <Button variant="outline" size="sm" className="h-7 gap-1 text-[10px]" onClick={() => onUpdate({ carouselCards: [...ad.carouselCards, { id: `card-${Date.now()}`, headline: "", imageUrl: "", finalUrl: "", callToAction: "AUTOMATED" }] })}>
-                      <Plus className="size-3" /> Add Card
+                    Carousel Cards
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
+                      {ad.carouselCards.length}/{DG_LIMITS.carousel.cards.max}
+                    </Badge>
+                    {ad.carouselCards.length < DG_LIMITS.carousel.cards.min && (
+                      <span className="text-[10px] text-red-500">Min {DG_LIMITS.carousel.cards.min} required</span>
+                    )}
+                  </Label>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 border-primary/30 text-xs text-primary"
+                      onClick={async () => {
+                        try {
+                          const [bestSellers, onSale] = await Promise.all([fetchBestSellers(6), fetchOnSale(4)]);
+                          const allProducts = [...bestSellers, ...onSale];
+                          const seen = new Set<string>();
+                          const unique = allProducts.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+                          const existingUrls = new Set(ad.carouselCards.map(c => c.finalUrl));
+                          const newProducts = unique.filter(p => !existingUrls.has(p.url));
+                          const newCards = newProducts.slice(0, DG_LIMITS.carousel.cards.max - ad.carouselCards.length).map((p, i) => ({
+                            id: `card-${Date.now()}-${i}`,
+                            headline: p.name.slice(0, DG_LIMITS.carousel.cardHeadline.charLimit),
+                            imageUrl: p.image,
+                            finalUrl: p.url,
+                            callToAction: "AUTOMATED",
+                          }));
+                          if (newCards.length > 0) {
+                            onUpdate({ carouselCards: [...ad.carouselCards, ...newCards].slice(0, DG_LIMITS.carousel.cards.max) });
+                          }
+                        } catch { /* silent */ }
+                      }}
+                    >
+                      <ShoppingBag className="size-3" /> Add Products from Store
                     </Button>
-                  )}
+                    {ad.carouselCards.length < DG_LIMITS.carousel.cards.max && (
+                      <Button variant="outline" size="sm" className="h-7 gap-1 text-[10px]" onClick={() => onUpdate({ carouselCards: [...ad.carouselCards, { id: `card-${Date.now()}`, headline: "", imageUrl: "", finalUrl: "", callToAction: "AUTOMATED" }] })}>
+                        <Plus className="size-3" /> Add Card
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-col gap-2.5">
                   {ad.carouselCards.map((card, ci) => (
-                    <div key={card.id} className="rounded-lg border border-border bg-muted/10 p-3">
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="text-[11px] font-semibold text-foreground">Card {ci + 1}</span>
-                        {ad.carouselCards.length > DG_LIMITS.carousel.cards.min && (
-                          <button type="button" onClick={() => onUpdate({ carouselCards: ad.carouselCards.filter((_, j) => j !== ci) })} className="rounded p-1 text-muted-foreground hover:text-red-500">
-                            <X className="size-3" />
-                          </button>
+                    <div key={card.id} className="flex gap-3 rounded-lg border border-border bg-background p-3">
+                      {/* Image preview or upload */}
+                      <div className="relative size-16 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                        {card.imageUrl ? (
+                          <img src={card.imageUrl} alt={card.headline} className="size-full object-cover" />
+                        ) : (
+                          <div className="flex size-full items-center justify-center">
+                            <ImageIcon className="size-5 text-muted-foreground/30" />
+                          </div>
                         )}
+                        <span className="absolute left-1 top-1 flex size-5 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white">{ci + 1}</span>
                       </div>
-                      <div className="flex gap-3">
-                        {/* Card image upload */}
-                        <div className="flex size-20 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-border bg-background transition-colors hover:border-primary/40">
-                          {card.imageUrl ? (
-                            <img src={card.imageUrl} alt="" className="size-full rounded-lg object-cover" />
-                          ) : (
-                            <div className="text-center">
-                              <ImageIcon className="mx-auto size-5 text-muted-foreground/30" />
-                              <p className="mt-0.5 text-[8px] text-muted-foreground">1200x628</p>
-                            </div>
-                          )}
+                      {/* Card fields */}
+                      <div className="flex flex-1 flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={card.headline}
+                            onChange={(e) => {
+                              const cards = [...ad.carouselCards];
+                              cards[ci] = { ...card, headline: e.target.value.slice(0, DG_LIMITS.carousel.cardHeadline.charLimit) };
+                              onUpdate({ carouselCards: cards });
+                            }}
+                            placeholder="Product headline"
+                            className="h-7 flex-1 text-xs"
+                          />
+                          <span className="shrink-0 text-[9px] text-muted-foreground">{card.headline.length}/{DG_LIMITS.carousel.cardHeadline.charLimit}</span>
                         </div>
-                        <div className="flex flex-1 flex-col gap-1.5">
-                          <div className="flex items-center gap-1.5">
-                            <Input placeholder={`Card ${ci + 1} headline`} value={card.headline} onChange={(e) => {
-                              const next = [...ad.carouselCards]; next[ci] = { ...next[ci], headline: e.target.value.slice(0, DG_LIMITS.carousel.cardHeadline.charLimit) }; onUpdate({ carouselCards: next });
-                            }} className="h-7 flex-1 text-xs" />
-                            <span className="text-[8px] text-muted-foreground">{card.headline.length}/{DG_LIMITS.carousel.cardHeadline.charLimit}</span>
-                          </div>
-                          <Input placeholder="https://store.salla.sa/product" value={card.finalUrl} onChange={(e) => {
-                            const next = [...ad.carouselCards]; next[ci] = { ...next[ci], finalUrl: e.target.value }; onUpdate({ carouselCards: next });
-                          }} className="h-7 text-xs" />
-                          <div className="flex flex-wrap gap-1">
-                            {CTA_OPTIONS.slice(0, 4).map((c) => (
-                              <button key={c.value} type="button" onClick={() => {
-                                const next = [...ad.carouselCards]; next[ci] = { ...next[ci], callToAction: c.value }; onUpdate({ carouselCards: next });
-                              }} className={cn("rounded border px-1.5 py-0.5 text-[8px] font-medium transition-colors",
-                                card.callToAction === c.value ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"
-                              )}>
-                                {c.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
+                        <Input
+                          value={card.finalUrl}
+                          onChange={(e) => {
+                            const cards = [...ad.carouselCards];
+                            cards[ci] = { ...card, finalUrl: e.target.value };
+                            onUpdate({ carouselCards: cards });
+                          }}
+                          placeholder="https://store.salla.sa/product/..."
+                          className="h-7 text-[10px] text-muted-foreground"
+                        />
                       </div>
+                      {/* Delete button */}
+                      {ad.carouselCards.length > DG_LIMITS.carousel.cards.min && (
+                        <button type="button" onClick={() => onUpdate({ carouselCards: ad.carouselCards.filter((_, j) => j !== ci) })}
+                          className="self-start text-muted-foreground hover:text-destructive">
+                          <X className="size-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -780,7 +840,7 @@ function DgAdEditor({
                 )}
               </div>
 
-              {/* Headlines (max 5, 30 chars) */}
+              {/* Headlines (max 5, 40 chars) */}
               <div className="mb-4">
                 <div className="mb-2 flex items-center gap-2">
                   <Type className="size-3.5 text-primary" />
@@ -922,15 +982,17 @@ const RSA_LIMITS = {
 /* ================================================================== */
 
 function RsaEditor({
-  ad, adIndex, totalAds, keywordCount, onUpdate, onDelete, onDuplicate,
+  ad, adIndex, totalAds, keywordCount, storeName, onUpdate, onDelete, onDuplicate, onExpand,
 }: {
   ad: GoogleSearchAd;
   adIndex: number;
   totalAds: number;
   keywordCount: number;
+  storeName: string;
   onUpdate: (patch: Partial<GoogleSearchAd>) => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  onExpand?: (idx: number) => void;
 }) {
   const [expanded, setExpanded] = useState(adIndex === 0);
   const strength = calcRsaStrength(ad, keywordCount);
@@ -963,7 +1025,7 @@ function RsaEditor({
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm transition-all">
       {/* Collapsed header */}
-      <div role="button" tabIndex={0} onClick={() => setExpanded(!expanded)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(!expanded); } }} className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left">
+      <div role="button" tabIndex={0} onClick={() => { const next = !expanded; setExpanded(next); if (next) onExpand?.(adIndex); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); const next = !expanded; setExpanded(next); if (next) onExpand?.(adIndex); } }} className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left">
         <div className={cn("flex size-8 items-center justify-center rounded-lg text-xs font-bold",
           strength.pct >= 75 ? "bg-emerald-100 text-emerald-700" : strength.pct >= 50 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
         )}>
@@ -1001,11 +1063,39 @@ function RsaEditor({
                 <Type className="size-3.5 text-primary" />
                 <Label className="text-xs font-semibold text-foreground">Headlines</Label>
                 <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{fH}/{RSA_LIMITS.headlines.max}</Badge>
-                <InfoTip text="Min 3, max 15 headlines (30 chars each). Google combines 3 at a time. Pin to force a headline into a specific position." />
+                <InfoTip text="Write 10-15 unique headlines. Google tests combinations to find what works best. Mix brand names (2-3), product/category terms (3-4), benefits like 'Free Shipping' (3-4), and calls to action like 'Shop Now' (2-3)." />
               </div>
-              {ad.headlines.length < RSA_LIMITS.headlines.max && (
-                <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] text-primary" onClick={addHeadline}><Plus className="size-3" /> Add</Button>
-              )}
+              <div className="flex items-center gap-1">
+                {ad.headlines.length < RSA_LIMITS.headlines.max && (
+                  <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] text-primary" onClick={addHeadline}><Plus className="size-3" /> Add</Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1 text-[10px] text-primary"
+                  onClick={async () => {
+                    const { generateHeadlines, getStoreSnapshot } = await import("@/lib/google/search-ai-generator");
+                    const snapshot = await getStoreSnapshot();
+                    const suggestions = generateHeadlines(snapshot);
+                    const existing = ad.headlines.filter(h => h.text?.trim()).map(h => h.text!.toLowerCase());
+                    const newHeadlines = [...ad.headlines];
+                    let suggIdx = 0;
+                    for (let i = 0; i < newHeadlines.length && suggIdx < suggestions.length; i++) {
+                      if (!newHeadlines[i].text?.trim()) {
+                        while (suggIdx < suggestions.length && existing.includes(suggestions[suggIdx].text.toLowerCase())) suggIdx++;
+                        if (suggIdx < suggestions.length) {
+                          newHeadlines[i] = { ...newHeadlines[i], text: suggestions[suggIdx].text };
+                          existing.push(suggestions[suggIdx].text.toLowerCase());
+                          suggIdx++;
+                        }
+                      }
+                    }
+                    onUpdate({ headlines: newHeadlines });
+                  }}
+                >
+                  <Sparkles className="size-3" /> Fill empty slots
+                </Button>
+              </div>
             </div>
             <div className="flex flex-col gap-1.5">
               {ad.headlines.map((h, i) => (
@@ -1034,6 +1124,32 @@ function RsaEditor({
             {fH < RSA_LIMITS.headlines.min && (
               <p className="mt-1 text-[10px] text-red-500">At least {RSA_LIMITS.headlines.min} headlines required</p>
             )}
+
+            {/* Headline Diversity Coaching */}
+            {(() => {
+              const filled = ad.headlines.filter((h: RSAHeadline) => h.text.trim());
+              if (filled.length < 3) return null;
+              const diversity = scoreHeadlineDiversity(filled, storeName);
+              const colorMap = { poor: "text-red-600 bg-red-50 border-red-200", average: "text-amber-600 bg-amber-50 border-amber-200", good: "text-emerald-600 bg-emerald-50 border-emerald-200", excellent: "text-primary bg-primary/5 border-primary/20" };
+              const colors = colorMap[diversity.score];
+              return (
+                <div className={`mt-3 rounded-lg border p-3 ${colors}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold">Headline diversity: {diversity.score.charAt(0).toUpperCase() + diversity.score.slice(1)}</span>
+                    </div>
+                    <span className="text-[10px]">{diversity.total}/15 headlines</span>
+                  </div>
+                  <div className="flex gap-3 text-[10px]">
+                    <span>Brand: {diversity.brand}</span>
+                    <span>Product: {diversity.product}</span>
+                    <span>Benefit: {diversity.benefit}</span>
+                    <span>CTA: {diversity.cta}</span>
+                  </div>
+                  <p className="mt-1.5 text-[10px]">{diversity.suggestion}</p>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Descriptions (2-4, 90 chars, pinnable) */}
@@ -1043,11 +1159,39 @@ function RsaEditor({
                 <FileText className="size-3.5 text-primary" />
                 <Label className="text-xs font-semibold text-foreground">Descriptions</Label>
                 <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{fD}/{RSA_LIMITS.descriptions.max}</Badge>
-                <InfoTip text="Min 2, max 4 descriptions (90 chars each). Google shows 2 at a time. Pin to force into position 1 or 2." />
+                <InfoTip text="Write 4 unique descriptions (90 chars each). Include your value proposition, social proof (e.g. '1000+ orders'), and a call to action. Google shows 2 at a time." />
               </div>
-              {ad.descriptions.length < RSA_LIMITS.descriptions.max && (
-                <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] text-primary" onClick={addDescription}><Plus className="size-3" /> Add</Button>
-              )}
+              <div className="flex items-center gap-1">
+                {ad.descriptions.length < RSA_LIMITS.descriptions.max && (
+                  <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] text-primary" onClick={addDescription}><Plus className="size-3" /> Add</Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1 text-[10px] text-primary"
+                  onClick={async () => {
+                    const { generateDescriptions, getStoreSnapshot } = await import("@/lib/google/search-ai-generator");
+                    const snapshot = await getStoreSnapshot();
+                    const suggestions = generateDescriptions(snapshot);
+                    const existing = ad.descriptions.filter(d => d.text?.trim()).map(d => d.text!.toLowerCase());
+                    const newDescs = [...ad.descriptions];
+                    let suggIdx = 0;
+                    for (let i = 0; i < newDescs.length && suggIdx < suggestions.length; i++) {
+                      if (!newDescs[i].text?.trim()) {
+                        while (suggIdx < suggestions.length && existing.includes(suggestions[suggIdx].text.toLowerCase())) suggIdx++;
+                        if (suggIdx < suggestions.length) {
+                          newDescs[i] = { ...newDescs[i], text: suggestions[suggIdx].text };
+                          existing.push(suggestions[suggIdx].text.toLowerCase());
+                          suggIdx++;
+                        }
+                      }
+                    }
+                    onUpdate({ descriptions: newDescs });
+                  }}
+                >
+                  <Sparkles className="size-3" /> Fill empty
+                </Button>
+              </div>
             </div>
             <div className="flex flex-col gap-1.5">
               {ad.descriptions.map((d, i) => (
@@ -1080,11 +1224,11 @@ function RsaEditor({
           {/* Final URL + Display Path */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="mb-1 text-[11px] font-semibold text-foreground">Final URL <span className="text-red-500">*</span></Label>
+              <Label className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-foreground">Final URL <span className="text-red-500">*</span> <InfoTip text="The landing page users visit after clicking your ad. Use a relevant product or category page — not just your homepage. Page relevance directly affects Quality Score and ad rank." /></Label>
               <Input value={ad.finalUrl} onChange={(e) => onUpdate({ finalUrl: e.target.value })} placeholder="https://store.salla.sa" className="h-8 text-xs" />
             </div>
             <div>
-              <Label className="mb-1 text-[11px] font-semibold text-foreground">Display Path</Label>
+              <Label className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-foreground">Display Path <InfoTip text="Cosmetic URL shown in the ad (doesn't affect where users go). Use it to signal relevance — e.g. store.salla.sa/Perfume/Shop." /></Label>
               <div className="flex items-center gap-1">
                 <span className="text-[10px] text-muted-foreground">salla.sa/</span>
                 <Input value={ad.displayPath1} onChange={(e) => onUpdate({ displayPath1: e.target.value.slice(0, RSA_LIMITS.displayPath.charLimit) })} placeholder="path1" className="h-8 w-20 text-xs" />
@@ -1590,6 +1734,31 @@ const DISPLAY_FORMAT_OPTIONS = [
   { value: "NATIVE" as const, label: "Native Only", desc: "Blend into site content" },
 ];
 
+const DISPLAY_TOPICS = [
+  { id: "/Arts & Entertainment", label: "Arts & Entertainment" },
+  { id: "/Autos & Vehicles", label: "Autos & Vehicles" },
+  { id: "/Beauty & Fitness", label: "Beauty & Fitness" },
+  { id: "/Books & Literature", label: "Books & Literature" },
+  { id: "/Business & Industrial", label: "Business & Industrial" },
+  { id: "/Computers & Electronics", label: "Computers & Electronics" },
+  { id: "/Finance", label: "Finance" },
+  { id: "/Food & Drink", label: "Food & Drink" },
+  { id: "/Games", label: "Games" },
+  { id: "/Health", label: "Health" },
+  { id: "/Hobbies & Leisure", label: "Hobbies & Leisure" },
+  { id: "/Home & Garden", label: "Home & Garden" },
+  { id: "/Internet & Telecom", label: "Internet & Telecom" },
+  { id: "/Jobs & Education", label: "Jobs & Education" },
+  { id: "/News", label: "News" },
+  { id: "/Online Communities", label: "Online Communities" },
+  { id: "/People & Society", label: "People & Society" },
+  { id: "/Pets & Animals", label: "Pets & Animals" },
+  { id: "/Real Estate", label: "Real Estate" },
+  { id: "/Shopping", label: "Shopping" },
+  { id: "/Sports", label: "Sports" },
+  { id: "/Travel", label: "Travel" },
+];
+
 function calcRdaStrength(ad: GoogleDisplayAd): { label: string; color: string; pct: number } {
   let pts = 0;
   const filledH = ad.headlines.filter((h) => h.text.trim()).length;
@@ -1615,6 +1784,9 @@ function DisplayCreativeEditor() {
   const [activeGroupIdx, setActiveGroupIdx] = useState(0);
   const [activeAdIdx, setActiveAdIdx] = useState(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [contentKeywordInput, setContentKeywordInput] = useState("");
+  const [placementInput, setPlacementInput] = useState("");
+  const [excludedPlacementInput, setExcludedPlacementInput] = useState("");
 
   const safeGroups = adGroups.length > 0 ? adGroups : [createDisplayAdGroup(1)];
   const currentGroup = safeGroups[activeGroupIdx] ?? safeGroups[0];
@@ -1631,19 +1803,6 @@ function DisplayCreativeEditor() {
     updateCurrentGroup({ ads });
   };
 
-  const addAdGroup = () => {
-    const groups = [...safeGroups, createDisplayAdGroup(safeGroups.length + 1)];
-    updateAdGroups(groups);
-    setActiveGroupIdx(groups.length - 1);
-    setActiveAdIdx(0);
-  };
-  const removeAdGroup = (idx: number) => {
-    if (safeGroups.length <= 1) return;
-    const groups = safeGroups.filter((_, i) => i !== idx);
-    updateAdGroups(groups);
-    setActiveGroupIdx(Math.min(activeGroupIdx, groups.length - 1));
-    setActiveAdIdx(0);
-  };
   const addAd = () => {
     const ads = [...currentGroup.ads, createDisplayAd(currentGroup.ads.length + 1)];
     updateCurrentGroup({ ads });
@@ -1697,6 +1856,31 @@ function DisplayCreativeEditor() {
     updateCurrentAd({ descriptions: currentAd.descriptions.filter((_, i) => i !== idx) });
   };
 
+  /* Content targeting helpers */
+  const contentKeywords = currentGroup.contentKeywords ?? [];
+  const topics = currentGroup.topics ?? [];
+  const placements = currentGroup.placements ?? [];
+  const excludedPlacements = currentGroup.excludedPlacements ?? [];
+
+  const addContentKeyword = () => {
+    const val = contentKeywordInput.trim();
+    if (!val || contentKeywords.includes(val)) return;
+    updateCurrentGroup({ contentKeywords: [...contentKeywords, val] });
+    setContentKeywordInput("");
+  };
+  const addPlacement = () => {
+    const val = placementInput.trim();
+    if (!val || placements.includes(val)) return;
+    updateCurrentGroup({ placements: [...placements, val] });
+    setPlacementInput("");
+  };
+  const addExcludedPlacement = () => {
+    const val = excludedPlacementInput.trim();
+    if (!val || excludedPlacements.includes(val)) return;
+    updateCurrentGroup({ excludedPlacements: [...excludedPlacements, val] });
+    setExcludedPlacementInput("");
+  };
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className={cn("flex flex-col gap-6 lg:flex-row", WIZARD_FOOTER_PADDING_BOTTOM)}>
@@ -1704,46 +1888,76 @@ function DisplayCreativeEditor() {
         {/* ===== LEFT: Ad Group Tabs + RDA Editor ===== */}
         <div className="flex flex-1 flex-col gap-5">
 
-          {/* Ad Group Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto">
-            {safeGroups.map((g, idx) => (
-              <button key={g.id} type="button" onClick={() => { setActiveGroupIdx(idx); setActiveAdIdx(0); }}
-                className={cn("flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
-                  idx === activeGroupIdx ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
-                )}>
-                <Layers className="size-3" />
-                {g.name}
-                <Badge variant="secondary" className="rounded-full px-1 py-0 text-[8px]">{g.ads.length} ad{g.ads.length !== 1 ? "s" : ""}</Badge>
-              </button>
-            ))}
-            <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={addAdGroup}>
-              <Plus className="size-3" /> Ad Group
-            </Button>
-            {safeGroups.length > 1 && (
-              <Button variant="ghost" size="sm" className="h-8 gap-1 text-[10px] text-red-500" onClick={() => removeAdGroup(activeGroupIdx)}>
-                <Trash2 className="size-3" /> Remove
+          {/* Generate from Store Banner */}
+          <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/[0.04] to-primary/[0.08] p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+                  <Sparkles className="size-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Generate Display Ad from Store</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Auto-fill headlines, descriptions, and business name from your store data.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="default"
+                size="sm"
+                className="shrink-0 gap-1.5"
+                onClick={async () => {
+                  try {
+                    const { getStoreSnapshot, generateHeadlines, generateDescriptions } = await import("@/lib/google/search-ai-generator");
+                    const snapshot = await getStoreSnapshot();
+                    const headlines = generateHeadlines(snapshot);
+                    const descriptions = generateDescriptions(snapshot);
+                    const curAd = currentGroup.ads[0];
+                    if (!curAd) return;
+
+                    const newHeadlines = curAd.headlines.map((h, i) => {
+                      if (h.text?.trim()) return h;
+                      return headlines[i] ? { ...h, text: headlines[i].text } : h;
+                    });
+                    const newDescs = curAd.descriptions.map((d, i) => {
+                      if (d.text?.trim()) return d;
+                      return descriptions[i] ? { ...d, text: descriptions[i].text } : d;
+                    });
+
+                    updateCurrentAd({
+                      headlines: newHeadlines,
+                      descriptions: newDescs,
+                      longHeadline: curAd.longHeadline || `Shop ${snapshot.categories[0] ?? "Products"} from ${snapshot.store.name}`,
+                      businessName: curAd.businessName || snapshot.store.name.slice(0, 25),
+                      finalUrl: curAd.finalUrl || (snapshot.store.domain.startsWith("http") ? snapshot.store.domain : `https://${snapshot.store.domain}`),
+                    });
+                  } catch { /* silent fail */ }
+                }}
+              >
+                <Sparkles className="size-4" /> Generate
               </Button>
-            )}
+            </div>
           </div>
 
-          {/* Ad Group Name + Content Targeting Summary */}
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-3">
-              <div>
-                <Label className="mb-1 text-xs font-semibold text-foreground">Ad Group Name</Label>
-                <Input value={currentGroup.name} onChange={(e) => updateCurrentGroup({ name: e.target.value })} placeholder="Ad Group 1" className="h-8 w-60 text-xs" />
-              </div>
-              <div className="flex-1" />
-              <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
-                <div className="flex items-center gap-1.5">
-                  <Tag className="size-3 text-primary" />
-                  <span className="text-[10px] text-foreground">{currentGroup.contentKeywords.length} keywords</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Target className="size-3 text-primary" />
-                  <span className="text-[10px] text-foreground">{currentGroup.topics.length} topics</span>
-                </div>
-                <button type="button" onClick={() => setStep(1)} className="text-[10px] text-primary underline">Edit</button>
+          {/* Ad Group Header (single group) */}
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+              <Layers className="size-4 text-primary" />
+            </div>
+            <div className="flex flex-1 items-center gap-3">
+              <Input
+                value={currentGroup.name}
+                onChange={(e) => updateCurrentGroup({ name: e.target.value })}
+                className="h-8 w-48 text-sm font-medium"
+                placeholder="Ad Group Name"
+              />
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px]">
+                  {currentGroup.contentKeywords?.length ?? 0} keywords
+                </Badge>
+                <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px]">
+                  {currentGroup.topics?.length ?? 0} topics
+                </Badge>
               </div>
             </div>
           </div>
@@ -1887,67 +2101,161 @@ function DisplayCreativeEditor() {
               </div>
             </div>
 
-            {/* Images Section */}
+            {/* Images Section — Functional Upload with Media Library */}
             <div className="mb-5">
-              <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <ImageIcon className="size-3 text-primary" /> Images
-                <InfoTip text="Upload landscape (1.91:1, min 600x314) and square (1:1, min 300x300) images. Maps to marketing_images and square_marketing_images." />
-              </Label>
-              <div className="grid grid-cols-2 gap-3">
-                {/* Landscape Images */}
-                <div className="rounded-lg border-2 border-dashed border-border p-4 text-center">
-                  <div className="mx-auto mb-2 flex aspect-video w-full max-w-[120px] items-center justify-center rounded bg-muted">
-                    <ImageIcon className="size-6 text-muted-foreground/30" />
-                  </div>
-                  <p className="text-[10px] font-semibold text-foreground">Landscape (1.91:1)</p>
-                  <p className="text-[9px] text-muted-foreground">Min 600x314 px</p>
-                  <Badge variant="secondary" className="mt-1 rounded-full px-1.5 py-0 text-[8px]">{currentAd.images.length}/{RDA_LIMITS.landscapeImage.max}</Badge>
-                  <div className="mt-2">
-                    <Button variant="outline" size="sm" className="h-7 gap-1 text-[10px]">
-                      <Plus className="size-3" /> Upload
-                    </Button>
-                  </div>
+              <div className="mb-3 flex items-center justify-between">
+                <Label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <ImageIcon className="size-3 text-primary" /> Images
+                  <InfoTip text="Upload landscape (1.91:1) and square (1:1) images. Google automatically adapts your images to fit different ad placements across 3M+ websites and apps. Provide both sizes for maximum reach." />
+                </Label>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <span className={currentAd.images.length > 0 ? "text-emerald-600" : "text-amber-600"}>
+                    Landscape: {currentAd.images.length}/{RDA_LIMITS.landscapeImage.max}
+                  </span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className={currentAd.squareImages.length > 0 ? "text-emerald-600" : "text-amber-600"}>
+                    Square: {currentAd.squareImages.length}/{RDA_LIMITS.squareImage.max}
+                  </span>
                 </div>
-                {/* Square Images */}
-                <div className="rounded-lg border-2 border-dashed border-border p-4 text-center">
-                  <div className="mx-auto mb-2 flex aspect-square w-full max-w-[80px] items-center justify-center rounded bg-muted">
-                    <ImageIcon className="size-6 text-muted-foreground/30" />
-                  </div>
-                  <p className="text-[10px] font-semibold text-foreground">Square (1:1)</p>
-                  <p className="text-[9px] text-muted-foreground">Min 300x300 px</p>
-                  <Badge variant="secondary" className="mt-1 rounded-full px-1.5 py-0 text-[8px]">{currentAd.squareImages.length}/{RDA_LIMITS.squareImage.max}</Badge>
-                  <div className="mt-2">
-                    <Button variant="outline" size="sm" className="h-7 gap-1 text-[10px]">
-                      <Plus className="size-3" /> Upload
-                    </Button>
-                  </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Landscape Upload */}
+                <div className="rounded-lg border border-border bg-muted/10 p-3">
+                  <p className="mb-1 text-[10px] font-semibold text-foreground">Landscape (1.91:1)</p>
+                  <p className="mb-2 text-[9px] text-muted-foreground">Min 600x314 · Rec 1200x628 · Max 5MB</p>
+                  <UploadZone
+                    accept="image/png,image/jpeg,image/gif"
+                    label="Upload landscape image"
+                    sublabel="JPG/PNG · 1.91:1 ratio"
+                    onFile={(file) => {
+                      const url = URL.createObjectURL(file);
+                      updateCurrentAd({ images: [...currentAd.images, { id: `img-l-${Date.now()}`, type: "IMAGE" as const, url }] });
+                    }}
+                    compact
+                    libraryContext={"IMAGE_LANDSCAPE" as "IMAGE"}
+                  />
+                  {currentAd.images.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {currentAd.images.map((img, i) => (
+                        <div key={img.id} className="group relative size-12 overflow-hidden rounded border border-border bg-muted">
+                          {img.url && <img src={img.url} alt={`Landscape ${i + 1}`} className="size-full object-cover" />}
+                          <button type="button" onClick={() => updateCurrentAd({ images: currentAd.images.filter((_, j) => j !== i) })} className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                            <X className="size-3 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Square Upload */}
+                <div className="rounded-lg border border-border bg-muted/10 p-3">
+                  <p className="mb-1 text-[10px] font-semibold text-foreground">Square (1:1)</p>
+                  <p className="mb-2 text-[9px] text-muted-foreground">Min 300x300 · Rec 1200x1200 · Max 5MB</p>
+                  <UploadZone
+                    accept="image/png,image/jpeg,image/gif"
+                    label="Upload square image"
+                    sublabel="JPG/PNG · 1:1 ratio"
+                    onFile={(file) => {
+                      const url = URL.createObjectURL(file);
+                      updateCurrentAd({ squareImages: [...currentAd.squareImages, { id: `img-s-${Date.now()}`, type: "IMAGE" as const, url }] });
+                    }}
+                    compact
+                    libraryContext={"IMAGE_SQUARE" as "IMAGE"}
+                  />
+                  {currentAd.squareImages.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {currentAd.squareImages.map((img, i) => (
+                        <div key={img.id} className="group relative size-12 overflow-hidden rounded border border-border bg-muted">
+                          {img.url && <img src={img.url} alt={`Square ${i + 1}`} className="size-full object-cover" />}
+                          <button type="button" onClick={() => updateCurrentAd({ squareImages: currentAd.squareImages.filter((_, j) => j !== i) })} className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                            <X className="size-3 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Logos Section */}
+            {/* Logos Section — Functional Upload */}
             <div className="mb-5">
-              <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                Logos
-                <span className="font-normal text-muted-foreground">(Optional)</span>
-                <InfoTip text="Landscape logo (4:1, min 512x128) and square logo (1:1, min 128x128). Maps to logo_images and square_logo_images." />
-              </Label>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg border-2 border-dashed border-border p-3 text-center">
-                  <p className="text-[10px] font-semibold text-foreground">Landscape Logo (4:1)</p>
-                  <p className="text-[9px] text-muted-foreground">Min 512x128 px</p>
-                  <Badge variant="secondary" className="mt-1 rounded-full px-1.5 py-0 text-[8px]">{currentAd.logos.length}/{RDA_LIMITS.logo.max}</Badge>
-                  <div className="mt-2">
-                    <Button variant="outline" size="sm" className="h-6 gap-1 text-[9px]"><Plus className="size-3" /> Upload</Button>
-                  </div>
+              <div className="mb-3 flex items-center justify-between">
+                <Label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  Logos
+                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">Recommended</Badge>
+                  <InfoTip text="Add your store logo in both landscape (4:1) and square (1:1) formats. Logos help build brand recognition across Display placements. Square logos are more versatile." />
+                </Label>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <span className={currentAd.logos.length > 0 ? "text-emerald-600" : "text-muted-foreground"}>
+                    Wide: {currentAd.logos.length}/{RDA_LIMITS.logo.max}
+                  </span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className={currentAd.squareLogos.length > 0 ? "text-emerald-600" : "text-muted-foreground"}>
+                    Square: {currentAd.squareLogos.length}/{RDA_LIMITS.squareLogo.max}
+                  </span>
                 </div>
-                <div className="rounded-lg border-2 border-dashed border-border p-3 text-center">
-                  <p className="text-[10px] font-semibold text-foreground">Square Logo (1:1)</p>
-                  <p className="text-[9px] text-muted-foreground">Min 128x128 px</p>
-                  <Badge variant="secondary" className="mt-1 rounded-full px-1.5 py-0 text-[8px]">{currentAd.squareLogos.length}/{RDA_LIMITS.squareLogo.max}</Badge>
-                  <div className="mt-2">
-                    <Button variant="outline" size="sm" className="h-6 gap-1 text-[9px]"><Plus className="size-3" /> Upload</Button>
-                  </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Wide Logo */}
+                <div className="rounded-lg border border-border bg-muted/10 p-3">
+                  <p className="mb-1 text-[10px] font-semibold text-foreground">Wide Logo (4:1)</p>
+                  <p className="mb-2 text-[9px] text-muted-foreground">Min 512x128 · Rec 1200x300</p>
+                  <UploadZone
+                    accept="image/png,image/jpeg"
+                    label="Upload wide logo"
+                    sublabel="PNG/JPG · 4:1 ratio"
+                    onFile={(file) => {
+                      const url = URL.createObjectURL(file);
+                      updateCurrentAd({ logos: [...currentAd.logos, { id: `logo-w-${Date.now()}`, type: "LOGO" as const, url }] });
+                    }}
+                    compact
+                    libraryContext={"LOGO_LANDSCAPE" as "IMAGE"}
+                  />
+                  {currentAd.logos.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {currentAd.logos.map((logo, i) => (
+                        <div key={logo.id} className="group relative h-8 w-16 overflow-hidden rounded border border-border bg-muted">
+                          {logo.url && <img src={logo.url} alt={`Logo ${i + 1}`} className="size-full object-contain" />}
+                          <button type="button" onClick={() => updateCurrentAd({ logos: currentAd.logos.filter((_, j) => j !== i) })} className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                            <X className="size-3 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Square Logo */}
+                <div className="rounded-lg border border-border bg-muted/10 p-3">
+                  <p className="mb-1 text-[10px] font-semibold text-foreground">Square Logo (1:1)</p>
+                  <p className="mb-2 text-[9px] text-muted-foreground">Min 128x128 · Rec 1200x1200</p>
+                  <UploadZone
+                    accept="image/png,image/jpeg"
+                    label="Upload square logo"
+                    sublabel="PNG/JPG · 1:1 ratio"
+                    onFile={(file) => {
+                      const url = URL.createObjectURL(file);
+                      updateCurrentAd({ squareLogos: [...currentAd.squareLogos, { id: `logo-s-${Date.now()}`, type: "LOGO" as const, url }] });
+                    }}
+                    compact
+                    libraryContext={"LOGO_SQUARE" as "IMAGE"}
+                  />
+                  {currentAd.squareLogos.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {currentAd.squareLogos.map((logo, i) => (
+                        <div key={logo.id} className="group relative size-10 overflow-hidden rounded border border-border bg-muted">
+                          {logo.url && <img src={logo.url} alt={`Square Logo ${i + 1}`} className="size-full object-contain" />}
+                          <button type="button" onClick={() => updateCurrentAd({ squareLogos: currentAd.squareLogos.filter((_, j) => j !== i) })} className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                            <X className="size-3 text-white" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1967,81 +2275,239 @@ function DisplayCreativeEditor() {
               </div>
             </div>
 
-            {/* Advanced Options Toggle */}
-            <div>
-              <button type="button" onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-2 text-xs font-medium text-primary">
-                <ChevronDown className={cn("size-3.5 transition-transform", showAdvanced && "rotate-180")} />
-                Advanced Options
-              </button>
-              {showAdvanced && (
-                <div className="mt-3 flex flex-col gap-4 rounded-lg border border-border bg-muted/10 p-4">
-                  {/* Colors */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="mb-1 text-[10px] font-semibold text-foreground">Main Color</Label>
-                      <Input type="text" value={currentAd.mainColor} onChange={(e) => updateCurrentAd({ mainColor: e.target.value })} placeholder="#000000" className="h-8 text-xs" />
-                    </div>
-                    <div>
-                      <Label className="mb-1 text-[10px] font-semibold text-foreground">Accent Color</Label>
-                      <Input type="text" value={currentAd.accentColor} onChange={(e) => updateCurrentAd({ accentColor: e.target.value })} placeholder="#ffffff" className="h-8 text-xs" />
-                    </div>
-                  </div>
-                  {/* Allow Flexible Color */}
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[11px] font-semibold text-foreground">Allow Flexible Color</p>
-                      <p className="text-[10px] text-muted-foreground">Let Google adapt colors to improve performance</p>
-                    </div>
-                    <Switch checked={currentAd.allowFlexibleColor} onCheckedChange={(v) => updateCurrentAd({ allowFlexibleColor: v })} />
-                  </div>
-                  {/* Promo Text */}
-                  <div>
-                    <Label className="mb-1 text-[10px] font-semibold text-foreground">Promo Text <span className="font-normal text-muted-foreground">(Optional, max 15 chars)</span></Label>
-                    <Input value={currentAd.promoText} onChange={(e) => updateCurrentAd({ promoText: e.target.value.slice(0, 15) })} placeholder="Free shipping" className="h-8 text-xs" />
-                  </div>
-                  {/* Price Prefix */}
-                  <div>
-                    <Label className="mb-1 text-[10px] font-semibold text-foreground">Price Prefix <span className="font-normal text-muted-foreground">(Optional)</span></Label>
-                    <Input value={currentAd.pricePrefix} onChange={(e) => updateCurrentAd({ pricePrefix: e.target.value })} placeholder="As low as" className="h-8 text-xs" />
-                  </div>
-                  {/* Format Setting */}
-                  <div>
-                    <Label className="mb-2 text-[10px] font-semibold text-foreground">Ad Format</Label>
-                    <div className="flex flex-col gap-1.5">
-                      {DISPLAY_FORMAT_OPTIONS.map((fmt) => (
-                        <label key={fmt.value} className={cn("flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 transition-all",
-                          currentAd.formatSetting === fmt.value ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/40"
-                        )}>
-                          <Checkbox checked={currentAd.formatSetting === fmt.value} onCheckedChange={() => updateCurrentAd({ formatSetting: fmt.value })} />
-                          <div>
-                            <p className={cn("text-[11px] font-medium", currentAd.formatSetting === fmt.value ? "text-primary" : "text-foreground")}>{fmt.label}</p>
-                            <p className="text-[9px] text-muted-foreground">{fmt.desc}</p>
+            {/* Promo Text — High impact for e-commerce, in main flow */}
+            <div className="mb-5">
+              <Label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                Promo Text
+                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">High Impact</Badge>
+                <InfoTip text="Shows as a promotional overlay on your Display ads. Use for offers like 'Free shipping', '20% off', or 'New arrivals'. Highly effective for e-commerce." />
+              </Label>
+              <Input value={currentAd.promoText} onChange={(e) => updateCurrentAd({ promoText: e.target.value.slice(0, 25) })} placeholder="e.g. Free shipping, 20% off today" className="h-9 text-sm" maxLength={25} />
+              <p className="mt-1 text-[10px] text-muted-foreground">{currentAd.promoText.length}/25 characters</p>
+            </div>
+
+            {/* YouTube Videos — In main flow */}
+            <div className="mb-5">
+              <Label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                YouTube Videos
+                <span className="font-normal text-muted-foreground">(Optional, up to {RDA_LIMITS.youtubeVideos.max})</span>
+                <InfoTip text="Add YouTube video URLs to include video assets in your Display ads. Video ads get higher engagement on Display Network." />
+              </Label>
+              {currentAd.youtubeVideos.map((vid, vi) => (
+                <div key={vi} className="mb-1.5 flex items-center gap-2">
+                  <Input value={vid} onChange={(e) => {
+                    const next = [...currentAd.youtubeVideos]; next[vi] = e.target.value;
+                    updateCurrentAd({ youtubeVideos: next });
+                  }} placeholder="https://youtube.com/watch?v=..." className="h-8 flex-1 text-xs" />
+                  <button type="button" onClick={() => updateCurrentAd({ youtubeVideos: currentAd.youtubeVideos.filter((_, i) => i !== vi) })}
+                    className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"><X className="size-3.5" /></button>
+                </div>
+              ))}
+              {currentAd.youtubeVideos.length < RDA_LIMITS.youtubeVideos.max && (
+                <Button variant="outline" size="sm" className="h-7 gap-1 border-dashed text-[10px]" onClick={() => updateCurrentAd({ youtubeVideos: [...currentAd.youtubeVideos, ""] })}>
+                  <Plus className="size-3" /> Add Video URL
+                </Button>
+              )}
+            </div>
+
+            {/* Ad Format Info — Not a selector, just a note */}
+            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+              <p className="text-[10px] text-muted-foreground">
+                <span className="font-medium text-foreground">Ad Format:</span> All Formats (recommended). Google automatically renders your ad as native or standard display depending on the placement.
+              </p>
+            </div>
+          </div>
+
+          {/* ===== Content Targeting ===== */}
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <Target className="size-4 text-primary" />
+              <Label className="text-sm font-semibold text-foreground">Content Targeting</Label>
+              <Badge className="rounded-full bg-primary/10 px-1.5 py-0 text-[10px] text-primary">Display</Badge>
+              <InfoTip text="Choose where Display ads can appear using context keywords, topics, and placements." />
+            </div>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Define where your Display ads should appear on the Google Display Network (3M+ websites and apps).
+            </p>
+
+            {/* Contextual Keywords */}
+            <div className="mb-5">
+              <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Search className="size-3 text-primary" />
+                Contextual Keywords
+                <InfoTip text="Contextual keywords match page content (not search queries). Keep them tightly related to your products." />
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  value={contentKeywordInput}
+                  onChange={(e) => setContentKeywordInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addContentKeyword(); }}}
+                  placeholder="e.g. women's fashion, smartphone accessories..."
+                  className="h-9 flex-1 text-sm"
+                />
+                <Button size="sm" variant="outline" onClick={addContentKeyword} className="h-9 shrink-0">
+                  <Plus className="mr-1 size-3" /> Add
+                </Button>
+              </div>
+              {contentKeywords.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {contentKeywords.map((kw) => (
+                    <span key={kw} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary">
+                      {kw}
+                      <button type="button" onClick={() => updateCurrentGroup({ contentKeywords: contentKeywords.filter((k) => k !== kw) })} className="rounded-full p-0.5 hover:bg-primary/10">
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {contentKeywords.length === 0 && (
+                <p className="mt-1.5 text-[10px] text-muted-foreground">No keywords selected. Ads will rely on topic and audience targeting only.</p>
+              )}
+            </div>
+
+            {/* Topic Targeting — Multi-select Dropdown */}
+            <div className="mb-5">
+              <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Tag className="size-3 text-primary" />
+                Topic Targeting
+                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">{topics.length} selected</Badge>
+                <InfoTip text="Your ads appear on web pages and apps related to these topics. Select topics that match your product categories for relevant reach across 3M+ sites." />
+              </Label>
+              <p className="mb-2 text-[11px] text-muted-foreground">Select topics relevant to your products. Your ads appear on pages about these topics.</p>
+
+              {/* Dropdown trigger */}
+              <div className="rounded-lg border border-border bg-background">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById("display-topic-dropdown");
+                    if (el) el.classList.toggle("hidden");
+                  }}
+                  className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                >
+                  <span className="text-xs text-muted-foreground">
+                    {topics.length === 0 ? "Choose topics..." : `${topics.length} topic${topics.length !== 1 ? "s" : ""} selected`}
+                  </span>
+                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                </button>
+
+                {/* Dropdown content */}
+                <div id="display-topic-dropdown" className="hidden border-t border-border">
+                  <div className="max-h-56 overflow-y-auto p-1.5">
+                    {DISPLAY_TOPICS.map((topic) => {
+                      const selected = topics.includes(topic.id);
+                      return (
+                        <button
+                          key={topic.id}
+                          type="button"
+                          onClick={() => updateCurrentGroup({ topics: selected ? topics.filter((t) => t !== topic.id) : [...topics, topic.id] })}
+                          className={cn(
+                            "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors",
+                            selected ? "bg-primary/5" : "hover:bg-muted/50"
+                          )}
+                        >
+                          <div className={cn(
+                            "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                            selected ? "border-primary bg-primary text-white" : "border-border"
+                          )}>
+                            {selected && <CheckCircle2 className="size-3" />}
                           </div>
-                        </label>
-                      ))}
+                          <span className={cn("text-xs", selected ? "font-medium text-primary" : "text-foreground")}>{topic.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {topics.length > 0 && (
+                    <div className="flex items-center justify-between border-t border-border px-3 py-2">
+                      <span className="text-[11px] text-muted-foreground">{topics.length} of {DISPLAY_TOPICS.length} topics</span>
+                      <button type="button" onClick={() => updateCurrentGroup({ topics: [] })} className="text-[11px] font-medium text-primary hover:underline">Clear all</button>
                     </div>
-                  </div>
-                  {/* YouTube Videos */}
-                  <div>
-                    <Label className="mb-1 text-[10px] font-semibold text-foreground">YouTube Videos <span className="font-normal text-muted-foreground">(Optional, up to {RDA_LIMITS.youtubeVideos.max})</span></Label>
-                    <p className="mb-1.5 text-[9px] text-muted-foreground">Enter YouTube video URLs to include video assets in your Display ads.</p>
-                    {currentAd.youtubeVideos.map((vid, vi) => (
-                      <div key={vi} className="mb-1 flex items-center gap-2">
-                        <Input value={vid} onChange={(e) => {
-                          const next = [...currentAd.youtubeVideos]; next[vi] = e.target.value;
-                          updateCurrentAd({ youtubeVideos: next });
-                        }} placeholder="https://youtube.com/watch?v=..." className="h-7 flex-1 text-[10px]" />
-                        <button type="button" onClick={() => updateCurrentAd({ youtubeVideos: currentAd.youtubeVideos.filter((_, i) => i !== vi) })}
-                          className="rounded p-1 hover:bg-muted"><X className="size-3 text-muted-foreground" /></button>
-                      </div>
-                    ))}
-                    {currentAd.youtubeVideos.length < RDA_LIMITS.youtubeVideos.max && (
-                      <Button variant="ghost" size="sm" className="h-6 gap-1 text-[9px] text-primary" onClick={() => updateCurrentAd({ youtubeVideos: [...currentAd.youtubeVideos, ""] })}>
-                        <Plus className="size-3" /> Add Video
-                      </Button>
-                    )}
-                  </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Selected topics as pills */}
+              {topics.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {topics.map((t) => {
+                    const topic = DISPLAY_TOPICS.find((dt) => dt.id === t);
+                    return (
+                      <span key={t} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        {topic?.label ?? t}
+                        <button type="button" onClick={() => updateCurrentGroup({ topics: topics.filter((x) => x !== t) })} className="text-primary/60 hover:text-primary">
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Managed Placements */}
+            <div className="mb-5">
+              <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Link2 className="size-3 text-primary" />
+                Managed Placements
+                <InfoTip text="Managed placements force delivery on specific sites/apps/channels you choose." />
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  value={placementInput}
+                  onChange={(e) => setPlacementInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPlacement(); }}}
+                  placeholder="e.g. example.com, youtube.com/channel/..."
+                  className="h-9 flex-1 text-sm"
+                />
+                <Button size="sm" variant="outline" onClick={addPlacement} className="h-9 shrink-0">
+                  <Plus className="mr-1 size-3" /> Add
+                </Button>
+              </div>
+              {placements.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {placements.map((p) => (
+                    <span key={p} className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                      <Globe className="size-3" />
+                      {p}
+                      <button type="button" onClick={() => updateCurrentGroup({ placements: placements.filter((x) => x !== p) })} className="rounded-full p-0.5 hover:bg-blue-100">
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Excluded Placements */}
+            <div>
+              <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <ShieldCheck className="size-3 text-red-500" />
+                Excluded Placements
+                <InfoTip text="Exclude low-quality or irrelevant placements to protect brand safety and spend quality." />
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  value={excludedPlacementInput}
+                  onChange={(e) => setExcludedPlacementInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addExcludedPlacement(); }}}
+                  placeholder="e.g. competitor-site.com..."
+                  className="h-9 flex-1 text-sm"
+                />
+                <Button size="sm" variant="outline" onClick={addExcludedPlacement} className="h-9 shrink-0">
+                  <Plus className="mr-1 size-3" /> Add
+                </Button>
+              </div>
+              {excludedPlacements.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {excludedPlacements.map((p) => (
+                    <span key={p} className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-600">
+                      {p}
+                      <button type="button" onClick={() => updateCurrentGroup({ excludedPlacements: excludedPlacements.filter((x) => x !== p) })} className="rounded-full p-0.5 hover:bg-red-100">
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  ))}
                 </div>
               )}
             </div>
@@ -2121,12 +2587,12 @@ function DisplayCreativeEditor() {
               <p className="mb-3 text-xs font-bold text-foreground">Ad Summary</p>
               <div className="flex flex-col gap-2 text-[11px]">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Ad Groups</span>
-                  <span className="font-semibold text-foreground">{safeGroups.length}</span>
+                  <span className="text-muted-foreground">Ad Group</span>
+                  <span className="font-semibold text-foreground">{currentGroup.name}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Ads</span>
-                  <span className="font-semibold text-foreground">{safeGroups.reduce((acc, g) => acc + g.ads.length, 0)}</span>
+                  <span className="font-semibold text-foreground">{currentGroup.ads.length}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Headlines</span>
@@ -2190,6 +2656,7 @@ function SearchCreativeEditor() {
   const { campaign, setStep, updateNested } = useGoogleCampaign();
   const adGroups = campaign.creative.searchAdGroups ?? [];
   const [activeGroupIdx, setActiveGroupIdx] = useState(0);
+  const [activeAdIdx, setActiveAdIdx] = useState(0);
 
   /* Ensure at least 1 ad group */
   const safeGroups = adGroups.length > 0 ? adGroups : [createSearchAdGroup(1)];
@@ -2199,19 +2666,6 @@ function SearchCreativeEditor() {
   const updateCurrentGroup = (patch: Partial<SearchAdGroup>) => {
     const groups = safeGroups.map((g, i) => i === activeGroupIdx ? { ...g, ...patch } : g);
     updateAdGroups(groups);
-  };
-
-  /* Add/remove ad groups */
-  const addAdGroup = () => {
-    const groups = [...safeGroups, createSearchAdGroup(safeGroups.length + 1)];
-    updateAdGroups(groups);
-    setActiveGroupIdx(groups.length - 1);
-  };
-  const removeAdGroup = (idx: number) => {
-    if (safeGroups.length <= 1) return;
-    const groups = safeGroups.filter((_, i) => i !== idx);
-    updateAdGroups(groups);
-    setActiveGroupIdx(Math.min(activeGroupIdx, groups.length - 1));
   };
 
   /* Ad CRUD within current group */
@@ -2236,6 +2690,84 @@ function SearchCreativeEditor() {
       descriptions: source.descriptions.map((d) => ({ ...d, id: `d-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` })),
     };
     updateCurrentGroup({ ads: [...currentGroup.ads, dupe] });
+  };
+
+  /* AI Generate from Store */
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateFromStore = async () => {
+    setIsGenerating(true);
+    try {
+      const draft = await generateSearchDraft();
+      const curGroup = safeGroups[activeGroupIdx] ?? safeGroups[0];
+      if (!curGroup) return;
+      const currentAd = curGroup.ads[0];
+      if (!currentAd) return;
+
+      // Fill headlines (up to 15, preserving existing non-empty ones)
+      const existingHeadlines = currentAd.headlines.filter(h => h.text.trim());
+      const newHeadlines = draft.headlines
+        .filter(h => !existingHeadlines.some(eh => eh.text.toLowerCase() === h.text.toLowerCase()))
+        .slice(0, 15 - existingHeadlines.length)
+        .map((h, i) => ({ id: `gen-h-${Date.now()}-${i}`, text: h.text, pinnedPosition: null as any }));
+      const allHeadlines = [...existingHeadlines, ...newHeadlines];
+      while (allHeadlines.length < 15) {
+        allHeadlines.push({ id: `pad-h-${Date.now()}-${allHeadlines.length}`, text: "", pinnedPosition: null as any });
+      }
+
+      // Fill descriptions (up to 4)
+      const existingDescs = currentAd.descriptions.filter(d => d.text.trim());
+      const newDescs = draft.descriptions
+        .filter(d => !existingDescs.some(ed => ed.text.toLowerCase() === d.text.toLowerCase()))
+        .slice(0, 4 - existingDescs.length)
+        .map((d, i) => ({ id: `gen-d-${Date.now()}-${i}`, text: d.text, pinnedPosition: null as any }));
+      const allDescs = [...existingDescs, ...newDescs];
+      while (allDescs.length < 4) {
+        allDescs.push({ id: `pad-d-${Date.now()}-${allDescs.length}`, text: "", pinnedPosition: null as any });
+      }
+
+      // Update the ad
+      const updatedAd = {
+        ...currentAd,
+        headlines: allHeadlines,
+        descriptions: allDescs,
+        finalUrl: currentAd.finalUrl || draft.finalUrl,
+        displayPath1: currentAd.displayPath1 || draft.displayPath1,
+        displayPath2: currentAd.displayPath2 || draft.displayPath2,
+      };
+
+      const updatedGroup = {
+        ...curGroup,
+        ads: curGroup.ads.map((a, i) => i === 0 ? updatedAd : a),
+      };
+
+      updateNested("creative", {
+        searchAdGroups: safeGroups.map((g, i) =>
+          i === activeGroupIdx ? updatedGroup : g
+        ),
+      });
+
+      // Auto-fill extensions if empty
+      if (campaign.creative.sitelinkExtensions.length === 0) {
+        const snapshot = await getStoreSnapshot();
+        updateNested("creative", { sitelinkExtensions: generateSitelinks(snapshot) });
+      }
+      if (campaign.creative.calloutExtensions.length === 0) {
+        updateNested("creative", {
+          calloutExtensions: generateCallouts().map((text, i) => ({
+            id: `gen-co-${Date.now()}-${i}`,
+            text,
+          })),
+        });
+      }
+      if (campaign.creative.structuredSnippetExtensions.length === 0) {
+        const snapshot = await getStoreSnapshot();
+        updateNested("creative", { structuredSnippetExtensions: generateSnippets(snapshot) });
+      }
+    } catch (e) {
+      console.error("Failed to generate draft:", e);
+    }
+    setIsGenerating(false);
   };
 
   /* Extensions (campaign-level, stored in creative settings) */
@@ -2269,8 +2801,8 @@ function SearchCreativeEditor() {
     updateNested("creative", { structuredSnippetExtensions: snippets.filter((s) => s.id !== id) });
   };
 
-  /* Preview ad (first ad in current group) */
-  const previewAd = currentGroup.ads[0] ?? createSearchAd(1);
+  /* Preview ad (active ad in current group) */
+  const previewAd = currentGroup.ads[activeAdIdx] ?? currentGroup.ads[0] ?? createSearchAd(1);
   const previewStrength = calcRsaStrength(previewAd, currentGroup.keywords.length);
 
   return (
@@ -2282,40 +2814,56 @@ function SearchCreativeEditor() {
         {/* ============================================================ */}
         <div className="flex flex-1 flex-col gap-5">
 
-          {/* Ad Group Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto">
-            {safeGroups.map((g, idx) => (
-              <button key={g.id} type="button" onClick={() => setActiveGroupIdx(idx)}
-                className={cn("flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
-                  idx === activeGroupIdx ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
-                )}>
-                <Layers className="size-3" />
-                {g.name}
-                <Badge variant="secondary" className="rounded-full px-1 py-0 text-[8px]">{g.keywords.length} kw</Badge>
-              </button>
-            ))}
-            <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={addAdGroup}>
-              <Plus className="size-3" /> Ad Group
-            </Button>
-            {safeGroups.length > 1 && (
-              <Button variant="ghost" size="sm" className="h-8 gap-1 text-[10px] text-red-500" onClick={() => removeAdGroup(activeGroupIdx)}>
-                <Trash2 className="size-3" /> Remove
+          {/* Smart Generate Banner */}
+          <div className="mb-4 rounded-xl border border-primary/20 bg-gradient-to-r from-primary/[0.04] to-primary/[0.08] p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+                  <Sparkles className="size-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Generate Ad from Store Data</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Auto-fill headlines, descriptions, display paths, sitelinks &amp; callouts from your store&apos;s products and categories.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="default"
+                size="sm"
+                className="shrink-0 gap-1.5"
+                onClick={handleGenerateFromStore}
+                disabled={isGenerating}
+              >
+                {isGenerating ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                {isGenerating ? "Generating..." : "Generate"}
               </Button>
-            )}
+            </div>
           </div>
 
-          {/* Ad Group Name + Keywords count */}
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-3">
-              <div>
-                <Label className="mb-1 text-xs font-semibold text-foreground">Ad Group Name</Label>
-                <Input value={currentGroup.name} onChange={(e) => updateCurrentGroup({ name: e.target.value })} placeholder="Ad Group 1" className="h-8 w-60 text-xs" />
-              </div>
-              <div className="flex-1" />
-              <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2">
-                <Search className="size-3.5 text-primary" />
-                <span className="text-xs text-foreground">{currentGroup.keywords.length} keywords</span>
-                <button type="button" onClick={() => setStep(1)} className="text-[10px] text-primary underline">Edit in Audience</button>
+          {/* Ad Group Header (single group) */}
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+              <Layers className="size-4 text-primary" />
+            </div>
+            <div className="flex flex-1 items-center gap-3">
+              <Input
+                value={currentGroup.name}
+                onChange={(e) => updateCurrentGroup({ name: e.target.value })}
+                className="h-8 w-48 text-sm font-medium"
+                placeholder="Ad Group Name"
+              />
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px]">
+                  {currentGroup.keywords?.length ?? 0} keywords
+                </Badge>
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="text-primary hover:underline"
+                >
+                  Edit in Audience →
+                </button>
               </div>
             </div>
           </div>
@@ -2329,9 +2877,11 @@ function SearchCreativeEditor() {
                 adIndex={adIdx}
                 totalAds={currentGroup.ads.length}
                 keywordCount={currentGroup.keywords.length}
+                storeName={campaign.objective.campaignName.split(" - ")[0] || "Store"}
                 onUpdate={(patch) => updateAd(adIdx, patch)}
                 onDelete={() => deleteAd(adIdx)}
                 onDuplicate={() => duplicateAd(adIdx)}
+                onExpand={(idx) => setActiveAdIdx(idx)}
               />
             ))}
             {currentGroup.ads.length < 3 && (
@@ -2356,11 +2906,24 @@ function SearchCreativeEditor() {
                   <ExternalLink className="size-3 text-primary" />
                   <Label className="text-xs font-semibold text-foreground">Sitelinks</Label>
                   <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{sitelinks.length}</Badge>
-                  <InfoTip text="Add links below your ad to specific pages. Max 25 chars for link text, 35 chars for descriptions." />
+                  <InfoTip text="Additional links shown below your ad. Add 4-6 sitelinks to boost CTR by up to 15%. Use key store pages: Best Sellers, New Arrivals, Sale, Categories." />
                 </div>
-                {sitelinks.length < 6 && (
-                  <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] text-primary" onClick={addSitelink}><Plus className="size-3" /> Add</Button>
-                )}
+                <div className="flex items-center gap-1">
+                  {sitelinks.length < 6 && (
+                    <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] text-primary" onClick={addSitelink}><Plus className="size-3" /> Add</Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 gap-1 text-[10px] text-primary"
+                    onClick={async () => {
+                      const snapshot = await getStoreSnapshot();
+                      updateNested("creative", { sitelinkExtensions: generateSitelinks(snapshot) });
+                    }}
+                  >
+                    <Sparkles className="size-3" /> Auto-fill from Store
+                  </Button>
+                </div>
               </div>
               {sitelinks.map((sl) => (
                 <div key={sl.id} className="mb-2 rounded-lg border border-border bg-muted/10 p-3">
@@ -2385,11 +2948,28 @@ function SearchCreativeEditor() {
                   <Hash className="size-3 text-primary" />
                   <Label className="text-xs font-semibold text-foreground">Callouts</Label>
                   <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{callouts.length}</Badge>
-                  <InfoTip text="Short text snippets that highlight key features. Max 25 chars each. e.g. 'Free Shipping', '24/7 Support'" />
+                  <InfoTip text="Short benefit phrases shown in your ad. Add 6-8 callouts highlighting key selling points: Free Shipping, Cash on Delivery, Easy Returns, 24/7 Support." />
                 </div>
-                {callouts.length < 10 && (
-                  <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] text-primary" onClick={addCallout}><Plus className="size-3" /> Add</Button>
-                )}
+                <div className="flex items-center gap-1">
+                  {callouts.length < 10 && (
+                    <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] text-primary" onClick={addCallout}><Plus className="size-3" /> Add</Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 gap-1 text-[10px] text-primary"
+                    onClick={() => {
+                      updateNested("creative", {
+                        calloutExtensions: generateCallouts().map((text, i) => ({
+                          id: `gen-co-${Date.now()}-${i}`,
+                          text,
+                        })),
+                      });
+                    }}
+                  >
+                    <Sparkles className="size-3" /> Auto-fill from Store
+                  </Button>
+                </div>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {callouts.map((co) => (
@@ -2411,9 +2991,22 @@ function SearchCreativeEditor() {
                   <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{snippets.length}</Badge>
                   <InfoTip text="Highlight specific aspects of your products using predefined headers and values (3-10 values, 25 chars each)." />
                 </div>
-                {snippets.length < 4 && (
-                  <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] text-primary" onClick={addSnippet}><Plus className="size-3" /> Add</Button>
-                )}
+                <div className="flex items-center gap-1">
+                  {snippets.length < 4 && (
+                    <Button variant="ghost" size="sm" className="h-6 gap-1 text-[10px] text-primary" onClick={addSnippet}><Plus className="size-3" /> Add</Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 gap-1 text-[10px] text-primary"
+                    onClick={async () => {
+                      const snapshot = await getStoreSnapshot();
+                      updateNested("creative", { structuredSnippetExtensions: generateSnippets(snapshot) });
+                    }}
+                  >
+                    <Sparkles className="size-3" /> Auto-fill from Store
+                  </Button>
+                </div>
               </div>
               {snippets.map((sn) => (
                 <div key={sn.id} className="mb-2 rounded-lg border border-border bg-muted/10 p-3">
@@ -2445,6 +3038,268 @@ function SearchCreativeEditor() {
               ))}
             </div>
           </div>
+
+          {/* ---- Price Extensions (Manual + AI) ---- */}
+          <SectionCard>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DollarSign className="size-4 text-primary" />
+                <Label className="text-sm font-semibold text-foreground">Price Extensions</Label>
+                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">{(campaign.creative.priceExtensions ?? []).flatMap(pe => pe.offerings).length} items</Badge>
+              </div>
+              <div className="flex gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 text-[10px]"
+                  onClick={() => {
+                    const existing = campaign.creative.priceExtensions ?? [];
+                    if (existing.length > 0) {
+                      // Add offering to first price asset
+                      const first = existing[0];
+                      if (first.offerings.length >= 8) return;
+                      const updated = { ...first, offerings: [...first.offerings, { id: `po-${Date.now()}`, header: "", description: "", priceMicros: 0, unit: "NONE" as const, finalUrl: "" }] };
+                      updateNested("creative", { priceExtensions: [updated, ...existing.slice(1)] });
+                    } else {
+                      // Create new price asset with one empty offering
+                      updateNested("creative", { priceExtensions: [{ id: `pe-${Date.now()}`, type: "PRODUCT_CATEGORIES" as const, priceQualifier: "FROM" as const, languageCode: "ar", offerings: [{ id: `po-${Date.now()}`, header: "", description: "", priceMicros: 0, unit: "NONE" as const, finalUrl: "" }] }] });
+                    }
+                  }}
+                >
+                  <Plus className="size-3" /> Add Item
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1 text-[10px] text-primary"
+                  onClick={async () => {
+                    const snapshot = await getStoreSnapshot();
+                    const { generatePriceExtensions } = await import("@/lib/google/search-ai-generator");
+                    updateNested("creative", { priceExtensions: generatePriceExtensions(snapshot) });
+                  }}
+                >
+                  <Sparkles className="size-3" /> Auto-fill
+                </Button>
+              </div>
+            </div>
+            <p className="mb-3 text-[11px] text-muted-foreground">
+              Show product prices directly in your ad. Pre-qualifies clicks — shoppers see prices before clicking, reducing wasted spend on browsers. Add up to 8 items.
+            </p>
+            {(campaign.creative.priceExtensions ?? []).length > 0 ? (
+              <div className="space-y-2">
+                {(campaign.creative.priceExtensions ?? []).map((pe, peIdx) => (
+                  <div key={pe.id} className="rounded-lg border border-border bg-muted/20 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">{pe.offerings.length}/8 items</span>
+                      <button type="button" className="text-[10px] text-destructive hover:underline" onClick={() => updateNested("creative", { priceExtensions: (campaign.creative.priceExtensions ?? []).filter(p => p.id !== pe.id) })}>
+                        Remove all
+                      </button>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {pe.offerings.map((o, oIdx) => (
+                        <div key={o.id} className="flex items-start gap-2 rounded border border-border bg-background p-2">
+                          <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
+                            <Input
+                              value={o.header}
+                              onChange={(e) => {
+                                const newOfferings = [...pe.offerings];
+                                newOfferings[oIdx] = { ...o, header: e.target.value.slice(0, 25) };
+                                const newPe = [...(campaign.creative.priceExtensions ?? [])];
+                                newPe[peIdx] = { ...pe, offerings: newOfferings };
+                                updateNested("creative", { priceExtensions: newPe });
+                              }}
+                              placeholder="Product name"
+                              className="h-7 text-[11px]"
+                            />
+                            <Input
+                              value={o.description}
+                              onChange={(e) => {
+                                const newOfferings = [...pe.offerings];
+                                newOfferings[oIdx] = { ...o, description: e.target.value.slice(0, 25) };
+                                const newPe = [...(campaign.creative.priceExtensions ?? [])];
+                                newPe[peIdx] = { ...pe, offerings: newOfferings };
+                                updateNested("creative", { priceExtensions: newPe });
+                              }}
+                              placeholder="Description"
+                              className="h-7 text-[11px]"
+                            />
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-muted-foreground">SAR</span>
+                              <Input
+                                type="number"
+                                value={o.priceMicros > 0 ? (o.priceMicros / 1_000_000).toFixed(0) : ""}
+                                onChange={(e) => {
+                                  const newOfferings = [...pe.offerings];
+                                  newOfferings[oIdx] = { ...o, priceMicros: Math.round(Number(e.target.value || 0) * 1_000_000) };
+                                  const newPe = [...(campaign.creative.priceExtensions ?? [])];
+                                  newPe[peIdx] = { ...pe, offerings: newOfferings };
+                                  updateNested("creative", { priceExtensions: newPe });
+                                }}
+                                placeholder="Price"
+                                className="h-7 w-20 text-[11px]"
+                              />
+                            </div>
+                            <Input
+                              value={o.finalUrl}
+                              onChange={(e) => {
+                                const newOfferings = [...pe.offerings];
+                                newOfferings[oIdx] = { ...o, finalUrl: e.target.value };
+                                const newPe = [...(campaign.creative.priceExtensions ?? [])];
+                                newPe[peIdx] = { ...pe, offerings: newOfferings };
+                                updateNested("creative", { priceExtensions: newPe });
+                              }}
+                              placeholder="URL"
+                              className="h-7 text-[11px]"
+                            />
+                          </div>
+                          <button type="button" className="mt-1 text-muted-foreground hover:text-destructive" onClick={() => {
+                            const newOfferings = pe.offerings.filter((_, i) => i !== oIdx);
+                            if (newOfferings.length === 0) {
+                              updateNested("creative", { priceExtensions: (campaign.creative.priceExtensions ?? []).filter(p => p.id !== pe.id) });
+                            } else {
+                              const newPe = [...(campaign.creative.priceExtensions ?? [])];
+                              newPe[peIdx] = { ...pe, offerings: newOfferings };
+                              updateNested("creative", { priceExtensions: newPe });
+                            }
+                          }}>
+                            <X className="size-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 text-center">
+                <p className="text-[11px] text-muted-foreground">No price items added. Use &quot;Add Item&quot; to add manually or &quot;Auto-fill&quot; to populate from your products.</p>
+              </div>
+            )}
+          </SectionCard>
+
+          {/* ---- Promotion Extensions (Manual + AI) ---- */}
+          <SectionCard>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Tag className="size-4 text-primary" />
+                <Label className="text-sm font-semibold text-foreground">Promotion Extensions</Label>
+                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">{(campaign.creative.promotionExtensions ?? []).length}</Badge>
+              </div>
+              <div className="flex gap-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 text-[10px]"
+                  onClick={() => {
+                    const today = new Date().toISOString().split("T")[0];
+                    const twoWeeks = new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0];
+                    updateNested("creative", {
+                      promotionExtensions: [...(campaign.creative.promotionExtensions ?? []), {
+                        id: `promo-${Date.now()}`,
+                        promotionTarget: "",
+                        discountModifier: "NONE" as const,
+                        discountType: "PERCENT_OFF" as const,
+                        moneyAmountMicros: 0,
+                        percentOff: 0,
+                        occasion: "NONE" as const,
+                        finalUrl: "",
+                        startDate: today,
+                        endDate: twoWeeks,
+                      }],
+                    });
+                  }}
+                >
+                  <Plus className="size-3" /> Add Promotion
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1 text-[10px] text-primary"
+                  onClick={async () => {
+                    const snapshot = await getStoreSnapshot();
+                    const { generatePromotionExtensions } = await import("@/lib/google/search-ai-generator");
+                    updateNested("creative", { promotionExtensions: generatePromotionExtensions(snapshot) });
+                  }}
+                >
+                  <Sparkles className="size-3" /> Auto-generate
+                </Button>
+              </div>
+            </div>
+            <p className="mb-3 text-[11px] text-muted-foreground">
+              Highlight active promotions with discount details and urgency. Increases CTR by 10-20%. Best used during sales, seasonal events, or limited-time offers.
+            </p>
+            {(campaign.creative.promotionExtensions ?? []).length > 0 ? (
+              <div className="space-y-3">
+                {(campaign.creative.promotionExtensions ?? []).map((promo, promoIdx) => (
+                  <div key={promo.id} className="rounded-lg border border-border bg-muted/20 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-medium text-foreground">Promotion {promoIdx + 1}</span>
+                      <button type="button" className="text-[10px] text-destructive hover:underline" onClick={() => updateNested("creative", { promotionExtensions: (campaign.creative.promotionExtensions ?? []).filter(p => p.id !== promo.id) })}>
+                        Remove
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-[10px] font-medium text-muted-foreground">What&apos;s being promoted (max 20 chars)</label>
+                        <Input
+                          value={promo.promotionTarget}
+                          onChange={(e) => {
+                            const newPromos = [...(campaign.creative.promotionExtensions ?? [])];
+                            newPromos[promoIdx] = { ...promo, promotionTarget: e.target.value.slice(0, 20) };
+                            updateNested("creative", { promotionExtensions: newPromos });
+                          }}
+                          placeholder="e.g. Summer Collection"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[10px] font-medium text-muted-foreground">Discount type</label>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => { const np = [...(campaign.creative.promotionExtensions ?? [])]; np[promoIdx] = { ...promo, discountType: "PERCENT_OFF" }; updateNested("creative", { promotionExtensions: np }); }} className={cn("rounded-md border px-2.5 py-1.5 text-[11px] transition-all", promo.discountType === "PERCENT_OFF" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>% Off</button>
+                          <button type="button" onClick={() => { const np = [...(campaign.creative.promotionExtensions ?? [])]; np[promoIdx] = { ...promo, discountType: "MONETARY" }; updateNested("creative", { promotionExtensions: np }); }} className={cn("rounded-md border px-2.5 py-1.5 text-[11px] transition-all", promo.discountType === "MONETARY" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>SAR Off</button>
+                          <button type="button" onClick={() => { const np = [...(campaign.creative.promotionExtensions ?? [])]; np[promoIdx] = { ...promo, discountType: "NONE" }; updateNested("creative", { promotionExtensions: np }); }} className={cn("rounded-md border px-2.5 py-1.5 text-[11px] transition-all", promo.discountType === "NONE" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground")}>No discount</button>
+                        </div>
+                      </div>
+                      {promo.discountType === "PERCENT_OFF" && (
+                        <div>
+                          <label className="mb-1 block text-[10px] font-medium text-muted-foreground">Discount percentage</label>
+                          <div className="flex items-center gap-1">
+                            <Input type="number" value={promo.percentOff || ""} onChange={(e) => { const np = [...(campaign.creative.promotionExtensions ?? [])]; np[promoIdx] = { ...promo, percentOff: Math.min(100, Math.max(0, Number(e.target.value || 0))) }; updateNested("creative", { promotionExtensions: np }); }} placeholder="20" className="h-8 w-20 text-xs" />
+                            <span className="text-xs text-muted-foreground">%</span>
+                          </div>
+                        </div>
+                      )}
+                      {promo.discountType === "MONETARY" && (
+                        <div>
+                          <label className="mb-1 block text-[10px] font-medium text-muted-foreground">Discount amount</label>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground">SAR</span>
+                            <Input type="number" value={promo.moneyAmountMicros > 0 ? (promo.moneyAmountMicros / 1_000_000).toFixed(0) : ""} onChange={(e) => { const np = [...(campaign.creative.promotionExtensions ?? [])]; np[promoIdx] = { ...promo, moneyAmountMicros: Math.round(Number(e.target.value || 0) * 1_000_000) }; updateNested("creative", { promotionExtensions: np }); }} placeholder="50" className="h-8 w-20 text-xs" />
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <label className="mb-1 block text-[10px] font-medium text-muted-foreground">Landing page URL</label>
+                        <Input value={promo.finalUrl} onChange={(e) => { const np = [...(campaign.creative.promotionExtensions ?? [])]; np[promoIdx] = { ...promo, finalUrl: e.target.value }; updateNested("creative", { promotionExtensions: np }); }} placeholder="https://store.salla.sa/sale" className="h-8 text-xs" />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[10px] font-medium text-muted-foreground">Start date</label>
+                        <Input type="date" value={promo.startDate} onChange={(e) => { const np = [...(campaign.creative.promotionExtensions ?? [])]; np[promoIdx] = { ...promo, startDate: e.target.value }; updateNested("creative", { promotionExtensions: np }); }} className="h-8 text-xs" />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[10px] font-medium text-muted-foreground">End date</label>
+                        <Input type="date" value={promo.endDate} onChange={(e) => { const np = [...(campaign.creative.promotionExtensions ?? [])]; np[promoIdx] = { ...promo, endDate: e.target.value }; updateNested("creative", { promotionExtensions: np }); }} className="h-8 text-xs" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 text-center">
+                <p className="text-[11px] text-muted-foreground">No promotions added. Use &quot;Add Promotion&quot; to create manually or &quot;Auto-generate&quot; from your sale items.</p>
+              </div>
+            )}
+          </SectionCard>
 
         </div>
 
@@ -2511,20 +3366,27 @@ function SearchCreativeEditor() {
               {/* Checklist */}
               <div className="flex flex-col gap-1.5 text-[11px]">
                 {[
-                  { label: "Headlines", done: previewAd.headlines.filter((h) => h.text.trim()).length >= RSA_LIMITS.headlines.min, count: `${previewAd.headlines.filter((h) => h.text.trim()).length}/${RSA_LIMITS.headlines.max}` },
-                  { label: "Descriptions", done: previewAd.descriptions.filter((d) => d.text.trim()).length >= RSA_LIMITS.descriptions.min, count: `${previewAd.descriptions.filter((d) => d.text.trim()).length}/${RSA_LIMITS.descriptions.max}` },
-                  { label: "Final URL", done: !!previewAd.finalUrl.trim(), count: previewAd.finalUrl.trim() ? "Set" : "Required" },
-                  { label: "Display Path", done: !!previewAd.displayPath1.trim(), count: previewAd.displayPath1.trim() ? "Set" : "Optional" },
-                  { label: "Keywords", done: currentGroup.keywords.length >= 1, count: `${currentGroup.keywords.length}` },
-                  { label: "Sitelinks", done: sitelinks.length >= 2, count: `${sitelinks.length}` },
-                  { label: "Callouts", done: callouts.length >= 2, count: `${callouts.length}` },
+                  { label: "Headlines", done: previewAd.headlines.filter((h) => h.text.trim()).length >= 10, count: `${previewAd.headlines.filter((h) => h.text.trim()).length}/${RSA_LIMITS.headlines.max}`, tip: "Add more for Google to test combinations" },
+                  { label: "Descriptions", done: previewAd.descriptions.filter((d) => d.text.trim()).length >= RSA_LIMITS.descriptions.max, count: `${previewAd.descriptions.filter((d) => d.text.trim()).length}/${RSA_LIMITS.descriptions.max}`, tip: "Max 4 \u2014 more variety = better results" },
+                  { label: "Final URL", done: !!previewAd.finalUrl.trim(), count: previewAd.finalUrl.trim() ? "Set" : "Required", tip: "Required \u2014 where users land after clicking" },
+                  { label: "Display Path", done: !!previewAd.displayPath1.trim(), count: previewAd.displayPath1.trim() ? "Set" : "Optional", tip: "Adds context \u2014 e.g. /Products/Perfume" },
+                  { label: "Keywords", done: currentGroup.keywords.length >= 5, count: `${currentGroup.keywords.length}`, tip: "Add 10+ keywords in Step 1 for better reach" },
+                  { label: "Sitelinks", done: sitelinks.length >= 2, count: `${sitelinks.length}`, tip: "Boosts CTR by up to 15%" },
+                  { label: "Callouts", done: callouts.length >= 2, count: `${callouts.length}`, tip: "Highlight benefits like Free Shipping, Easy Returns" },
                 ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      {item.done ? <CheckCircle2 className="size-3 text-emerald-500" /> : <div className="size-3 rounded-full border-2 border-muted" />}
-                      <span className={item.done ? "text-foreground" : "text-muted-foreground"}>{item.label}</span>
+                  <div key={item.label}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        {item.done ? <CheckCircle2 className="size-3 text-emerald-500" /> : <div className="size-3 rounded-full border-2 border-muted" />}
+                        <span className={item.done ? "text-foreground" : "text-muted-foreground"}>{item.label}</span>
+                      </div>
+                      <span className="text-muted-foreground">{item.count}</span>
                     </div>
-                    <span className="text-muted-foreground">{item.count}</span>
+                    {!item.done && (
+                      <p className="ml-6 -mt-0.5 mb-1 text-[9px] text-muted-foreground">
+                        {item.tip}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -2592,32 +3454,6 @@ function DemandGenCreativeEditor() {
     setAdGroups(next);
   }, [adGroups, setAdGroups]);
 
-  const addAdGroup = () => {
-    const next = [...adGroups, createDemandGenAdGroup(adGroups.length + 1)];
-    setAdGroups(next);
-    setActiveGroupIdx(next.length - 1);
-  };
-
-  const deleteAdGroup = (idx: number) => {
-    if (adGroups.length <= 1) return;
-    const next = adGroups.filter((_, i) => i !== idx);
-    setAdGroups(next);
-    setActiveGroupIdx(Math.min(activeGroupIdx, next.length - 1));
-  };
-
-  const duplicateAdGroup = (idx: number) => {
-    const source = adGroups[idx];
-    const dup: DemandGenAdGroup = {
-      ...source,
-      id: `dg-ag-${Date.now()}`,
-      name: `${source.name} (copy)`,
-      ads: source.ads.map((a) => ({ ...a, id: `dg-ad-${Date.now()}-${Math.random().toString(36).slice(2, 5)}` })),
-    };
-    const next = [...adGroups]; next.splice(idx + 1, 0, dup);
-    setAdGroups(next);
-    setActiveGroupIdx(idx + 1);
-  };
-
   const addAd = (groupIdx: number) => {
     const group = adGroups[groupIdx];
     updateGroup(groupIdx, { ads: [...group.ads, createDemandGenAd(group.ads.length + 1)] });
@@ -2661,59 +3497,60 @@ function DemandGenCreativeEditor() {
             </p>
           </div>
 
-          {/* ---- Ad Group Tabs ---- */}
-          <div className="flex items-end gap-2 border-b border-border pb-0">
-            <div className="flex flex-1 gap-1 overflow-x-auto">
-              {adGroups.map((ag, gi) => (
-                <div
-                  key={ag.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setActiveGroupIdx(gi)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveGroupIdx(gi); } }}
-                  className={cn(
-                    "group flex shrink-0 cursor-pointer items-center gap-2 rounded-t-lg border-x border-t px-3.5 py-2 text-xs font-medium transition-colors",
-                    gi === activeGroupIdx
-                      ? "border-border bg-card text-foreground shadow-sm"
-                      : "border-transparent bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                  )}
-                >
-                  <span>{ag.name || `Ad Group ${gi + 1}`}</span>
-                  <Badge variant="secondary" className="rounded-full px-1 py-0 text-[9px]">{ag.ads.length} ad{ag.ads.length !== 1 ? "s" : ""}</Badge>
-                  {adGroups.length > 1 && (
-                    <span className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                      <button type="button" onClick={(e) => { e.stopPropagation(); duplicateAdGroup(gi); }} className="rounded p-0.5 hover:bg-muted" title="Duplicate">
-                        <Copy className="size-3 text-muted-foreground" />
-                      </button>
-                      <button type="button" onClick={(e) => { e.stopPropagation(); deleteAdGroup(gi); }} className="rounded p-0.5 hover:bg-red-50" title="Delete">
-                        <Trash2 className="size-3 text-muted-foreground hover:text-red-500" />
-                      </button>
-                    </span>
-                  )}
+          {/* ---- Generate from Store Banner ---- */}
+          <div className="mb-4 rounded-xl border border-primary/20 bg-gradient-to-r from-primary/[0.04] to-primary/[0.08] p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+                  <Sparkles className="size-5 text-primary" />
                 </div>
-              ))}
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Generate Demand Gen Ad from Store</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Auto-fill headlines, descriptions, and business name from your store data.</p>
+                </div>
+              </div>
+              <Button variant="default" size="sm" className="shrink-0 gap-1.5" onClick={async () => {
+                try {
+                  const { getStoreSnapshot, generateHeadlines, generateDescriptions } = await import("@/lib/google/search-ai-generator");
+                  const snapshot = await getStoreSnapshot();
+                  const headlines = generateHeadlines(snapshot);
+                  const descriptions = generateDescriptions(snapshot);
+                  const currentAd = activeGroup?.ads[0];
+                  if (!currentAd) return;
+                  const newHeadlines = currentAd.headlines.map((h, i) => {
+                    if (h.text?.trim()) return h;
+                    return headlines[i] ? { text: headlines[i].text } : h;
+                  });
+                  const newDescs = currentAd.descriptions.map((d, i) => {
+                    if (d.text?.trim()) return d;
+                    return descriptions[i] ? { text: descriptions[i].text } : d;
+                  });
+                  updateAd(activeGroupIdx, 0, {
+                    headlines: newHeadlines,
+                    descriptions: newDescs,
+                    businessName: currentAd.businessName || snapshot.store.name.slice(0, 25),
+                    finalUrl: currentAd.finalUrl || (snapshot.store.domain.startsWith("http") ? snapshot.store.domain : `https://${snapshot.store.domain}`),
+                  });
+                } catch { /* silent */ }
+              }}>
+                <Sparkles className="size-4" /> Generate
+              </Button>
             </div>
-            <Button variant="ghost" size="sm" className="mb-0.5 gap-1 text-xs text-primary hover:text-primary" onClick={addAdGroup}>
-              <Plus className="size-3" /> Ad Group
-            </Button>
+          </div>
+
+          {/* ---- Ad Group Header (single group) ---- */}
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
+              <Layers className="size-4 text-primary" />
+            </div>
+            <div className="flex flex-1 items-center gap-3">
+              <Input value={activeGroup?.name ?? ""} onChange={(e) => updateGroup(activeGroupIdx, { name: e.target.value })} className="h-8 w-48 text-sm font-medium" placeholder="Ad Group Name" />
+            </div>
           </div>
 
           {/* ---- Active Ad Group Panel ---- */}
           {activeGroup && (
             <div className="flex flex-col gap-4">
-              {/* Ad Group Name */}
-              <div className="flex items-center gap-3">
-                <div className="flex-1">
-                  <Label className="mb-1 text-xs font-semibold text-foreground">Ad Group Name</Label>
-                  <Input
-                    value={activeGroup.name}
-                    onChange={(e) => updateGroup(activeGroupIdx, { name: e.target.value })}
-                    placeholder="Ad Group name"
-                    className="h-9 text-sm"
-                  />
-                </div>
-              </div>
-
               {/* Channel Controls (per ad group) */}
               <SectionCard>
                 <div className="mb-3 flex items-center gap-2">
@@ -3047,10 +3884,10 @@ const MOCK_PRODUCTS = [
 ];
 
 const DIMENSION_OPTIONS: { value: ProductDimensionType; label: string; icon: React.ReactNode; desc: string }[] = [
-  { value: "PRODUCT_BRAND", label: "Brand", icon: <Star className="size-3.5" />, desc: "Group products by brand name" },
+  { value: "PRODUCT_BRAND", label: "Brand", icon: <Star className="size-3.5" />, desc: "Group by product brand name" },
   { value: "PRODUCT_CATEGORY", label: "Category", icon: <FolderTree className="size-3.5" />, desc: "Group by Google product category" },
   { value: "PRODUCT_TYPE", label: "Product Type", icon: <Package className="size-3.5" />, desc: "Group by your custom product type" },
-  { value: "PRODUCT_CONDITION", label: "Condition", icon: <Tag className="size-3.5" />, desc: "Group by new, refurbished, or used" },
+  { value: "PRODUCT_CONDITION", label: "Condition", icon: <Tag className="size-3.5" />, desc: "New, refurbished, or used" },
   { value: "PRODUCT_CUSTOM_ATTRIBUTE_0", label: "Custom Label 0", icon: <Filter className="size-3.5" />, desc: "Group by custom label 0 from your feed" },
   { value: "PRODUCT_CUSTOM_ATTRIBUTE_1", label: "Custom Label 1", icon: <Filter className="size-3.5" />, desc: "Group by custom label 1 from your feed" },
   { value: "PRODUCT_ITEM_ID", label: "Item ID", icon: <Tag className="size-3.5" />, desc: "Target specific products by ID" },
@@ -3068,6 +3905,98 @@ function ShoppingProductGroups() {
   const [selectedValues, setSelectedValues] = useState<string[]>([]);
   const [excludedValues, setExcludedValues] = useState<string[]>([]);
   const [bidOverrides, setBidOverrides] = useState<Record<string, number>>({});
+
+  // Stable ref to avoid infinite loops in the persist effect
+  const updateRef = useRef(updateNested);
+  updateRef.current = updateNested;
+
+  // Initialize local state from saved product group root (draft recovery)
+  useEffect(() => {
+    const root = creative.productGroupRoot;
+    if (!root || root.type !== "SUBDIVISION" || root.children.length === 0) return;
+
+    setSelectedDimension(root.dimensionType);
+    const included = root.children
+      .filter((c) => c.type === "UNIT_INCLUDED" && c.dimensionValue)
+      .map((c) => c.dimensionValue);
+    const excluded = root.children
+      .filter((c) => c.type === "UNIT_EXCLUDED")
+      .map((c) => c.dimensionValue);
+    const bids: Record<string, number> = {};
+    for (const c of root.children) {
+      if (c.cpcBidMicros && c.dimensionValue) {
+        bids[c.dimensionValue] = c.cpcBidMicros / 1_000_000;
+      }
+    }
+
+    if (included.length > 0) setSelectedValues(included);
+    if (excluded.length > 0) setExcludedValues(excluded);
+    if (Object.keys(bids).length > 0) setBidOverrides(bids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
+  // Persist product group selections to campaign state
+  useEffect(() => {
+    // Build product group tree from local state
+    if (selectedValues.length === 0 && excludedValues.length === 0) {
+      // All products included (no subdivision)
+      updateRef.current("creative", {
+        productGroupRoot: {
+          id: "root",
+          dimensionType: selectedDimension,
+          dimensionValue: "",
+          type: "UNIT_INCLUDED" as const,
+          children: [],
+        },
+      });
+      return;
+    }
+
+    // Build subdivision tree
+    const children: ProductGroupNode[] = [];
+
+    // Add included values as UNIT_INCLUDED
+    for (const val of selectedValues) {
+      children.push({
+        id: `inc-${val.replace(/\s+/g, "-").toLowerCase()}`,
+        dimensionType: selectedDimension,
+        dimensionValue: val,
+        type: "UNIT_INCLUDED" as const,
+        cpcBidMicros: bidOverrides[val] ? Math.round(bidOverrides[val] * 1_000_000) : undefined,
+        children: [],
+      });
+    }
+
+    // Add excluded values as UNIT_EXCLUDED
+    for (const val of excludedValues) {
+      children.push({
+        id: `exc-${val.replace(/\s+/g, "-").toLowerCase()}`,
+        dimensionType: selectedDimension,
+        dimensionValue: val,
+        type: "UNIT_EXCLUDED" as const,
+        children: [],
+      });
+    }
+
+    // Add "Everything else" node (required by Google Ads API)
+    children.push({
+      id: "other",
+      dimensionType: selectedDimension,
+      dimensionValue: "",
+      type: "UNIT_INCLUDED" as const,
+      children: [],
+    });
+
+    updateRef.current("creative", {
+      productGroupRoot: {
+        id: "root",
+        dimensionType: selectedDimension,
+        dimensionValue: "",
+        type: "SUBDIVISION" as const,
+        children,
+      },
+    });
+  }, [selectedDimension, selectedValues, excludedValues, bidOverrides]);
 
   const toggleValue = (val: string) =>
     setSelectedValues((prev) => prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]);
@@ -3104,7 +4033,7 @@ function ShoppingProductGroups() {
               Product Groups & Listing
             </h1>
             <p className="mt-2 max-w-lg text-pretty text-sm leading-relaxed text-muted-foreground">
-              Shopping ads are auto-generated from your Merchant Center feed. Organize your products into groups to control bids and exclude products you don't want to advertise.
+              Shopping ads are auto-generated from your Merchant Center feed — no creative work needed. Organize products into groups to control which products are advertised and set different bid amounts per group.
             </p>
           </div>
 
@@ -3113,6 +4042,7 @@ function ShoppingProductGroups() {
             <div className="mb-4 flex items-center gap-2">
               <Store className="size-4 text-primary" />
               <Label className="text-sm font-semibold text-foreground">Product Feed Overview</Label>
+              <InfoTip text="Your Salla product catalog synced to Google Merchant Center. Products must be approved before they can appear in Shopping ads." />
               <Badge className="rounded-full bg-primary/10 px-2 py-0 text-xs text-primary">Salla</Badge>
             </div>
             <div className="mb-4 grid grid-cols-4 gap-3">
@@ -3165,7 +4095,7 @@ function ShoppingProductGroups() {
             <div className="mb-1 flex items-center gap-2">
               <FolderTree className="size-4 text-primary" />
               <Label className="text-sm font-semibold text-foreground">Product Group Partitions</Label>
-              <InfoTip text="Split your products into groups to control bids and targeting. Maps to AdGroupListingGroupFilter in the Google Ads API. Leave all selected to bid on all products." />
+              <InfoTip text="Subdivide your products to control bids and targeting at a granular level. For example, bid more on high-margin categories and exclude low-margin items. Every subdivision must include an 'Everything else' group — this is added automatically." />
             </div>
             <p className="mb-4 text-xs text-muted-foreground">
               Choose how to subdivide your products. You can include or exclude specific groups and set bid overrides per group.
@@ -3299,7 +4229,7 @@ function ShoppingProductGroups() {
               <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">Auto-generated</Badge>
             </div>
             <p className="mb-4 text-xs text-muted-foreground">
-              Shopping ads are automatically created from your Merchant Center product feed. No creative setup is needed -- Google generates product listing ads using your product images, titles, prices, and store name.
+              Shopping ads are automatically created by Google using your product images, titles, prices, and store name from the Merchant Center feed. No ad copy or creative setup needed — your product data IS the ad.
             </p>
 
             {/* Preview cards */}
@@ -3505,17 +4435,12 @@ export function GoogleStepCreative() {
   /* For Shopping, render the product groups UI instead of asset groups */
   if (isShopping) return <ShoppingProductGroups />;
 
-  /* Ensure PMax keeps exactly one asset group (matches payload mapper) */
+  /* Ensure PMax has at least one asset group (supports 1-100) */
   useEffect(() => {
     if (creative.assetGroups.length === 0) {
       updateNested("creative", { assetGroups: [newAssetGroup()] });
-      return;
     }
-    if (creative.assetGroups.length > 1) {
-      updateNested("creative", { assetGroups: [creative.assetGroups[0]] });
-    }
-    if (activeGroupIdx !== 0) setActiveGroupIdx(0);
-  }, [activeGroupIdx, creative.assetGroups, updateNested]);
+  }, [creative.assetGroups, updateNested]);
 
   /* Keep a single active PMax group */
   const assetGroups = creative.assetGroups.length > 0 ? creative.assetGroups : [newAssetGroup()];

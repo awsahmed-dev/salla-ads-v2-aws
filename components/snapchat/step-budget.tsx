@@ -208,13 +208,8 @@ const ALL_OPTIMIZATION_GOALS: {
     icon: <TrendingUp className="size-4" />,
     requiresMMP: true,
   },
-  {
-    value: "APP_REENGAGE_OPEN",
-    label: "Re-engage App Opens",
-    desc: "Bring back existing users and encourage them to re-open your app.",
-    icon: <Download className="size-4" />,
-    requiresMMP: true,
-  },
+  // APP_REENGAGE_OPEN removed from UI: requires MMP + app_install_state targeting.
+  // Will be added back when MMP integration is available.
 ];
 
 
@@ -665,6 +660,11 @@ export function StepBudget() {
               if (newStrategy !== "AUTO_BID" && (!budget.bidAmount || budget.bidAmount <= 0)) {
                 updates.bidAmount = Math.round(((suggestedBid.min + suggestedBid.max) / 2) * 100) / 100;
               }
+              // Snap API: ACCELERATED pacing requires LOWEST_COST_WITH_MAX_BID + bid_micro.
+              // If switching away from that strategy while ACCELERATED is active, revert to STANDARD.
+              if (budget.pacingType === "ACCELERATED" && newStrategy !== "LOWEST_COST_WITH_MAX_BID") {
+                updates.pacingType = "STANDARD";
+              }
               updateNested("budget", updates);
             }}
             layout="buttons"
@@ -720,7 +720,7 @@ export function StepBudget() {
                   <span className="text-sm font-semibold text-foreground">Advanced Settings</span>
                   <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs font-normal">
                     {[
-                      objectiveConfig.hasConversionWindow,
+                      objectiveConfig.hasConversionWindow || budget.optimizationGoal.startsWith("PIXEL_"),
                       canUseAccelerated && budget.pacingType !== "STANDARD",
                       budget.frequencyCapEnabled,
                     ].filter(Boolean).length} active
@@ -733,7 +733,11 @@ export function StepBudget() {
             <CollapsibleContent className="flex flex-col gap-5 pt-5">
 
               {/* -- Attribution Window -- */}
-              {objectiveConfig.hasConversionWindow && (() => {
+              {/* Snap API: conversion_window applies when optimizing for pixel-based goals,
+                  regardless of the objective. Show attribution window for any pixel goal
+                  (PIXEL_PURCHASE, PIXEL_ADD_TO_CART, PIXEL_PAGE_VIEW, PIXEL_SIGNUP)
+                  or when the objective config explicitly says so (e.g. APP_PROMOTION). */}
+              {(objectiveConfig.hasConversionWindow || budget.optimizationGoal.startsWith("PIXEL_")) && (() => {
                 const goalTip =
                   budget.optimizationGoal === "PIXEL_PURCHASE"
                     ? "Purchases often happen days after the first ad — use the wider window."

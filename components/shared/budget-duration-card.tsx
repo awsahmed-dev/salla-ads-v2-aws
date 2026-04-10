@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+import { InfoTip } from "@/components/shared/info-tip";
 import {
   Select,
   SelectContent,
@@ -376,8 +377,9 @@ export function BudgetDurationCard({
           </div>
         )}
 
-        <Label className="mb-1.5 block text-xs font-medium text-foreground">
+        <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
           {budgetMode === "daily" ? "Daily Budget" : "Lifetime Budget"}
+          <InfoTip text={budgetMode === "daily" ? "The average amount you're willing to spend per day. Google may spend up to 2x on high-traffic days but won't exceed your monthly cap (daily \u00d7 30.4)." : "The total amount you're willing to spend over the campaign's lifetime."} />
         </Label>
 
         <div className="flex items-center gap-2">

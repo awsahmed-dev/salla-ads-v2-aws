@@ -19,6 +19,7 @@ import {
   Upload,
   AlertCircle,
   CheckCircle2,
+  Info,
 } from "lucide-react";
 import type { AdGroup, AdFormat, AdDestination, CreativeAsset, WebViewCTA, CampaignObjective } from "@/lib/snapchat/campaign-types";
 import { deriveCreativeType, makeDefaultDynamicTemplate, OBJECTIVE_CONFIGS } from "@/lib/snapchat/campaign-types";
@@ -494,6 +495,12 @@ export function AdGroupPanel({
                 <div className="mt-2 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 dark:border-amber-800/40 dark:bg-amber-950/30">
                   <AlertCircle className="size-3 shrink-0 text-amber-500" />
                   <span className="text-xs text-amber-700 dark:text-amber-400">Snap requires at least 3 snaps for Story Ads — add {3 - assetCount} more</span>
+                </div>
+              )}
+              {ad.adFormat === "STORY" && assetCount >= 2 && (
+                <div className="mt-2 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 dark:border-blue-800/40 dark:bg-blue-950/30">
+                  <Info className="size-3 shrink-0 text-blue-500" />
+                  <span className="text-xs text-blue-700 dark:text-blue-400">Snap API: Story snap order is fixed once the campaign goes live and cannot be rearranged after.</span>
                 </div>
               )}
               {assetCount > 0 && assetCount < maxAssets && maxAssets > 1 && !(ad.adFormat === "STORY" && assetCount < 3) && (

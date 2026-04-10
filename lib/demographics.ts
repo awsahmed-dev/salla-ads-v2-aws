@@ -11,10 +11,11 @@ export const SUPPORTED_LANGUAGES = [
 
 export type SupportedLanguageCode = (typeof SUPPORTED_LANGUAGES)[number]["code"];
 
-/** Supported genders (Male and Female only). */
+/** Supported genders. Snap API supports MALE, FEMALE, OTHER. */
 export const SUPPORTED_GENDERS = [
   { id: "MALE", label: "Male" },
   { id: "FEMALE", label: "Female" },
+  { id: "OTHER", label: "Other" },
 ] as const;
 
 export type SupportedGenderId = (typeof SUPPORTED_GENDERS)[number]["id"];

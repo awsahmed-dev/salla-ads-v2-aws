@@ -39,7 +39,14 @@ export function LeadFormBuilder({
   onChange: (updated: LeadGenerationForm) => void;
 }) {
   const [showAddField, setShowAddField] = useState(false);
-  const [showLegalDisclosures, setShowLegalDisclosures] = useState(!!form.legal_disclosures);
+  const [showLegalDisclosures, setShowLegalDisclosures] = useState(!!form.legal_disclosures?.length);
+  // Snap API: legal_disclosures is an array. UI operates on the first (and only) disclosure.
+  const disclosure = form.legal_disclosures?.[0];
+  const hasDisclosure = !!disclosure;
+  const updateDisclosure = (partial: Partial<typeof disclosure>) => {
+    const updated = { ...disclosure!, ...partial };
+    onChange({ ...form, legal_disclosures: [updated] });
+  };
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const updateField = (idx: number, partial: Partial<LeadFormField>) => {
@@ -582,28 +589,27 @@ export function LeadFormBuilder({
               <div className="mb-3 flex items-center justify-between">
                 <Label className="text-sm font-medium text-foreground">Enable legal disclosures</Label>
                 <Switch
-                  checked={!!form.legal_disclosures}
+                  checked={hasDisclosure}
                   onCheckedChange={(v) =>
                     onChange({
                       ...form,
                       legal_disclosures: v
-                        ? { title: "", description: "", consent_form_fields: [{ consent_description: "", required: true }] }
+                        ? [{ title: "", description: "", consent_form_fields: [{ consent_description: "", required: true }] }]
                         : undefined,
                     })
                   }
                 />
               </div>
-              {form.legal_disclosures && (
+              {hasDisclosure && (
                 <div className="flex flex-col gap-3">
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex flex-col gap-1">
                       <Label className="text-xs font-medium text-muted-foreground">Title</Label>
                       <Input
                         placeholder="e.g. Terms & Conditions"
-                        value={form.legal_disclosures.title}
-                        onChange={(e) =>
-                          onChange({ ...form, legal_disclosures: { ...form.legal_disclosures!, title: e.target.value } })
-                        }
+                        value={disclosure!.title}
+                        maxLength={35}
+                        onChange={(e) => updateDisclosure({ title: e.target.value.slice(0, 35) })}
                         className="h-7 text-xs"
                       />
                     </div>
@@ -611,26 +617,25 @@ export function LeadFormBuilder({
                       <Label className="text-xs font-medium text-muted-foreground">Description</Label>
                       <Input
                         placeholder="Legal text..."
-                        value={form.legal_disclosures.description}
-                        onChange={(e) =>
-                          onChange({ ...form, legal_disclosures: { ...form.legal_disclosures!, description: e.target.value } })
-                        }
+                        value={disclosure!.description}
+                        maxLength={80}
+                        onChange={(e) => updateDisclosure({ description: e.target.value.slice(0, 80) })}
                         className="h-7 text-xs"
                       />
                     </div>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Label className="text-xs font-medium text-muted-foreground">Consent Checkboxes</Label>
-                    {form.legal_disclosures.consent_form_fields.map((cf, ci) => (
+                    {disclosure!.consent_form_fields.map((cf, ci) => (
                       <div key={ci} className="flex items-center gap-1.5">
                         <input type="checkbox" checked disabled className="accent-primary" />
                         <Input
                           placeholder={`Consent text ${ci + 1}`}
                           value={cf.consent_description}
                           onChange={(e) => {
-                            const fields = [...form.legal_disclosures!.consent_form_fields];
+                            const fields = [...disclosure!.consent_form_fields];
                             fields[ci] = { ...fields[ci], consent_description: e.target.value };
-                            onChange({ ...form, legal_disclosures: { ...form.legal_disclosures!, consent_form_fields: fields } });
+                            updateDisclosure({ consent_form_fields: fields });
                           }}
                           className="h-6 flex-1 text-xs"
                         />
@@ -639,20 +644,20 @@ export function LeadFormBuilder({
                             type="checkbox"
                             checked={cf.required}
                             onChange={(e) => {
-                              const fields = [...form.legal_disclosures!.consent_form_fields];
+                              const fields = [...disclosure!.consent_form_fields];
                               fields[ci] = { ...fields[ci], required: e.target.checked };
-                              onChange({ ...form, legal_disclosures: { ...form.legal_disclosures!, consent_form_fields: fields } });
+                              updateDisclosure({ consent_form_fields: fields });
                             }}
                             className="accent-primary"
                           />
                           Req.
                         </label>
-                        {form.legal_disclosures!.consent_form_fields.length > 1 && (
+                        {disclosure!.consent_form_fields.length > 1 && (
                           <button
                             type="button"
                             onClick={() => {
-                              const fields = form.legal_disclosures!.consent_form_fields.filter((_, i) => i !== ci);
-                              onChange({ ...form, legal_disclosures: { ...form.legal_disclosures!, consent_form_fields: fields } });
+                              const fields = disclosure!.consent_form_fields.filter((_, i) => i !== ci);
+                              updateDisclosure({ consent_form_fields: fields });
                             }}
                             className="rounded p-0.5 text-muted-foreground hover:text-destructive"
                           >
@@ -664,8 +669,8 @@ export function LeadFormBuilder({
                     <button
                       type="button"
                       onClick={() => {
-                        const fields = [...form.legal_disclosures!.consent_form_fields, { consent_description: "", required: false }];
-                        onChange({ ...form, legal_disclosures: { ...form.legal_disclosures!, consent_form_fields: fields } });
+                        const fields = [...disclosure!.consent_form_fields, { consent_description: "", required: false }];
+                        updateDisclosure({ consent_form_fields: fields });
                       }}
                       className="flex items-center gap-1 self-start text-xs font-medium text-primary hover:underline"
                     >

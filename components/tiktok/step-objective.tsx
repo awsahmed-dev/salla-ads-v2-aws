@@ -459,6 +459,46 @@ export function TikTokStepObjective() {
                 </div>
               </div>
 
+              {/* ---- Campaign Budget Optimization (CBO) ---- */}
+              <div className="mb-6 rounded-xl border border-border bg-card p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <TrendingUp className="size-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">
+                          Campaign Budget Optimization
+                        </p>
+                        <Badge variant="outline" className="rounded-full px-2 text-[10px] font-medium">
+                          CBO
+                        </Badge>
+                      </div>
+                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                        Let TikTok automatically distribute your campaign budget across ad groups to maximize overall results.
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={obj.budgetOptimizeOn}
+                    onCheckedChange={(checked) =>
+                      updateNested("objective", { budgetOptimizeOn: checked })
+                    }
+                  />
+                </div>
+                {obj.budgetOptimizeOn && (
+                  <div className="mt-3 rounded-lg border border-primary/20 bg-primary/[0.03] px-4 py-3">
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      <span className="font-medium text-foreground">How it works:</span> TikTok
+                      will automatically allocate more budget to higher-performing ad groups
+                      and reduce spend on underperformers. All ad groups must share the same
+                      optimization goal. Recommended for campaigns with 3+ ad groups.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* ---- Salla Product Catalog (only for catalog-capable objectives) ---- */}
               {config.catalogAvailable && (
               <div className="mb-6 flex flex-col gap-4">

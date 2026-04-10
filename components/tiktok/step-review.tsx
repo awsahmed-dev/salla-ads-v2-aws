@@ -377,6 +377,7 @@ export function TikTokStepReview() {
         objective_type: objective.objective,
         ...(isSales && { promotion_type: "WEBSITE" }),
         operation_status: "ENABLE",
+        ...(objective.budgetOptimizeOn && { budget_optimize_on: true }),
       },
       adgroup: {
         advertiser_id: "<ADVERTISER_ID>",
@@ -385,7 +386,7 @@ export function TikTokStepReview() {
         ...(isSales && { promotion_type: "WEBSITE" }),
         placement_type: creative.placementType,
         budget_mode: budget.budgetMode,
-        budget: budget.amount,
+        budget: budget.budgetMode === "BUDGET_MODE_TOTAL" ? budget.lifetimeAmount : budget.amount,
         optimization_goal: budget.optimizationGoal,
         ...(isSales && { optimization_event: budget.optimizationEvent }),
         ...(isAppPromo && {
@@ -430,7 +431,19 @@ export function TikTokStepReview() {
         gender: audience.gender,
         languages: audience.languages,
         ...(hasNonMockInterests && { interest_category_ids: audience.interests }),
+        ...(audience.interestKeywordIds?.length > 0 && { interest_keyword_ids: audience.interestKeywordIds }),
+        ...(audience.purchaseIntentKeywordIds?.length > 0 && { purchase_intention_keyword_ids: audience.purchaseIntentKeywordIds }),
         ...(audience.operatingSystems.length > 0 && { operating_systems: audience.operatingSystems }),
+        // Search Placement
+        ...(budget.searchResultEnabled && { search_result_enabled: true }),
+        // Brand Safety
+        ...(creative.brandSafetyType && creative.brandSafetyType !== "NO_BRAND_SAFETY" && {
+          brand_safety_type: creative.brandSafetyType,
+        }),
+        // Content Controls
+        ...(creative.contentControls?.commentDisabled && { comment_disabled: true }),
+        ...(creative.contentControls?.shareDisabled && { share_disabled: true }),
+        ...(creative.contentControls?.videoDownloadDisabled && { video_download_disabled: true }),
       },
       ...(isLeadGen && objective.leadOptimizationLocation === "INSTANT_FORM" && {
         instant_form: {
@@ -625,6 +638,7 @@ export function TikTokStepReview() {
                   </>
                 )}
                 <ReviewRow label="Campaign Name" value={objective.campaignName || "Not set"} warn={!objective.campaignName} />
+                <ReviewRow label="Budget Optimization" value={objective.budgetOptimizeOn ? "CBO Enabled" : "Manual"} />
                 {!isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo && (
                   <ReviewRow label="TikTok Pixel" value={
                     objective.pixelMode === "salla_managed"
@@ -695,7 +709,13 @@ export function TikTokStepReview() {
                 } />
                 <ReviewRow label="Languages" value={audience.languages.map((l) => l === "ar" ? "Arabic" : "English").join(", ")} />
                 {audience.interests.length > 0 && (
-                  <ReviewRow label="Interests" value={`${audience.interests.length} selected`} />
+                  <ReviewRow label="Interests" value={`${audience.interests.length} categories`} />
+                )}
+                {(audience.interestKeywordIds?.length ?? 0) > 0 && (
+                  <ReviewRow label="Interest Keywords" value={`${audience.interestKeywordIds.length} keywords`} />
+                )}
+                {(audience.purchaseIntentKeywordIds?.length ?? 0) > 0 && (
+                  <ReviewRow label="Purchase Intent" value={`${audience.purchaseIntentKeywordIds.length} keywords`} />
                 )}
                 <ReviewRow label="Auto Targeting" value={audience.autoTargetingEnabled ? "Enabled" : "Disabled"} />
               </SectionCard>
@@ -703,16 +723,21 @@ export function TikTokStepReview() {
               {/* ---- Budget ---- */}
               <SectionCard>
                 <SectionHeader icon={DollarSign} title="Budget & Schedule" step={2} setStep={setStep} />
-                <ReviewRow label="Daily Budget" value={`SAR ${budget.amount}`} />
+                <ReviewRow label="Budget Mode" value={budget.budgetMode === "BUDGET_MODE_TOTAL" ? "Lifetime" : "Daily"} />
+                <ReviewRow label={budget.budgetMode === "BUDGET_MODE_TOTAL" ? "Lifetime Budget" : "Daily Budget"} value={`SAR ${budget.budgetMode === "BUDGET_MODE_TOTAL" ? budget.lifetimeAmount : budget.amount}`} />
                 <ReviewRow label="Duration" value={`${durationDays} days`} />
                 <ReviewRow label="Total Budget" value={`SAR ${totalBudget.toLocaleString()}`} />
                 <ReviewRow label="Optimization" value={GOAL_LABELS[budget.optimizationGoal] || budget.optimizationGoal} />
                 {!isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo && budget.optimizationGoal !== "CLICK" && (
                   <ReviewRow label="Conversion Event" value={EVENT_LABELS[budget.optimizationEvent] || budget.optimizationEvent} />
                 )}
-                <ReviewRow label="Bid Strategy" value={BID_LABELS[budget.bidType] || budget.bidType} />
+                <ReviewRow label="Bid Strategy" value={
+                  budget.bidType === "BID_TYPE_NO_BID" ? "Maximum Delivery"
+                    : budget.bidStrategy === "BID_CAP" ? "Bid Cap"
+                    : "Cost Cap"
+                } />
                 {budget.bidType === "BID_TYPE_CUSTOM" && (
-                  <ReviewRow label="Cost Cap" value={`SAR ${budget.bidAmount}`} />
+                  <ReviewRow label={budget.bidStrategy === "BID_CAP" ? "Max Bid" : "Target Cost"} value={`SAR ${budget.bidAmount}`} />
                 )}
                 <ReviewRow label="Billing Event" value={
                   budget.billingEvent === "OCPM" ? "Optimized CPM"
@@ -768,6 +793,22 @@ export function TikTokStepReview() {
                 <ReviewRow label="Avatar" value={creative.identity?.avatarPreviewUrl ? "Uploaded" : "Not set"} />
                 <ReviewRow label="Total Ads" value={creative.ads.length} />
                 <ReviewRow label="Placement" value={creative.placementType === "PLACEMENT_TYPE_AUTOMATIC" ? "Automatic" : "Manual"} />
+                {budget.searchResultEnabled && (
+                  <ReviewRow label="Search Ads" value="Enabled" />
+                )}
+                <ReviewRow label="Brand Safety" value={
+                  creative.brandSafetyType === "STANDARD_INVENTORY" ? "Standard"
+                    : creative.brandSafetyType === "LIMITED_INVENTORY" ? "Limited"
+                    : creative.brandSafetyType === "EXPANDED_INVENTORY" ? "Expanded"
+                    : "None"
+                } />
+                {(creative.contentControls?.commentDisabled || creative.contentControls?.shareDisabled || creative.contentControls?.videoDownloadDisabled) && (
+                  <ReviewRow label="Content Controls" value={[
+                    creative.contentControls?.commentDisabled && "No comments",
+                    creative.contentControls?.shareDisabled && "No sharing",
+                    creative.contentControls?.videoDownloadDisabled && "No download",
+                  ].filter(Boolean).join(", ")} />
+                )}
                 {creative.ads.map((ad, i) => (
                   <div key={ad.id} className="mt-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
                     <p className="text-xs font-medium text-foreground">Ad {i + 1}: {ad.name || "Untitled"}</p>

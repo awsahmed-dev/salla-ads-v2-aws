@@ -3157,6 +3157,72 @@ export function TikTokStepCreative() {
             )}
           </SectionCard>
 
+          {/* ---- Brand Safety & Content Controls ---- */}
+          <SectionCard>
+            <div className="mb-4 flex items-center gap-2">
+              <ShieldCheck className="size-4 text-primary" />
+              <Label className="text-sm font-semibold text-foreground">Brand Safety & Content Controls</Label>
+              <InfoTip text="Control where your ads appear and how users interact with them. Maps to TikTok API brand_safety_type, comment_disabled, share_disabled, and video_download_disabled." />
+            </div>
+
+            {/* Inventory Filter */}
+            <Label className="mb-2 block text-xs font-medium text-muted-foreground">Inventory Filter</Label>
+            <div className="mb-4 grid gap-2 sm:grid-cols-2">
+              {([
+                { value: "NO_BRAND_SAFETY" as const, label: "Full Inventory", desc: "No content filtering. Maximum reach." },
+                { value: "STANDARD_INVENTORY" as const, label: "Standard Inventory", desc: "Appropriate for most brands. Recommended." },
+                { value: "LIMITED_INVENTORY" as const, label: "Limited Inventory", desc: "Most restrictive. No mature themes." },
+                { value: "EXPANDED_INVENTORY" as const, label: "Expanded Inventory", desc: "Exclude only explicitly inappropriate content." },
+              ]).map((opt) => {
+                const active = cr.brandSafetyType === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => updateNested("creative", { brandSafetyType: opt.value })}
+                    className={cn(
+                      "flex flex-col items-start rounded-lg border px-3 py-2.5 text-left transition-colors",
+                      active ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/40"
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn("text-xs font-medium", active ? "text-primary" : "text-foreground")}>{opt.label}</span>
+                      {opt.value === "STANDARD_INVENTORY" && (
+                        <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">Recommended</Badge>
+                      )}
+                    </div>
+                    <span className="mt-0.5 text-[11px] text-muted-foreground">{opt.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Content Interaction Controls */}
+            <Label className="mb-2 block text-xs font-medium text-muted-foreground">Content Interaction Controls</Label>
+            <div className="flex flex-col gap-2">
+              {([
+                { key: "commentDisabled" as const, label: "Disable comments", desc: "Prevent users from commenting on your ads." },
+                { key: "shareDisabled" as const, label: "Disable sharing", desc: "Prevent users from sharing your ads." },
+                { key: "videoDownloadDisabled" as const, label: "Disable video download", desc: "Prevent users from downloading your ad videos." },
+              ]).map((ctrl) => (
+                <div key={ctrl.key} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">{ctrl.label}</p>
+                    <p className="text-[11px] text-muted-foreground">{ctrl.desc}</p>
+                  </div>
+                  <Switch
+                    checked={cr.contentControls[ctrl.key]}
+                    onCheckedChange={(checked) =>
+                      updateNested("creative", {
+                        contentControls: { ...cr.contentControls, [ctrl.key]: checked },
+                      })
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+
           {/* ---- Lead Gen: location picker + instant form builder ---- */}
           {isLeadGen && <InstantFormBuilder />}
 

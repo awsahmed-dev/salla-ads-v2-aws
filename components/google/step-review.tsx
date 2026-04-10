@@ -250,7 +250,7 @@ export function GoogleStepReview() {
       step: 2,
     });
 
-    if (objective.objective === "SHOPPING") {
+    if (isShopping) {
       list.push({
         id: "merchant_center",
         label: "Merchant Center connected",
@@ -258,87 +258,264 @@ export function GoogleStepReview() {
         detail: objective.merchantCenterConnected || objective.merchantCenterId ? "Connected" : "Missing",
         step: 0,
       });
+      list.push({
+        id: "shopping_priority",
+        label: "Campaign priority configured",
+        ok: [0, 1, 2].includes(objective.shoppingSettings?.campaignPriority),
+        detail: `Priority: ${objective.shoppingSettings?.campaignPriority ?? "not set"}`,
+        step: 0,
+      });
+      list.push({
+        id: "shopping_product_groups",
+        label: "Product groups configured",
+        ok: !!creative.productGroupRoot,
+        detail: creative.productGroupRoot ? (creative.productGroupRoot.type === "SUBDIVISION" ? `${creative.productGroupRoot.children.length} groups` : "All products") : "Missing",
+        step: 3,
+      });
+      list.push({
+        id: "shopping_negative_kw",
+        label: "Negative keywords added (recommended)",
+        ok: (creative.negativeKeywords?.length ?? 0) > 0 || (audience.negativeKeywords?.length ?? 0) > 0,
+        detail: `${(creative.negativeKeywords?.length ?? 0) + (audience.negativeKeywords?.length ?? 0)} keywords`,
+        step: 1,
+      });
     }
 
     if (isSearch) {
       const searchGroup = creative.searchAdGroups?.[0];
       const searchAd = searchGroup?.ads?.[0];
-      const searchHeadlines = searchAd?.headlines?.filter((h) => h.text?.trim()).length ?? 0;
-      const searchDescriptions = searchAd?.descriptions?.filter((d) => d.text?.trim()).length ?? 0;
+      const searchHeadlines = searchAd?.headlines?.filter((h: { text?: string }) => h.text?.trim()).length ?? 0;
+      const searchDescriptions = searchAd?.descriptions?.filter((d: { text?: string }) => d.text?.trim()).length ?? 0;
       list.push({
-        id: "keywords",
-        label: "Keywords added",
-        ok: (searchGroup?.keywords?.length ?? 0) >= 1,
-        detail: `${searchGroup?.keywords?.length ?? 0} keywords`,
+        id: "search_ad_group",
+        label: "Min 1 ad group with min 1 keyword",
+        ok: (creative.searchAdGroups?.length ?? 0) >= 1 && (searchGroup?.keywords?.length ?? 0) >= 1,
+        detail: `${creative.searchAdGroups?.length ?? 0} ad groups, ${searchGroup?.keywords?.length ?? 0} keywords`,
         step: 3,
       });
       list.push({
         id: "assets",
-        label: "RSA has minimum assets",
+        label: "RSA has min 3 headlines, 2 descriptions",
         ok: searchHeadlines >= 3 && searchDescriptions >= 2,
         detail: `${searchHeadlines} headlines, ${searchDescriptions} descriptions`,
         step: 3,
       });
+      list.push({
+        id: "search_final_url",
+        label: "Final URL set per RSA",
+        ok: !!searchAd?.finalUrl?.trim(),
+        detail: searchAd?.finalUrl?.trim() || "Missing",
+        step: 3,
+      });
     } else if (isApp) {
       const appAd = creative.appAds?.[0];
-      const appHeadlines = appAd?.headlines?.filter((h) => h.text?.trim()).length ?? 0;
-      const appDescriptions = appAd?.descriptions?.filter((d) => d.text?.trim()).length ?? 0;
+      const appHeadlines = appAd?.headlines?.filter((h: { text?: string }) => h.text?.trim()).length ?? 0;
+      const appDescriptions = appAd?.descriptions?.filter((d: { text?: string }) => d.text?.trim()).length ?? 0;
       list.push({
-        id: "app_settings",
-        label: "App configured",
+        id: "app_id",
+        label: "App ID set",
         ok: !!objective.appSettings?.appId?.trim(),
-        detail: `${objective.appSettings?.appStore === "GOOGLE_APP_STORE" ? "Google Play" : "Apple"}: ${objective.appSettings?.appId || "not set"}`,
+        detail: objective.appSettings?.appId?.trim() || "Missing",
         step: 0,
+      });
+      list.push({
+        id: "app_store",
+        label: "App store selected",
+        ok: !!objective.appSettings?.appStore,
+        detail: objective.appSettings?.appStore === "GOOGLE_APP_STORE" ? "Google Play" : objective.appSettings?.appStore === "APPLE_APP_STORE" ? "Apple App Store" : "Not selected",
+        step: 0,
+      });
+      list.push({
+        id: "app_mandatory_text",
+        label: "Mandatory ad text filled",
+        ok: !!appAd?.mandatoryAdText?.trim(),
+        detail: appAd?.mandatoryAdText?.trim() ? "Set" : "Missing",
+        step: 3,
       });
       list.push({
         id: "assets",
         label: "App ad has minimum assets",
-        ok: appHeadlines >= 1 && appDescriptions >= 1 && !!appAd?.mandatoryAdText?.trim(),
-        detail: `${appHeadlines} headlines, ${appDescriptions} descriptions, mandatory text: ${appAd?.mandatoryAdText?.trim() ? "set" : "missing"}`,
+        ok: appHeadlines >= 1 && appDescriptions >= 1,
+        detail: `${appHeadlines} headlines, ${appDescriptions} descriptions`,
         step: 3,
       });
     } else if (isDisplay) {
       const displayGroup = creative.displayAdGroups?.[0];
       const displayAd = displayGroup?.ads?.[0];
-      const dHeadlines = displayAd?.headlines?.filter((h) => h.text?.trim()).length ?? 0;
-      const dDescriptions = displayAd?.descriptions?.filter((d) => d.text?.trim()).length ?? 0;
+      const dHeadlines = displayAd?.headlines?.filter((h: { text?: string }) => h.text?.trim()).length ?? 0;
+      const dDescriptions = displayAd?.descriptions?.filter((d: { text?: string }) => d.text?.trim()).length ?? 0;
+      const dLandscapeImages = displayAd?.images?.filter((i: { url?: string }) => i.url?.trim()).length ?? 0;
+      const dSquareImages = displayAd?.squareImages?.filter((i: { url?: string }) => i.url?.trim()).length ?? 0;
+
+      list.push({
+        id: "display_ad_group",
+        label: "Min 1 ad group",
+        ok: (creative.displayAdGroups?.length ?? 0) >= 1,
+        detail: `${creative.displayAdGroups?.length ?? 0} ad groups`,
+        step: 3,
+      });
+      list.push({
+        id: "display_long_headline",
+        label: "Long headline set",
+        ok: !!displayAd?.longHeadline?.trim(),
+        detail: displayAd?.longHeadline?.trim() ? "Set" : "Missing",
+        step: 3,
+      });
+      list.push({
+        id: "display_text_assets",
+        label: "Min 1 headline + 1 description",
+        ok: dHeadlines >= 1 && dDescriptions >= 1,
+        detail: `${dHeadlines} headlines, ${dDescriptions} descriptions`,
+        step: 3,
+      });
+      list.push({
+        id: "display_images",
+        label: "Min 1 image (landscape or square)",
+        ok: dLandscapeImages >= 1 || dSquareImages >= 1,
+        detail: `${dLandscapeImages} landscape, ${dSquareImages} square`,
+        step: 3,
+      });
+      list.push({
+        id: "display_business_name",
+        label: "Business name set",
+        ok: !!displayAd?.businessName?.trim(),
+        detail: displayAd?.businessName?.trim() || "Missing",
+        step: 3,
+      });
+      list.push({
+        id: "display_final_url",
+        label: "Final URL set",
+        ok: !!displayAd?.finalUrl?.trim(),
+        detail: displayAd?.finalUrl?.trim() || "Missing",
+        step: 3,
+      });
       list.push({
         id: "display_targeting",
-        label: "Content targeting configured",
+        label: "Content targeting configured (recommended)",
         ok: (displayGroup?.contentKeywords?.length ?? 0) > 0 || (displayGroup?.topics?.length ?? 0) > 0 || (displayGroup?.placements?.length ?? 0) > 0,
         detail: `${displayGroup?.contentKeywords?.length ?? 0} keywords, ${displayGroup?.topics?.length ?? 0} topics, ${displayGroup?.placements?.length ?? 0} placements`,
         step: 3,
       });
+    } else if (isDemandGen) {
+      const dgAdGroups = creative.demandGenAdGroups ?? [];
+      const dgFirstGroup = dgAdGroups[0];
+      const dgFirstAd = dgFirstGroup?.ads?.[0];
+      const dgAdsCount = dgAdGroups.reduce((sum: number, ag: { ads?: unknown[] }) => sum + (ag.ads?.length ?? 0), 0);
+      const dgHeadlines = dgFirstAd?.headlines?.filter((h: { text?: string }) => (h.text ?? "").trim().length > 0).length ?? 0;
+      const dgDescriptions = dgFirstAd?.descriptions?.filter((d: { text?: string }) => (d.text ?? "").trim().length > 0).length ?? 0;
+
       list.push({
-        id: "assets",
-        label: "Display ad has minimum assets",
-        ok: dHeadlines >= 1 && dDescriptions >= 1 && !!displayAd?.longHeadline?.trim(),
-        detail: `${dHeadlines} headlines, ${dDescriptions} descriptions, long headline: ${displayAd?.longHeadline?.trim() ? "set" : "missing"}`,
+        id: "dg_ad_group",
+        label: "Min 1 ad group with min 1 ad",
+        ok: dgAdGroups.length >= 1 && dgAdsCount >= 1,
+        detail: `${dgAdGroups.length} ad groups, ${dgAdsCount} ads`,
         step: 3,
       });
-    } else {
       list.push({
-        id: "assets",
-        label: "Asset group has minimum assets",
-        ok: filledHeadlines >= 3 && filledDescriptions >= 2,
-        detail: `${filledHeadlines} headlines, ${filledDescriptions} descriptions`,
+        id: "dg_business_name",
+        label: "Business name set (max 25 chars)",
+        ok: !!dgFirstAd?.businessName?.trim() && (dgFirstAd?.businessName?.length ?? 0) <= 25,
+        detail: dgFirstAd?.businessName?.trim()
+          ? `${dgFirstAd.businessName} (${dgFirstAd.businessName.length} chars)`
+          : "Missing",
         step: 3,
       });
+      list.push({
+        id: "dg_headlines",
+        label: "Headlines filled (max 40 chars each)",
+        ok: dgHeadlines >= 1,
+        detail: `${dgHeadlines} headlines`,
+        step: 3,
+      });
+      list.push({
+        id: "dg_descriptions",
+        label: "Descriptions filled",
+        ok: dgDescriptions >= 1,
+        detail: `${dgDescriptions} descriptions`,
+        step: 3,
+      });
+      if (dgFirstAd?.adType === "MULTI_ASSET") {
+        list.push({
+          id: "dg_images",
+          label: "Min 1 image per multi-asset ad",
+          ok: (dgFirstAd?.images?.length ?? 0) >= 1,
+          detail: `${dgFirstAd?.images?.length ?? 0} images`,
+          step: 3,
+        });
+      }
+      if (dgFirstAd?.adType === "CAROUSEL") {
+        const filledCards = dgFirstAd?.carouselCards?.filter((c: { headline?: string; cardUrl?: string }) => c.headline?.trim() && c.cardUrl?.trim()).length ?? 0;
+        list.push({
+          id: "dg_carousel_cards",
+          label: "Min 2 carousel cards with headlines + URLs",
+          ok: filledCards >= 2,
+          detail: `${filledCards} complete cards`,
+          step: 3,
+        });
+      }
+      list.push({
+        id: "dg_logo",
+        label: "Logo set per ad",
+        ok: (dgFirstAd?.logos?.length ?? 0) >= 1,
+        detail: `${dgFirstAd?.logos?.length ?? 0} logos`,
+        step: 3,
+      });
+    } else if (!isShopping) {
+      /* ---- PMax (and other non-Shopping objectives that use asset groups) ---- */
+      const assetGroups = creative.assetGroups ?? [];
+      const agCount = assetGroups.length;
+
+      list.push({
+        id: "pmax_asset_groups",
+        label: "At least 1 asset group",
+        ok: agCount >= 1,
+        detail: `${agCount} asset groups`,
+        step: 3,
+      });
+
+      list.push({
+        id: "assets",
+        label: "Asset group has min 3 headlines, 1 long headline, 2 descriptions",
+        ok:
+          filledHeadlines >= 3 &&
+          filledDescriptions >= 2 &&
+          (firstGroup?.longHeadlines?.filter((h: { text?: string }) => (h.text ?? "").trim().length > 0).length ?? 0) >= 1,
+        detail: `${filledHeadlines} headlines, ${firstGroup?.longHeadlines?.filter((h: { text?: string }) => (h.text ?? "").trim().length > 0).length ?? 0} long headlines, ${filledDescriptions} descriptions`,
+        step: 3,
+      });
+
+      list.push({
+        id: "pmax_images",
+        label: "Min 1 landscape image + 1 square image + 1 logo",
+        ok:
+          (firstGroup?.images?.filter((i: { url?: string }) => i.url?.trim()).length ?? 0) >= 1 &&
+          (firstGroup?.logos?.filter((l: { url?: string }) => l.url?.trim()).length ?? 0) >= 1,
+        detail: `${firstGroup?.images?.filter((i: { url?: string }) => i.url?.trim()).length ?? 0} images, ${firstGroup?.logos?.filter((l: { url?: string }) => l.url?.trim()).length ?? 0} logos`,
+        step: 3,
+      });
+
+      list.push({
+        id: "pmax_business_name",
+        label: "Business name set",
+        ok: !!firstGroup?.businessName?.trim(),
+        detail: firstGroup?.businessName?.trim() || "Missing",
+        step: 3,
+      });
+
+      list.push({
+        id: "pmax_final_url",
+        label: "Final URL set",
+        ok: !!firstGroup?.finalUrl?.trim(),
+        detail: firstGroup?.finalUrl?.trim() || "Missing",
+        step: 3,
+      });
+
       if (isRetailPMax) {
         list.push({
           id: "listing_groups",
           label: "Listing groups configured",
           ok: !!creative.productGroupRoot,
           detail: retailListingSummary,
-          step: 3,
-        });
-      }
-      if (isPMax && budget.brandGuidelinesEnabled) {
-        list.push({
-          id: "pmax_brand_assets",
-          label: "Campaign brand assets ready",
-          ok: !!firstGroup?.businessName?.trim() && (firstGroup?.logos?.length ?? 0) > 0,
-          detail: `Business name: ${firstGroup?.businessName?.trim() ? "set" : "missing"}, logos: ${firstGroup?.logos?.length ?? 0}`,
           step: 3,
         });
       }
@@ -363,7 +540,7 @@ export function GoogleStepReview() {
     }
 
     return list;
-  }, [objective, audience, budget, creative, filledHeadlines, filledDescriptions, isSearch, isApp, isPMax, isRetailPMax, firstGroup, retailListingSummary]);
+  }, [objective, audience, budget, creative, filledHeadlines, filledDescriptions, isSearch, isApp, isPMax, isRetailPMax, isDisplay, isDemandGen, isShopping, firstGroup, retailListingSummary]);
 
   const allPassed = checks.every((c) => c.ok);
   const passedCount = checks.filter((c) => c.ok).length;
@@ -549,6 +726,602 @@ export function GoogleStepReview() {
     },
   ];
 
+  const searchSections = (() => {
+    const searchGroup = creative.searchAdGroups?.[0];
+    const searchAd = searchGroup?.ads?.[0];
+    const searchHeadlineCount = searchAd?.headlines?.filter((h: { text?: string }) => h.text?.trim()).length ?? 0;
+    const searchDescCount = searchAd?.descriptions?.filter((d: { text?: string }) => d.text?.trim()).length ?? 0;
+
+    const aiAutomationRows = (() => {
+      const automationEntries = budget.assetAutomationSettings ?? [];
+      const getStatus = (type: string) => {
+        const entry = automationEntries.find((e: { type: string }) => e.type === type);
+        return entry?.status ?? "OPTED_IN";
+      };
+      const types = ["TEXT_ASSET_AUTOMATION", "FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION", "GENERATE_IMAGE_ENHANCEMENT"];
+      const labels: Record<string, string> = {
+        TEXT_ASSET_AUTOMATION: "Text Generation",
+        FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION: "URL Text Generation",
+        GENERATE_IMAGE_ENHANCEMENT: "Image Enhancement",
+      };
+      return { types, labels, getStatus };
+    })();
+
+    return [
+      {
+        id: 0,
+        title: "Objective & Tracking",
+        step: 0,
+        warn: warnObjective,
+        chips: objectiveChips,
+        rows: (
+          <>
+            <ReviewRow label="Campaign Type" value={objConfig.label} />
+            <ReviewRow label="Campaign Name" value={objective.campaignName || "Not set"} warn={!objective.campaignName} />
+            <ReviewRow
+              label="Conversion Tracking"
+              value={
+                objective.tagMode === "salla_managed"
+                  ? "Salla Managed (Auto)"
+                  : objective.conversionId
+                    ? `ID: ${objective.conversionId}`
+                    : "Not configured"
+              }
+              warn={objective.tagMode === "none"}
+            />
+            {(objective.merchantCenterConnected || objective.merchantCenterId) && (
+              <ReviewRow label="Merchant Center" value={objective.merchantCenterId ? `ID: ${objective.merchantCenterId}` : "Connected"} />
+            )}
+          </>
+        ),
+      },
+      {
+        id: 1,
+        title: "Audience & Targeting",
+        step: 1,
+        warn: warnAudience,
+        chips: audienceChips,
+        rows: (
+          <>
+            <ReviewRow label="Locations" value={locationLabel} warn={audience.locationIds.length === 0} />
+            <ReviewRow label="Languages" value={languageLabel} />
+            <ReviewRow label="Audience Mode" value={audience.audienceTargetingMode === "TARGETING" ? "Targeting (restricted)" : "Observation (recommended)"} />
+            <ReviewRow label="Audience Segments" value={
+              (audience.inMarketSegments?.length ?? 0) + (audience.affinitySegments?.length ?? 0) > 0
+                ? `${(audience.inMarketSegments?.length ?? 0) + (audience.affinitySegments?.length ?? 0)} segments`
+                : "None"
+            } />
+            <ReviewRow label="RLSA Lists" value={
+              audience.audienceSignals?.length > 0
+                ? `${audience.audienceSignals.length} list${audience.audienceSignals.length !== 1 ? "s" : ""}`
+                : "None"
+            } />
+            <ReviewRow label="Search Partners" value={audience.searchPartners !== false ? "Enabled" : "Disabled"} />
+            <ReviewRow label="Ad Schedule" value={
+              audience.adScheduleEntries?.length > 0
+                ? `${audience.adScheduleEntries.length} entr${audience.adScheduleEntries.length !== 1 ? "ies" : "y"}`
+                : "24/7 (all day)"
+            } />
+            {audience.householdIncome?.length > 0 && (
+              <ReviewRow label="Household Income" value={`${audience.householdIncome.length} tier${audience.householdIncome.length !== 1 ? "s" : ""}`} />
+            )}
+            {audience.parentalStatus?.length > 0 && (
+              <ReviewRow label="Parental Status" value={audience.parentalStatus.join(", ")} />
+            )}
+          </>
+        ),
+      },
+      {
+        id: 2,
+        title: "Budget & Bidding",
+        step: 2,
+        warn: warnBudget,
+        chips: budgetChips,
+        rows: (
+          <>
+            <ReviewRow label="Daily Budget" value={`SAR ${budget.amount}`} />
+            <ReviewRow label="Bidding Strategy" value={BIDDING_LABELS[budget.biddingStrategy] || budget.biddingStrategy} />
+            {budget.biddingStrategy === "TARGET_CPA" && (
+              <ReviewRow label="Target CPA" value={`SAR ${budget.targetCpa}`} />
+            )}
+            {budget.biddingStrategy === "TARGET_ROAS" && (
+              <ReviewRow label="Target ROAS" value={`${budget.targetRoas}%`} />
+            )}
+            <ReviewRow label="Conversion Goal" value={conversionGoalLabel} />
+            <ReviewRow label="Schedule" value={
+              budget.endDate && !budget.endDateOptional
+                ? `${budget.startDate ?? "Today"} to ${budget.endDate}`
+                : `${budget.startDate ?? "Today"} (No end date)`
+            } />
+            <ReviewRow label="URL Expansion" value={budget.urlExpansionOptOut ? "Disabled" : "Enabled"} />
+            <ReviewRow label="Salla Performance Boost" value={budget.performanceBoost ? "SAR 149/mo" : "Off"} />
+          </>
+        ),
+      },
+      {
+        id: 4,
+        title: "AI Features",
+        step: 2,
+        warn: false,
+        chips: [
+          assetAutomationSummary,
+          budget.aiMaxSettings?.enableAiMax ? "AI Max on" : "AI Max off",
+        ],
+        rows: (
+          <>
+            <p className="mb-1 text-[10px] font-semibold text-muted-foreground">Campaign Asset Automation</p>
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {aiAutomationRows.types.map((type) => {
+                const isOn = aiAutomationRows.getStatus(type) === "OPTED_IN";
+                return (
+                  <Badge key={type} variant="secondary" className={cn("rounded-full px-2 py-0.5 text-[9px]", isOn ? "border-primary/30 bg-primary/10 text-primary" : "border-red-200 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400")}>
+                    {isOn ? "ON" : "OFF"}: {aiAutomationRows.labels[type] ?? type}
+                  </Badge>
+                );
+              })}
+            </div>
+            <div className="border-t border-border pt-2">
+              <ReviewRow label="AI Max for Search" value={budget.aiMaxSettings?.enableAiMax ? "Enabled" : "Disabled"} />
+              {budget.aiMaxSettings?.enableAiMax && (
+                <>
+                  {budget.aiMaxSettings.brandInclusions?.length > 0 && (
+                    <ReviewRow label="Brand Inclusions" value={budget.aiMaxSettings.brandInclusions.join(", ")} />
+                  )}
+                  {budget.aiMaxSettings.brandExclusions?.length > 0 && (
+                    <ReviewRow label="Brand Exclusions" value={budget.aiMaxSettings.brandExclusions.join(", ")} />
+                  )}
+                  {budget.aiMaxSettings.urlInclusions?.length > 0 && (
+                    <ReviewRow label="URL Restrictions" value={budget.aiMaxSettings.urlInclusions.join(", ")} />
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        ),
+      },
+      {
+        id: 3,
+        title: "Search Ads",
+        step: 3,
+        warn: warnCreative,
+        chips: creativeChips,
+        rows: (
+          <>
+            <ReviewRow label="Ad Groups" value={`${creative.searchAdGroups?.length ?? 0}`} />
+            {(creative.searchAdGroups ?? []).map((ag: { id: string; name: string; keywords: { text: string; matchType: string }[]; negativeKeywords: { text: string }[]; ads: { id: string; name: string; headlines: { text: string }[]; descriptions: { text: string }[]; finalUrl: string; displayPath1: string; displayPath2: string }[] }, gi: number) => (
+              <div key={ag.id} className={cn("mt-2 rounded-lg border border-border p-3", gi > 0 && "mt-2")}>
+                <p className="mb-1.5 text-xs font-semibold text-foreground">{ag.name || `Ad Group ${gi + 1}`}</p>
+                <ReviewRow label="Keywords" value={`${ag.keywords?.length ?? 0} (${["BROAD", "PHRASE", "EXACT"].map((mt) => {
+                  const c = ag.keywords?.filter((k: { matchType: string }) => k.matchType === mt).length ?? 0;
+                  return c > 0 ? `${c} ${mt.toLowerCase()}` : null;
+                }).filter(Boolean).join(", ") || "none"})`} />
+                <ReviewRow label="Negative Keywords" value={`${ag.negativeKeywords?.length ?? 0}`} />
+                <ReviewRow label="RSA Ads" value={`${ag.ads?.length ?? 0}`} />
+                {(ag.ads ?? []).map((ad, ai: number) => {
+                  const hCount = ad.headlines?.filter((h) => h.text?.trim()).length ?? 0;
+                  const dCount = ad.descriptions?.filter((d) => d.text?.trim()).length ?? 0;
+                  return (
+                    <div key={ad.id} className="ml-2 mt-1 border-l-2 border-primary/20 pl-2">
+                      <p className="text-[11px] font-medium text-foreground">{ad.name || `RSA ${ai + 1}`}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {hCount}/15 headlines, {dCount}/4 descriptions
+                        {ad.finalUrl ? ` | ${ad.finalUrl}` : ""}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {/* Extensions summary */}
+            {(creative.sitelinkExtensions?.length > 0 || creative.calloutExtensions?.length > 0 || creative.structuredSnippetExtensions?.length > 0) && (
+              <div className="mt-3 border-t border-border pt-3">
+                <p className="mb-1 text-xs font-semibold text-foreground">Ad Extensions</p>
+                {creative.sitelinkExtensions?.length > 0 && (
+                  <ReviewRow label="Sitelinks" value={`${creative.sitelinkExtensions.length}`} />
+                )}
+                {creative.calloutExtensions?.length > 0 && (
+                  <ReviewRow label="Callouts" value={creative.calloutExtensions.map((c: { text: string }) => c.text).filter(Boolean).join(", ") || `${creative.calloutExtensions.length}`} />
+                )}
+                {creative.structuredSnippetExtensions?.length > 0 && (
+                  <ReviewRow label="Structured Snippets" value={`${creative.structuredSnippetExtensions.length}`} />
+                )}
+              </div>
+            )}
+          </>
+        ),
+      },
+    ];
+  })();
+
+  const shoppingSections = useMemo(() => {
+    const sections = [];
+
+    // 1. Objective & Merchant Center
+    sections.push({
+      id: 0,
+      title: "Objective & Merchant Center",
+      step: 0,
+      warn: warnObjective || (!objective.merchantCenterConnected && !objective.merchantCenterId),
+      chips: [objConfig.label, objective.campaignName].filter(Boolean),
+      rows: (
+        <>
+          <ReviewRow label="Campaign Type" value="Shopping" />
+          <ReviewRow label="Campaign Name" value={objective.campaignName || "Not set"} warn={!objective.campaignName} />
+          <ReviewRow label="Conversion Tracking" value={objective.tagMode === "salla_managed" ? "Salla Managed (Auto)" : objective.conversionId ? `ID: ${objective.conversionId}` : "Not configured"} warn={objective.tagMode === "none"} />
+          <ReviewRow label="Merchant Center" value={objective.merchantCenterConnected || objective.merchantCenterId ? "Connected" : "Not connected"} warn={!objective.merchantCenterConnected && !objective.merchantCenterId} />
+          <ReviewRow label="Campaign Priority" value={objective.shoppingSettings?.campaignPriority === 2 ? "High" : objective.shoppingSettings?.campaignPriority === 1 ? "Medium" : "Low"} />
+          {objective.shoppingSettings?.feedLabel && <ReviewRow label="Feed Label" value={objective.shoppingSettings.feedLabel} />}
+          <ReviewRow label="Local Inventory" value={objective.shoppingSettings?.enableLocal ? "Enabled" : "Disabled"} />
+        </>
+      ),
+    });
+
+    // 2. Audience & Targeting
+    sections.push({
+      id: 1,
+      title: "Audience & Targeting",
+      step: 1,
+      warn: warnAudience,
+      chips: [
+        audience.locationIds.map((c: string) => COUNTRY_MAP[c] || c).join(", ") || "No locations",
+        audience.languages?.length > 0 ? audience.languages.map((l: string) => l === "ar" ? "Arabic" : l === "en" ? "English" : l).join(", ") : "All",
+      ],
+      rows: (
+        <>
+          <ReviewRow label="Locations" value={audience.locationIds.map((c: string) => COUNTRY_MAP[c] || c).join(", ") || "None"} warn={audience.locationIds.length === 0} />
+          <ReviewRow label="Languages" value={audience.languages?.length > 0 ? audience.languages.map((l: string) => l === "ar" ? "Arabic" : l === "en" ? "English" : l).join(", ") : "All"} />
+          <ReviewRow label="Negative Keywords" value={(audience.negativeKeywords?.length ?? 0) > 0 ? `${audience.negativeKeywords.length} keywords` : "None"} />
+          <ReviewRow label="Optimized Targeting" value={audience.optimizedTargeting ? "Enabled" : "Disabled"} />
+        </>
+      ),
+    });
+
+    // 3. Budget & Bidding
+    sections.push({
+      id: 2,
+      title: "Budget & Bidding",
+      step: 2,
+      warn: warnBudget,
+      chips: [`SAR ${budget.amount}/day`, BIDDING_LABELS[budget.biddingStrategy] || budget.biddingStrategy, `Goal: ${CONVERSION_LABELS[budget.conversionGoal] || budget.conversionGoal}`],
+      rows: (
+        <>
+          <ReviewRow label="Daily Budget" value={`SAR ${budget.amount}`} />
+          <ReviewRow label="Bidding Strategy" value={BIDDING_LABELS[budget.biddingStrategy] || budget.biddingStrategy} />
+          {budget.biddingStrategy === "TARGET_ROAS" && <ReviewRow label="Target ROAS" value={`${budget.targetRoas}%`} />}
+          {budget.biddingStrategy === "TARGET_CPA" && <ReviewRow label="Target CPA" value={`SAR ${budget.targetCpa}`} />}
+          <ReviewRow label="Conversion Goal" value={CONVERSION_LABELS[budget.conversionGoal] || budget.conversionGoal} />
+          <ReviewRow label="Schedule" value={budget.endDate && !budget.endDateOptional ? `${budget.startDate ?? "Today"} to ${budget.endDate}` : `${budget.startDate ?? "Today"} (No end date)`} />
+          <ReviewRow label="Performance Boost" value={budget.performanceBoost ? "SAR 149/mo" : "Off"} />
+        </>
+      ),
+    });
+
+    // 4. Product Groups
+    sections.push({
+      id: 3,
+      title: "Product Groups",
+      step: 3,
+      warn: warnCreative || !creative.productGroupRoot,
+      chips: [
+        creative.productGroupRoot
+          ? (creative.productGroupRoot.type === "SUBDIVISION"
+            ? `${creative.productGroupRoot.children.length} groups`
+            : "All products")
+          : "Not configured",
+      ],
+      rows: (
+        <>
+          <ReviewRow label="Ad Type" value="Shopping Product Ads (auto-generated from feed)" />
+          <ReviewRow label="Product Source" value="Merchant Center Feed (synced from Salla)" />
+          <ReviewRow label="Product Groups" value={
+            creative.productGroupRoot
+              ? (creative.productGroupRoot.type === "SUBDIVISION"
+                ? (() => {
+                    const included = creative.productGroupRoot.children.filter((c: { type: string; dimensionValue?: string }) => c.type === "UNIT_INCLUDED" && c.dimensionValue).length;
+                    const excluded = creative.productGroupRoot.children.filter((c: { type: string }) => c.type === "UNIT_EXCLUDED").length;
+                    return `${included} included, ${excluded} excluded`;
+                  })()
+                : "All products (no subdivision)")
+              : "Not configured"
+          } warn={!creative.productGroupRoot} />
+          <ReviewRow label="Negative Keywords" value={
+            (creative.negativeKeywords?.length ?? 0) + (audience.negativeKeywords?.length ?? 0) > 0
+              ? `${(creative.negativeKeywords?.length ?? 0) + (audience.negativeKeywords?.length ?? 0)} keywords`
+              : "None (recommended to add)"
+          } />
+        </>
+      ),
+    });
+
+    return sections;
+  }, [objective, audience, budget, creative, objConfig, warnObjective, warnAudience, warnBudget, warnCreative]);
+
+  const displaySections = useMemo(() => {
+    const sections: { id: number; title: string; step: number; warn: boolean; chips: string[]; rows: React.ReactNode }[] = [];
+
+    // 1. Objective & Tracking
+    sections.push({
+      id: 0,
+      title: "Objective & Tracking",
+      step: 0,
+      warn: warnObjective,
+      chips: ["Display", objective.campaignName || "Unnamed", objective.tagMode === "none" ? "Tracking missing" : "Tracking ready"],
+      rows: (
+        <>
+          <ReviewRow label="Campaign Type" value="Display" />
+          <ReviewRow label="Campaign Name" value={objective.campaignName || "Not set"} warn={!objective.campaignName} />
+          <ReviewRow
+            label="Conversion Tracking"
+            value={
+              objective.tagMode === "salla_managed"
+                ? "Salla Managed (Auto)"
+                : objective.conversionId
+                  ? `ID: ${objective.conversionId}`
+                  : "Not configured"
+            }
+            warn={objective.tagMode === "none"}
+          />
+        </>
+      ),
+    });
+
+    // 2. Audience & Targeting
+    const contentKeywordsCount = creative.displayAdGroups?.reduce((sum: number, g: { contentKeywords?: unknown[] }) => sum + (g.contentKeywords?.length ?? 0), 0) ?? 0;
+    const topicsCount = creative.displayAdGroups?.reduce((sum: number, g: { topics?: unknown[] }) => sum + (g.topics?.length ?? 0), 0) ?? 0;
+    const placementsCount = creative.displayAdGroups?.reduce((sum: number, g: { placements?: unknown[] }) => sum + (g.placements?.length ?? 0), 0) ?? 0;
+
+    sections.push({
+      id: 1,
+      title: "Audience & Targeting",
+      step: 1,
+      warn: warnAudience,
+      chips: [
+        locationLabel || "No locations",
+        languageLabel,
+        audience.optimizedTargeting ? "Optimized on" : "Optimized off",
+        `${contentKeywordsCount} keywords, ${topicsCount} topics, ${placementsCount} placements`,
+      ],
+      rows: (
+        <>
+          <ReviewRow label="Locations" value={locationLabel} warn={audience.locationIds.length === 0} />
+          <ReviewRow label="Languages" value={languageLabel} />
+          <ReviewRow label="Optimized Targeting" value={audience.optimizedTargeting ? "Enabled" : "Disabled"} />
+          <ReviewRow label="Content Targeting" value={
+            contentKeywordsCount + topicsCount + placementsCount > 0
+              ? `${contentKeywordsCount} keywords, ${topicsCount} topics, ${placementsCount} placements`
+              : "None configured"
+          } warn={contentKeywordsCount + topicsCount + placementsCount === 0} />
+        </>
+      ),
+    });
+
+    // 3. Budget & Bidding
+    sections.push({
+      id: 2,
+      title: "Budget & Bidding",
+      step: 2,
+      warn: warnBudget,
+      chips: [
+        `SAR ${budget.amount}/day`,
+        BIDDING_LABELS[budget.biddingStrategy] || budget.biddingStrategy,
+        `Goal: ${CONVERSION_LABELS[budget.conversionGoal] || budget.conversionGoal}`,
+        scheduleLabel,
+      ],
+      rows: (
+        <>
+          <ReviewRow label="Daily Budget" value={`SAR ${budget.amount}`} />
+          <ReviewRow label="Bidding Strategy" value={BIDDING_LABELS[budget.biddingStrategy] || budget.biddingStrategy} />
+          {budget.biddingStrategy === "TARGET_CPA" && <ReviewRow label="Target CPA" value={`SAR ${budget.targetCpa}`} />}
+          {budget.biddingStrategy === "TARGET_ROAS" && <ReviewRow label="Target ROAS" value={`${budget.targetRoas}%`} />}
+          <ReviewRow label="Conversion Goal" value={CONVERSION_LABELS[budget.conversionGoal] || budget.conversionGoal} />
+          <ReviewRow label="Schedule" value={
+            budget.endDate && !budget.endDateOptional
+              ? `${budget.startDate ?? "Today"} to ${budget.endDate}`
+              : `${budget.startDate ?? "Today"} (No end date)`
+          } />
+          <ReviewRow label="Performance Boost" value={budget.performanceBoost ? "SAR 149/mo" : "Off"} />
+        </>
+      ),
+    });
+
+    // 4. Display Ads
+    sections.push({
+      id: 3,
+      title: "Display Ads",
+      step: 3,
+      warn: warnCreative,
+      chips: [`${creative.displayAdGroups?.length ?? 0} ad groups`],
+      rows: (
+        <>
+          <ReviewRow label="Ad Groups" value={`${creative.displayAdGroups?.length ?? 0}`} />
+          {(creative.displayAdGroups ?? []).map((ag: { id: string; name: string; contentKeywords?: unknown[]; topics?: unknown[]; placements?: unknown[]; excludedPlacements?: unknown[]; ads?: { id: string; name: string; headlines?: { text?: string }[]; descriptions?: { text?: string }[]; longHeadline?: string; images?: unknown[]; squareImages?: unknown[]; logos?: unknown[]; squareLogos?: unknown[]; businessName?: string; finalUrl?: string }[] }, gi: number) => (
+            <div key={ag.id} className={cn("mt-2 rounded-lg border border-border p-3", gi > 0 && "mt-2")}>
+              <p className="mb-1.5 text-xs font-semibold text-foreground">{ag.name || `Ad Group ${gi + 1}`}</p>
+              <ReviewRow label="RDA Ads" value={`${ag.ads?.length ?? 0}`} />
+              {(ag.ads ?? []).map((ad, ai: number) => {
+                const hCount = ad.headlines?.filter((h) => h.text?.trim()).length ?? 0;
+                const dCount = ad.descriptions?.filter((d) => d.text?.trim()).length ?? 0;
+                const imgCount = (ad.images?.length ?? 0) + (ad.squareImages?.length ?? 0);
+                return (
+                  <div key={ad.id} className="ml-2 mt-1 border-l-2 border-primary/20 pl-2">
+                    <p className="text-[11px] font-medium text-foreground">{ad.name || `RDA ${ai + 1}`}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {hCount}/5 headlines, {dCount}/5 descriptions
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {imgCount} images | Business: {ad.businessName?.trim() || "missing"}
+                    </p>
+                    {ad.finalUrl && (
+                      <p className="text-[10px] text-muted-foreground">{ad.finalUrl}</p>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="mt-2 border-t border-border/60 pt-1.5">
+                <p className="text-[10px] text-muted-foreground">
+                  Content: {ag.contentKeywords?.length ?? 0} keywords, {ag.topics?.length ?? 0} topics, {ag.placements?.length ?? 0} placements
+                </p>
+              </div>
+            </div>
+          ))}
+        </>
+      ),
+    });
+
+    return sections;
+  }, [objective, audience, budget, creative, warnObjective, warnAudience, warnBudget, warnCreative, locationLabel, languageLabel, scheduleLabel]);
+
+  const demandGenSections = useMemo(() => {
+    const dgAdGroups = creative.demandGenAdGroups ?? [];
+    const dgFirstGroup = dgAdGroups[0];
+    const dgFirstAd = dgFirstGroup?.ads?.[0];
+
+    const sections: { id: number; title: string; step: number; warn: boolean; chips: string[]; rows: React.ReactNode }[] = [];
+
+    // 1. Objective & Tracking
+    sections.push({
+      id: 0,
+      title: "Objective & Tracking",
+      step: 0,
+      warn: warnObjective,
+      chips: ["Demand Gen", objective.campaignName || "Unnamed", objective.tagMode === "none" ? "Tracking missing" : "Tracking ready"],
+      rows: (
+        <>
+          <ReviewRow label="Campaign Type" value="Demand Gen" />
+          <ReviewRow label="Campaign Name" value={objective.campaignName || "Not set"} warn={!objective.campaignName} />
+          <ReviewRow
+            label="Conversion Tracking"
+            value={
+              objective.tagMode === "salla_managed"
+                ? "Salla Managed (Auto)"
+                : objective.conversionId
+                  ? `ID: ${objective.conversionId}`
+                  : "Not configured"
+            }
+            warn={objective.tagMode === "none"}
+          />
+        </>
+      ),
+    });
+
+    // 2. Audience & Targeting
+    sections.push({
+      id: 1,
+      title: "Audience & Targeting",
+      step: 1,
+      warn: warnAudience,
+      chips: [
+        locationLabel || "No locations",
+        languageLabel,
+        audience.lookalikeSegments?.length > 0 ? `${audience.lookalikeSegments.length} lookalike` : undefined,
+        audience.customerMatchLists?.length > 0 ? `${audience.customerMatchLists.length} customer match` : undefined,
+        audience.optimizedTargeting ? "Optimized on" : "Optimized off",
+      ].filter(Boolean) as string[],
+      rows: (
+        <>
+          <ReviewRow label="Locations" value={locationLabel} warn={audience.locationIds.length === 0} />
+          <ReviewRow label="Languages" value={languageLabel} />
+          <ReviewRow label="Lookalike Segments" value={
+            audience.lookalikeSegments?.length > 0
+              ? `${audience.lookalikeSegments.length} segment${audience.lookalikeSegments.length !== 1 ? "s" : ""} (${audience.lookalikeExpansion ?? "NARROW"})`
+              : "None"
+          } />
+          <ReviewRow label="Customer Match" value={
+            audience.customerMatchLists?.length > 0
+              ? `${audience.customerMatchLists.length} list${audience.customerMatchLists.length !== 1 ? "s" : ""}`
+              : "None"
+          } />
+          <ReviewRow label="Optimized Targeting" value={audience.optimizedTargeting ? "Enabled" : "Disabled"} />
+        </>
+      ),
+    });
+
+    // 3. Budget & Bidding
+    sections.push({
+      id: 2,
+      title: "Budget & Bidding",
+      step: 2,
+      warn: warnBudget,
+      chips: [
+        budget.demandGenBudgetMode === "TOTAL"
+          ? `SAR ${budget.demandGenTotalAmount} total`
+          : `SAR ${budget.amount}/day`,
+        BIDDING_LABELS[budget.biddingStrategy] || budget.biddingStrategy,
+        `Goal: ${CONVERSION_LABELS[budget.conversionGoal] || budget.conversionGoal}`,
+        scheduleLabel,
+      ],
+      rows: (
+        <>
+          <ReviewRow label="Budget Mode" value={budget.demandGenBudgetMode === "TOTAL" ? "Total Budget" : "Daily Budget"} />
+          <ReviewRow label="Amount" value={
+            budget.demandGenBudgetMode === "TOTAL"
+              ? `SAR ${budget.demandGenTotalAmount}`
+              : `SAR ${budget.amount}/day`
+          } />
+          <ReviewRow label="Bidding Strategy" value={BIDDING_LABELS[budget.biddingStrategy] || budget.biddingStrategy} />
+          {budget.biddingStrategy === "TARGET_CPA" && <ReviewRow label="Target CPA" value={`SAR ${budget.targetCpa}`} />}
+          {budget.biddingStrategy === "TARGET_ROAS" && <ReviewRow label="Target ROAS" value={`${budget.targetRoas}%`} />}
+          <ReviewRow label="Conversion Goal" value={CONVERSION_LABELS[budget.conversionGoal] || budget.conversionGoal} />
+          <ReviewRow label="Schedule" value={
+            budget.endDate && !budget.endDateOptional
+              ? `${budget.startDate ?? "Today"} to ${budget.endDate}`
+              : `${budget.startDate ?? "Today"} (No end date)`
+          } />
+          <ReviewRow label="Performance Boost" value={budget.performanceBoost ? "SAR 149/mo" : "Off"} />
+        </>
+      ),
+    });
+
+    // 4. Demand Gen Ads
+    const dgAdsCount = dgAdGroups.reduce((sum: number, ag: { ads?: unknown[] }) => sum + (ag.ads?.length ?? 0), 0);
+    sections.push({
+      id: 3,
+      title: "Demand Gen Ads",
+      step: 3,
+      warn: warnCreative,
+      chips: [`${dgAdGroups.length} ad groups`, `${dgAdsCount} ads`],
+      rows: (
+        <>
+          <ReviewRow label="Ad Groups" value={`${dgAdGroups.length}`} />
+          {dgAdGroups.map((ag, gi: number) => (
+            <div key={ag.id} className={cn("mt-2 rounded-lg border border-border p-3", gi > 0 && "mt-2")}>
+              <p className="mb-1.5 text-xs font-semibold text-foreground">{ag.name || `Ad Group ${gi + 1}`}</p>
+              <ReviewRow label="Channels" value={
+                Object.entries(ag.channelControls ?? {})
+                  .filter(([, v]) => v)
+                  .map(([k]) => k.replace(/([A-Z])/g, " $1").replace(/^./, (s: string) => s.toUpperCase()))
+                  .join(", ") || "None"
+              } />
+              <ReviewRow label="Ads" value={`${ag.ads.length}`} />
+              {ag.ads.map((ad, ai: number) => {
+                const hCount = ad.headlines?.filter((h) => h.text?.trim()).length ?? 0;
+                const dCount = ad.descriptions?.filter((d) => d.text?.trim()).length ?? 0;
+                const formatLabel = ad.adType === "MULTI_ASSET" ? "Multi-Asset" : ad.adType === "CAROUSEL" ? "Carousel" : "Video Responsive";
+                return (
+                  <div key={ad.id} className="ml-2 mt-1 border-l-2 border-primary/20 pl-2">
+                    <p className="text-[11px] font-medium text-foreground">{ad.name || `Ad ${ai + 1}`}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {formatLabel} | {hCount} headlines, {dCount} descriptions
+                      {ad.adType === "MULTI_ASSET" && ` | ${ad.images?.length ?? 0} images`}
+                      {ad.adType === "CAROUSEL" && ` | ${ad.carouselCards?.filter((c) => c.headline?.trim()).length ?? 0} cards`}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Business: {ad.businessName?.trim() || "missing"}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </>
+      ),
+    });
+
+    return sections;
+  }, [objective, audience, budget, creative, warnObjective, warnAudience, warnBudget, warnCreative, locationLabel, languageLabel, scheduleLabel]);
+
+  const reviewSections = isSearch ? searchSections : isShopping ? shoppingSections : isDisplay ? displaySections : isDemandGen ? demandGenSections : pmaxSections;
+
   /* ---- API JSON ---- */
   const apiJson = useMemo(
     () => buildGoogleCampaignPayloadV23(campaign),
@@ -600,14 +1373,14 @@ export function GoogleStepReview() {
 
   return (
     <TooltipProvider delayDuration={200}>
-      {isPMax && (
+      {(isPMax || isSearch || isShopping || isDisplay || isDemandGen) && (
         <div className={cn("flex flex-col gap-6 lg:flex-row lg:items-start", WIZARD_FOOTER_PADDING_BOTTOM)}>
           {/* ============ LEFT COLUMN ============ */}
           <div className="flex flex-1 flex-col gap-4">
             <div>
               <h2 className="text-lg font-bold text-foreground">Review & Launch</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Review your Performance Max campaign settings below. Expand any section to see details or edit.
+                Review your {objConfig.label} campaign settings below. Expand any section to see details or edit.
               </p>
             </div>
 
@@ -634,8 +1407,135 @@ export function GoogleStepReview() {
               </div>
             )}
 
+            {/* Quick Wins Optimization Tips */}
+            {isSearch && (() => {
+              const searchGroup = campaign.creative.searchAdGroups[0];
+              const headlineCount = searchGroup?.ads[0]?.headlines?.filter((h: { text: string }) => h.text.trim()).length ?? 0;
+              const negCount = searchGroup?.negativeKeywords?.length ?? 0;
+              const sitelinkCount = campaign.creative.sitelinkExtensions.length;
+              const calloutCount = campaign.creative.calloutExtensions.length;
+              const aiMaxOn = campaign.budget.aiMaxSettings.enableAiMax;
+              const tips = [
+                headlineCount < 10 && { text: `Add ${10 - headlineCount} more headlines (you have ${headlineCount}/15 — Google recommends 10+)`, step: 3 },
+                negCount === 0 && { text: `Add negative keywords (0 added — prevents wasted spend on irrelevant searches)`, step: 1 },
+                !aiMaxOn && { text: `Enable AI Max for Search (auto-expands keyword reach with Google AI)`, step: 2 },
+                sitelinkCount === 0 && { text: `Add sitelinks (0/6 — boosts CTR by up to 15%)`, step: 3 },
+                calloutCount === 0 && { text: `Add callouts (0/10 — highlights key benefits like "Free Shipping")`, step: 3 },
+              ].filter(Boolean) as { text: string; step: number }[];
+              if (tips.length === 0) return null;
+              return (
+                <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+                  <div className="mb-2.5 flex items-center gap-2">
+                    <Zap className="size-4 text-blue-600 dark:text-blue-400" />
+                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Quick wins before launch</p>
+                    <Badge variant="outline" className="h-4 px-1.5 text-[9px] text-blue-600">{tips.length} suggestions</Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {tips.map((tip, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setStep(tip.step)}
+                        className="flex w-full items-start gap-2 rounded-lg border border-blue-100 bg-white/70 p-2.5 text-left transition-colors hover:bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 dark:hover:bg-blue-950/50"
+                      >
+                        <div className="mt-0.5 size-4 shrink-0 rounded-full border border-blue-300" />
+                        <p className="text-[11px] text-blue-800 dark:text-blue-300">{tip.text}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {isShopping && (() => {
+              const negCount = (creative.negativeKeywords?.length ?? 0) + (audience.negativeKeywords?.length ?? 0);
+              const hasProductGroups = creative.productGroupRoot?.type === "SUBDIVISION";
+              const tips = [
+                negCount === 0 && { text: "Add negative keywords to reduce wasted spend on irrelevant searches (saves 20-40% budget)", step: 1 },
+                !hasProductGroups && { text: "Subdivide product groups by category or brand for granular bid control", step: 3 },
+              ].filter(Boolean) as { text: string; step: number }[];
+              if (tips.length === 0) return null;
+              return (
+                <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+                  <div className="mb-2.5 flex items-center gap-2">
+                    <Zap className="size-4 text-blue-600 dark:text-blue-400" />
+                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Quick wins before launch</p>
+                    <Badge variant="outline" className="h-4 px-1.5 text-[9px] text-blue-600">{tips.length} suggestions</Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {tips.map((tip, i) => (
+                      <button key={i} type="button" onClick={() => setStep(tip.step)} className="flex w-full items-start gap-2 rounded-lg border border-blue-100 bg-white/70 p-2.5 text-left transition-colors hover:bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+                        <div className="mt-0.5 size-4 shrink-0 rounded-full border border-blue-300" />
+                        <p className="text-[11px] text-blue-800 dark:text-blue-300">{tip.text}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {isDisplay && (() => {
+              const displayGroup = creative.displayAdGroups?.[0];
+              const displayAd = displayGroup?.ads?.[0];
+              const hCount = displayAd?.headlines?.filter((h: { text?: string }) => h.text?.trim()).length ?? 0;
+              const imgCount = (displayAd?.images?.length ?? 0) + (displayAd?.squareImages?.length ?? 0);
+              const hasTargeting = (displayGroup?.contentKeywords?.length ?? 0) + (displayGroup?.topics?.length ?? 0) + (displayGroup?.placements?.length ?? 0) > 0;
+              const tips = [
+                hCount < 5 && { text: `Add ${5 - hCount} more headlines (you have ${hCount}/5 — Google tests combinations)`, step: 3 },
+                imgCount === 0 && { text: "Add images (at least 1 landscape + 1 square required)", step: 3 },
+                !hasTargeting && { text: "Add content targeting (keywords, topics, or placements) for relevant reach", step: 3 },
+                !displayAd?.businessName?.trim() && { text: "Set your business name (shown in all ad formats)", step: 3 },
+              ].filter(Boolean) as { text: string; step: number }[];
+              if (tips.length === 0) return null;
+              return (
+                <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+                  <div className="mb-2.5 flex items-center gap-2">
+                    <Zap className="size-4 text-blue-600" />
+                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Quick wins before launch</p>
+                    <Badge variant="outline" className="h-4 px-1.5 text-[9px] text-blue-600">{tips.length} suggestions</Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {tips.map((tip, i) => (
+                      <button key={i} type="button" onClick={() => setStep(tip.step)} className="flex w-full items-start gap-2 rounded-lg border border-blue-100 bg-white/70 p-2.5 text-left transition-colors hover:bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+                        <div className="mt-0.5 size-4 shrink-0 rounded-full border border-blue-300" />
+                        <p className="text-[11px] text-blue-800 dark:text-blue-300">{tip.text}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {isDemandGen && (() => {
+              const dgGroup = creative.demandGenAdGroups?.[0];
+              const dgAd = dgGroup?.ads?.[0];
+              const channels = Object.values(dgGroup?.channelControls ?? {}).filter(Boolean).length;
+              const tips = [
+                channels < 3 && { text: "Enable more channels (YouTube + Discover + Gmail) for broader reach", step: 3 },
+                !dgAd?.businessName?.trim() && { text: "Set your business name (required for all Demand Gen formats)", step: 3 },
+              ].filter(Boolean) as { text: string; step: number }[];
+              if (tips.length === 0) return null;
+              return (
+                <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+                  <div className="mb-2.5 flex items-center gap-2">
+                    <Zap className="size-4 text-blue-600 dark:text-blue-400" />
+                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Quick wins before launch</p>
+                    <Badge variant="outline" className="h-4 px-1.5 text-[9px] text-blue-600">{tips.length} suggestions</Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {tips.map((tip, i) => (
+                      <button key={i} type="button" onClick={() => setStep(tip.step)} className="flex w-full items-start gap-2 rounded-lg border border-blue-100 bg-white/70 p-2.5 text-left transition-colors hover:bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 dark:hover:bg-blue-950/50">
+                        <div className="mt-0.5 size-4 shrink-0 rounded-full border border-blue-300" />
+                        <p className="text-[11px] text-blue-800 dark:text-blue-300">{tip.text}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="flex flex-col gap-2.5">
-              {pmaxSections.map((s) => {
+              {reviewSections.map((s) => {
                 const isOpen = expandedSection === s.id;
                 return (
                   <div key={s.id} className="rounded-xl border border-border bg-card overflow-hidden">
@@ -853,7 +1753,7 @@ export function GoogleStepReview() {
           </div>
         </div>
       )}
-      {!isPMax && (
+      {!isPMax && !isSearch && !isShopping && !isDisplay && !isDemandGen && (
       <div className={cn("flex flex-col gap-6 lg:flex-row", WIZARD_FOOTER_PADDING_BOTTOM)}>
         {/* ============================================================ */}
         {/* LEFT COLUMN                                                   */}
@@ -926,7 +1826,7 @@ export function GoogleStepReview() {
 
               {/* ---- Audience ---- */}
               <SectionCard>
-                <SectionHeader icon={Users} title={isSearch ? "Audience & Targeting" : "Audience Signals"} step={1} setStep={setStep} />
+                <SectionHeader icon={Users} title="Audience Signals" step={1} setStep={setStep} />
                 <ReviewRow label="Locations" value={audience.locationIds.map((c: string) => COUNTRY_MAP[c] || c).join(", ") || "None"} warn={audience.locationIds.length === 0} />
                 <ReviewRow label="Languages" value={
                   audience.languages?.length > 0
@@ -934,37 +1834,8 @@ export function GoogleStepReview() {
                     : "All languages"
                 } />
 
-                {/* Search-specific audience fields */}
-                {isSearch && (
-                  <>
-                    <ReviewRow label="Audience Mode" value={audience.audienceTargetingMode === "TARGETING" ? "Targeting (restricted)" : "Observation (recommended)"} />
-                    <ReviewRow label="Audience Segments" value={
-                      (audience.inMarketSegments?.length ?? 0) + (audience.affinitySegments?.length ?? 0) > 0
-                        ? `${(audience.inMarketSegments?.length ?? 0) + (audience.affinitySegments?.length ?? 0)} segments`
-                        : "None"
-                    } />
-                    <ReviewRow label="RLSA Lists" value={
-                      audience.audienceSignals?.length > 0
-                        ? `${audience.audienceSignals.length} list${audience.audienceSignals.length !== 1 ? "s" : ""}`
-                        : "None"
-                    } />
-                    <ReviewRow label="Search Partners" value={audience.searchPartners !== false ? "Enabled" : "Disabled"} />
-                    <ReviewRow label="Ad Schedule" value={
-                      audience.adScheduleEntries?.length > 0
-                        ? `${audience.adScheduleEntries.length} entr${audience.adScheduleEntries.length !== 1 ? "ies" : "y"}`
-                        : "24/7 (all day)"
-                    } />
-                    {audience.householdIncome?.length > 0 && (
-                      <ReviewRow label="Household Income" value={`${audience.householdIncome.length} tier${audience.householdIncome.length !== 1 ? "s" : ""}`} />
-                    )}
-                    {audience.parentalStatus?.length > 0 && (
-                      <ReviewRow label="Parental Status" value={audience.parentalStatus.join(", ")} />
-                    )}
-                  </>
-                )}
-
-                {/* PMax / non-search fields */}
-                {!isShopping && !isSearch && (
+                {/* Non-search / non-shopping fields */}
+                {!isShopping && (
                   <>
                     <ReviewRow label="Search Themes" value={
                       audience.searchThemes?.length > 0
@@ -985,9 +1856,7 @@ export function GoogleStepReview() {
                       : "None"
                   } />
                 )}
-                {!isSearch && (
-                  <ReviewRow label="Optimized Targeting" value={audience.optimizedTargeting ? "Enabled" : "Disabled"} />
-                )}
+                <ReviewRow label="Optimized Targeting" value={audience.optimizedTargeting ? "Enabled" : "Disabled"} />
               </SectionCard>
 
               {/* ---- Budget & Bidding ---- */}
@@ -1011,68 +1880,10 @@ export function GoogleStepReview() {
                 <ReviewRow label="Salla Performance Boost" value={budget.performanceBoost ? "SAR 149/mo" : "Off"} />
               </SectionCard>
 
-              {/* ---- AI Features (PMax + Search + Demand Gen) ---- */}
-              {(isPMax || isSearch || isDemandGen) && (
+              {/* ---- AI Features (Demand Gen) ---- */}
+              {isDemandGen && (
                 <SectionCard className="border-primary/20 bg-primary/[0.02]">
                   <SectionHeader icon={Sparkles} title="AI Features" step={2} setStep={setStep} />
-
-                  {/* Campaign-level asset automation (PMax + Search) */}
-                  {(isPMax || isSearch) && (
-                    <>
-                      <p className="mb-1 text-[10px] font-semibold text-muted-foreground">Campaign Asset Automation</p>
-                      {(() => {
-                        const automationEntries = budget.assetAutomationSettings ?? [];
-                        const getStatus = (type: string) => {
-                          const entry = automationEntries.find((e: { type: string }) => e.type === type);
-                          return entry?.status ?? "OPTED_IN";
-                        };
-                        const types = isPMax
-                          ? ["TEXT_ASSET_AUTOMATION", "FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION", "GENERATE_IMAGE_EXTRACTION", "GENERATE_IMAGE_ENHANCEMENT", "GENERATE_ENHANCED_YOUTUBE_VIDEOS"]
-                          : ["TEXT_ASSET_AUTOMATION", "FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION", "GENERATE_IMAGE_ENHANCEMENT"];
-                        const labels: Record<string, string> = {
-                          TEXT_ASSET_AUTOMATION: "Text Generation",
-                          FINAL_URL_EXPANSION_TEXT_ASSET_AUTOMATION: "URL Text Generation",
-                          GENERATE_IMAGE_EXTRACTION: "Image Extraction",
-                          GENERATE_IMAGE_ENHANCEMENT: "Image Enhancement",
-                          GENERATE_ENHANCED_YOUTUBE_VIDEOS: "Video Enhancement",
-                        };
-                        return (
-                          <div className="mb-3 flex flex-wrap gap-1.5">
-                            {types.map((type) => {
-                              const isOn = getStatus(type) === "OPTED_IN";
-                              return (
-                                <Badge key={type} variant="secondary" className={cn("rounded-full px-2 py-0.5 text-[9px]", isOn ? "border-primary/30 bg-primary/10 text-primary" : "border-red-200 bg-red-50 text-red-600 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400")}>
-                                  {isOn ? "ON" : "OFF"}: {labels[type] ?? type}
-                                </Badge>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
-                    </>
-                  )}
-
-                  {/* AI Max for Search */}
-                  {isSearch && (
-                    <>
-                      <div className="mb-2 border-t border-border pt-2">
-                        <ReviewRow label="AI Max for Search" value={budget.aiMaxSettings?.enableAiMax ? "Enabled" : "Disabled"} />
-                        {budget.aiMaxSettings?.enableAiMax && (
-                          <>
-                            {budget.aiMaxSettings.brandInclusions?.length > 0 && (
-                              <ReviewRow label="Brand Inclusions" value={budget.aiMaxSettings.brandInclusions.join(", ")} />
-                            )}
-                            {budget.aiMaxSettings.brandExclusions?.length > 0 && (
-                              <ReviewRow label="Brand Exclusions" value={budget.aiMaxSettings.brandExclusions.join(", ")} />
-                            )}
-                            {budget.aiMaxSettings.urlInclusions?.length > 0 && (
-                              <ReviewRow label="URL Restrictions" value={budget.aiMaxSettings.urlInclusions.join(", ")} />
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </>
-                  )}
 
                   {/* Demand Gen ad-level automation */}
                   {isDemandGen && (
@@ -1185,56 +1996,17 @@ export function GoogleStepReview() {
                     )}
                   </div>
                 </SectionCard>
-              ) : isSearch ? (
-                <SectionCard>
-                  <SectionHeader icon={Search} title="Search Ads" step={3} setStep={setStep} />
-                  <ReviewRow label="Ad Groups" value={`${creative.searchAdGroups?.length ?? 0}`} />
-                  {(creative.searchAdGroups ?? []).map((ag: { id: string; name: string; keywords: { text: string; matchType: string }[]; negativeKeywords: { text: string }[]; ads: { id: string; name: string; headlines: { text: string }[]; descriptions: { text: string }[]; finalUrl: string; displayPath1: string; displayPath2: string }[] }, gi: number) => (
-                    <div key={ag.id} className={cn("mt-3 rounded-lg border border-border p-3", gi > 0 && "mt-2")}>
-                      <p className="mb-1.5 text-xs font-semibold text-foreground">{ag.name || `Ad Group ${gi + 1}`}</p>
-                      <ReviewRow label="Keywords" value={`${ag.keywords?.length ?? 0} (${["BROAD", "PHRASE", "EXACT"].map((mt) => {
-                        const c = ag.keywords?.filter((k: { matchType: string }) => k.matchType === mt).length ?? 0;
-                        return c > 0 ? `${c} ${mt.toLowerCase()}` : null;
-                      }).filter(Boolean).join(", ") || "none"})`} />
-                      <ReviewRow label="Negative Keywords" value={`${ag.negativeKeywords?.length ?? 0}`} />
-                      <ReviewRow label="RSA Ads" value={`${ag.ads?.length ?? 0}`} />
-                      {(ag.ads ?? []).map((ad, ai: number) => {
-                        const hCount = ad.headlines?.filter((h) => h.text?.trim()).length ?? 0;
-                        const dCount = ad.descriptions?.filter((d) => d.text?.trim()).length ?? 0;
-                        return (
-                          <div key={ad.id} className="ml-2 mt-1 border-l-2 border-primary/20 pl-2">
-                            <p className="text-[11px] font-medium text-foreground">{ad.name || `RSA ${ai + 1}`}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {hCount}/15 headlines, {dCount}/4 descriptions
-                              {ad.finalUrl ? ` | ${ad.finalUrl}` : ""}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                  {/* Extensions summary */}
-                  {(creative.sitelinkExtensions?.length > 0 || creative.calloutExtensions?.length > 0 || creative.structuredSnippetExtensions?.length > 0) && (
-                    <div className="mt-3 border-t border-border pt-3">
-                      <p className="mb-1 text-xs font-semibold text-foreground">Ad Extensions</p>
-                      {creative.sitelinkExtensions?.length > 0 && (
-                        <ReviewRow label="Sitelinks" value={`${creative.sitelinkExtensions.length}`} />
-                      )}
-                      {creative.calloutExtensions?.length > 0 && (
-                        <ReviewRow label="Callouts" value={creative.calloutExtensions.map((c: { text: string }) => c.text).filter(Boolean).join(", ") || `${creative.calloutExtensions.length}`} />
-                      )}
-                      {creative.structuredSnippetExtensions?.length > 0 && (
-                        <ReviewRow label="Structured Snippets" value={`${creative.structuredSnippetExtensions.length}`} />
-                      )}
-                    </div>
-                  )}
-                </SectionCard>
               ) : isShopping ? (
                 <SectionCard>
                   <SectionHeader icon={FolderTree} title="Product Groups" step={3} setStep={setStep} />
-                  <ReviewRow label="Ad Type" value="Shopping Product Ads (auto-generated)" />
-                  <ReviewRow label="Product Source" value="Merchant Center Feed" />
+                  <ReviewRow label="Ad Type" value="Shopping Product Ads (auto-generated from feed)" />
+                  <ReviewRow label="Product Source" value="Merchant Center Feed (synced from Salla)" />
                   <ReviewRow label="Active Products" value="1,198 approved" />
+                  <ReviewRow label="Product Groups" value={
+                    creative.productGroupRoot?.type === "SUBDIVISION"
+                      ? `${creative.productGroupRoot.children.filter((c: { type: string }) => c.type === "UNIT_INCLUDED").length} included, ${creative.productGroupRoot.children.filter((c: { type: string }) => c.type === "UNIT_EXCLUDED").length} excluded`
+                      : "All products (no subdivision)"
+                  } />
                   <ReviewRow label="Negative Keywords" value={
                     creative.negativeKeywords?.length > 0
                       ? `${creative.negativeKeywords.length} keyword${creative.negativeKeywords.length !== 1 ? "s" : ""}`
@@ -1324,24 +2096,6 @@ export function GoogleStepReview() {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Salla Performance Boost</span>
                       <span className="font-medium text-primary">SAR 149</span>
-                    </div>
-                  )}
-                  {(isPMax || isSearch) && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">AI Automation</span>
-                      <span className="font-medium text-foreground">
-                        {(() => {
-                          const entries = budget.assetAutomationSettings ?? [];
-                          const offCount = entries.filter((e: { status: string }) => e.status === "OPTED_OUT").length;
-                          return offCount > 0 ? `${offCount} disabled` : "All on";
-                        })()}
-                      </span>
-                    </div>
-                  )}
-                  {isSearch && budget.aiMaxSettings?.enableAiMax && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">AI Max</span>
-                      <span className="font-medium text-amber-600">Enabled</span>
                     </div>
                   )}
                   <div className="mt-2 flex justify-between border-t border-border pt-2">
@@ -1534,9 +2288,10 @@ export function GoogleStepReview() {
                   </>
                 ) : isShopping ? (
                   <>
-                    <li>- Shopping campaigns need 1-2 weeks to learn</li>
-                    <li>- Optimize product titles and images in your store</li>
-                    <li>- Use negative keywords to reduce wasted spend</li>
+                    <li>- Shopping campaigns need 1-2 weeks to learn — avoid changes during this period</li>
+                    <li>- Optimize product titles and images in your Salla store for better click-through rates</li>
+                    <li>- Use negative keywords to prevent wasted spend on irrelevant searches</li>
+                    <li>- Subdivide product groups to bid more on high-margin items</li>
                   </>
                 ) : isDemandGen ? (
                   <>
@@ -1604,7 +2359,7 @@ export function GoogleStepReview() {
           disabled: savedAsDraft,
         }}
       />
-      {isPMax && (
+      {(isPMax || isSearch || isShopping || isDisplay || isDemandGen) && (
         <Sheet open={topUpOpen} onOpenChange={setTopUpOpen}>
           <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
             <SheetHeader>

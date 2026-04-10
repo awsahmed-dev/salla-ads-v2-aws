@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useCampaign } from "@/lib/snapchat/campaign-context";
+import { SMART_TARGETING_INCOMPATIBLE_GOALS } from "@/lib/snapchat/campaign-types";
 import { cn } from "@/lib/utils";
 import { getCityById, getCountryByCode, REGIONS } from "@/lib/locations";
 import { LocationSelector } from "@/components/shared/location-selector";
@@ -46,6 +47,9 @@ import { SNAP_INTEREST_GROUPS, getInterestById } from "@/lib/interest-targeting"
 export function StepAudience() {
   const { campaign, setStep, updateNested } = useCampaign();
   const aud = campaign.audience;
+
+  // Snap API: Smart Targeting not available for awareness/engagement goals
+  const smartTargetingBlocked = SMART_TARGETING_INCOMPATIBLE_GOALS.includes(campaign.budget.optimizationGoal);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -254,15 +258,20 @@ export function StepAudience() {
                           <p className="text-[11px] text-muted-foreground leading-tight">
                             Expand beyond gender and age limits to maximize conversions. Requires both expansion options enabled.
                           </p>
-                          {aud.smartTargeting && aud.interestExpansion && aud.customAudienceExpansion && (
+                          {smartTargetingBlocked && (
+                            <p className="mt-1 text-[10px] text-amber-600 font-medium">
+                              Not available for your current optimization goal (awareness/engagement goals).
+                            </p>
+                          )}
+                          {aud.smartTargeting && aud.interestExpansion && aud.customAudienceExpansion && !smartTargetingBlocked && (
                             <p className="mt-1 text-[10px] text-primary font-medium">
                               Active — Snap will optimize across demographics for best performance
                             </p>
                           )}
                         </div>
                         <Switch
-                          checked={aud.smartTargeting}
-                          disabled={!aud.interestExpansion || !aud.customAudienceExpansion}
+                          checked={aud.smartTargeting && !smartTargetingBlocked}
+                          disabled={!aud.interestExpansion || !aud.customAudienceExpansion || smartTargetingBlocked}
                           onCheckedChange={(v) =>
                             updateNested("audience", { smartTargeting: v })
                           }

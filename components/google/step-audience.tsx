@@ -66,7 +66,10 @@ import {
   Tablet,
   Radio,
   DollarSign,
+  Info,
+  Loader2,
 } from "lucide-react";
+import { generateKeywords, generateNegativeKeywords, getStoreSnapshot, type GeneratedKeyword } from "@/lib/google/search-ai-generator";
 
 /* ================================================================== */
 /*  Static data                                                       */
@@ -220,6 +223,23 @@ export function GoogleStepAudience() {
   const [themeInput, setThemeInput] = useState("");
   const [customKeywordInput, setCustomKeywordInput] = useState("");
   const [customUrlInput, setCustomUrlInput] = useState("");
+
+  /* --- AI keyword generator state --- */
+  const [aiKeywords, setAiKeywords] = useState<GeneratedKeyword[]>([]);
+  const [aiKeywordsLoading, setAiKeywordsLoading] = useState(false);
+  const [aiNegatives, setAiNegatives] = useState<string[]>([]);
+
+  const handleGenerateKeywords = async () => {
+    setAiKeywordsLoading(true);
+    try {
+      const snapshot = await getStoreSnapshot();
+      const keywords = generateKeywords(snapshot);
+      const negatives = generateNegativeKeywords();
+      setAiKeywords(keywords);
+      setAiNegatives(negatives);
+    } catch { /* fail silently */ }
+    setAiKeywordsLoading(false);
+  };
 
   const toggleInArray = (arr: string[], val: string) =>
     arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val];
@@ -616,10 +636,46 @@ export function GoogleStepAudience() {
                 Simple rule: start with <strong>People in this location</strong>. Use <strong>People in or interested in</strong> only when you want broader reach.
               </p>
             </div>
+
+            {/* Excluded (negative) locations */}
+            {aud.excludedLocationIds.length > 0 && (
+              <div className="mt-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+                <Label className="mb-1.5 block text-xs font-medium text-destructive">Excluded locations</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {aud.excludedLocationIds.map((loc) => (
+                    <Badge key={loc} variant="outline" className="gap-1 border-destructive/30 text-destructive">
+                      {loc}
+                      <button type="button" className="ml-0.5 text-destructive/60 hover:text-destructive" onClick={() => updateNested("audience", { excludedLocationIds: aud.excludedLocationIds.filter((l) => l !== loc) })}>
+                        &times;
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[10px] text-muted-foreground">Ads will not show to people in these locations. Maps to negative CampaignCriterion.</p>
+              </div>
+            )}
           </SectionCard>
 
+          {/* ---- APP: automated targeting notice ---- */}
+          {isApp && (
+            <SectionCard>
+              <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+                <Sparkles className="mt-0.5 size-5 shrink-0 text-blue-600 dark:text-blue-400" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">Automated targeting for App campaigns</p>
+                  <p className="mt-1 text-xs text-blue-700 dark:text-blue-400">
+                    Google App campaigns automatically target users across Search, Play, YouTube, Discover, and Display Network. You cannot manually set demographics, keywords, or audience targeting. Google optimizes based on your app listing, ad assets, and campaign goal.
+                  </p>
+                  <p className="mt-2 text-xs text-blue-600 dark:text-blue-500">
+                    Only location and language targeting are available for App campaigns.
+                  </p>
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
           {/* ---- 2. Demographics (shared: English/Arabic, Male/Female, age bands) ---- */}
-          <DemographicsCard
+          {!isApp && <DemographicsCard
             languageCodes={aud.languages}
             onLanguagesChange={(codes) => updateNested("audience", { languages: codes })}
             genderIds={aud.genders.length === 0 || (aud.genders.includes("MALE") && aud.genders.includes("FEMALE")) ? ["MALE", "FEMALE"] : aud.genders.includes("MALE") ? ["MALE"] : ["FEMALE"]}
@@ -638,8 +694,9 @@ export function GoogleStepAudience() {
               ? "Use demographics as guidance, not hard limits. PMax can still expand if it predicts better conversions."
               : "Set language, age, and gender to keep targeting relevant for your offer."
             }
-          />
+          />}
 
+          {!isApp && (<>
           <SectionGroupHeader
             title="Recommended for performance"
             description={isPMax
@@ -657,7 +714,7 @@ export function GoogleStepAudience() {
                 <Search className="size-4 text-primary" />
                 <Label className="text-sm font-semibold text-foreground">Keywords</Label>
                 <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">Search</Badge>
-                <InfoTip text="These are the search terms that can trigger your ads. Use buyer-intent terms and a mix of match types for balanced reach and control." />
+                <InfoTip text="Keywords trigger your ads when people search these terms on Google. Start with 10-20 keywords per category. Use Broad match for reach, Phrase for relevance, and Exact for precision." />
               </div>
               <p className="mb-3 mt-2 text-xs text-muted-foreground">
                 Add what customers type before buying. Start with 10-20 relevant keywords per ad group.
@@ -727,39 +784,100 @@ export function GoogleStepAudience() {
                 </div>
               </div>
 
-              {/* Suggested keywords */}
-              <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
-                <p className="mb-2 text-xs font-semibold text-foreground">Suggested Keywords:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {["buy online", "best price", "free shipping", "shop now", "discount", "new arrival", "original", "sale"].map((kw) => {
-                    const alreadyAdded = searchKeywords.some((k) => k.text === kw);
-                    return (
-                      <button
-                        key={kw}
-                        type="button"
-                        disabled={alreadyAdded}
-                        onClick={() => {
-                          const newKw: SearchKeyword = { id: `kw-${Date.now()}-${kw}`, text: kw, matchType: "BROAD" };
-                          updateSearchAdGroupKeywords([...searchKeywords, newKw]);
-                        }}
-                        className={cn(
-                          "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
-                          alreadyAdded ? "border-primary/20 bg-primary/5 text-primary/50" : "border-border bg-background text-foreground hover:border-primary/40"
-                        )}
-                      >
-                        {alreadyAdded ? <CheckCircle2 className="mr-1 inline size-3" /> : <Plus className="mr-1 inline size-3" />}
-                        {kw}
-                      </button>
-                    );
-                  })}
+              {/* AI Keyword Generator */}
+              <div className="mt-4 rounded-lg border border-primary/20 bg-primary/[0.03] p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="size-4 text-primary" />
+                    <span className="text-xs font-semibold text-foreground">Smart Keywords from Store Data</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={handleGenerateKeywords}
+                    disabled={aiKeywordsLoading}
+                  >
+                    {aiKeywordsLoading ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                    {aiKeywords.length > 0 ? "Regenerate" : "Generate Keywords"}
+                  </Button>
                 </div>
+
+                {aiKeywords.length > 0 ? (
+                  <div className="space-y-3">
+                    {/* Group keywords by group */}
+                    {Object.entries(
+                      aiKeywords.reduce((acc, kw) => {
+                        (acc[kw.group] = acc[kw.group] || []).push(kw);
+                        return acc;
+                      }, {} as Record<string, GeneratedKeyword[]>)
+                    ).map(([group, kws]) => (
+                      <div key={group}>
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-muted-foreground">{group}</span>
+                          <button
+                            type="button"
+                            className="text-[10px] font-medium text-primary hover:underline"
+                            onClick={() => {
+                              const existingTexts = new Set(searchKeywords.map(k => k.text.toLowerCase()));
+                              const newKws = kws.filter(k => !existingTexts.has(k.text.toLowerCase()));
+                              if (newKws.length > 0) {
+                                updateSearchAdGroupKeywords([
+                                  ...searchKeywords,
+                                  ...newKws.map(k => ({ id: `kw-${Date.now()}-${k.text}`, text: k.text, matchType: k.matchType } as SearchKeyword)),
+                                ]);
+                              }
+                            }}
+                          >
+                            + Add all
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {kws.map((kw) => {
+                            const isAdded = searchKeywords.some(k => k.text.toLowerCase() === kw.text.toLowerCase());
+                            return (
+                              <button
+                                key={kw.text}
+                                type="button"
+                                disabled={isAdded}
+                                onClick={() => {
+                                  if (!isAdded) {
+                                    const newKw: SearchKeyword = { id: `kw-${Date.now()}-${kw.text}`, text: kw.text, matchType: kw.matchType };
+                                    updateSearchAdGroupKeywords([...searchKeywords, newKw]);
+                                  }
+                                }}
+                                className={cn(
+                                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-all",
+                                  isAdded
+                                    ? "border-primary/30 bg-primary/10 text-primary"
+                                    : "border-border bg-background text-foreground hover:border-primary/40 hover:bg-primary/5"
+                                )}
+                              >
+                                {!isAdded && <span className="text-muted-foreground">+</span>}
+                                {isAdded && <CheckCircle2 className="size-3 text-primary" />}
+                                {kw.text}
+                                <Badge variant="outline" className="ml-0.5 h-3.5 px-1 text-[9px]">
+                                  {kw.matchType === "BROAD" ? "Broad" : kw.matchType === "PHRASE" ? "Phrase" : "Exact"}
+                                </Badge>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    Click &quot;Generate Keywords&quot; to get AI-powered keyword suggestions based on your store&apos;s products, categories, and brand.
+                  </p>
+                )}
               </div>
 
               {/* Negative Keywords for Search */}
               <div className="mt-5 border-t border-border pt-4">
                 <div className="mb-2 flex items-center gap-2">
                   <Label className="text-xs font-semibold text-foreground">Negative Keywords</Label>
-                  <InfoTip text="Block irrelevant searches so budget goes to better traffic. Add terms like free, jobs, tutorial, and other non-buying intent queries." />
+                  <InfoTip text="Prevent your ads from showing on irrelevant searches. For e-commerce, always exclude: free, used, cheap, DIY, tutorial, repair, jobs." />
                 </div>
                 <div className="mb-2 flex gap-2">
                   <Input
@@ -786,6 +904,41 @@ export function GoogleStepAudience() {
                   </div>
                 )}
                 <p className="mt-1 text-[10px] text-muted-foreground">{searchNegKeywords.length} negative keyword{searchNegKeywords.length !== 1 ? "s" : ""} added.</p>
+
+                {aiNegatives.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <ShieldCheck className="size-3.5 text-muted-foreground" />
+                      <span className="text-[11px] font-medium text-foreground">Suggested Negative Keywords</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {aiNegatives.map((neg) => {
+                        const isAdded = searchNegKeywords.some(n => n.text.toLowerCase() === neg.toLowerCase());
+                        return (
+                          <button
+                            key={neg}
+                            type="button"
+                            disabled={isAdded}
+                            onClick={() => {
+                              if (!isAdded) {
+                                const newKw: SearchKeyword = { id: `nkw-${Date.now()}-${neg}`, text: neg, matchType: "BROAD" };
+                                updateSearchAdGroupNegKeywords([...searchNegKeywords, newKw]);
+                              }
+                            }}
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] transition-all",
+                              isAdded
+                                ? "border-destructive/30 bg-destructive/10 text-destructive"
+                                : "border-border bg-background text-muted-foreground hover:border-destructive/40"
+                            )}
+                          >
+                            {isAdded ? "✓" : "+"} {neg}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </SectionCard>
           )}
@@ -862,8 +1015,8 @@ export function GoogleStepAudience() {
                 />
                 <div className="grid grid-cols-2 gap-2">
                   {([
-                    { value: "OBSERVATION" as AudienceTargetingMode, label: "Observation", desc: "Ads still show to all keyword searches; you can measure and adjust bids by audience." },
-                    { value: "TARGETING" as AudienceTargetingMode, label: "Targeting", desc: "Ads show only to selected audiences who also search your keywords." },
+                    { value: "OBSERVATION" as AudienceTargetingMode, label: "Observation", desc: "Your ads show to everyone searching your keywords. Audience data is collected for optimization. Best for most stores." },
+                    { value: "TARGETING" as AudienceTargetingMode, label: "Targeting", desc: "Ads ONLY show to people in your selected audiences who also search your keywords. Significantly reduces reach." },
                   ]).map((mode) => {
                     const isSelected = aud.audienceTargetingMode === mode.value;
                     return (
@@ -991,48 +1144,19 @@ export function GoogleStepAudience() {
               <SectionCard>
                 <div className="mb-3 flex items-center gap-2">
                   <Search className="size-4 text-primary" />
-                  <Label className="text-sm font-semibold text-foreground">Search Themes</Label>
+                  <Label className="text-sm font-semibold text-foreground">Search Themes & Audience Signals</Label>
                   <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">PMax</Badge>
-                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">Optional signal</Badge>
-                  <InfoTip text="Search themes are signals (not exact keywords). They help PMax understand your shopper intent faster. Up to 25." />
                 </div>
-                <ObjectiveExplainer
-                  className="mb-3"
-                  highlight={
-                    <>
-                      <span className="font-semibold text-primary">Simple rule:</span> add shopper-intent phrases (what people search before buying), not internal product codes.
-                    </>
-                  }
-                  secondary="Google uses these as signals to learn faster. It can still expand beyond these terms."
-                  stepsTitle="Starter setup"
-                  steps={[
-                    "Start with 8-15 high-intent themes.",
-                    "Use specific phrases (for example: buy abaya online, oud perfume delivery).",
-                    "Avoid very broad themes like clothes or gifts.",
-                  ]}
-                />
-                <div className="mb-3 flex gap-2">
-                  <Input
-                    placeholder="e.g. buy abaya online, oud perfume delivery"
-                    value={themeInput}
-                    onChange={(e) => setThemeInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSearchTheme())}
-                    className="h-9 flex-1 text-sm"
-                  />
-                  <Button size="sm" variant="outline" className="h-9 gap-1 text-xs" disabled={!themeInput.trim() || aud.searchThemes.length >= 25} onClick={addSearchTheme}>
-                    <Plus className="size-3" /> Add
-                  </Button>
-                </div>
-                {aud.searchThemes.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-1.5">
-                    {aud.searchThemes.map((t) => (
-                      <TagPill key={t} label={t} onRemove={() => updateNested("audience", { searchThemes: aud.searchThemes.filter((s) => s !== t) })} />
-                    ))}
+                <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-950/20">
+                  <div className="flex items-start gap-2.5">
+                    <Info className="mt-0.5 size-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                    <div>
+                      <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Configured per asset group in Step 3</p>
+                      <p className="mt-0.5 text-[11px] text-blue-700 dark:text-blue-400">
+                        In Google Ads API v23, search themes and audience signals are set per asset group (not at campaign level). You&apos;ll configure these in the Creative step for each asset group individually.
+                      </p>
+                    </div>
                   </div>
-                )}
-                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                  <span>{aud.searchThemes.length}/25 themes</span>
-                  <span>Press Enter to add (optional)</span>
                 </div>
               </SectionCard>
 
@@ -1204,9 +1328,13 @@ export function GoogleStepAudience() {
 
               {/* Suggested negatives */}
               <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
-                <p className="mb-2 text-xs font-medium text-foreground">Suggested negatives for Shopping:</p>
+                <div className="mb-2 flex items-center gap-2">
+                  <ShieldCheck className="size-3.5 text-muted-foreground" />
+                  <p className="text-xs font-medium text-foreground">Suggested negatives for Shopping</p>
+                </div>
+                <p className="mb-2 text-[10px] text-muted-foreground">Click to add. These prevent your Shopping ads from showing on low-intent or irrelevant searches, reducing wasted spend by 20-40%.</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {["free", "used", "cheap", "wholesale", "DIY", "repair", "tutorial", "how to"].map((kw) => {
+                  {["free", "used", "cheap", "wholesale", "DIY", "repair", "tutorial", "how to", "review", "compare", "alternative", "download", "pdf", "jobs", "career", "sample"].map((kw) => {
                     const alreadyAdded = aud.negativeKeywords.includes(kw);
                     return (
                       <button
@@ -1472,155 +1600,30 @@ export function GoogleStepAudience() {
             </SectionCard>
           )}
 
-          {/* ---- 3f. Display content & placements ---- */}
+          {/* ---- 3f. Display content targeting note (actual UI is in Step 3) ---- */}
           {isDisplay && (
             <SectionCard>
               <div className="mb-3 flex items-center gap-2">
                 <Target className="size-4 text-primary" />
-                <Label className="text-sm font-semibold text-foreground">Display content & placements</Label>
+                <Label className="text-sm font-semibold text-foreground">Content Targeting</Label>
                 <Badge className="rounded-full bg-primary/10 px-1.5 py-0 text-[10px] text-primary">Display</Badge>
-                <InfoTip text="Choose where Display ads can appear using context keywords, topics, and placements. Use 1-2 methods to start, then refine." />
+                <InfoTip text="Content targeting (keywords, topics, placements) is configured in the Ad Design step alongside your Display ad creative." />
               </div>
-              <p className="mb-4 text-xs text-muted-foreground">
-                Define where your Display ads should appear on the Google Display Network (3M+ websites and apps). Use contextual keywords, topics, or specific placements.
-              </p>
 
-              {/* Contextual Keywords */}
-              <div className="mb-5">
-                <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                  <Search className="size-3 text-primary" />
-                  Contextual Keywords
-                  <InfoTip text="Contextual keywords match page content (not search queries). Keep them tightly related to your products." />
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={displayContentKeywordInput}
-                    onChange={(e) => setDisplayContentKeywordInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDisplayContentKeyword(); }}}
-                    placeholder="e.g. women's fashion, smartphone accessories..."
-                    className="h-9 flex-1 text-sm"
-                  />
-                  <Button size="sm" variant="outline" onClick={addDisplayContentKeyword} className="h-9 shrink-0">
-                    <Plus className="mr-1 size-3" /> Add
-                  </Button>
-                </div>
-                {displayContentKeywords.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {displayContentKeywords.map((kw) => (
-                      <TagPill
-                        key={kw}
-                        label={kw}
-                        onRemove={() => updateDisplayAdGroup({ contentKeywords: displayContentKeywords.filter((k) => k !== kw) })}
-                      />
-                    ))}
+              {/* Redirect note */}
+              <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-950/20">
+                <div className="flex items-start gap-2.5">
+                  <Info className="mt-0.5 size-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                  <div>
+                    <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Configured in Ad Design (Step 3)</p>
+                    <p className="mt-0.5 text-[11px] text-blue-700 dark:text-blue-400">
+                      Content targeting (contextual keywords, topics, and placements) is set per ad group in the Ad Design step. You&apos;ll configure where your Display ads appear alongside your ad creative.
+                    </p>
                   </div>
-                )}
-                {displayContentKeywords.length === 0 && (
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">No keywords selected. Ads will rely on topic and audience targeting only.</p>
-                )}
-              </div>
-
-              {/* Topic Targeting */}
-              <div className="mb-5">
-                <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                  <Tag className="size-3 text-primary" />
-                  Topic Targeting
-                  <InfoTip text="Topic targeting places ads on pages about selected topics. Use this for broad but relevant discovery." />
-                </Label>
-                <p className="mb-2 text-[11px] text-muted-foreground">Select topics relevant to your products. Your ads appear on pages about these topics.</p>
-                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                  {DISPLAY_TOPICS.map((topic) => {
-                    const selected = displayTopics.includes(topic.id);
-                    return (
-                      <label
-                        key={topic.id}
-                        className={cn(
-                          "flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 transition-all",
-                          selected ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/40"
-                        )}
-                      >
-                        <Checkbox checked={selected} onCheckedChange={() => updateDisplayAdGroup({ topics: selected ? displayTopics.filter((t) => t !== topic.id) : [...displayTopics, topic.id] })} />
-                        <span className={cn("text-xs font-medium", selected ? "text-primary" : "text-foreground")}>{topic.label}</span>
-                      </label>
-                    );
-                  })}
                 </div>
-                {displayTopics.length > 0 && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground">{displayTopics.length} topic{displayTopics.length !== 1 ? "s" : ""} selected</span>
-                    <button type="button" onClick={() => updateDisplayAdGroup({ topics: [] })} className="text-[11px] text-primary underline">Clear all</button>
-                  </div>
-                )}
               </div>
 
-              {/* Managed Placements */}
-              <div className="mb-5">
-                <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                  <Link2 className="size-3 text-primary" />
-                  Managed Placements
-                  <InfoTip text="Managed placements force delivery on specific sites/apps/channels you choose." />
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={displayPlacementInput}
-                    onChange={(e) => setDisplayPlacementInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDisplayPlacement(); }}}
-                    placeholder="e.g. example.com, youtube.com/channel/..."
-                    className="h-9 flex-1 text-sm"
-                  />
-                  <Button size="sm" variant="outline" onClick={addDisplayPlacement} className="h-9 shrink-0">
-                    <Plus className="mr-1 size-3" /> Add
-                  </Button>
-                </div>
-                {displayPlacements.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {displayPlacements.map((p) => (
-                      <span key={p} className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                        <Globe className="size-3" />
-                        {p}
-                        <button type="button" onClick={() => updateDisplayAdGroup({ placements: displayPlacements.filter((x) => x !== p) })} className="rounded-full p-0.5 hover:bg-blue-100">
-                          <X className="size-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Excluded Placements */}
-              <div className="mb-4">
-                <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                  <ShieldCheck className="size-3 text-red-500" />
-                  Excluded Placements
-                  <InfoTip text="Exclude low-quality or irrelevant placements to protect brand safety and spend quality." />
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={displayExcludedPlacementInput}
-                    onChange={(e) => setDisplayExcludedPlacementInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDisplayExcludedPlacement(); }}}
-                    placeholder="e.g. competitor-site.com..."
-                    className="h-9 flex-1 text-sm"
-                  />
-                  <Button size="sm" variant="outline" onClick={addDisplayExcludedPlacement} className="h-9 shrink-0">
-                    <Plus className="mr-1 size-3" /> Add
-                  </Button>
-                </div>
-                {displayExcludedPlacements.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {displayExcludedPlacements.map((p) => (
-                      <span key={p} className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-600">
-                        {p}
-                        <button type="button" onClick={() => updateDisplayAdGroup({ excludedPlacements: displayExcludedPlacements.filter((x) => x !== p) })} className="rounded-full p-0.5 hover:bg-red-100">
-                          <X className="size-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Optimized Targeting */}
+              {/* Optimized Targeting — stays here (campaign-level) */}
               <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-2.5">
@@ -1629,7 +1632,6 @@ export function GoogleStepAudience() {
                       <p className="text-xs font-semibold text-foreground">Optimized Targeting</p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
                         Let Google expand beyond your targeting to find users who are likely to convert. Recommended for Display campaigns.
-                        Maps to AdGroup.targeting_setting.target_restrictions.
                       </p>
                     </div>
                   </div>
@@ -1639,15 +1641,6 @@ export function GoogleStepAudience() {
                     className="mt-0.5"
                   />
                 </div>
-              </div>
-
-              {/* Content Targeting Summary */}
-              <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2">
-                <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  <span className="font-semibold text-primary">Best practice:</span>{" "}
-                  Combine contextual keywords with topic targeting for best results. Add 15-20 keywords related to your products and select 3-5 relevant topics to maximize reach while maintaining relevance.
-                </p>
               </div>
             </SectionCard>
           )}
@@ -1926,6 +1919,7 @@ export function GoogleStepAudience() {
               </div>
             )}
           </div>
+          </>)}
 
         </div>
 

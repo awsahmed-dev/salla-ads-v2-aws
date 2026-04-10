@@ -231,37 +231,56 @@ const CONVERSION_EVENTS: {
   },
 ];
 
+/** We use composite keys (COST_CAP / BID_CAP) for the card component, then map back to the API bid_type. */
 const BID_STRATEGIES: {
-  value: BidType;
+  value: string;
+  /** The actual API bid_type value */
+  apiBidType: BidType;
+  /** Cost Cap vs Bid Cap sub-strategy */
+  bidStrategy: "COST_CAP" | "BID_CAP" | "NONE";
   label: string;
   apiLabel: string;
   desc: string;
   bestFor: string;
   icon: React.ReactNode;
   recommended?: boolean;
-  /** Which optimization goals support this strategy */
   supportedGoals: OptimizationGoal[];
 }[] = [
   {
-    value: "BID_TYPE_NO_BID",
+    value: "LOWEST_COST",
+    apiBidType: "BID_TYPE_NO_BID",
+    bidStrategy: "NONE",
     label: "Maximum Delivery",
     apiLabel: "Lowest Cost (auto-bid)",
     desc: "TikTok automatically bids to get the most results within your budget. No manual CPA needed.",
     bestFor: "Best for most Salla merchants, especially when starting a new campaign or testing new products.",
     icon: <Zap className="size-4" />,
     recommended: true,
-  supportedGoals: ["CONVERSION", "VALUE", "CLICK", "LANDING_PAGE_VIEW", "REACH", "VIDEO_VIEW", "FOCUSED_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
+    supportedGoals: ["CONVERSION", "VALUE", "CLICK", "LANDING_PAGE_VIEW", "REACH", "VIDEO_VIEW", "FOCUSED_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
   },
   {
-  value: "BID_TYPE_CUSTOM",
-  label: "Cost Cap",
-  apiLabel: "Cost Cap (target CPA / CPV / CPI)",
-  desc: "Set a target cost per result. TikTok keeps your average cost per result around this amount.",
-  bestFor: "Best when you know your target CPA/CPV/CPI and want to maintain profitability at scale.",
-  icon: <Target className="size-4" />,
-  supportedGoals: ["CONVERSION", "VIDEO_VIEW", "FOCUSED_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
+    value: "COST_CAP",
+    apiBidType: "BID_TYPE_CUSTOM",
+    bidStrategy: "COST_CAP",
+    label: "Cost Cap",
+    apiLabel: "Cost Cap (target CPA / CPV / CPI)",
+    desc: "Set a target cost per result. TikTok averages your cost around this amount but may exceed per-auction.",
+    bestFor: "Best when you know your target CPA and want to scale while maintaining average profitability.",
+    icon: <Target className="size-4" />,
+    supportedGoals: ["CONVERSION", "VIDEO_VIEW", "FOCUSED_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
   },
-  ];
+  {
+    value: "BID_CAP",
+    apiBidType: "BID_TYPE_CUSTOM",
+    bidStrategy: "BID_CAP",
+    label: "Bid Cap",
+    apiLabel: "Bid Cap (max bid per auction)",
+    desc: "Set a hard maximum bid per auction. TikTok will never exceed your bid amount in any single auction.",
+    bestFor: "Best for strict cost control. Use when profitability per-action matters more than volume.",
+    icon: <Target className="size-4" />,
+    supportedGoals: ["CONVERSION", "CLICK", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
+  },
+];
 
 const CLICK_ATTRIBUTION_WINDOWS: { value: ClickAttributionWindow; label: string }[] = [
   { value: "1", label: "1 day" },
@@ -440,10 +459,17 @@ export function TikTokStepBudget() {
             budgetTypes={BUDGET_TYPES}
             paymentMethod={budget.paymentMethod}
             onPaymentMethodChange={(v) => updateNested("budget", { paymentMethod: v })}
-            showLifetimeToggle={false}
-            budgetMode="daily"
-            amount={budget.amount}
-            onAmountChange={(v) => updateNested("budget", { amount: v })}
+            showLifetimeToggle={true}
+            budgetMode={budget.budgetMode === "BUDGET_MODE_TOTAL" ? "lifetime" : "daily"}
+            onBudgetModeChange={(mode) =>
+              updateNested("budget", {
+                budgetMode: mode === "lifetime" ? "BUDGET_MODE_TOTAL" : "BUDGET_MODE_DAY",
+              })
+            }
+            amount={budget.budgetMode === "BUDGET_MODE_TOTAL" ? budget.lifetimeAmount : budget.amount}
+            onAmountChange={(v) =>
+              updateNested("budget", budget.budgetMode === "BUDGET_MODE_TOTAL" ? { lifetimeAmount: v } : { amount: v })
+            }
             suggestedDaily={suggestedDaily}
             goalLabel={goalLabel}
             platformName="TikTok"
@@ -646,10 +672,22 @@ export function TikTokStepBudget() {
           {/* ======================================================= */}
           <BidStrategyCard
             strategies={BID_STRATEGIES.filter((s) => s.supportedGoals.includes(budget.optimizationGoal))}
-            selectedStrategy={budget.bidType}
-            onStrategyChange={(v) => updateNested("budget", { bidType: v })}
+            selectedStrategy={
+              budget.bidType === "BID_TYPE_NO_BID" ? "LOWEST_COST"
+                : budget.bidStrategy === "BID_CAP" ? "BID_CAP"
+                : "COST_CAP"
+            }
+            onStrategyChange={(v: string) => {
+              const strategy = BID_STRATEGIES.find((s) => s.value === v);
+              if (strategy) {
+                updateNested("budget", {
+                  bidType: strategy.apiBidType,
+                  bidStrategy: strategy.bidStrategy === "NONE" ? "COST_CAP" : strategy.bidStrategy,
+                });
+              }
+            }}
             layout="cards"
-            infoTipText="Choose how TikTok spends your daily budget. Maximum Delivery gets the most results; Cost Cap controls your cost per result."
+            infoTipText="Choose how TikTok spends your daily budget. Maximum Delivery gets the most results; Cost Cap averages around your target; Bid Cap is a hard max per auction."
             billingContext={[
               {
                 label: "Billing model",
@@ -910,6 +948,30 @@ export function TikTokStepBudget() {
                   </div>
                 )}
 
+                {/* Search Placement (Sales & Traffic only) */}
+                {(!isReach && !isVideoViews && !isLeadGen && !isAppPromo) && (
+                  <div className="mt-3 flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <MousePointerClick className="size-3.5 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs font-medium text-foreground">TikTok Search Ads</p>
+                        <p className="text-xs text-muted-foreground">Also show your ads in TikTok search results when users search for related keywords.</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={budget.searchResultEnabled}
+                      onCheckedChange={(checked) => updateNested("budget", { searchResultEnabled: checked })}
+                    />
+                  </div>
+                )}
+                {budget.searchResultEnabled && (!isReach && !isVideoViews && !isLeadGen && !isAppPromo) && (
+                  <div className="mt-2 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2">
+                    <Sparkles className="mt-0.5 size-3 shrink-0 text-primary" />
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Search ads appear when users search for keywords related to your products on TikTok. This can drive additional high-intent traffic at no extra cost.
+                    </p>
+                  </div>
+                )}
 
               </SectionCard>
 
@@ -983,14 +1045,16 @@ export function TikTokStepBudget() {
                 { label: "Budget type", value: BUDGET_TYPES.find((m) => m.value === budget.paymentMethod)?.label ?? "-" },
                 { label: "End date", value: budget.endDateOptional ? "Continuous" : budget.endDate || "Not set" },
                 { label: "Goal", value: goalLabel },
-                { label: "Bid", value: budget.bidType === "BID_TYPE_NO_BID" ? "Maximum Delivery" : `Cost Cap: SAR ${budget.bidAmount}` },
+                { label: "Budget mode", value: budget.budgetMode === "BUDGET_MODE_TOTAL" ? "Lifetime" : "Daily" },
+                { label: "Bid", value: budget.bidType === "BID_TYPE_NO_BID" ? "Maximum Delivery" : `${budget.bidStrategy === "BID_CAP" ? "Bid Cap" : "Cost Cap"}: SAR ${budget.bidAmount}` },
                 { label: "Schedule", value: showScheduling ? "Custom hours" : "24/7" },
+                ...(budget.searchResultEnabled ? [{ label: "Search ads", value: "Enabled" }] : []),
                 ...(autoIncrease.enabled ? [{ label: "Auto-increase", value: `+${autoIncrease.pct}% / ${autoIncrease.intervalDays}d` }] : []),
               ]}
               checkItems={[
                 { label: "Budget", status: dailyAmount >= 50 ? "ok" as const : "warning" as const, text: dailyAmount >= 50 ? "Budget is healthy" : "Below recommended minimum" },
                 { label: "Duration", status: (durationDays >= 7 || (budget.endDateOptional ?? false)) ? "ok" as const : "warning" as const, text: (durationDays >= 7 || (budget.endDateOptional ?? false)) ? "Sufficient learning time" : "Too short for optimization" },
-                { label: "Bid strategy", status: "ok" as const, text: budget.bidType === "BID_TYPE_NO_BID" ? "Maximum Delivery" : `Cost Cap: SAR ${budget.bidAmount}` },
+                { label: "Bid strategy", status: "ok" as const, text: budget.bidType === "BID_TYPE_NO_BID" ? "Maximum Delivery" : `${budget.bidStrategy === "BID_CAP" ? "Bid Cap" : "Cost Cap"}: SAR ${budget.bidAmount}` },
                 { label: "Billing event", status: "ok" as const, text: budget.billingEvent === "OCPM" ? "oCPM (optimized)" : budget.billingEvent === "CPV" ? "CPV (per view)" : budget.billingEvent },
                 ...(isTraffic && budget.optimizationGoal === "LANDING_PAGE_VIEW" && !hasPixel ? [{ label: "Pixel", status: "error" as const, text: "Required for Landing Page View" }] : []),
               ]}

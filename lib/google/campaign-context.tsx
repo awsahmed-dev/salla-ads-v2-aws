@@ -14,7 +14,7 @@ import { defaultGoogleCampaign, type GoogleCampaignData } from "@/lib/google/cam
 const DRAFT_KEY = "salla_google_campaign_draft";
 const DRAFT_STEP_KEY = "salla_google_campaign_step";
 /** Bump this when adding new fields to force stale drafts to reset */
-const DRAFT_VERSION = 8;
+const DRAFT_VERSION = 9;
 const DRAFT_VERSION_KEY = "salla_google_draft_version";
 
 function getClientDates() {
