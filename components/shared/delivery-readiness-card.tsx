@@ -32,7 +32,7 @@ export function DeliveryReadinessCard({ items, className }: DeliveryReadinessCar
         <Label className="text-sm font-semibold text-foreground">Delivery Readiness</Label>
         <span
           className={cn(
-            "ml-auto flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+            "ml-auto flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
             allOk
               ? "bg-emerald-50 text-emerald-600"
               : hasErrors
@@ -58,7 +58,7 @@ export function DeliveryReadinessCard({ items, className }: DeliveryReadinessCar
               <span className="text-xs font-medium text-foreground leading-tight">{item.label}</span>
               <span
                 className={cn(
-                  "text-[10px] leading-snug",
+                  "text-xs leading-snug",
                   item.status === "ok"
                     ? "text-muted-foreground"
                     : item.status === "warning"

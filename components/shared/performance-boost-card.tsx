@@ -133,7 +133,7 @@ export function PerformanceBoostCard({
               </h3>
               <Badge
                 className={cn(
-                  "rounded-full border-0 px-1.5 py-0.5 text-[10px]",
+                  "rounded-full border-0 px-1.5 py-0.5 text-xs",
                   enabled
                     ? "bg-[#a4ffe5] text-[#004956]"
                     : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
@@ -152,14 +152,14 @@ export function PerformanceBoostCard({
         {/* Price + toggle */}
         <div className="flex shrink-0 items-center gap-3">
           <div className="text-right">
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               One-time payment
             </p>
             <div className="mt-0.5 flex items-center justify-end gap-1.5">
               <span className="text-sm font-medium text-muted-foreground line-through">
                 {ORIGINAL_PRICE}
               </span>
-              <span className="text-[10px] text-muted-foreground">&bull;</span>
+              <span className="text-xs text-muted-foreground">&bull;</span>
               <SarSymbol className="size-3.5 text-foreground" />
               <span
                 className={cn(

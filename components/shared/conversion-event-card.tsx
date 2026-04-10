@@ -70,7 +70,7 @@ export function ConversionEventCard({
         />
         <Label className="text-sm font-semibold text-foreground">{title}</Label>
         {apiBadge && (
-          <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px] font-normal">
+          <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs font-normal">
             {apiBadge}
           </Badge>
         )}
@@ -116,12 +116,12 @@ export function ConversionEventCard({
                     {ev.label}
                   </span>
                   {ev.recommended && (
-                    <Badge className="rounded-full border-0 bg-emerald-100 px-1 py-0 text-[8px] font-medium text-emerald-700">
+                    <Badge className="rounded-full border-0 bg-emerald-100 px-1 py-0 text-[11px] font-medium text-emerald-700">
                       Best
                     </Badge>
                   )}
                   {ev.funnelStage && (
-                    <span className="ml-auto text-[10px] text-muted-foreground">
+                    <span className="ml-auto text-xs text-muted-foreground">
                       {ev.funnelStage}
                     </span>
                   )}
@@ -151,7 +151,7 @@ export function ConversionEventCard({
               {roas.label ?? "Minimum ROAS Target"}
             </Label>
             {roas.apiBadge && (
-              <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px] font-normal">
+              <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs font-normal">
                 {roas.apiBadge}
               </Badge>
             )}
@@ -174,10 +174,10 @@ export function ConversionEventCard({
               />
             </div>
             <div className="shrink-0 text-center">
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 SAR 1 spent → SAR {(roas.value || 0).toFixed(1)}
               </p>
-              <p className="text-[10px] font-medium text-emerald-600">
+              <p className="text-xs font-medium text-emerald-600">
                 Recommended: 2.0x - 5.0x
               </p>
             </div>

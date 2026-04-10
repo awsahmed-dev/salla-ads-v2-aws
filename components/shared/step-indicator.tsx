@@ -31,7 +31,7 @@ export function StepIndicator({
   return (
     <nav
       aria-label="Campaign progress"
-      className="flex items-center gap-4 rounded-xl bg-card p-6"
+      className="flex items-center gap-2 rounded-xl bg-card p-3 sm:gap-4 sm:p-6"
     >
       {steps.map((s, i) => {
         const done = current > s.step;
@@ -64,7 +64,7 @@ export function StepIndicator({
             {/* Label */}
             <span
               className={cn(
-                "shrink-0 text-sm font-medium whitespace-nowrap",
+                "hidden shrink-0 text-sm font-medium whitespace-nowrap sm:inline",
                 done || active ? "text-[#004956]" : "text-muted-foreground"
               )}
             >
@@ -75,7 +75,7 @@ export function StepIndicator({
             {!isLast && (
               <div
                 className={cn(
-                  "ml-2 h-0 flex-1 border-t-2",
+                  "ml-1 h-0 flex-1 border-t-2 sm:ml-2",
                   done
                     ? "border-[#a4ffe5]"
                     : "border-dashed border-border"

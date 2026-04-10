@@ -42,7 +42,7 @@ function NewBadge() {
 
 function RecommendedBadge() {
   return (
-    <span className="rounded-full bg-gradient-to-r from-[#ffd8c2] to-[#ffaf83] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#883000]">
+    <span className="rounded-full bg-gradient-to-r from-[#ffd8c2] to-[#ffaf83] px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-[#883000]">
       Recommended
     </span>
   );

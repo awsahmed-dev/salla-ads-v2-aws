@@ -193,19 +193,19 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
       <div className="flex min-h-screen bg-background">
         <div className="flex flex-1 flex-col">
           <div className="flex-1 overflow-y-auto">
-            <div className={cn("mx-auto w-full max-w-3xl px-6 py-8", WIZARD_FOOTER_PADDING_BOTTOM)}>
+            <div className={cn("mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8", WIZARD_FOOTER_PADDING_BOTTOM)}>
 
               {/* ── Goal Selection ── */}
               <div className="mb-10 overflow-hidden rounded-2xl bg-card">
                 {/* Header */}
-                <div className="px-8 pt-8 pb-6">
+                <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-6">
                   <h2 className="text-xl font-bold text-foreground">What&apos;s your campaign goal?</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Pick one — we&apos;ll optimize everything for the best results.
                   </p>
 
                   {/* Funnel stage indicator */}
-                  <div className="mt-5 inline-flex items-center rounded-full bg-[#f4f4f4] p-1">
+                  <div className="mt-5 inline-flex flex-wrap items-center rounded-full bg-[#f4f4f4] p-1">
                     {(["awareness", "consideration", "conversion"] as const).map((stage) => {
                       const f = FUNNEL_LABELS[stage];
                       const FIcon = f.icon;
@@ -229,7 +229,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
 
                 {/* 3x2 Objective Grid */}
-                <div className="grid grid-cols-3 gap-3 px-8 pb-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 px-4 sm:px-8 pb-6 sm:pb-8">
                   {OBJECTIVES.map((o) => {
                     const selected = obj.objective === o.value;
                     const OIcon = o.icon;
@@ -258,10 +258,10 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                           <div className="flex items-center gap-1.5">
                             <span className={cn("text-sm font-bold", selected ? "text-[#004956]" : "text-foreground")}>{o.label}</span>
                             {o.recommended && (
-                              <span className="rounded-full bg-[#a4ffe5] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#004956]">Best</span>
+                              <span className="rounded-full bg-[#a4ffe5] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#004956]">Best</span>
                             )}
                             {!o.recommended && o.badge && (
-                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-bold uppercase text-emerald-700">{o.badge}</span>
+                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[11px] font-bold uppercase text-emerald-700">{o.badge}</span>
                             )}
                           </div>
                           <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2">{o.desc}</p>
@@ -272,7 +272,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
 
                 {/* Selected objective detail bar */}
-                <div className="border-t border-border bg-[#f4f4f4] px-8 py-4">
+                <div className="border-t border-border bg-[#f4f4f4] px-4 sm:px-8 py-4">
                   <div className="flex items-center gap-4">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground">
@@ -301,7 +301,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                       </div>
                       <div>
                         <SheetTitle className="text-lg font-bold text-white">{selectedObj.label}</SheetTitle>
-                        <Badge className="mt-1 rounded-full border-0 bg-[#a4ffe5] px-2 py-0.5 text-[10px] font-medium text-[#004956]">
+                        <Badge className="mt-1 rounded-full border-0 bg-[#a4ffe5] px-2 py-0.5 text-xs font-medium text-[#004956]">
                           {FUNNEL_LABELS[selectedObj.funnelStage].label}
                         </Badge>
                       </div>
@@ -331,15 +331,15 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                       <div className="grid grid-cols-3 gap-3">
                         <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
                           <p className="text-lg font-bold text-[#004956]">{currentConfig.allowedFormats.length}</p>
-                          <p className="text-[10px] font-medium text-muted-foreground">Ad Formats</p>
+                          <p className="text-xs font-medium text-muted-foreground">Ad Formats</p>
                         </div>
                         <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
                           <p className="text-lg font-bold text-[#004956]">SAR 150</p>
-                          <p className="text-[10px] font-medium text-muted-foreground">Min Budget/day</p>
+                          <p className="text-xs font-medium text-muted-foreground">Min Budget/day</p>
                         </div>
                         <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
                           <p className="text-lg font-bold text-[#004956]">7+</p>
-                          <p className="text-[10px] font-medium text-muted-foreground">Days Recommended</p>
+                          <p className="text-xs font-medium text-muted-foreground">Days Recommended</p>
                         </div>
                       </div>
 
@@ -418,7 +418,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                       <ArrowRight className="size-4" />
                       Start Campaign
                     </button>
-                    <p className="mt-2 text-center text-[10px] text-muted-foreground">
+                    <p className="mt-2 text-center text-xs text-muted-foreground">
                       You can change your objective at any time before launching.
                     </p>
                   </div>
@@ -427,7 +427,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
 
               {/* ── Campaign Setup ── */}
               <div className="overflow-hidden rounded-2xl bg-card">
-                <div className="px-8 pt-8 pb-6">
+                <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-6">
                   <h2 className="text-xl font-bold text-foreground">Campaign Setup</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Name your campaign and configure tracking.
@@ -435,7 +435,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
 
                 {/* Campaign Name */}
-                <div className="px-8 pb-6">
+                <div className="px-4 sm:px-8 pb-6">
                   <div className="mb-2 flex items-center justify-between">
                     <Label className="text-sm font-medium text-foreground">
                       Campaign Name <span className="text-red-500">*</span>
@@ -468,7 +468,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
 
               {/* Catalog Toggle */}
               {currentConfig.catalogAvailable && (
-                <div className="border-t border-border px-8 py-5">
+                <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
                       <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
@@ -502,9 +502,9 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                         </div>
                         <div className="flex-1">
                           <p className="text-xs font-medium text-foreground">My Salla Store</p>
-                          <p className="text-[10px] text-muted-foreground">Auto-synced product catalog</p>
+                          <p className="text-xs text-muted-foreground">Auto-synced product catalog</p>
                         </div>
-                        <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-600">
+                        <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
                           <CheckCircle2 className="size-3" /> Connected
                         </span>
                       </div>
@@ -515,7 +515,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
 
               {/* Pixel section inside same card */}
               {currentConfig.pixelRequirement !== "none" && (
-                <div className="border-t border-border px-8 py-5">
+                <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="mb-4 flex items-start gap-3">
                     <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
                       <Scan className="size-4 text-primary" />
@@ -523,7 +523,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-foreground">Snap Pixel</p>
-                        <Badge variant={currentConfig.pixelRequirement === "required" ? "secondary" : "outline"} className="rounded-full px-1.5 py-0 text-[10px]">
+                        <Badge variant={currentConfig.pixelRequirement === "required" ? "secondary" : "outline"} className="rounded-full px-1.5 py-0 text-xs">
                           {currentConfig.pixelRequirement === "required" ? "Required" : "Optional"}
                         </Badge>
                       </div>
@@ -546,7 +546,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                       )}
                     >
                       <div className="absolute -top-2.5 right-3">
-                        <Badge className="rounded-full bg-[#004956] px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                        <Badge className="rounded-full bg-[#004956] px-2 py-0.5 text-xs font-semibold text-white shadow-sm">
                           Recommended
                         </Badge>
                       </div>
@@ -621,7 +621,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                           <Badge
                             variant="outline"
                             className={cn(
-                              "rounded-full px-2 py-0 text-[9px] font-medium",
+                              "rounded-full px-2 py-0 text-[11px] font-medium",
                               connectedPixel.status === "ACTIVE"
                                 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                                 : "border-amber-200 bg-amber-50 text-amber-700"
@@ -629,7 +629,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                           >
                             {connectedPixel.status === "ACTIVE" ? "Active" : connectedPixel.status === "PENDING" ? "Pending" : "Inactive"}
                           </Badge>
-                          <span className="text-[10px] text-muted-foreground">
+                          <span className="text-xs text-muted-foreground">
                             Last event {(() => {
                               const mins = Math.round((Date.now() - new Date(connectedPixel.lastEventAt).getTime()) / 60000);
                               return mins < 60 ? `${mins}m ago` : `${Math.round(mins / 60)}h ago`;
@@ -767,7 +767,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                           onChange={(e) => updateNested("objective", { appSettings: { ...obj.appSettings!, iosAppId: e.target.value.replace(/\D/g, "") } })}
                           className="h-10 font-mono text-xs"
                         />
-                        <p className="mt-1 text-[10px] text-muted-foreground">The numeric ID from your App Store listing URL.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">The numeric ID from your App Store listing URL.</p>
                       </div>
                     )}
 
@@ -783,7 +783,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                           onChange={(e) => updateNested("objective", { appSettings: { ...obj.appSettings!, androidAppUrl: e.target.value } })}
                           className="h-10 font-mono text-xs"
                         />
-                        <p className="mt-1 text-[10px] text-muted-foreground">The package name from your Google Play listing.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">The package name from your Google Play listing.</p>
                       </div>
                     )}
                   </div>
@@ -791,14 +791,14 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
               )}
 
               {/* Public Profile inside same card */}
-              <div className="border-t border-border px-8 py-5">
+              <div className="border-t border-border px-4 sm:px-8 py-5">
                 <p className="text-sm font-bold text-foreground">Snapchat Public Profile</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Auto-detected from your Salla account. Appears on all your ads.
                 </p>
               </div>
                 {snapProfile ? (
-                  <div className="px-8 pb-8">
+                  <div className="px-4 sm:px-8 pb-6 sm:pb-8">
                     <div className="flex items-center gap-3 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-4 py-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -814,7 +814,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                             <span> - {snapProfile.displayNameAr}</span>
                           )}
                         </p>
-                        <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{snapProfile.profileId}</p>
+                        <p className="mt-0.5 font-mono text-xs text-muted-foreground">{snapProfile.profileId}</p>
                       </div>
                       <CheckCircle2 className="size-5 shrink-0 text-[#004956]" />
                     </div>
@@ -842,7 +842,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                           <div className="flex items-center gap-2">
                             <Label className="text-sm font-semibold text-foreground">Public Profile ID</Label>
                             {hasValue && isValidUUID && (
-                              <Badge variant="outline" className="gap-1 rounded-full border-emerald-200 bg-emerald-50 px-2 py-0 text-[10px] font-medium text-emerald-700">
+                              <Badge variant="outline" className="gap-1 rounded-full border-emerald-200 bg-emerald-50 px-2 py-0 text-xs font-medium text-emerald-700">
                                 <CheckCircle2 className="size-2.5" /> Set
                               </Badge>
                             )}

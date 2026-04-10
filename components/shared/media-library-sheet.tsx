@@ -360,7 +360,7 @@ export function MediaLibrarySheet({
                               crossOrigin="anonymous"
                             />
                             {item.mediaType === "VIDEO" && (
-                              <div className="absolute bottom-1 left-1 flex items-center gap-0.5 rounded bg-black/70 px-1 py-0.5 text-[9px] font-medium text-white">
+                              <div className="absolute bottom-1 left-1 flex items-center gap-0.5 rounded bg-black/70 px-1 py-0.5 text-[11px] font-medium text-white">
                                 <Film className="size-2" />
                                 {item.duration
                                   ? formatDuration(item.duration)
@@ -376,10 +376,10 @@ export function MediaLibrarySheet({
 
                           {/* Info */}
                           <div className="flex flex-col gap-0.5 px-2 py-1.5">
-                            <span className="truncate text-[10px] font-medium text-foreground">
+                            <span className="truncate text-xs font-medium text-foreground">
                               {item.name}
                             </span>
-                            <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
+                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                               {item.mediaType === "VIDEO" ? (
                                 <Film className="size-2.5" />
                               ) : (
@@ -387,7 +387,7 @@ export function MediaLibrarySheet({
                               )}
                               <span>{formatFileSize(item.fileSize)}</span>
                             </div>
-                            <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
+                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                               <Clock className="size-2.5" />
                               <span>{relativeDate(item.uploadedAt)}</span>
                               {item.usedInCampaigns > 0 && (
@@ -468,7 +468,7 @@ export function MediaLibrarySheet({
                   </p>
                 </div>
               </button>
-              <p className="text-center text-[10px] leading-relaxed text-muted-foreground">
+              <p className="text-center text-xs leading-relaxed text-muted-foreground">
                 Uploaded media is saved to your library for reuse across all
                 campaigns.
               </p>

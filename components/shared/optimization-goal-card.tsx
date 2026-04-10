@@ -103,7 +103,7 @@ export function OptimizationGoalCard({
                 {/* Title + badges */}
                 <div className="flex flex-wrap items-center justify-center gap-1.5">
                   {g.recommended && !isLocked && (
-                    <Badge className="rounded-full border-0 bg-[#a4ffe5] px-1.5 py-0.5 text-[10px] font-normal text-[#004956]">
+                    <Badge className="rounded-full border-0 bg-[#a4ffe5] px-1.5 py-0.5 text-xs font-normal text-[#004956]">
                       Best
                     </Badge>
                   )}
@@ -116,19 +116,19 @@ export function OptimizationGoalCard({
                     {g.label}
                   </span>
                   {isLocked && g.requiresPixel && (
-                    <Badge variant="outline" className="rounded-full border-amber-300 bg-amber-50 px-1 py-0 text-[8px] text-amber-600">
+                    <Badge variant="outline" className="rounded-full border-amber-300 bg-amber-50 px-1 py-0 text-[11px] text-amber-600">
                       Pixel needed
                     </Badge>
                   )}
                   {isLocked && g.requiresMMP && (
-                    <Badge variant="outline" className="rounded-full border-orange-300 bg-orange-50 px-1 py-0 text-[8px] text-orange-600">
+                    <Badge variant="outline" className="rounded-full border-orange-300 bg-orange-50 px-1 py-0 text-[11px] text-orange-600">
                       MMP needed
                     </Badge>
                   )}
                 </div>
 
                 {/* Description */}
-                <p className="text-[10px] leading-snug text-muted-foreground">
+                <p className="text-xs leading-snug text-muted-foreground">
                   {isLocked && g.requiresPixel
                     ? "Set up your Snap Pixel first to unlock this goal."
                     : g.desc}
@@ -136,7 +136,7 @@ export function OptimizationGoalCard({
 
                 {/* Cost hint */}
                 {selected && g.costHint && (
-                  <p className="text-[10px] font-normal text-foreground">
+                  <p className="text-xs font-normal text-foreground">
                     {g.costHint}
                   </p>
                 )}
@@ -190,22 +190,22 @@ export function OptimizationGoalCard({
                       {g.label}
                     </span>
                     {g.recommended && !isLocked && (
-                      <Badge className="rounded-full border-0 bg-[#a4ffe5] px-1.5 py-0.5 text-[10px] font-normal text-[#004956]">
+                      <Badge className="rounded-full border-0 bg-[#a4ffe5] px-1.5 py-0.5 text-xs font-normal text-[#004956]">
                         Best
                       </Badge>
                     )}
                     {g.billingLabel && (
-                      <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px] font-normal">
+                      <Badge variant="outline" className="rounded-full px-1.5 py-0 text-xs font-normal">
                         {g.billingLabel}
                       </Badge>
                     )}
                     {isLocked && g.requiresPixel && (
-                      <Badge variant="outline" className="rounded-full border-amber-300 bg-amber-50 px-1.5 py-0 text-[10px] text-amber-600">
+                      <Badge variant="outline" className="rounded-full border-amber-300 bg-amber-50 px-1.5 py-0 text-xs text-amber-600">
                         Pixel needed
                       </Badge>
                     )}
                     {isLocked && g.requiresMMP && (
-                      <Badge variant="outline" className="rounded-full border-orange-300 bg-orange-50 px-1.5 py-0 text-[10px] text-orange-600">
+                      <Badge variant="outline" className="rounded-full border-orange-300 bg-orange-50 px-1.5 py-0 text-xs text-orange-600">
                         MMP needed
                       </Badge>
                     )}

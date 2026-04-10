@@ -65,32 +65,32 @@ export function GlobalHeader() {
   return (
     <header className="shrink-0">
       {/* Top bar — dark teal */}
-      <div className="bg-[#004956] px-14 py-4">
-        <div className="flex items-center gap-5">
+      <div className="bg-[#004956] px-4 py-4 sm:px-6 lg:px-14">
+        <div className="flex items-center gap-3 sm:gap-5">
           {/* Logo */}
           <SallaLogo />
 
           {/* Primary nav tabs */}
-          <nav className="flex flex-1 items-center gap-2.5">
+          <nav className="flex flex-1 items-center gap-1 overflow-x-auto scrollbar-none sm:gap-2.5">
             {PRIMARY_TABS.map((tab) => (
               <button
                 key={tab.label}
                 type="button"
                 className={cn(
-                  "flex items-center gap-1 rounded px-4 py-2 text-base font-medium transition-colors",
+                  "flex shrink-0 items-center gap-1 rounded px-2 py-2 text-sm font-medium transition-colors sm:px-4 sm:text-base",
                   tab.active
                     ? "bg-[#a4ffe5] text-[#004956] font-bold"
                     : "text-white hover:bg-white/10"
                 )}
               >
                 <tab.icon className="size-5" />
-                {tab.label}
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
           </nav>
 
           {/* Right: search, messages, notifications, avatar */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button type="button" className="text-white hover:text-[#a4ffe5]">
               <Search className="size-5" />
             </button>
@@ -104,28 +104,28 @@ export function GlobalHeader() {
             {/* User */}
             <button type="button" className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white/10">
               <div className="size-10 rounded-full bg-white/20" />
-              <div className="text-right">
+              <div className="hidden text-right md:block">
                 <p className="text-sm text-white">Abdullah</p>
                 <span className="rounded-full border border-[#a4ffe5] px-2 py-0.5 text-xs text-[#a4ffe5]">
                   Special
                 </span>
               </div>
-              <ChevronDown className="size-4 text-white" />
+              <ChevronDown className="hidden size-4 text-white md:block" />
             </button>
           </div>
         </div>
       </div>
 
       {/* Sub-header — white */}
-      <div className="flex h-16 items-center gap-6 border-b border-border bg-white px-14">
+      <div className="flex h-14 items-center gap-4 border-b border-border bg-white px-4 sm:h-16 sm:gap-6 sm:px-6 lg:px-14">
         {/* Secondary tabs */}
-        <nav className="flex flex-1 items-center gap-4">
+        <nav className="flex flex-1 items-center gap-2 overflow-x-auto scrollbar-none sm:gap-4">
           {SECONDARY_TABS.map((tab) => (
             <button
               key={tab.label}
               type="button"
               className={cn(
-                "px-0.5 py-2 text-base font-medium transition-colors",
+                "shrink-0 px-0.5 py-2 text-sm font-medium transition-colors sm:text-base",
                 tab.active
                   ? "border-b-2 border-[#004956] font-bold text-[#004956]"
                   : "text-muted-foreground hover:text-foreground"
@@ -137,17 +137,17 @@ export function GlobalHeader() {
         </nav>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <button
             type="button"
             className="flex h-10 items-center gap-1 rounded-lg border-2 border-[#a4ffe5] bg-[#a4ffe5] px-3 text-sm font-medium text-[#004956]"
           >
             <Plus className="size-4" />
-            Create Ad
+            <span className="hidden sm:inline">Create Ad</span>
           </button>
           <button
             type="button"
-            className="flex h-10 items-center gap-1 rounded-lg border border-[#a4ffe5] bg-white px-3 text-sm font-medium text-[#004956]"
+            className="hidden h-10 items-center gap-1 rounded-lg border border-[#a4ffe5] bg-white px-3 text-sm font-medium text-[#004956] md:flex"
           >
             <HelpCircle className="size-4" />
             Help Center
@@ -156,7 +156,7 @@ export function GlobalHeader() {
       </div>
 
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 px-14 py-3">
+      <div className="flex items-center gap-2 px-4 py-3 sm:px-6 lg:px-14">
         <span className="text-sm text-muted-foreground">Marketing</span>
         <ChevronRight className="size-4 text-muted-foreground" />
         <span className="text-sm text-muted-foreground">Advertisements</span>

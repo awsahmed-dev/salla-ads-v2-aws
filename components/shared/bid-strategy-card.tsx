@@ -80,7 +80,7 @@ export function BidStrategyCard({
                 {ctx.value}
               </p>
               {ctx.desc && (
-                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   {ctx.desc}
                 </p>
               )}
@@ -159,12 +159,12 @@ export function BidStrategyCard({
                       {s.label}
                     </span>
                     {s.recommended && (
-                      <Badge className="rounded-full border-0 bg-emerald-100 px-1.5 py-0 text-[10px] font-medium text-emerald-700">
+                      <Badge className="rounded-full border-0 bg-emerald-100 px-1.5 py-0 text-xs font-medium text-emerald-700">
                         Recommended
                       </Badge>
                     )}
                     {s.apiLabel && (
-                      <span className="ml-auto text-[10px] text-muted-foreground">
+                      <span className="ml-auto text-xs text-muted-foreground">
                         {s.apiLabel}
                       </span>
                     )}

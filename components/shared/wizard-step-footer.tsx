@@ -44,7 +44,7 @@ export function WizardStepFooter({
       role="navigation"
       aria-label="Step navigation"
     >
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-6 py-4">
+      <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-4 sm:gap-4 sm:px-6">
         {/* Left: Back button */}
         {!hidePrevious && (
           <button
@@ -75,8 +75,8 @@ export function WizardStepFooter({
         </div>
 
         {/* Right: Auto-save + Next */}
-        <div className="flex shrink-0 items-center gap-4">
-          <span className="flex items-center gap-1 text-sm font-medium text-foreground">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+          <span className="hidden items-center gap-1 text-sm font-medium text-foreground sm:flex">
             Auto save
             {saveStatus === "saving" ? (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -90,7 +90,7 @@ export function WizardStepFooter({
             onClick={onNext}
             disabled={nextDisabled || nextLoading}
             className={cn(
-              "flex h-10 w-[120px] items-center justify-center rounded-lg border-2 text-sm font-medium transition-colors",
+              "flex h-10 w-[100px] items-center justify-center rounded-lg border-2 text-sm font-medium transition-colors sm:w-[120px]",
               nextDisabled
                 ? "border-[#e6fff9] bg-[#e6fff9] text-[#95c8d0] cursor-not-allowed"
                 : "border-[#a4ffe5] bg-[#a4ffe5] text-[#004956] hover:bg-[#8af5d5]"

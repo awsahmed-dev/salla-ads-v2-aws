@@ -189,7 +189,7 @@ export function UploadZone({
       >
         <Upload className={cn("text-muted-foreground", compact ? "size-4" : "size-5")} />
         <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-xs")}>{label}</span>
-        <span className={cn("text-center text-muted-foreground", compact ? "text-[8px]" : "text-xs")}>{sublabel}</span>
+        <span className={cn("text-center text-muted-foreground", compact ? "text-[11px]" : "text-xs")}>{sublabel}</span>
         <input ref={inputRef} type="file" accept={accept} multiple={multiSelect} className="hidden" onChange={(e) => handleFiles(e.target.files)} />
       </button>
       {enableLibrary && (

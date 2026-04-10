@@ -82,7 +82,7 @@ export function CampaignEstimateCard({
             </span>
           </div>
           {startDate && (
-            <p className="text-[10px] text-muted-foreground mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {fmtDate(startDate)}
               {isOngoing ? " → Ongoing" : endDate ? ` → ${fmtDate(endDate)}` : ""}
             </p>

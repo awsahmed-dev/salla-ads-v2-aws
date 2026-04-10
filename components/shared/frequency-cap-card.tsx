@@ -126,7 +126,7 @@ export function FrequencyCapCard({
               Frequency Cap
             </Label>
             {apiBadge && (
-              <span className="rounded bg-muted px-1.5 py-0 text-[10px] font-mono text-muted-foreground">
+              <span className="rounded bg-muted px-1.5 py-0 text-xs font-mono text-muted-foreground">
                 {apiBadge}
               </span>
             )}

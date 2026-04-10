@@ -218,7 +218,7 @@ export function AudienceBudgetFitCard({
                     style={{ width: `${Math.max(2, reachBarPercent)}%` }}
                   />
                 </div>
-                <p className="mt-0.5 text-[9px] text-muted-foreground">
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
                   Reaching {reachBarPercent < 1 ? "<1" : reachBarPercent.toFixed(1)}% of your audience daily
                 </p>
               </div>
@@ -227,17 +227,17 @@ export function AudienceBudgetFitCard({
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div className="rounded-lg bg-muted/50 px-2.5 py-2 text-center">
                   <p className="text-lg font-bold text-foreground">{fmt(m.dailyImpressions)}</p>
-                  <p className="text-[9px] text-muted-foreground">Impressions/day</p>
+                  <p className="text-[11px] text-muted-foreground">Impressions/day</p>
                 </div>
                 {isSales ? (
                   <div className="rounded-lg bg-muted/50 px-2.5 py-2 text-center">
                     <p className="text-lg font-bold text-foreground">{m.dailyConversions}</p>
-                    <p className="text-[9px] text-muted-foreground">Est. purchases/day</p>
+                    <p className="text-[11px] text-muted-foreground">Est. purchases/day</p>
                   </div>
                 ) : (
                   <div className="rounded-lg bg-muted/50 px-2.5 py-2 text-center">
                     <p className="text-lg font-bold text-foreground">{fmt(m.dailyClicks)}</p>
-                    <p className="text-[9px] text-muted-foreground">Est. clicks/day</p>
+                    <p className="text-[11px] text-muted-foreground">Est. clicks/day</p>
                   </div>
                 )}
               </div>
@@ -271,25 +271,25 @@ export function AudienceBudgetFitCard({
               {/* Visual comparison */}
               <div className="mt-2 space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="w-14 text-right text-[9px] text-muted-foreground">Current</span>
+                  <span className="w-14 text-right text-[11px] text-muted-foreground">Current</span>
                   <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                     <div className="h-full rounded-full bg-primary/40" style={{ width: `${Math.max(5, (dailyBudget / m.nextTierBudget) * 100)}%` }} />
                   </div>
-                  <span className="w-14 text-[9px] font-medium text-muted-foreground">SAR {dailyBudget}</span>
+                  <span className="w-14 text-[11px] font-medium text-muted-foreground">SAR {dailyBudget}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="w-14 text-right text-[9px] text-primary font-medium">Upgrade</span>
+                  <span className="w-14 text-right text-[11px] text-primary font-medium">Upgrade</span>
                   <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                     <div className="h-full rounded-full bg-primary" style={{ width: "100%" }} />
                   </div>
-                  <span className="w-14 text-[9px] font-bold text-primary">SAR {m.nextTierBudget.toLocaleString()}</span>
+                  <span className="w-14 text-[11px] font-bold text-primary">SAR {m.nextTierBudget.toLocaleString()}</span>
                 </div>
               </div>
 
               {reachBarPercent < 5 && (
                 <div className="mt-2 flex items-start gap-1.5 rounded-md bg-amber-50 border border-amber-200 px-2 py-1.5">
                   <TrendingUp className="mt-0.5 size-3 shrink-0 text-amber-600" />
-                  <p className="text-[10px] text-amber-700 leading-relaxed">
+                  <p className="text-xs text-amber-700 leading-relaxed">
                     Your current budget reaches less than 5% of your audience. Increasing budget will help Snap find buyers faster and lower your cost per purchase over time.
                   </p>
                 </div>

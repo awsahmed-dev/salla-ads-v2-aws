@@ -65,7 +65,7 @@ export function DemographicsCard({
   return (
     <div className={cn("overflow-hidden rounded-xl border border-border bg-card", className)}>
       {/* Header */}
-      <div className="px-6 py-5">
+      <div className="px-4 py-4 sm:px-6 sm:py-5">
         <h3 className="text-base font-bold text-foreground">Audience</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           Define who sees your ads by gender, age, and language.
@@ -73,7 +73,7 @@ export function DemographicsCard({
       </div>
 
       {/* Content — 3 columns */}
-      <div className="flex items-start justify-between px-6 pb-6">
+      <div className="flex flex-col gap-6 px-4 pb-6 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-6">
         {/* Age Range */}
         <div>
           <p className="mb-2 text-sm font-medium text-foreground">Age Range</p>
@@ -86,7 +86,7 @@ export function DemographicsCard({
                   type="button"
                   onClick={() => toggleAgeBand(band.value)}
                   className={cn(
-                    "w-[50px] rounded-full border px-2 py-1.5 text-xs font-medium transition-all",
+                    "w-[50px] rounded-full border px-2 py-2 text-xs font-medium transition-all",
                     sel
                       ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956] shadow-sm"
                       : "border-border bg-white text-foreground hover:border-border/80"

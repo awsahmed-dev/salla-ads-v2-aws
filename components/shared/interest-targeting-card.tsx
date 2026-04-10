@@ -77,7 +77,7 @@ export function InterestTargetingCard({
   return (
     <div className={cn("rounded-xl border border-border bg-card", className)}>
       {/* Header */}
-      <div className="px-6 py-5">
+      <div className="px-4 sm:px-6 py-5">
         <h3 className="text-base font-bold text-foreground">Interest Targeting</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           Choose interests to reach people likely to engage with your business. Leave blank to reach all.
@@ -85,9 +85,9 @@ export function InterestTargetingCard({
       </div>
 
       {/* Content */}
-      <div className="px-6 pb-6">
+      <div className="px-4 sm:px-6 pb-6">
         {/* Include / Exclude tabs */}
-        <div className="mb-6 flex h-[37px] rounded-xl bg-[#f4f4f4] p-0.5">
+        <div className="mb-6 flex h-10 rounded-xl bg-[#f4f4f4] p-0.5">
           <button
             type="button"
             onClick={() => setMode("include")}
@@ -149,7 +149,7 @@ export function InterestTargetingCard({
               </div>
 
               {/* Results */}
-              <div className="max-h-[280px] overflow-y-auto p-1">
+              <div className="max-h-[200px] sm:max-h-[280px] overflow-y-auto p-1">
                 {groupedFiltered.length === 0 ? (
                   <p className="py-6 text-center text-xs text-muted-foreground">No interests found</p>
                 ) : (
@@ -224,7 +224,7 @@ export function InterestTargetingCard({
       <div className="h-px bg-border/40" />
 
       {/* Interest Expansion */}
-      <div className="flex items-center justify-between px-6 py-5">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-5">
         <div>
           <p className="text-sm font-medium text-foreground">Interest Expansion</p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -306,7 +306,7 @@ export function LegacyInterestTargetingCard({
                 <Input placeholder={searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 pl-8 text-xs" autoFocus />
               </div>
             </div>
-            <div className="max-h-[240px] overflow-y-auto p-1">
+            <div className="max-h-[180px] sm:max-h-[240px] overflow-y-auto p-1">
               {filtered.length === 0 ? (
                 <p className="py-4 text-center text-xs text-muted-foreground">No results</p>
               ) : filtered.map((opt) => {
@@ -344,11 +344,11 @@ export function LegacyInterestTargetingCard({
 
   return (
     <div className={cn("rounded-xl border border-border bg-card", className)}>
-      <div className="px-6 py-5">
+      <div className="px-4 sm:px-6 py-5">
         <h3 className="text-base font-bold text-foreground">{title}</h3>
         <p className="mt-1 text-xs text-muted-foreground">{description}</p>
       </div>
-      <div className="px-6 pb-6">{content}</div>
+      <div className="px-4 sm:px-6 pb-6">{content}</div>
     </div>
   );
 }

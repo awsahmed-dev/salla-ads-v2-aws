@@ -336,7 +336,7 @@ export function LocationSelector({
                     <Globe className="size-3.5 text-muted-foreground" />
                     Narrow by region
                     {(value.regions ?? []).length > 0 && (
-                      <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                      <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-xs">
                         {(value.regions ?? []).length}
                       </Badge>
                     )}
@@ -447,7 +447,7 @@ export function LocationSelector({
                         {countryEmoji(country.code)} {country.name}
                       </p>
                       {country.code === PRIMARY_COUNTRY_CODE && (
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                           Most popular
                         </span>
                       )}

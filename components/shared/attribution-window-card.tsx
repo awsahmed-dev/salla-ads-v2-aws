@@ -112,7 +112,7 @@ export function AttributionWindowCard({
                     {w.recommended && (
                       <Badge
                         className={cn(
-                          "rounded-full border-0 px-1.5 py-0.5 text-[10px] font-normal",
+                          "rounded-full border-0 px-1.5 py-0.5 text-xs font-normal",
                           isSelected
                             ? "bg-[#a4ffe5] text-[#004956]"
                             : "bg-muted text-muted-foreground"
@@ -122,7 +122,7 @@ export function AttributionWindowCard({
                       </Badge>
                     )}
                     {w.requiresEligibility && (
-                      <Badge variant="outline" className="rounded-full border-amber-300 bg-amber-50 px-1.5 py-0 text-[8px] font-medium text-amber-600">
+                      <Badge variant="outline" className="rounded-full border-amber-300 bg-amber-50 px-1.5 py-0 text-[11px] font-medium text-amber-600">
                         Pixel dependent
                       </Badge>
                     )}
@@ -132,13 +132,13 @@ export function AttributionWindowCard({
                   {(w.clickWindow || w.viewWindow) && (
                     <div className="flex items-center gap-2">
                       {w.clickWindow && (
-                        <span className="flex items-center gap-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-xs text-muted-foreground">
                           {w.clickWindow}
                           <MousePointerClick className="size-2.5" />
                         </span>
                       )}
-                      <span className="text-[10px] text-foreground">+</span>
-                      <span className="flex items-center gap-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      <span className="text-xs text-foreground">+</span>
+                      <span className="flex items-center gap-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-xs text-muted-foreground">
                         {w.viewWindow ?? "No view"}
                         <Eye className="size-2.5" />
                       </span>
@@ -147,7 +147,7 @@ export function AttributionWindowCard({
 
                   {/* Description */}
                   {w.desc && (
-                    <p className="text-[10px] leading-snug text-muted-foreground">
+                    <p className="text-xs leading-snug text-muted-foreground">
                       {w.desc}
                     </p>
                   )}
@@ -158,12 +158,12 @@ export function AttributionWindowCard({
 
           {/* Legend bar */}
           <div className="mt-4 flex items-center gap-4 rounded-lg bg-muted/30 px-3 py-2">
-            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <MousePointerClick className="size-3.5" />
               Click = User swipes up, then purchases later
             </span>
-            <span className="text-[10px] text-muted-foreground">&bull;</span>
-            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">&bull;</span>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Eye className="size-3.5" />
               View = User sees the ad only, then purchases later
             </span>

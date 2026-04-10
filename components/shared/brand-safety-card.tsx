@@ -42,7 +42,7 @@ export function BrandSafetyCard({
         <Shield className={cn("size-4", !custom && "text-primary")} style={accentStyle} />
         <Label className="text-sm font-semibold text-foreground">{title}</Label>
         {apiBadge && (
-          <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px] font-normal">
+          <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs font-normal">
             {apiBadge}
           </Badge>
         )}
@@ -83,7 +83,7 @@ export function BrandSafetyCard({
                     {l.label}
                   </span>
                   {l.recommended && (
-                    <Badge className="rounded-full border-0 bg-emerald-100 px-1.5 py-0 text-[8px] font-medium text-emerald-700">
+                    <Badge className="rounded-full border-0 bg-emerald-100 px-1.5 py-0 text-[11px] font-medium text-emerald-700">
                       Recommended
                     </Badge>
                   )}

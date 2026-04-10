@@ -94,7 +94,7 @@ export function PlacementConfigCard({
               <div className="mb-2 flex items-center gap-2">
                 {g.icon && <span className="text-muted-foreground">{g.icon}</span>}
                 <span className="text-xs font-semibold text-foreground">{g.label}</span>
-                <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px] font-normal">
+                <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs font-normal">
                   {g.selectedValues.length}/{g.options.length}
                 </Badge>
               </div>

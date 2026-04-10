@@ -337,7 +337,7 @@ export function StepReview() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="truncate text-xs font-medium text-foreground">{ad.name}</p>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground">
                   {FORMAT_LABELS[ad.adFormat ?? "SINGLE"] || AD_TYPE_LABELS[ad.adType] || ad.adType}{ad.adFormat === "SINGLE" ? ` · ${DEST_LABELS[ad.adDestination ?? "WEBSITE"] || ""}` : ""} · {(ad.adFormat ?? "SINGLE") === "DYNAMIC" ? (ad.dynamicTemplateConfig?.productSetName || "No product set") : `${ad.assets.length} creative${ad.assets.length !== 1 ? "s" : ""}`}{ad.isInfluencer ? " · Influencer" : ""}
                 </p>
               </div>
@@ -439,7 +439,7 @@ export function StepReview() {
               <div key={stat.label} className="flex flex-col gap-1 bg-card px-4 py-3">
                 <div className="flex items-center gap-1.5">
                   <stat.icon className="size-3 text-muted-foreground" />
-                  <span className="text-[10px] text-muted-foreground">{stat.label}</span>
+                  <span className="text-[11px] text-muted-foreground">{stat.label}</span>
                 </div>
                 <span className="text-xs font-semibold text-foreground">{stat.value}</span>
               </div>
@@ -447,7 +447,7 @@ export function StepReview() {
           </div>
 
           <div className="border-t border-border px-5 py-3">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+            <div className="grid grid-cols-1 gap-y-2 sm:grid-cols-2 sm:gap-x-6 text-xs">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Targeting</span>
                 <span className="font-medium text-foreground">{countriesLabel}</span>
@@ -678,7 +678,7 @@ export function StepReview() {
                 >
                   <Wallet className={cn("size-5", paymentMethod === "wallet" ? "text-primary" : "text-muted-foreground")} />
                   <p className={cn("text-[11px] font-semibold", paymentMethod === "wallet" ? "text-primary" : "text-foreground")}>Store Wallet</p>
-                  <p className={cn("text-[10px] font-bold tabular-nums", walletBalance >= totalWithVat ? "text-emerald-600" : "text-amber-600")}>
+                  <p className={cn("text-[11px] font-bold tabular-nums", walletBalance >= totalWithVat ? "text-emerald-600" : "text-amber-600")}>
                     {walletBalance.toLocaleString()} SAR
                   </p>
                 </button>
@@ -700,7 +700,7 @@ export function StepReview() {
                     <p className={cn("text-[11px] font-semibold", paymentMethod === "credit" ? "text-primary" : "text-foreground")}>Monthly Credit</p>
                     {!isCreditEligible && <Lock className="size-2.5 text-muted-foreground" />}
                   </div>
-                  <p className={cn("text-[10px] font-bold tabular-nums", creditAvailable >= totalWithVat ? "text-emerald-600" : "text-amber-600")}>
+                  <p className={cn("text-[11px] font-bold tabular-nums", creditAvailable >= totalWithVat ? "text-emerald-600" : "text-amber-600")}>
                     {creditAvailable.toLocaleString()} SAR
                   </p>
                 </button>
@@ -710,7 +710,7 @@ export function StepReview() {
               {fundsInsufficient && (
                 <div className="mt-2 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                   <p className="text-[11px] font-medium text-amber-800">Need {shortfall.toLocaleString()} SAR more</p>
-                  <Button size="sm" variant="outline" className="h-6 gap-1 border-amber-300 px-2 text-[10px] text-amber-700 hover:bg-amber-100" onClick={() => setTopUpOpen(true)}>
+                  <Button size="sm" variant="outline" className="h-6 gap-1 border-amber-300 px-2 text-[11px] text-amber-700 hover:bg-amber-100" onClick={() => setTopUpOpen(true)}>
                     <Plus className="size-2.5" /> Top Up
                   </Button>
                 </div>
@@ -944,7 +944,7 @@ export function StepReview() {
             <Wallet className="size-4" />
             Top Up {topUpAmount ? `${Number(topUpAmount).toLocaleString()} SAR` : ""}
           </Button>
-          <p className="mt-2 text-center text-[10px] text-muted-foreground">You will be redirected to complete the payment</p>
+          <p className="mt-2 text-center text-[11px] text-muted-foreground">You will be redirected to complete the payment</p>
         </div>
       </SheetContent>
     </Sheet>

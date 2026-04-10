@@ -170,7 +170,7 @@ export function StepAudience() {
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
               className={cn(
-                "flex w-full items-center justify-between px-6 pb-3 pt-5 text-left transition-colors rounded-2xl",
+                "flex w-full items-center justify-between px-4 pb-3 pt-4 sm:px-6 sm:pt-5 text-left transition-colors rounded-2xl",
                 !showAdvanced && "border border-border bg-card hover:bg-muted/30"
               )}
             >
@@ -200,7 +200,7 @@ export function StepAudience() {
 
                   {/* Custom Audience Expansion — inside same card */}
                   <div className="h-px bg-border/40" />
-                  <div className="flex items-center justify-between px-6 py-5">
+                  <div className="flex items-center justify-between px-4 py-4 sm:px-6 sm:py-5">
                     <div>
                       <p className="text-sm font-medium text-foreground">Custom Audience Expansion</p>
                       <p className="mt-1 text-xs text-muted-foreground">

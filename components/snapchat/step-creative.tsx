@@ -331,7 +331,7 @@ export function StepCreative() {
                 </div>
                 {catalogStatus && (
                   <span className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                    "rounded-full px-2 py-0.5 text-xs font-medium",
                     catalogStatus.syncHealth === "healthy" ? "bg-emerald-100 text-emerald-700" :
                     catalogStatus.syncHealth === "warning" ? "bg-amber-100 text-amber-700" :
                     "bg-red-100 text-red-700"
@@ -447,7 +447,7 @@ export function StepCreative() {
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-medium text-foreground">
                       Chat Background
-                      <Badge variant="outline" className="ml-1.5 rounded-full px-1.5 py-0 text-[8px]">Optional</Badge>
+                      <Badge variant="outline" className="ml-1.5 rounded-full px-1.5 py-0 text-[11px]">Optional</Badge>
                     </Label>
                   </div>
                   <div className={cn(
@@ -535,7 +535,7 @@ export function StepCreative() {
               <p className="mt-1 mb-4 text-xs text-muted-foreground">
                 Defines the type of content your ads appear next to. This doesn&apos;t change your ad—it controls its environment.
               </p>
-              <div className="flex gap-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
                 {([
                   {
                     val: "FULL_INVENTORY" as const,
@@ -600,7 +600,7 @@ export function StepCreative() {
               </div>
             ) : (
             <>
-              <div className="flex gap-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
                 {([
                   {
                     val: "AUTOMATIC" as PlacementConfig,
@@ -631,7 +631,7 @@ export function StepCreative() {
                       <div className="flex w-full items-center justify-between">
                         <span className={cn("text-sm font-bold", selected ? "text-[#004956]" : "text-foreground")}>{opt.label}</span>
                         {opt.recommended && (
-                          <span className="rounded-full bg-[#a4ffe5] px-2 py-0.5 text-[10px] font-medium text-[#004956]">Recommended</span>
+                          <span className="rounded-full bg-[#a4ffe5] px-2 py-0.5 text-xs font-medium text-[#004956]">Recommended</span>
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">{opt.desc}</p>
@@ -713,13 +713,13 @@ export function StepCreative() {
                             <div className="flex items-center gap-1.5">
                               <span className={cn("text-xs font-medium", checked && !isDisabled ? "text-foreground" : "text-foreground")}>{pos.label}</span>
                               {disabledByBrandSafety && (
-                                <span className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">Full Inventory only</span>
+                                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">Full Inventory only</span>
                               )}
                               {noMatchingAds && !disabledByBrandSafety && (
-                                <span className="rounded bg-red-50 px-1.5 py-0.5 text-[9px] font-medium text-red-500">No {formatNote} ads</span>
+                                <span className="rounded bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-500">No {formatNote} ads</span>
                               )}
                               {hasFormatRestriction && !noMatchingAds && !isDisabled && (
-                                <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-600">{formatNote} only</span>
+                                <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-600">{formatNote} only</span>
                               )}
                             </div>
                             <p className="text-[11px] leading-snug text-muted-foreground">{pos.desc}</p>
@@ -751,7 +751,7 @@ export function StepCreative() {
                           });
                           updateNested("creative", { customPositions: hasFormat.map((p) => p.id) });
                         }}
-                        className="text-[10px] font-medium text-primary hover:underline"
+                        className="text-xs font-medium text-primary hover:underline"
                       >
                         Select all available
                       </button>
@@ -832,7 +832,7 @@ export function StepCreative() {
                   </p>
                 </div>
                 {/* Format cards */}
-                <div className="flex gap-6 px-6 pb-6">
+                <div className="grid grid-cols-2 gap-3 px-4 pb-4 sm:flex sm:gap-6 sm:px-6 sm:pb-6">
                   {FILTERED_AD_FORMATS.map((opt, i) => {
                     const isFirst = i === 0;
                     return (
@@ -854,7 +854,7 @@ export function StepCreative() {
                           <span className={cn("[&>svg]:size-5", isFirst ? "text-[#004956]" : "text-muted-foreground")}>{opt.icon}</span>
                         </div>
                         <p className={cn("text-xs font-bold", isFirst ? "text-[#004956]" : "text-foreground")}>{opt.label}</p>
-                        <p className="text-[10px] leading-snug text-muted-foreground">{opt.desc}</p>
+                        <p className="text-xs leading-snug text-muted-foreground">{opt.desc}</p>
                       </button>
                     );
                   })}
@@ -932,7 +932,7 @@ export function StepCreative() {
                             >
                               <span className="shrink-0 text-muted-foreground [&>svg]:size-5">{opt.icon}</span>
                               <p className="text-xs font-medium text-foreground">{opt.label}</p>
-                              <p className="line-clamp-2 text-[10px] leading-snug text-muted-foreground">{opt.desc}</p>
+                              <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">{opt.desc}</p>
                             </button>
                           );
                         })}
@@ -1000,7 +1000,7 @@ export function StepCreative() {
                     {creative.leadForm.privacy_policy_url && (
                       <div className="mt-2 flex items-center gap-1 border-t border-border pt-2">
                         <ShieldCheck className="size-2.5 text-emerald-500" />
-                        <span className="truncate text-[8px] text-muted-foreground">Privacy Policy linked</span>
+                        <span className="truncate text-[11px] text-muted-foreground">Privacy Policy linked</span>
                       </div>
                     )}
                   </div>
@@ -1008,11 +1008,11 @@ export function StepCreative() {
                   <div className="grid grid-cols-3 gap-2">
                     <div className="flex flex-col items-center rounded-lg border border-border bg-muted/20 px-2 py-2">
                       <span className="text-lg font-bold text-foreground">{creative.leadForm.form_fields.length}</span>
-                      <span className="text-[8px] text-muted-foreground">Fields</span>
+                      <span className="text-[11px] text-muted-foreground">Fields</span>
                     </div>
                     <div className="flex flex-col items-center rounded-lg border border-border bg-muted/20 px-2 py-2">
                       <span className="text-lg font-bold text-foreground">{creative.leadForm.form_fields.filter((f) => f.type === "CUSTOM").length}</span>
-                      <span className="text-[8px] text-muted-foreground">Custom</span>
+                      <span className="text-[11px] text-muted-foreground">Custom</span>
                     </div>
                     <div className="flex flex-col items-center rounded-lg border border-border bg-muted/20 px-2 py-2">
                       {creative.leadForm.end_page_properties ? (
@@ -1020,7 +1020,7 @@ export function StepCreative() {
                       ) : (
                         <div className="size-4 rounded-full border border-muted-foreground/30" />
                       )}
-                      <span className="mt-0.5 text-[8px] text-muted-foreground">End Page</span>
+                      <span className="mt-0.5 text-[11px] text-muted-foreground">End Page</span>
                     </div>
                   </div>
                 </div>
@@ -1398,7 +1398,7 @@ function CampaignReadinessCard({
                 </div>
                 <div>
                   <p className={cn("text-xs font-bold", bp.met ? "text-[#004956]" : "text-foreground")}>{bp.label}</p>
-                  <p className="text-[10px] text-muted-foreground">{bp.met ? bp.metTip : bp.tip}</p>
+                  <p className="text-xs text-muted-foreground">{bp.met ? bp.metTip : bp.tip}</p>
                 </div>
               </div>
             ))}

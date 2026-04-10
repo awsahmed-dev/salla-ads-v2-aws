@@ -37,7 +37,7 @@ export function EstimatedResultsCard({
           Estimated Results
         </h3>
         {badge && (
-          <Badge variant="outline" className="text-[10px]">
+          <Badge variant="outline" className="text-xs">
             {badge}
           </Badge>
         )}
@@ -65,7 +65,7 @@ export function EstimatedResultsCard({
       )}
 
       {disclaimer && (
-        <p className="mt-4 text-[10px] leading-relaxed text-muted-foreground">
+        <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
           {disclaimer}
         </p>
       )}

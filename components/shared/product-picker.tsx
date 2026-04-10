@@ -138,7 +138,7 @@ export function ProductPickerDialog({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.image} alt="" className="size-5 rounded-full object-cover" crossOrigin="anonymous" />
-                  <span className="max-w-[80px] truncate text-[10px] font-medium text-foreground">{p.name}</span>
+                  <span className="max-w-[80px] truncate text-xs font-medium text-foreground">{p.name}</span>
                   <X className="size-2.5 shrink-0 text-muted-foreground group-hover:text-destructive" />
                 </button>
               ))}
@@ -149,7 +149,7 @@ export function ProductPickerDialog({
                 setSelected(new Set());
                 setSelectedItems({});
               }}
-              className="shrink-0 text-[10px] text-primary hover:underline"
+              className="shrink-0 text-xs text-primary hover:underline"
             >
               Clear
             </button>
@@ -278,7 +278,7 @@ export function ProductPickerDialog({
                         </div>
                       )}
                       {hasSale && !alreadyAdded && product.inStock && (
-                        <div className="absolute left-2 top-2 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                        <div className="absolute left-2 top-2 rounded-full bg-red-500 px-1.5 py-0.5 text-xs font-bold text-white shadow-sm">
                           SALE
                         </div>
                       )}
@@ -300,7 +300,7 @@ export function ProductPickerDialog({
                       {product.rating != null && (
                         <div className="flex items-center gap-1">
                           <Star className="size-2.5 fill-amber-400 text-amber-400" />
-                          <span className="text-[10px] tabular-nums text-muted-foreground">
+                          <span className="text-xs tabular-nums text-muted-foreground">
                             {product.rating} ({product.reviewCount ?? 0})
                           </span>
                         </div>
@@ -312,7 +312,7 @@ export function ProductPickerDialog({
                               <span className="text-xs font-bold tabular-nums text-red-600">
                                 {formatSAR(product.salePrice!)}
                               </span>
-                              <span className="text-[10px] tabular-nums text-muted-foreground line-through">
+                              <span className="text-xs tabular-nums text-muted-foreground line-through">
                                 {formatSAR(product.price)}
                               </span>
                             </>
@@ -322,7 +322,7 @@ export function ProductPickerDialog({
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] text-muted-foreground">{product.sku}</span>
+                        <span className="text-xs text-muted-foreground">{product.sku}</span>
                       </div>
                     </div>
                   </button>

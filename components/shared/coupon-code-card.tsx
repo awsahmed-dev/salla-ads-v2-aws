@@ -127,7 +127,7 @@ export function CouponCodeCard({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-foreground">{c.title}</p>
-                <p className="text-[10px] leading-relaxed text-muted-foreground line-clamp-2">{c.description}</p>
+                <p className="text-xs leading-relaxed text-muted-foreground line-clamp-2">{c.description}</p>
               </div>
               <button
                 type="button"

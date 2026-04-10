@@ -152,7 +152,7 @@ export function LocationMapPreview({ countryCodes, cities }: LocationMapPreviewP
   if (!MAPBOX_TOKEN) {
     return (
       <div className="rounded-xl border border-border bg-muted/30 overflow-hidden">
-        <div className="flex h-[200px] items-center justify-center">
+        <div className="flex h-[160px] sm:h-[200px] items-center justify-center">
           <div className="text-center">
             <Globe className="mx-auto mb-2 size-6 text-muted-foreground/20" />
             <p className="text-xs text-muted-foreground">
@@ -169,7 +169,7 @@ export function LocationMapPreview({ countryCodes, cities }: LocationMapPreviewP
   return (
     <div className="rounded-xl border border-border bg-background overflow-hidden">
       {/* Clean map canvas — all basemap labels stripped, only our markers shown */}
-      <div className="relative h-[220px]">
+      <div className="relative h-[160px] sm:h-[220px]">
         <Map
           ref={mapRef}
           mapboxAccessToken={MAPBOX_TOKEN}
@@ -200,7 +200,7 @@ export function LocationMapPreview({ countryCodes, cities }: LocationMapPreviewP
                 {/* Pin dot */}
                 <div className="relative size-3 rounded-full bg-indigo-500 ring-[2.5px] ring-white shadow-sm" />
                 {/* City name */}
-                <span className="mt-1 whitespace-nowrap text-[10px] font-medium leading-none text-gray-700 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
+                <span className="mt-1 whitespace-nowrap text-xs font-medium leading-none text-gray-700 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">
                   {city.name}
                 </span>
               </div>

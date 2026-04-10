@@ -831,7 +831,7 @@ export function StepBudget() {
 
                     {budget.frequencyCapEnabled ? (
                       <div className="mt-4 space-y-3">
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {FREQ_PRESETS.map((preset) => {
                             const isActive = activePreset?.id === preset.id;
                             return (
@@ -849,11 +849,11 @@ export function StepBudget() {
                                 <span className={cn("text-lg font-bold tabular-nums", isActive ? "text-primary" : "text-foreground")}>
                                   {preset.count}x
                                 </span>
-                                <span className="text-[10px] text-muted-foreground">
+                                <span className="text-xs text-muted-foreground">
                                   / {preset.window}
                                 </span>
                                 <span className={cn(
-                                  "mt-1.5 rounded-full px-2 py-0.5 text-[9px] font-medium",
+                                  "mt-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium",
                                   isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
                                 )}>
                                   {preset.recommended && !isActive ? "★ " : ""}{preset.hint}
