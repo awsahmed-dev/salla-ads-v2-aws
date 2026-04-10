@@ -4,56 +4,77 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
-import {
-  Zap,
-  Info,
-  Rocket,
-  Shield,
-  BarChart3,
+  Users,
+  SlidersHorizontal,
+  UserCheck,
   Sparkles,
-  CheckCircle2,
-  RefreshCw,
   TrendingUp,
+  RefreshCw,
 } from "lucide-react";
 
 const ORIGINAL_PRICE = 500;
 const CURRENT_PRICE = 299;
 const DISCOUNT_PCT = Math.round(((ORIGINAL_PRICE - CURRENT_PRICE) / ORIGINAL_PRICE) * 100);
 
+function SallaLogo({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 54 46"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M27.3 0C20.1 0 14 4.5 11.3 11H5.4C2.4 11 0 13.4 0 16.4v13.2C0 32.6 2.4 35 5.4 35h5.9c2.7 6.5 8.8 11 16 11 9.6 0 17.4-7.8 17.4-17.4v-11.2C44.7 7.8 36.9 0 27.3 0zm0 40.3c-5.7 0-10.7-3.3-13.1-8.1 1.4.5 2.9.8 4.5.8h17.2c1.6 0 3.1-.3 4.5-.8-2.4 4.8-7.4 8.1-13.1 8.1zm13.1-13.1c0 2.8-2.3 5.1-5.1 5.1H18.7c-2.8 0-5.1-2.3-5.1-5.1v-8.4c0-2.8 2.3-5.1 5.1-5.1h16.6c2.8 0 5.1 2.3 5.1 5.1v8.4z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function SarSymbol({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 1124 1256"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M699.5 1087.5c0 31.6-10.5 58-31.6 79.3-20.9 21.1-46.4 31.6-76.4 31.6H197.3c-31 0-57.4-10.5-79.3-31.6-20.1-21.3-30.2-47.7-30.2-79.3V916.9h124.6v137.4c0 10.5 3.7 19.5 11.1 27 7.4 7.4 16.4 11.1 27 11.1h351.4c10.5 0 19.5-3.7 27-11.1 7.4-7.5 11.1-16.5 11.1-27V916.9h59.5v170.6zm0-422.9v213.3H87.8V664.6h124.6v180.1h351.4V664.6h135.7zM87.8 0h124.6v553.5H87.8V0zm236 0h124.6v553.5H323.8V0zm236 0h139.7v553.5H559.8V0zm254.5 0H939v553.5H814.3V0zm185.6 0h124.6v553.5H999.9V0z" />
+    </svg>
+  );
+}
+
 const BOOST_FEATURES = [
   {
-    icon: Rocket,
-    title: "3-Day Human + AI Monitoring",
-    desc: "A specialist and Salla's AI monitor your campaign for the first 72 hours",
-  },
-  {
-    icon: BarChart3,
-    title: "Smart Bid Tuning",
-    desc: "AI reviews bids regularly, specialist approves adjustments",
-  },
-  {
-    icon: Shield,
+    icon: UserCheck,
     title: "Priority Review",
-    desc: "Your ads are prioritized in the approval queue",
+    desc: "Your ads get top priority in the approval queue for faster launching.",
   },
   {
-    icon: Sparkles,
-    title: "AI Creative Enhancement",
-    desc: "AI-generated headline and copy suggestions tested for performance",
+    icon: SlidersHorizontal,
+    title: "Smart Bid Adjustment",
+    desc: "AI reviews bids regularly, with expert approval for all adjustments.",
+  },
+  {
+    icon: Users,
+    title: "3-Day Human + AI Monitoring",
+    desc: "Experts and Salla AI monitor your campaign for the first 72 hours.",
+  },
+  {
+    icon: RefreshCw,
+    title: "Refund on Rejection",
+    desc: `Full ${CURRENT_PRICE} SAR refund if the platform rejects your advertisement.`,
   },
   {
     icon: TrendingUp,
     title: "Audience Insights Report",
-    desc: "See which audiences perform best for your campaign",
+    desc: "View detailed reports on which audiences are performing best.",
   },
   {
-    icon: RefreshCw,
-    title: "Refund if Disapproved",
-    desc: "Full SAR 299 back if Snapchat rejects your ad",
+    icon: Sparkles,
+    title: "AI-Powered Creative Boost",
+    desc: "Performance-tested AI suggestions for headlines and ad copy.",
   },
 ];
 
@@ -69,58 +90,56 @@ export function PerformanceBoostCard({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border-2 p-5 transition-all duration-300",
+        "relative overflow-hidden rounded-xl p-6 transition-all duration-300",
         enabled
-          ? "border-primary/40 bg-gradient-to-br from-primary/[0.04] via-primary/[0.02] to-transparent shadow-md shadow-primary/5"
-          : "border-border/60 bg-card hover:border-border"
+          ? "shadow-md"
+          : "opacity-80"
       )}
+      style={{
+        backgroundImage: enabled
+          ? "linear-gradient(125deg, rgb(255, 255, 255) 78%, rgb(164, 255, 229) 98%)"
+          : undefined,
+        backgroundColor: enabled ? undefined : "hsl(var(--card))",
+      }}
     >
-      {enabled && (
-        <div className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-primary/[0.06] blur-3xl" />
-      )}
-
       {/* Header */}
-      <div className="relative flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          {/* Salla logo */}
           <div
             className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors",
+              "flex size-[51px] shrink-0 items-center justify-center rounded-full border-[3px] border-white shadow-md transition-colors",
               enabled
-                ? "bg-primary/15 shadow-sm shadow-primary/10"
+                ? "bg-emerald-50"
                 : "bg-muted/60"
             )}
           >
-            <Zap
+            <SallaLogo
               className={cn(
-                "size-5 transition-colors",
-                enabled ? "text-primary" : "text-muted-foreground"
+                "size-8 transition-colors",
+                enabled ? "text-[#004956]" : "text-muted-foreground"
               )}
             />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-bold text-foreground">
-                Salla Performance Boost
+              <h3 className="text-base font-bold text-foreground">
+                Campaign Performance Boost by Salla
               </h3>
               <Badge
                 className={cn(
-                  "rounded-full border-0 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                  "rounded-full border-0 px-1.5 py-0.5 text-[10px]",
                   enabled
-                    ? "bg-primary/15 text-primary"
+                    ? "bg-[#a4ffe5] text-[#004956]"
                     : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                 )}
               >
-                {DISCOUNT_PCT}% off
+                {DISCOUNT_PCT}% Off
               </Badge>
-              {enabled && (
-                <Badge className="rounded-full border-0 bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                  <CheckCircle2 className="mr-0.5 size-3" />
-                  Added
-                </Badge>
-              )}
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Human specialist + AI working together on your campaign for 3 days.
+            <p className="mt-1 text-xs text-muted-foreground">
+              Salla&apos;s ads team will optimize your campaign using best
+              practices for superior results.
             </p>
           </div>
         </div>
@@ -128,23 +147,24 @@ export function PerformanceBoostCard({
         {/* Price + toggle */}
         <div className="flex shrink-0 items-center gap-3">
           <div className="text-right">
-            <div className="flex items-baseline justify-end gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground line-through decoration-muted-foreground/50">
+            <p className="text-[10px] text-muted-foreground">
+              One-time payment
+            </p>
+            <div className="mt-0.5 flex items-center justify-end gap-1.5">
+              <span className="text-sm font-medium text-muted-foreground line-through">
                 {ORIGINAL_PRICE}
               </span>
+              <span className="text-[10px] text-muted-foreground">&bull;</span>
+              <SarSymbol className="size-3.5 text-foreground" />
               <span
                 className={cn(
-                  "text-lg font-extrabold tabular-nums tracking-tight",
-                  enabled ? "text-primary" : "text-foreground"
+                  "text-xl font-bold tabular-nums tracking-tight",
+                  enabled ? "text-foreground" : "text-foreground"
                 )}
               >
                 {CURRENT_PRICE}
               </span>
-              <span className="text-[10px] font-semibold text-muted-foreground">
-                SAR
-              </span>
             </div>
-            <p className="text-[10px] text-muted-foreground">one-time</p>
           </div>
           <Switch checked={enabled} onCheckedChange={onToggle} />
         </div>
@@ -153,78 +173,31 @@ export function PerformanceBoostCard({
       {/* Feature grid */}
       <div
         className={cn(
-          "mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2 transition-all",
+          "mt-6 grid grid-cols-1 gap-x-6 gap-y-0 sm:grid-cols-3 transition-all",
           enabled ? "opacity-100" : "opacity-60"
         )}
       >
         {BOOST_FEATURES.map((feat) => (
           <div
             key={feat.title}
-            className={cn(
-              "rounded-lg border px-3 py-2.5 transition-colors",
-              enabled
-                ? "border-primary/15 bg-primary/[0.03]"
-                : "border-border/40 bg-muted/20"
-            )}
+            className="flex flex-col gap-2 px-4 py-4"
           >
-            <feat.icon
-              className={cn(
-                "mb-1.5 size-3.5",
-                enabled ? "text-primary" : "text-muted-foreground"
-              )}
-            />
-            <p className="text-[11px] font-semibold leading-tight text-foreground">
-              {feat.title}
-            </p>
-            <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <feat.icon
+                className={cn(
+                  "size-5 shrink-0",
+                  enabled ? "text-[#004956]" : "text-muted-foreground"
+                )}
+              />
+              <p className="text-xs font-bold text-foreground">
+                {feat.title}
+              </p>
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
               {feat.desc}
             </p>
           </div>
         ))}
-      </div>
-
-      {/* Trust bar */}
-      <div className="mt-3.5 flex items-center justify-between rounded-lg bg-muted/30 px-3.5 py-2">
-        <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <CheckCircle2 className="size-3 text-emerald-500" />
-            One-time
-          </span>
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <CheckCircle2 className="size-3 text-emerald-500" />
-            Cancel before launch
-          </span>
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            <CheckCircle2 className="size-3 text-emerald-500" />
-            Refund if disapproved
-          </span>
-        </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              className="flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"
-            >
-              <Info className="size-3" />
-              Details
-            </button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs text-xs leading-relaxed">
-            <p className="font-semibold">When you enable Boost:</p>
-            <ol className="mt-1 list-inside list-decimal space-y-0.5 text-muted-foreground">
-              <li>A specialist + AI monitor your campaign for 3 days</li>
-              <li>AI tunes bids, specialist reviews and approves</li>
-              <li>Your ads get priority in the review queue</li>
-              <li>AI generates creative suggestions + audience report</li>
-            </ol>
-            <p className="mt-2 text-[11px] font-medium text-emerald-600">
-              Full SAR {CURRENT_PRICE} refund if your ad is disapproved.
-            </p>
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              Powered by Salla Ads — not a Snapchat feature.
-            </p>
-          </TooltipContent>
-        </Tooltip>
       </div>
     </div>
   );

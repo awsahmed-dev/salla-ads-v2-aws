@@ -317,18 +317,20 @@ export function DV360StepBudget() {
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-5 py-4 shadow-sm transition-colors hover:bg-muted/30"
+                className={cn(
+                  "flex w-full items-center justify-between rounded-2xl px-6 pb-3 pt-5 text-left transition-colors",
+                  showAdvanced ? "bg-muted/50" : "border border-border bg-card hover:bg-muted/30"
+                )}
               >
-                <div className="flex items-center gap-2.5">
-                  <Settings2 className="size-4 text-muted-foreground" />
-                  <span className="text-sm font-semibold text-foreground">Advanced Settings</span>
-                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs">Optional</Badge>
+                <div>
+                  <span className="text-base font-bold text-foreground">Advanced Settings</span>
+                  <p className="mt-1 text-xs text-muted-foreground">Pacing Strategy, Frequency Cap</p>
                 </div>
-                {showAdvanced ? <ChevronDown className="size-4 text-muted-foreground" /> : <ChevronRight className="size-4 text-muted-foreground" />}
+                <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", showAdvanced && "rotate-180")} />
               </button>
             </CollapsibleTrigger>
 
-            <CollapsibleContent className="flex flex-col gap-5 pt-5">
+            <CollapsibleContent className={cn("flex flex-col gap-4 rounded-b-2xl px-2 pb-2", showAdvanced && "bg-muted/50")}>
           {/* ---- Pacing ---- */}
           <DeliveryPacingCard
             title="Pacing Strategy"

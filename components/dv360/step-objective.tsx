@@ -94,7 +94,7 @@ const FUNNEL_LABELS: Record<string, { label: string; color: string; icon: React.
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export function DV360StepObjective() {
+export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested } = useDV360Campaign();
   const obj = campaign.objective;
   const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved">("idle");
@@ -506,8 +506,8 @@ export function DV360StepObjective() {
 
       </div>
       <WizardStepFooter
-        hidePrevious
-        onPrevious={() => {}}
+        previousLabel="Cancel"
+        onPrevious={onCancel ?? (() => {})}
         onNext={() => setStep(1)}
         nextLabel="Next"
         nextDisabled={!canProceed}

@@ -121,7 +121,7 @@ const FUNNEL_LABELS: Record<string, { label: string; color: string; icon: React.
 /*  Component                                                         */
 /* ------------------------------------------------------------------ */
 
-export function StepObjective() {
+export function StepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested } = useCampaign();
   const obj = campaign.objective;
   const selectedObj = OBJECTIVES.find((o) => o.value === obj.objective)!;
@@ -824,8 +824,8 @@ export function StepObjective() {
         </div>
       </div>
       <WizardStepFooter
-        hidePrevious
-        onPrevious={() => {}}
+        previousLabel="Cancel"
+        onPrevious={onCancel ?? (() => {})}
         onNext={() => setStep(1)}
         nextLabel="Next"
         nextDisabled={

@@ -10,9 +10,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { Clock, MousePointerClick, Eye, Sparkles, ArrowRight } from "lucide-react";
-import { InfoTip } from "@/components/shared/info-tip";
-import { SectionCard } from "@/components/shared/section-card";
+import { MousePointerClick, Eye, Sparkles } from "lucide-react";
 
 export interface CombinedOption {
   value: string;
@@ -64,101 +62,62 @@ export function AttributionWindowCard({
   subtitle,
   tip,
   accent = "primary",
-  apiBadge,
-  icon,
-  infoTipText = "How long after seeing your ad should results be counted?",
+  infoTipText = "How long after a view or click should a conversion be credited? A wider window provides more data to optimize performance.",
   goalContext,
   children,
 }: AttributionWindowCardProps) {
   const isCustomAccent = accent.startsWith("#");
   const accentStyle = isCustomAccent ? { color: accent } : undefined;
 
-  const selectedOption = combinedOptions?.find((o) => o.value === combinedValue);
-
   return (
-    <SectionCard>
-      <div className="mb-3 flex items-center gap-2">
-        {icon ?? (
-          <Clock
-            className={cn("size-4", !isCustomAccent && "text-primary")}
-            style={accentStyle}
-          />
-        )}
-        <Label className="text-sm font-semibold text-foreground">
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      {/* Header */}
+      <div className="px-6 py-5">
+        <h3 className="text-base font-bold text-foreground">
           Attribution Window
-        </Label>
-        {apiBadge && (
-          <Badge
-            variant="secondary"
-            className="rounded-full px-1.5 py-0 text-[10px] font-normal"
-          >
-            {apiBadge}
-          </Badge>
-        )}
-        <InfoTip text={infoTipText} />
+        </h3>
+        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+          {infoTipText}
+        </p>
       </div>
 
-      {subtitle && (
-        <p className="mb-3 text-xs text-muted-foreground">{subtitle}</p>
-      )}
-
-      {/* Click vs View explainer */}
-      <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-          <div className="mb-1 flex items-center gap-1.5">
-            <MousePointerClick className="size-3 text-primary" />
-            <span className="text-[11px] font-semibold text-foreground">Click-through</span>
-          </div>
-          <p className="text-[10px] leading-snug text-muted-foreground">
-            User <span className="font-medium text-foreground">swipes up</span> on your ad, then buys later
-          </p>
-        </div>
-        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-          <div className="mb-1 flex items-center gap-1.5">
-            <Eye className="size-3 text-primary" />
-            <span className="text-[11px] font-semibold text-foreground">View-through</span>
-          </div>
-          <p className="text-[10px] leading-snug text-muted-foreground">
-            User <span className="font-medium text-foreground">sees</span> your ad (no click), then buys later
-          </p>
-        </div>
-      </div>
-
+      {/* Combined mode: horizontal cards */}
       {mode === "combined" && combinedOptions && onCombinedChange && (
-        <div className="flex flex-col gap-2">
-          {combinedOptions.map((w) => {
-            const isSelected = combinedValue === w.value;
-            return (
-              <button
-                key={w.value}
-                type="button"
-                onClick={() => onCombinedChange(w.value)}
-                className={cn(
-                  "flex items-start gap-3 rounded-xl border px-4 py-3.5 text-left transition-all",
-                  isSelected
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border bg-background hover:border-primary/40"
-                )}
-              >
-                <div
+        <div className="px-6 pb-6">
+          <div className="flex gap-6">
+            {combinedOptions.map((w) => {
+              const isSelected = combinedValue === w.value;
+              return (
+                <button
+                  key={w.value}
+                  type="button"
+                  onClick={() => onCombinedChange(w.value)}
                   className={cn(
-                    "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border-2",
+                    "flex flex-1 flex-col gap-3 rounded-xl border px-5 py-4 text-left transition-all",
                     isSelected
-                      ? "border-primary"
-                      : "border-muted-foreground/30"
+                      ? "border-[#a4ffe5] bg-[#e6fff9]"
+                      : "border-border bg-card hover:border-border/80"
                   )}
                 >
-                  {isSelected && (
-                    <div className="size-2 rounded-full bg-primary" />
-                  )}
-                </div>
-                  <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={cn("text-sm font-semibold", isSelected ? "text-primary" : "text-foreground")}>
+                  {/* Title + recommended */}
+                  <div className="flex items-center justify-between w-full">
+                    <span
+                      className={cn(
+                        "text-sm font-bold",
+                        isSelected ? "text-[#004956]" : "text-foreground"
+                      )}
+                    >
                       {w.label}
                     </span>
                     {w.recommended && (
-                      <Badge className="rounded-full border-0 bg-emerald-100 px-1.5 py-0 text-[8px] font-medium text-emerald-700">
+                      <Badge
+                        className={cn(
+                          "rounded-full border-0 px-1.5 py-0.5 text-[10px] font-normal",
+                          isSelected
+                            ? "bg-[#a4ffe5] text-[#004956]"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
                         Recommended
                       </Badge>
                     )}
@@ -168,120 +127,117 @@ export function AttributionWindowCard({
                       </Badge>
                     )}
                   </div>
-                  {w.desc && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {w.desc}
-                    </p>
-                  )}
-                  {/* Click / View window breakdown */}
+
+                  {/* Click/View window tags */}
                   {(w.clickWindow || w.viewWindow) && (
-                    <div className="mt-2 flex items-center gap-3">
-                      <span className="flex items-center gap-1 text-[10px]">
-                        <MousePointerClick className="size-2.5 text-muted-foreground" />
-                        <span className="font-medium text-foreground">{w.clickWindow ?? "—"}</span>
-                      </span>
-                      <span className="flex items-center gap-1 text-[10px]">
-                        <Eye className="size-2.5 text-muted-foreground" />
-                        <span className="font-medium text-foreground">{w.viewWindow ?? "—"}</span>
+                    <div className="flex items-center gap-2">
+                      {w.clickWindow && (
+                        <span className="flex items-center gap-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          {w.clickWindow}
+                          <MousePointerClick className="size-2.5" />
+                        </span>
+                      )}
+                      <span className="text-[10px] text-foreground">+</span>
+                      <span className="flex items-center gap-1 rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        {w.viewWindow ?? "No view"}
+                        <Eye className="size-2.5" />
                       </span>
                     </div>
                   )}
-                </div>
-              </button>
-            );
-          })}
+
+                  {/* Description */}
+                  {w.desc && (
+                    <p className="text-[10px] leading-snug text-muted-foreground">
+                      {w.desc}
+                    </p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Legend bar */}
+          <div className="mt-4 flex items-center gap-4 rounded-lg bg-muted/30 px-3 py-2">
+            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              <MousePointerClick className="size-3.5" />
+              Click = User swipes up, then purchases later
+            </span>
+            <span className="text-[10px] text-muted-foreground">&bull;</span>
+            <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              <Eye className="size-3.5" />
+              View = User sees the ad only, then purchases later
+            </span>
+          </div>
         </div>
       )}
 
+      {/* Separate mode: dropdowns */}
       {mode === "separate" &&
         clickOptions &&
         viewOptions &&
         onClickChange &&
         onViewChange && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-border bg-muted/20 p-3.5">
-              <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <MousePointerClick
-                  className={cn("size-3", !isCustomAccent && "text-primary")}
-                  style={accentStyle}
-                />
-                Click-through
-              </Label>
-              <Select value={clickValue} onValueChange={onClickChange}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {clickOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="mt-1.5 text-[11px] text-muted-foreground">
-                Conversions counted after a click
-              </p>
-            </div>
+          <div className="px-6 pb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-border bg-muted/20 p-3.5">
+                <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <MousePointerClick
+                    className={cn("size-3", !isCustomAccent && "text-[#004956]")}
+                    style={accentStyle}
+                  />
+                  Click-through
+                </Label>
+                <Select value={clickValue} onValueChange={onClickChange}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clickOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  Conversions counted after a click
+                </p>
+              </div>
 
-            <div className="rounded-xl border border-border bg-muted/20 p-3.5">
-              <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <Eye
-                  className={cn("size-3", !isCustomAccent && "text-primary")}
-                  style={accentStyle}
-                />
-                View-through
-              </Label>
-              <Select value={viewValue} onValueChange={onViewChange}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {viewOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="mt-1.5 text-[11px] text-muted-foreground">
-                Conversions counted after a view only
-              </p>
+              <div className="rounded-xl border border-border bg-muted/20 p-3.5">
+                <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <Eye
+                    className={cn("size-3", !isCustomAccent && "text-[#004956]")}
+                    style={accentStyle}
+                  />
+                  View-through
+                </Label>
+                <Select value={viewValue} onValueChange={onViewChange}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {viewOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  Conversions counted after a view only
+                </p>
+              </div>
             </div>
           </div>
         )}
 
-      {/* Selected option visual summary */}
-      {mode === "combined" && selectedOption && (
-        <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-3.5 py-2.5">
-          <div className="flex items-center gap-2 text-[11px]">
-            <span className="font-semibold text-primary">How it works:</span>
-            <span className="text-foreground">User sees your ad</span>
-            <ArrowRight className="size-3 text-muted-foreground" />
-            {selectedOption.viewWindow && selectedOption.viewWindow !== "None" ? (
-              <span className="text-foreground">
-                Buys within <span className="font-semibold">{selectedOption.clickWindow}</span> (click) or <span className="font-semibold">{selectedOption.viewWindow}</span> (view)
-              </span>
-            ) : (
-              <span className="text-foreground">
-                Swipes up, then buys within <span className="font-semibold">{selectedOption.clickWindow}</span>
-              </span>
-            )}
-            <ArrowRight className="size-3 text-muted-foreground" />
-            <span className="font-semibold text-emerald-600">Counted</span>
-          </div>
-        </div>
-      )}
-
-      {/* Goal-specific context */}
+      {/* Goal context */}
       {goalContext && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
-          <InfoTip text="" className="hidden" />
-          <div className="flex size-4 shrink-0 items-center justify-center">
-            <svg viewBox="0 0 16 16" className="size-3.5 text-blue-600" fill="currentColor">
-              <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 2a1 1 0 110 2 1 1 0 010-2zm2 8H6v-1h1.5V7H6V6h2.5v4H10v1z" />
-            </svg>
-          </div>
+        <div className="mx-6 mb-4 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+          <svg viewBox="0 0 16 16" className="mt-0.5 size-3.5 shrink-0 text-blue-600" fill="currentColor">
+            <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 2a1 1 0 110 2 1 1 0 010-2zm2 8H6v-1h1.5V7H6V6h2.5v4H10v1z" />
+          </svg>
           <p className="text-[11px] leading-relaxed text-blue-700">
             {goalContext}
           </p>
@@ -289,7 +245,7 @@ export function AttributionWindowCard({
       )}
 
       {tip && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+        <div className="mx-6 mb-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
           <Sparkles className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
           <p className="text-[11px] leading-relaxed text-emerald-700">
             <span className="font-semibold">Salla Tip:</span> {tip}
@@ -298,6 +254,6 @@ export function AttributionWindowCard({
       )}
 
       {children}
-    </SectionCard>
+    </div>
   );
 }

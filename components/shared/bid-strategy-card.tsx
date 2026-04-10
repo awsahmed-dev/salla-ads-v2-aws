@@ -4,8 +4,7 @@ import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Info, Sparkles, AlertTriangle } from "lucide-react";
-import { InfoTip } from "@/components/shared/info-tip";
+import { Star, Info, AlertTriangle } from "lucide-react";
 import { SectionCard } from "@/components/shared/section-card";
 
 export interface BidStrategyOption {
@@ -52,19 +51,21 @@ export function BidStrategyCard({
   billingContext,
   contextNote,
   layout = "cards",
-  infoTipText = "Choose how your budget competes for ad placements.",
+  infoTipText = "Choose how your budget competes for ad placements. Auto-bidding is recommended for most advertisers.",
   children,
 }: BidStrategyCardProps) {
   const activeStrategy = strategies.find((s) => s.value === selectedStrategy);
 
   return (
     <SectionCard>
-      <div className="mb-4 flex items-center gap-2">
-        <TrendingUp className="size-4 text-primary" />
-        <Label className="text-sm font-semibold text-foreground">
-          Bid Strategy
-        </Label>
-        <InfoTip text={infoTipText} />
+      {/* Header */}
+      <div className="mb-5">
+        <h3 className="text-base font-bold text-foreground">
+          Bidding Strategy
+        </h3>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          {infoTipText}
+        </p>
       </div>
 
       {billingContext && billingContext.length > 0 && (
@@ -90,42 +91,33 @@ export function BidStrategyCard({
 
       {layout === "buttons" ? (
         <>
+          {/* Button group */}
           <div className="flex gap-2">
-            {strategies.map((s) => (
-              <button
-                key={s.value}
-                type="button"
-                onClick={() => onStrategyChange(s.value)}
-                className={cn(
-                  "flex-1 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
-                  selectedStrategy === s.value
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background text-foreground hover:border-primary/40"
-                )}
-              >
-                <span>{s.label}</span>
-                {s.recommended && selectedStrategy !== s.value && (
-                  <Badge
-                    variant="secondary"
-                    className="ml-1 rounded-full px-1 py-0 text-[8px]"
-                  >
-                    Best
-                  </Badge>
-                )}
-              </button>
-            ))}
+            {strategies.map((s) => {
+              const selected = selectedStrategy === s.value;
+              return (
+                <button
+                  key={s.value}
+                  type="button"
+                  onClick={() => onStrategyChange(s.value)}
+                  className={cn(
+                    "flex-1 rounded-lg border px-5 py-2.5 text-xs font-medium transition-all",
+                    selected
+                      ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956]"
+                      : "border-border bg-card text-foreground hover:border-border/80"
+                  )}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
           </div>
+
+          {/* Description */}
           {activeStrategy && (
-            <div className="mt-2.5">
-              <p className="text-xs text-muted-foreground">
-                {activeStrategy.desc}
-              </p>
-              {activeStrategy.bestFor && (
-                <p className="mt-1 text-xs font-medium text-primary/80">
-                  {activeStrategy.bestFor}
-                </p>
-              )}
-            </div>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {activeStrategy.desc}
+            </p>
           )}
         </>
       ) : (
@@ -140,8 +132,8 @@ export function BidStrategyCard({
                 className={cn(
                   "relative flex items-start gap-3.5 rounded-xl border px-4 py-4 text-left transition-all",
                   selected
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border bg-background hover:border-primary/40"
+                    ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                    : "border-border bg-background hover:border-border/80"
                 )}
               >
                 {s.icon && (
@@ -149,7 +141,7 @@ export function BidStrategyCard({
                     className={cn(
                       "flex size-9 shrink-0 items-center justify-center rounded-lg",
                       selected
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-[#004956] text-white"
                         : "bg-muted text-muted-foreground"
                     )}
                   >
@@ -161,7 +153,7 @@ export function BidStrategyCard({
                     <span
                       className={cn(
                         "text-sm font-semibold",
-                        selected ? "text-primary" : "text-foreground"
+                        selected ? "text-[#004956]" : "text-foreground"
                       )}
                     >
                       {s.label}
@@ -181,7 +173,7 @@ export function BidStrategyCard({
                     {s.desc}
                   </p>
                   {selected && s.bestFor && (
-                    <p className="mt-1 text-xs font-medium text-primary/80">
+                    <p className="mt-1 text-xs font-medium text-[#004956]/80">
                       {s.bestFor}
                     </p>
                   )}
@@ -194,73 +186,77 @@ export function BidStrategyCard({
 
       {contextNote}
 
+      {/* Bid inputs */}
       {bidInputs &&
         bidInputs.map((input) => (
           <div
             key={input.label}
-            className="mt-4 rounded-xl border border-border bg-muted/20 p-4"
+            className="mt-6 rounded-xl border border-border p-4"
           >
-            <Label className="mb-1 block text-xs font-semibold text-foreground">
-              {input.label}
-            </Label>
-            {input.desc && (
-              <p className="mb-3 text-[11px] text-muted-foreground">
-                {input.desc}
-              </p>
-            )}
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1">
-                {input.prefix && (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">
-                    {input.prefix}
-                  </span>
-                )}
-                <Input
-                  type="number"
-                  min={input.min ?? 0}
-                  step={input.step ?? 0.01}
-                  value={input.value ?? ""}
-                  onChange={(e) => input.onChange(Number(e.target.value))}
-                  className={cn(
-                    "h-10 text-base font-semibold",
-                    input.prefix && "pl-12",
-                    input.suffix && !input.suggestedRange && "pr-24"
-                  )}
-                />
-                {input.suffix && !input.suggestedRange && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                    {input.suffix}
-                  </span>
+            <div className="flex flex-col gap-4">
+              {/* Label and description */}
+              <div>
+                <Label className="text-sm font-medium text-foreground">
+                  {input.label}
+                </Label>
+                {input.desc && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {input.desc}
+                  </p>
                 )}
               </div>
-              {input.suggestedRange && (
-                <div className="shrink-0 rounded-lg bg-muted px-3 py-2 text-center">
-                  <p className="text-[10px] text-muted-foreground">
-                    Suggested range
+
+              {/* Input field */}
+              <div>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    min={input.min ?? 0}
+                    step={input.step ?? 0.01}
+                    value={input.value ?? ""}
+                    onChange={(e) => input.onChange(Number(e.target.value))}
+                    className="h-10 pr-10 text-sm"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+                    {input.prefix ?? "SAR"}
+                  </span>
+                </div>
+
+                {/* Suggested range */}
+                {input.suggestedRange && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Suggested range{" "}
+                    {input.suggestedRange.min.toFixed(
+                      input.step && input.step < 0.01 ? 3 : input.step && input.step < 1 ? 2 : 0
+                    )}
+                    -
+                    {input.suggestedRange.max.toFixed(
+                      input.step && input.step < 0.01 ? 3 : input.step && input.step < 1 ? 2 : 0
+                    )}
                   </p>
-                  <p className="text-xs font-semibold text-foreground">
-                    {input.prefix ?? ""} {input.suggestedRange.min.toFixed(input.step && input.step < 0.01 ? 3 : input.step && input.step < 1 ? 2 : 0)}{" "}
-                    - {input.suggestedRange.max.toFixed(input.step && input.step < 0.01 ? 3 : input.step && input.step < 1 ? 2 : 0)}
+                )}
+              </div>
+
+              {/* Salla Tip (green alert) */}
+              {input.tip && (
+                <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2">
+                  <Star className="size-4 shrink-0 text-emerald-600" />
+                  <p className="text-xs font-medium text-emerald-700">
+                    Salla Tip: {input.tip}
+                  </p>
+                </div>
+              )}
+
+              {/* Warning (yellow alert) */}
+              {input.warning && (
+                <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
+                  <Info className="size-4 shrink-0 text-amber-600" />
+                  <p className="text-xs font-medium text-amber-700">
+                    {input.warning}
                   </p>
                 </div>
               )}
             </div>
-            {input.warning && (
-              <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-                <p className="text-[11px] leading-relaxed text-amber-700">
-                  {input.warning}
-                </p>
-              </div>
-            )}
-            {input.tip && !input.warning && (
-              <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                <Sparkles className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-                <p className="text-[11px] leading-relaxed text-emerald-700">
-                  <span className="font-semibold">Salla Tip:</span> {input.tip}
-                </p>
-              </div>
-            )}
           </div>
         ))}
 

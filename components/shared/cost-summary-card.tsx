@@ -1,14 +1,5 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { Label } from "@/components/ui/label";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
-import { DollarSign, Zap, Info } from "lucide-react";
-
 const VAT_RATE = 0.15;
 
 interface CostSummaryCardProps {
@@ -26,111 +17,102 @@ interface CostSummaryCardProps {
   accent?: string;
 }
 
+function formatDate(date: string) {
+  const d = new Date(date);
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
 export function CostSummaryCard({
   budgetLabel,
   budgetAmount,
   durationDays,
   isOngoing,
   totalBudget,
-  totalBudgetLabel = "Ad spend",
   autoIncreaseEnabled,
   boostEnabled,
   boostAmount = 299,
   startDate,
   endDate,
-  accent,
 }: CostSummaryCardProps) {
-  const totalWithBoost = totalBudget + (boostEnabled ? boostAmount : 0);
+  const adSpend = totalBudget;
+  const totalWithBoost = adSpend + (boostEnabled ? boostAmount : 0);
   const vat = Math.round(totalWithBoost * VAT_RATE);
-  const grandTotal = Math.round(totalWithBoost * (1 + VAT_RATE));
-  const accentColor = accent ?? "primary";
+  const grandTotal = totalWithBoost + vat;
+  const showAdSpendRow = adSpend !== budgetAmount;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
-        <DollarSign className={cn("size-4", `text-${accentColor}`)} />
-        <Label className="text-sm font-semibold text-foreground">Cost Summary</Label>
-      </div>
-      <div className="flex flex-col gap-2.5 text-sm">
+    <div className="rounded-lg bg-card p-6">
+      <h3 className="mb-4 text-lg font-medium text-[#004d5a]">
+        Campaign Budget Summary
+      </h3>
+
+      <div className="flex flex-col gap-2.5">
+        {/* Daily/Lifetime budget */}
         <div className="flex items-center justify-between">
-          <span className="text-muted-foreground">{budgetLabel}</span>
-          <span className="font-semibold tabular-nums text-foreground">
-            {budgetAmount.toLocaleString()} SAR
+          <span className="text-sm text-muted-foreground">{budgetLabel}</span>
+          <span className="text-sm font-bold tabular-nums text-foreground">
+            SAR {budgetAmount.toLocaleString()}
           </span>
         </div>
 
+        {/* Duration */}
         {durationDays != null && (
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Duration</span>
-            <span className="font-medium text-foreground">
+            <span className="text-sm text-muted-foreground">Duration</span>
+            <span className="text-sm font-bold text-foreground">
               {isOngoing ? "Ongoing" : `${durationDays} days`}
             </span>
           </div>
         )}
 
-        {totalBudget !== budgetAmount && (
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">{totalBudgetLabel}</span>
-              <span className="font-medium tabular-nums text-foreground">
-                {totalBudget.toLocaleString()} SAR
-              </span>
-            </div>
-            {autoIncreaseEnabled && (
-              <p className={cn("text-right text-[10px]", `text-${accentColor}`)}>
-                incl. auto-increase
-              </p>
-            )}
+        {/* Ad spend total (only if different from daily) */}
+        {showAdSpendRow && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              Ad spend{autoIncreaseEnabled ? " (incl. auto-increase)" : ""}
+            </span>
+            <span className="text-sm font-bold tabular-nums text-foreground">
+              SAR {adSpend.toLocaleString()}
+            </span>
           </div>
         )}
 
+        {/* Boost */}
         {boostEnabled && (
           <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1 text-muted-foreground">
-              <Zap className="size-3" /> Boost
-            </span>
-            <span className="font-medium text-foreground">
-              {boostAmount} SAR
+            <span className="text-sm text-muted-foreground">Performance Boost</span>
+            <span className="text-sm font-bold tabular-nums text-foreground">
+              SAR {boostAmount.toLocaleString()}
             </span>
           </div>
         )}
 
+        {/* VAT */}
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1 text-muted-foreground">
-            VAT (15%)
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="size-2.5 cursor-help text-muted-foreground/60" />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs text-xs">
-                Saudi Arabia VAT at 15% applied to total ad spend per ZATCA
-                regulations.
-              </TooltipContent>
-            </Tooltip>
-          </span>
-          <span className="font-medium tabular-nums text-foreground">
-            {vat.toLocaleString()} SAR
+          <span className="text-sm text-muted-foreground">VAT (15%)</span>
+          <span className="text-sm font-bold tabular-nums text-foreground">
+            SAR {vat.toLocaleString()}
           </span>
         </div>
-
-        <div className="h-px bg-border" />
-
-        <div className="flex items-center justify-between">
-          <span className="font-semibold text-foreground">
-            Total (incl. VAT)
-          </span>
-          <span className={cn("text-lg font-bold tabular-nums", `text-${accentColor}`)}>
-            {grandTotal.toLocaleString()} SAR
-          </span>
-        </div>
-
-        {startDate && (
-          <p className="text-xs text-muted-foreground">
-            {new Date(startDate).toLocaleDateString("en-SA", { month: "short", day: "numeric" })}
-            {isOngoing ? " → Ongoing" : endDate ? ` → ${new Date(endDate).toLocaleDateString("en-SA", { month: "short", day: "numeric" })}` : ""}
-          </p>
-        )}
       </div>
+
+      {/* Divider + Total */}
+      <div className="my-4 h-px bg-border" />
+
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-bold text-foreground">Total (incl. VAT)</span>
+        <span className="text-base font-bold tabular-nums text-[#004d5a]">
+          SAR {grandTotal.toLocaleString()}
+        </span>
+      </div>
+
+      {/* Date range */}
+      {startDate && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {formatDate(startDate)}
+          {isOngoing ? " → Ongoing" : endDate ? ` → ${formatDate(endDate)}` : ""}
+        </p>
+      )}
     </div>
   );
 }

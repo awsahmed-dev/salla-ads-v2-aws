@@ -134,7 +134,7 @@ const FUNNEL_LABELS: Record<string, { label: string; color: string; icon: React.
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export function GoogleStepObjective() {
+export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested } = useGoogleCampaign();
   const obj = campaign.objective;
   const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved">("idle");
@@ -906,8 +906,8 @@ export function GoogleStepObjective() {
 
       </div>
       <WizardStepFooter
-        hidePrevious
-        onPrevious={() => {}}
+        previousLabel="Cancel"
+        onPrevious={onCancel ?? (() => {})}
         onNext={() => setStep(1)}
         nextLabel="Next"
         nextDisabled={!canProceed}

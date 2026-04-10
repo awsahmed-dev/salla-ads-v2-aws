@@ -88,96 +88,85 @@ const ALL_OPTIMIZATION_GOALS: {
   {
     value: "PIXEL_PURCHASE",
     label: "Purchases",
-    desc: "Snap optimizes delivery to people most likely to buy from your store.",
+    desc: "Optimized for people most likely to buy from your store.",
     icon: <ShoppingCart className="size-4" />,
     recommended: { SALES: true },
     requiresPixel: true,
-    bestFor: "Best for: maximizing revenue and ROAS from your ad spend",
     costHint: "Higher cost per action, highest return",
   },
   {
     value: "PIXEL_ADD_TO_CART",
     label: "Add to Cart",
-    desc: "Reach shoppers who are likely to add products to their cart — a strong purchase intent signal.",
+    desc: "Target shoppers likely to add products to their cart.",
     icon: <TrendingUp className="size-4" />,
     requiresPixel: true,
-    bestFor: "Best for: building a retargeting pool of high-intent shoppers",
     costHint: "Moderate cost per action",
   },
   {
     value: "PIXEL_PAGE_VIEW",
     label: "Page Views",
-    desc: "Drive the most visitors to your store pages. Great for new stores building traffic.",
+    desc: "Drive visitors to your store pages. Ideal for new stores.",
     icon: <Eye className="size-4" />,
     requiresPixel: true,
-    bestFor: "Best for: new stores, product launches, or driving traffic to specific pages",
     costHint: "Lower cost per action, broader reach",
   },
   {
     value: "SWIPES",
     label: "Swipe Ups",
-    desc: "Maximize clicks to your website. Doesn't require a pixel.",
+    desc: "Maximize clicks to your website. No pixel required.",
     icon: <MousePointerClick className="size-4" />,
     recommended: { WEBSITE_VISITS: true },
-    bestFor: "Best for: driving traffic when pixel is not yet installed",
     costHint: "Lowest cost per action",
   },
   {
     value: "LANDING_PAGE_VIEW",
     label: "Landing Page Views",
-    desc: "Optimize for visitors who fully load your page — higher quality traffic than swipe-ups.",
+    desc: "Higher quality traffic — visitors who fully load your page.",
     icon: <FileText className="size-4" />,
     requiresPixel: true,
-    bestFor: "Best for: ensuring visitors actually see your content, not just click",
     costHint: "Moderate cost, higher quality",
   },
   {
     value: "IMPRESSIONS",
     label: "Impressions",
-    desc: "Show your ad to as many people as possible. Best for brand awareness campaigns.",
+    desc: "Show your ad to the maximum number of people.",
     icon: <Eye className="size-4" />,
     recommended: { ENGAGEMENT: true, SPONSORED_CHAT: true },
-    bestFor: "Best for: brand awareness, product launches, seasonal promotions",
     costHint: "Lowest cost per 1,000 views",
   },
   {
     value: "STORY_OPENS",
     label: "Story Opens",
-    desc: "Get more people to open and watch your Story Ad in the Discover feed.",
+    desc: "More people open and watch your Story Ad.",
     icon: <Eye className="size-4" />,
-    bestFor: "Best for: Story Ads with multi-snap narratives",
     costHint: "Low cost per open",
   },
   {
     value: "VIDEO_VIEWS",
     label: "Video Views (2s)",
-    desc: "Maximize the number of people who watch at least 2 seconds of your video.",
+    desc: "Maximize people who watch at least 2s of your video.",
     icon: <Eye className="size-4" />,
-    bestFor: "Best for: short-form video awareness",
     costHint: "Low cost per view",
   },
   {
     value: "VIDEO_VIEWS_15_SEC",
     label: "Video Views (15s)",
-    desc: "Reach engaged viewers who watch at least 15 seconds — deeper engagement than 2s views.",
+    desc: "Reach viewers who watch at least 15 seconds.",
     icon: <Eye className="size-4" />,
-    bestFor: "Best for: longer storytelling videos, product demos",
     costHint: "Higher cost, more engaged viewers",
   },
   {
     value: "USES",
     label: "Lens/Filter Uses",
-    desc: "Get more people to use your branded AR Lens or Filter.",
+    desc: "More people use your branded AR Lens or Filter.",
     icon: <Sparkles className="size-4" />,
-    bestFor: "Best for: interactive brand experiences",
   },
   {
     value: "LEAD_FORM_SUBMISSIONS",
     label: "Form Submissions",
-    desc: "Collect leads directly through Snapchat's native lead form — no website needed.",
+    desc: "Collect leads through Snapchat's native lead form.",
     icon: <FileText className="size-4" />,
     recommended: { LEADS: true },
-    bestFor: "Best for: collecting customer info, pre-orders, waitlists",
     costHint: "Cost per lead varies by form length",
   },
   {
@@ -186,7 +175,6 @@ const ALL_OPTIMIZATION_GOALS: {
     desc: "Drive the most app downloads for your budget.",
     icon: <Download className="size-4" />,
     recommended: { APP_PROMOTION: true },
-    bestFor: "Best for: growing your app user base",
     costHint: "Moderate cost per install",
   },
   {
@@ -239,7 +227,7 @@ const CONVERSION_WINDOWS: {
     label: "28-Day Click + 1-Day View",
     clickWindow: "28 days",
     viewWindow: "1 day",
-    desc: "Captures conversions within 28 days of a swipe-up or 1 day of viewing your ad. Gives Snap the most signal to optimize delivery.",
+    desc: "Captures conversions within 28 days of a click or 1 day of a view. Gives Snap the strongest optimization signal.",
     recommended: true,
   },
   {
@@ -247,7 +235,7 @@ const CONVERSION_WINDOWS: {
     label: "7-Day Click Only",
     clickWindow: "7 days",
     viewWindow: "None",
-    desc: "Stricter window — only counts conversions within 7 days of a swipe-up. Requires your pixel to have sufficient event data.",
+    desc: "Stricter window — only credits conversions within 7 days of a click. Requires sufficient pixel data.",
     requiresEligibility: true,
   },
 ];
@@ -263,21 +251,18 @@ const BID_STRATEGIES: {
   {
     value: "AUTO_BID",
     label: "Auto Bid",
-    desc: "Snapchat automatically sets your bid to get the most results within your budget. No manual input needed.",
-    bestFor: "Best for most advertisers — especially if you're new to Snap Ads or want a hands-off approach.",
+    desc: "Snapchat automatically sets your bid for the most results. No manual input needed.",
     recommended: true,
   },
   {
     value: "LOWEST_COST_WITH_MAX_BID",
     label: "Max Bid",
-    desc: "Set a ceiling — Snapchat will try to get results as cheaply as possible but never bid above your maximum.",
-    bestFor: "Best when you have a strict cost-per-result ceiling (e.g. max SAR 15 per purchase).",
+    desc: "Set a cap — Snapchat won't exceed your limit per result.",
   },
   {
     value: "TARGET_COST",
     label: "Target Cost",
-    desc: "Set your ideal cost per result. Snapchat will try to average around this amount — some may cost more, some less.",
-    bestFor: "Best for predictable unit economics — keeps your average CPA stable over time.",
+    desc: "Set your ideal cost per result. Snapchat averages around this amount.",
   },
 ];
 
@@ -573,37 +558,7 @@ export function StepBudget() {
         <div className="flex flex-1 flex-col gap-5">
 
           {/* ======================================================= */}
-          {/* SECTION 1: Budget, Duration & Payment (shared card)      */}
-          {/* ======================================================= */}
-          <BudgetDurationCard
-            budgetTypes={BUDGET_TYPES}
-            paymentMethod={budget.paymentMethod}
-            onPaymentMethodChange={(v) => updateNested("budget", { paymentMethod: v })}
-            showLifetimeToggle={false}
-            budgetMode="daily"
-            amount={budget.amount}
-            onAmountChange={(v) => updateNested("budget", { amount: v })}
-            minAmount={150}
-            suggestedDaily={suggestedDaily}
-            goalLabel={goalLabel}
-            platformName="Snap"
-            strengthTiers={strengthTiers}
-            startDate={budget.startDate}
-            endDate={budget.endDate}
-            endDateOptional={budget.endDateOptional}
-            onStartDateChange={(d) => updateNested("budget", { startDate: d })}
-            onEndDateChange={(d) => updateNested("budget", { endDate: d })}
-            showRunContinuously={true}
-            endDateRequired={endDateRequired}
-            showAutoIncrease={true}
-            autoIncrease={autoIncrease}
-            onAutoIncreaseChange={(ai) => updateNested("budget", { autoIncrease: ai })}
-            onBulkUpdate={(updates) => updateNested("budget", updates)}
-            showSmartStart={true}
-          />
-
-          {/* ======================================================= */}
-          {/* SECTION 2: Optimization Goal                             */}
+          {/* SECTION 1: Optimization Goal                             */}
           {/* ======================================================= */}
           <OptimizationGoalCard
             goals={goalsWithLocked}
@@ -627,23 +582,23 @@ export function StepBudget() {
                   <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                     <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
                     <p className="text-xs leading-relaxed text-amber-700">
-                      Some goals require a <span className="font-semibold">Snap Pixel</span>. Go back to the Objective step to connect your pixel and unlock all optimization goals.
+                      Some goals require a <span className="font-semibold">Snap Pixel</span>. Connect it in the Objective step to unlock them.
                     </p>
                   </div>
                 )}
                 {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && hasPixelConfigured && (
                   <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
                     <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-                    <p className="text-xs leading-relaxed text-emerald-700">
-                      Snap Pixel is connected — all pixel-based goals are available.
+                    <p className="text-xs text-emerald-700">
+                      Snap Pixel connected — all pixel-based goals available.
                     </p>
                   </div>
                 )}
                 {OPTIMIZATION_GOALS.some((g) => g.requiresMMP) && (
                   <div className="mt-3 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2">
                     <Lock className="mt-0.5 size-3.5 shrink-0 text-orange-600" />
-                    <p className="text-xs leading-relaxed text-orange-700">
-                      In-app event goals require a <span className="font-semibold">Mobile Measurement Partner (MMP)</span> integration. Without an MMP, Snapchat cannot track post-install events.
+                    <p className="text-xs text-orange-700">
+                      In-app event goals require an <span className="font-semibold">MMP</span> integration to track post-install events.
                     </p>
                   </div>
                 )}
@@ -710,30 +665,64 @@ export function StepBudget() {
           />
 
           {/* ======================================================= */}
-          {/* ADVANCED SETTINGS (Collapsible)                          */}
+          {/* SECTION 3: Budget, Duration & Payment (shared card)      */}
+          {/* ======================================================= */}
+          <BudgetDurationCard
+            budgetTypes={BUDGET_TYPES}
+            paymentMethod={budget.paymentMethod}
+            onPaymentMethodChange={(v) => updateNested("budget", { paymentMethod: v })}
+            showLifetimeToggle={false}
+            budgetMode="daily"
+            amount={budget.amount}
+            onAmountChange={(v) => updateNested("budget", { amount: v })}
+            minAmount={150}
+            suggestedDaily={suggestedDaily}
+            goalLabel={goalLabel}
+            platformName="Snap"
+            strengthTiers={strengthTiers}
+            startDate={budget.startDate}
+            endDate={budget.endDate}
+            endDateOptional={budget.endDateOptional}
+            onStartDateChange={(d) => updateNested("budget", { startDate: d })}
+            onEndDateChange={(d) => updateNested("budget", { endDate: d })}
+            showRunContinuously={true}
+            endDateRequired={endDateRequired}
+            showAutoIncrease={true}
+            autoIncrease={autoIncrease}
+            onAutoIncreaseChange={(ai) => updateNested("budget", { autoIncrease: ai })}
+            onBulkUpdate={(updates) => updateNested("budget", updates)}
+            showSmartStart={true}
+          />
+
+          {/* ======================================================= */}
+          {/* SECTION 4: Performance Boost (Salla Upsell)              */}
+          {/* ======================================================= */}
+          <PerformanceBoostCard
+            enabled={budget.performanceBoost}
+            onToggle={(checked) => updateNested("budget", { performanceBoost: checked })}
+          />
+
+          {/* ======================================================= */}
+          {/* SECTION 5: ADVANCED SETTINGS (Collapsible)               */}
           {/* ======================================================= */}
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-5 py-3.5 text-left transition-colors hover:bg-muted/30"
+                className={cn(
+                  "flex w-full items-center justify-between rounded-2xl px-6 pb-3 pt-5 text-left transition-colors",
+                  showAdvanced ? "bg-muted/50" : "border border-border bg-card hover:bg-muted/30"
+                )}
               >
-                <div className="flex items-center gap-2.5">
-                  <Settings2 className="size-4 text-muted-foreground" />
-                  <span className="text-sm font-semibold text-foreground">Advanced Settings</span>
-                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs font-normal">
-                    {[
-                      objectiveConfig.hasConversionWindow || budget.optimizationGoal.startsWith("PIXEL_"),
-                      canUseAccelerated && budget.pacingType !== "STANDARD",
-                      budget.frequencyCapEnabled,
-                    ].filter(Boolean).length} active
-                  </Badge>
+                <div>
+                  <span className="text-base font-bold text-foreground">Advanced Settings</span>
+                  <p className="mt-1 text-xs text-muted-foreground">Attribution Window, Frequency Cap</p>
                 </div>
                 <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", showAdvanced && "rotate-180")} />
               </button>
             </CollapsibleTrigger>
 
-            <CollapsibleContent className="flex flex-col gap-5 pt-5">
+            <CollapsibleContent className={cn("flex flex-col gap-4 rounded-b-2xl px-2 pb-2", showAdvanced && "bg-muted/50")}>
 
               {/* -- Attribution Window (shared component) -- */}
               {(objectiveConfig.hasConversionWindow || budget.optimizationGoal.startsWith("PIXEL_")) && (
@@ -905,14 +894,6 @@ export function StepBudget() {
             </CollapsibleContent>
           </Collapsible>
 
-          {/* ======================================================= */}
-          {/* PERFORMANCE BOOST (Salla Upsell)                         */}
-          {/* ======================================================= */}
-          <PerformanceBoostCard
-            enabled={budget.performanceBoost}
-            onToggle={(checked) => updateNested("budget", { performanceBoost: checked })}
-          />
-
         </div>
 
         {/* ============= RIGHT COLUMN ============= */}
@@ -974,23 +955,23 @@ export function StepBudget() {
             <ConfigCheckCard
               configRows={[
                 { label: "Budget type", value: budget.type === "lifetime" ? "Lifetime" : "Daily" },
-                { label: "End date", value: budget.endDateOptional ? "Continuous" : budget.endDate || "Not set" },
-                { label: "Goal", value: goalLabel },
+                { label: "End date", value: budget.endDateOptional ? "Ongoing" : budget.endDate ? new Date(budget.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Not set" },
+                { label: "Goal", value: goalLabel.charAt(0).toUpperCase() + goalLabel.slice(1) },
                 { label: "Bid", value: budget.bidStrategy === "AUTO_BID" ? "Auto Bid" : `${budget.bidStrategy === "TARGET_COST" ? "Target Cost" : "Max Bid"}: SAR ${budget.bidAmount}` },
                 ...(objectiveConfig.hasConversionWindow ? [{ label: "Attribution", value: CONVERSION_WINDOWS.find((w) => w.value === budget.conversionWindow)?.label ?? "Set" }] : []),
-                ...(budget.frequencyCapEnabled ? [{ label: "Frequency cap", value: `${budget.frequencyCapCount}× / ${budget.frequencyCapInterval}h` }] : []),
+                ...(budget.frequencyCapEnabled ? [{ label: "Frequency cap", value: `${budget.frequencyCapCount}× / ${Math.round(budget.frequencyCapInterval / 24)} days` }] : []),
               ]}
               checkItems={[
-                { label: "Budget", status: (budget.amount >= 150 ? "ok" : "error") as "ok" | "warning" | "error", text: budget.amount >= 150 ? `SAR ${budget.amount}/day meets minimum` : "Below SAR 150/day minimum" },
-                { label: "Duration", status: ((durationDays >= 7 || budget.endDateOptional) ? "ok" : "warning") as "ok" | "warning" | "error", text: (durationDays >= 7 || budget.endDateOptional) ? "Sufficient learning time" : "Below 7 days — limited optimization" },
+                { label: "Budget", status: (budget.amount >= 150 ? "ok" : "error") as "ok" | "warning" | "error", text: budget.amount >= 150 ? `SAR ${budget.amount}/day — meets minimum` : "Below SAR 150/day minimum" },
+                { label: "Duration", status: ((durationDays >= 7 || budget.endDateOptional) ? "ok" : "warning") as "ok" | "warning" | "error", text: (durationDays >= 7 || budget.endDateOptional) ? `${budget.endDateOptional ? "Ongoing" : `${durationDays} days`} — sufficient for optimization` : `${durationDays} days — below 7-day minimum` },
                 { label: "Bid strategy", status: (() => {
                   if (budget.bidStrategy === "AUTO_BID") return "ok" as const;
                   if (!budget.bidAmount || budget.bidAmount <= 0) return "error" as const;
                   return "ok" as const;
-                })(), text: budget.bidStrategy === "AUTO_BID" ? "Auto-optimized by Snap" : `SAR ${budget.bidAmount?.toFixed(2) ?? "0"} per ${goalLabel.replace(/s$/, "")}` },
+                })(), text: budget.bidStrategy === "AUTO_BID" ? "Auto-optimized by Snapchat" : `SAR ${budget.bidAmount?.toFixed(2) ?? "0"} per ${goalLabel.replace(/s$/, "")}` },
                 { label: "Billing", status: "ok" as const, text: "Impression-based (CPM)" },
                 ...(budget.frequencyCapEnabled && campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1
-                  ? [{ label: "Frequency Cap", status: "error" as const, text: "Mixed ad formats — disable cap or unify formats" }]
+                  ? [{ label: "Frequency cap", status: "error" as const, text: "Mixed ad formats — unify or disable cap" }]
                   : []),
               ]}
             />

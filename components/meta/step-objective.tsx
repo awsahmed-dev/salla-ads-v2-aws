@@ -149,7 +149,7 @@ const SPECIAL_AD_OPTIONS: { value: MetaSpecialAdCategory; label: string; desc: s
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export function MetaStepObjective() {
+export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested } = useMetaCampaign();
   const obj = campaign.objective;
   const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved">("idle");
@@ -849,8 +849,8 @@ export function MetaStepObjective() {
 
       </div>
       <WizardStepFooter
-        hidePrevious
-        onPrevious={() => {}}
+        previousLabel="Cancel"
+        onPrevious={onCancel ?? (() => {})}
         onNext={() => setStep(1)}
         nextLabel="Next"
         nextDisabled={!canProceed}

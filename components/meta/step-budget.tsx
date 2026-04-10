@@ -474,23 +474,19 @@ export function MetaStepBudget() {
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-5 py-4 shadow-sm transition-colors hover:bg-muted/50"
+                className={cn(
+                  "flex w-full items-center justify-between rounded-2xl px-6 pb-3 pt-5 text-left transition-colors",
+                  showAdvanced ? "bg-muted/50" : "border border-border bg-card hover:bg-muted/30"
+                )}
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
-                    <Settings2 className="size-5 text-[#1877F2]" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-semibold text-foreground">Advanced Settings</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Pacing and delivery type
-                    </p>
-                  </div>
+                <div>
+                  <span className="text-base font-bold text-foreground">Advanced Settings</span>
+                  <p className="mt-1 text-xs text-muted-foreground">Pacing and delivery type</p>
                 </div>
                 <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", showAdvanced && "rotate-180")} />
               </button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2 flex flex-col gap-4">
+            <CollapsibleContent className={cn("flex flex-col gap-4 rounded-b-2xl px-2 pb-2", showAdvanced && "bg-muted/50")}>
 
               {/* Delivery Pacing */}
               <DeliveryPacingCard

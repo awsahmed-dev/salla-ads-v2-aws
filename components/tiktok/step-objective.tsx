@@ -145,7 +145,7 @@ const FUNNEL_LABELS: Record<string, { label: string; color: string; icon: React.
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export function TikTokStepObjective() {
+export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested, adAccountStatus } = useTikTokCampaign();
   const catalogReady = adAccountStatus === null ? null : (adAccountStatus.exists && adAccountStatus.catalogSynced);
   const obj = campaign.objective;
@@ -1749,8 +1749,8 @@ export function TikTokStepObjective() {
 
       </div>
       <WizardStepFooter
-        hidePrevious
-        onPrevious={() => {}}
+        previousLabel="Cancel"
+        onPrevious={onCancel ?? (() => {})}
         onNext={() => setStep(1)}
         nextLabel="Next"
         nextDisabled={!canProceed}
