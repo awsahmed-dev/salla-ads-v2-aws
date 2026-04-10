@@ -423,7 +423,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
               )}
 
-              {/* Snap Pixel */}
+              {/* ── Snapchat Connection (Pixel + Public Profile merged) ── */}
               {currentConfig.pixelRequirement !== "none" && (
                 <div className="mb-4 rounded-xl border border-border bg-card p-5">
                   <div className="mb-4 flex items-start gap-3">
@@ -700,26 +700,17 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
               )}
 
-              {/* ---- Step 3: Snapchat Account ---- */}
-              <div className="mb-6">
-                <h2 className="text-base font-bold text-foreground">Snapchat Account</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Your Snapchat Public Profile is shown on all your ads.
-                </p>
-              </div>
-
-              <div className="mb-6 rounded-xl border border-border bg-card p-5">
+              {/* ---- Snapchat Public Profile (simplified) ---- */}
+              <div className="mb-6 overflow-hidden rounded-xl border border-border bg-card">
+                <div className="px-6 py-5">
+                  <h3 className="text-base font-bold text-foreground">Snapchat Public Profile</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Your public profile appears on all your ads. It&apos;s auto-detected from your Salla account.
+                  </p>
+                </div>
                 {snapProfile ? (
-                  /* ═══ Authenticated: profile auto-linked from Salla ═══ */
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <User className="size-4 text-primary" />
-                      <p className="text-sm font-semibold text-foreground">Public Profile</p>
-                      <Badge variant="outline" className="gap-1 rounded-full border-emerald-200 bg-emerald-50 px-2 py-0 text-[10px] font-medium text-emerald-700">
-                        <CheckCircle2 className="size-2.5" /> Connected
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/[0.03] px-3.5 py-2.5">
+                  <div className="border-t border-border px-6 py-4">
+                    <div className="flex items-center gap-3 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-4 py-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={snapProfile.avatarUrl}
@@ -728,17 +719,15 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                         crossOrigin="anonymous"
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">
+                        <p className="truncate text-sm font-bold text-[#004956]">
                           {snapProfile.displayName}
                           {snapProfile.displayNameAr && (
-                            <span className="ml-1 text-muted-foreground"> - {snapProfile.displayNameAr}</span>
+                            <span> - {snapProfile.displayNameAr}</span>
                           )}
                         </p>
                         <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{snapProfile.profileId}</p>
                       </div>
-                      {snapProfile.verified && (
-                        <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
-                      )}
+                      <CheckCircle2 className="size-5 shrink-0 text-[#004956]" />
                     </div>
                   </div>
                 ) : (

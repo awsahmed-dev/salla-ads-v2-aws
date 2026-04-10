@@ -138,18 +138,26 @@ export function PlatformSelectionPage({ onSelect, onResumeDraft, onTemplate }: P
         {/* ── Saved Drafts ── */}
         {drafts.length > 0 && (
           <section className="mb-10">
-            <div className="mb-4 flex items-center gap-2">
-              <Clock className="size-4 text-muted-foreground" />
-              <h2 className="text-sm font-bold text-foreground">Continue Where You Left Off</h2>
-              <span className="rounded-full bg-[#e6fff9] px-2 py-0.5 text-xs font-medium text-[#004956]">
-                {drafts.length} {drafts.length === 1 ? "draft" : "drafts"}
-              </span>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="size-4 text-muted-foreground" />
+                <h2 className="text-sm font-bold text-foreground">Continue Where You Left Off</h2>
+                <span className="rounded-full bg-[#e6fff9] px-2 py-0.5 text-xs font-medium text-[#004956]">
+                  {drafts.length}
+                </span>
+              </div>
+              {drafts.length > 3 && (
+                <p className="text-xs text-muted-foreground">Scroll for more →</p>
+              )}
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Horizontal scrollable slider */}
+            <div className="-mx-6 px-6">
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none" style={{ scrollSnapType: "x mandatory" }}>
               {drafts.map((draft) => (
                 <div
                   key={draft.id}
-                  className="group flex flex-col rounded-xl border border-border bg-card p-4 transition-all hover:border-[#a4ffe5] hover:shadow-md"
+                  className="flex w-[280px] shrink-0 flex-col rounded-xl border border-border bg-card p-4 transition-all hover:border-[#a4ffe5] hover:shadow-md"
+                  style={{ scrollSnapAlign: "start" }}
                 >
                   <div className="mb-3 flex items-center gap-3">
                     <div className="flex size-10 items-center justify-center rounded-full bg-muted/60">
@@ -168,7 +176,7 @@ export function PlatformSelectionPage({ onSelect, onResumeDraft, onTemplate }: P
                   {/* Progress */}
                   <div className="mb-3">
                     <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Step: {getStepLabel(draft.step)}</span>
+                      <span className="text-muted-foreground">{getStepLabel(draft.step)}</span>
                       <span className="font-medium text-[#004956]">{draft.step}/{draft.totalSteps}</span>
                     </div>
                     <div className="h-1.5 w-full rounded-full bg-muted/60">
@@ -199,6 +207,7 @@ export function PlatformSelectionPage({ onSelect, onResumeDraft, onTemplate }: P
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           </section>
         )}

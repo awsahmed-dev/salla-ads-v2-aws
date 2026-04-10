@@ -239,22 +239,19 @@ export function AdGroupPanel({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border-2 transition-all",
-        isActive ? "border-primary shadow-md shadow-primary/5" : "border-border"
+        "overflow-hidden rounded-xl border transition-all",
+        isActive ? "border-[#a4ffe5] shadow-md" : "border-border"
       )}
     >
       {/* ═══ Header ═══ */}
       <div
-        className={cn(
-          "flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors",
-          isActive ? "bg-primary/[0.04]" : "bg-muted/20 hover:bg-muted/40"
-        )}
+        className="flex items-center gap-3 px-5 py-4 cursor-pointer transition-colors hover:bg-muted/20"
         onClick={onSelect}
       >
         {/* Number badge */}
         <div className={cn(
           "flex size-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold transition-colors",
-          isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+          isActive ? "bg-[#004956] text-white" : "bg-muted text-muted-foreground"
         )}>
           {adIndex + 1}
         </div>
@@ -313,14 +310,14 @@ export function AdGroupPanel({
       {isActive && (
         <div className="flex flex-col gap-0 border-t border-border">
 
-          {/* ── Format Picker (4 cards) ── */}
-          <div className="px-4 py-4">
-            <div className="mb-3 flex items-center gap-1.5">
-              <Label className="text-xs font-semibold text-foreground">Ad Format</Label>
-              <InfoTip text="Choose the format for this ad. You can add more ads with different formats." />
-            </div>
+          {/* ── Ad Type (format picker) ── */}
+          <div className="px-6 py-5">
+            <p className="mb-1 text-xs font-bold text-foreground">Ad Type</p>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Choose a format for this ad. You can add more ads in different formats.
+            </p>
 
-            <div className="grid gap-1.5 grid-cols-2 sm:grid-cols-4">
+            <div className="flex gap-6">
               {FORMAT_OPTIONS.filter((f) => allowedFormats.includes(f.value)).map((opt) => {
                 const isSelected = ad.adFormat === opt.value;
                 const lockedOut = freqCapLockedFormat !== null && opt.value !== freqCapLockedFormat && !isSelected;
@@ -331,38 +328,37 @@ export function AdGroupPanel({
                     disabled={lockedOut}
                     onClick={() => changeFormat(opt.value)}
                     className={cn(
-                      "group relative flex flex-col items-center gap-2 rounded-lg border px-3 py-3 text-center transition-all",
+                      "flex flex-1 flex-col items-center gap-2 rounded-xl border px-5 py-4 text-center transition-all",
                       lockedOut
-                        ? "cursor-not-allowed border-border/50 opacity-40"
+                        ? "cursor-not-allowed opacity-40 border-border"
                         : isSelected
-                          ? "border-primary bg-primary/[0.04] ring-1 ring-primary/20"
-                          : "border-border bg-background hover:border-primary/30 hover:bg-muted/20"
+                          ? "border-[#a4ffe5] bg-[#e6fff9]"
+                          : "border-border bg-card hover:border-[#a4ffe5] hover:bg-[#e6fff9]"
                     )}
                   >
-                    <span className={cn(
-                      "shrink-0 [&>svg]:size-5 transition-colors",
-                      isSelected ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                    <div className={cn(
+                      "flex size-10 items-center justify-center rounded-full",
+                      isSelected ? "bg-[#a4ffe5]" : "bg-muted/60"
                     )}>
-                      {opt.icon}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <span className={cn("text-xs font-semibold", isSelected ? "text-primary" : "text-foreground")}>{opt.label}</span>
-                      {isSelected && <Check className="size-3 text-primary" />}
+                      <span className={cn("[&>svg]:size-5", isSelected ? "text-[#004956]" : "text-muted-foreground")}>
+                        {opt.icon}
+                      </span>
                     </div>
-                    <p className="line-clamp-2 text-[10px] leading-snug text-muted-foreground">{opt.desc}</p>
+                    <p className={cn("text-xs font-bold", isSelected ? "text-[#004956]" : "text-foreground")}>{opt.label}</p>
+                    <p className="text-[10px] leading-snug text-muted-foreground">{opt.desc}</p>
                   </button>
                 );
               })}
             </div>
 
-            {/* ── Destination selector (SINGLE / INFLUENCER format only, hidden when only 1 option) ── */}
+            {/* ── Attachment type (SINGLE / INFLUENCER format only) ── */}
             {(ad.adFormat === "SINGLE" || ad.adFormat === "INFLUENCER") && allowedDestinations.length > 1 && (
-              <div className="mt-4">
-                <div className="mb-2 flex items-center gap-1.5">
-                  <Label className="text-xs font-semibold text-foreground">Destination</Label>
-                  <InfoTip text="Where users go when they swipe up on your ad." />
-                </div>
-                <div className="flex flex-wrap gap-1.5">
+              <div className="mt-6">
+                <p className="mb-1 text-xs font-bold text-foreground">Attachment type</p>
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Choose the action for viewers when they interact with your ad.
+                </p>
+                <div className="flex gap-4">
                   {DESTINATION_OPTIONS.filter((d) => allowedDestinations.includes(d.value)).map((opt) => {
                     const isSelected = ad.adDestination === opt.value;
                     return (
@@ -371,18 +367,22 @@ export function AdGroupPanel({
                         type="button"
                         onClick={() => changeDestination(opt.value)}
                         className={cn(
-                          "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-left transition-all",
+                          "flex flex-1 items-center gap-4 rounded-xl border px-5 py-4 text-left transition-all",
                           isSelected
-                            ? "border-primary bg-primary/[0.04] ring-1 ring-primary/20"
-                            : "border-border bg-background hover:border-primary/30 hover:bg-muted/20"
+                            ? "border-[#a4ffe5] bg-[#e6fff9]"
+                            : "border-border bg-card hover:border-[#a4ffe5]"
                         )}
                       >
-                        <span className={cn("[&>svg]:size-3.5", isSelected ? "text-primary" : "text-muted-foreground")}>{opt.icon}</span>
-                        <div>
-                          <span className={cn("text-xs font-semibold", isSelected ? "text-primary" : "text-foreground")}>{opt.label}</span>
-                          <p className="text-[10px] text-muted-foreground">{opt.desc}</p>
+                        <div className={cn(
+                          "flex size-10 shrink-0 items-center justify-center rounded-full",
+                          isSelected ? "bg-[#a4ffe5]" : "bg-muted/60"
+                        )}>
+                          <span className={cn("[&>svg]:size-5", isSelected ? "text-[#004956]" : "text-muted-foreground")}>{opt.icon}</span>
                         </div>
-                        {isSelected && <Check className="ml-auto size-3 text-primary" />}
+                        <div>
+                          <p className={cn("text-sm font-bold", isSelected ? "text-[#004956]" : "text-foreground")}>{opt.label}</p>
+                          <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                        </div>
                       </button>
                     );
                   })}
@@ -399,24 +399,30 @@ export function AdGroupPanel({
             </div>
           )}
 
-          {/* ── Creative Variations ── */}
+          {/* ── Ad Content ── */}
           {ad.adFormat !== "DYNAMIC" && (
-            <div className="border-t border-border px-4 py-4">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <ImagePlus className="size-3.5 text-muted-foreground" />
-                  <Label className="text-xs font-semibold text-foreground">
-                    {ad.adFormat === "COLLECTION" ? "Top Snap" : ad.adFormat === "STORY" ? "Story Snaps" : ad.adDestination === "LEAD_FORM" ? "Top Snap Creative" : ad.adFormat === "INFLUENCER" ? "Influencer Creatives" : "Creatives"}
-                  </Label>
-                  <span className={cn(
-                    "rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums",
-                    ad.adFormat === "STORY" && assetCount < 3 ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"
-                  )}>{assetCount}/{maxAssets} {ad.adFormat === "STORY" && assetCount < 3 ? "(min 3)" : ""}</span>
-                </div>
-                <Button size="sm" variant="outline" onClick={addAsset} disabled={!canAddAsset} className="h-7 gap-1 rounded-lg text-xs">
-                  <Plus className="size-3" />
-                  {ad.adFormat === "STORY" ? "Add Snap" : "Add"}
-                </Button>
+            <div className="border-t border-border px-6 py-5">
+              <div className="mb-4 flex items-center justify-between">
+                <p className="text-sm font-bold text-foreground">
+                  {ad.adFormat === "INFLUENCER" ? "Ad content" : "Ad Content"}
+                </p>
+                {ad.adFormat === "STORY" && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {assetCount}/{maxAssets} {assetCount < 3 ? "(min 3)" : ""}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={addAsset}
+                      disabled={!canAddAsset}
+                      className="flex items-center gap-1 text-xs font-medium text-[#004956] hover:underline disabled:opacity-50"
+                    >
+                      <Plus className="size-3" />
+                      Add Story
+                    </button>
+                  </div>
+                )}
+                <ChevronDown className="size-4 text-muted-foreground" />
               </div>
 
               {assetCount === 0 ? (
@@ -439,7 +445,7 @@ export function AdGroupPanel({
                     onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                     onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer.files.length) handleBulkFiles(e.dataTransfer.files); }}
                     onClick={() => bulkFileRef.current?.click()}
-                    className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-10 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/[0.02] hover:text-foreground"
+                    className="flex w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border py-12 text-muted-foreground transition-colors hover:border-[#a4ffe5] hover:bg-[#e6fff9]/30"
                   >
                     <input
                       ref={bulkFileRef}
@@ -449,13 +455,11 @@ export function AdGroupPanel({
                       className="hidden"
                       onChange={(e) => { if (e.target.files?.length) handleBulkFiles(e.target.files); e.target.value = ""; }}
                     />
-                    <div className="flex size-10 items-center justify-center rounded-xl bg-muted/60">
-                      <Upload className="size-5" />
-                    </div>
+                    <ImagePlus className="size-8 text-muted-foreground/40" />
                     <div className="text-center">
-                      <p className="text-xs font-medium">Upload creatives</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        Drop or select multiple files · PNG, JPG, GIF, MP4, MOV · up to {maxAssets} creatives
+                      <p className="text-sm font-medium text-foreground">Upload Ad Content</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Recommended: 1080x1920 / Video: H.264, up to 30s / Images: PNG or JPEG
                       </p>
                     </div>
                   </div>
@@ -509,6 +513,57 @@ export function AdGroupPanel({
                   {ad.adFormat === "STORY" ? "Snap recommends 3–5 snaps for a compelling story" : "Snap recommends 3–5 creative variations for best performance"}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* ── Brand Name & Ad Headline ── */}
+          {ad.adFormat !== "DYNAMIC" && ad.assets.length > 0 && (
+            <div className="border-t border-border px-6 py-5">
+              <div className="flex gap-6">
+                <div className="flex-1">
+                  <Label className="mb-2 block text-sm font-medium text-foreground">Brand Name</Label>
+                  <div className="relative">
+                    <Input
+                      value={ad.assets[0]?.brandName ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value.slice(0, 34);
+                        const updated = ad.assets.map((a, i) => i === 0 ? { ...a, brandName: val } : a);
+                        onUpdate({ ...ad, assets: updated });
+                      }}
+                      placeholder="Your brand"
+                      className="h-10 pr-12 text-sm"
+                      maxLength={34}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                      {(ad.assets[0]?.brandName ?? "").length}/34
+                    </span>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <Label className="mb-2 block text-sm font-medium text-foreground">
+                    Ad Headline <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      value={ad.assets[0]?.headline ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value.slice(0, 34);
+                        const updated = ad.assets.map((a, i) => i === 0 ? { ...a, headline: val } : a);
+                        onUpdate({ ...ad, assets: updated });
+                      }}
+                      placeholder="Catchy headline"
+                      className="h-10 pr-16 text-sm"
+                      maxLength={34}
+                    />
+                    <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1">
+                      <Sparkles className="size-3.5 text-amber-400" />
+                      <span className="text-xs text-muted-foreground">
+                        {(ad.assets[0]?.headline ?? "").length}/34
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

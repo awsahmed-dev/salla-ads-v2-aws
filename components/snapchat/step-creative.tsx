@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useCampaign } from "@/lib/snapchat/campaign-context";
 import { getCatalogStatus, getSnapPublicProfile, type SallaCatalogStatus, type SnapPublicProfile } from "@/lib/salla/store-api";
+import { SnapchatLogo } from "@/components/shared/snapchat-logo";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -65,7 +66,7 @@ export function StepCreative() {
   const [catalogStatus, setCatalogStatus] = useState<SallaCatalogStatus | null>(null);
   const [snapProfile, setSnapProfile] = useState<SnapPublicProfile | null>(null);
   const [showNewAdPicker, setShowNewAdPicker] = useState(false);
-  const [placementExpanded, setPlacementExpanded] = useState(true);
+  const [placementExpanded, setPlacementExpanded] = useState(false);
 
   const ads = creative.ads ?? [];
   const activeAd = ads[activeAdIdx] ?? ads[0] ?? null;
@@ -310,61 +311,14 @@ export function StepCreative() {
       <div className={cn("flex flex-col gap-6 lg:flex-row", WIZARD_FOOTER_PADDING_BOTTOM)}>
         {/* ============ LEFT COLUMN ============ */}
         <div className="flex flex-1 flex-col gap-5">
-          {/* ---- Snapchat Public Profile (compact — configured in Step 0) ---- */}
-          <SectionCard>
-            {hasValidProfile ? (
-              <div className="flex items-center gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-                  <CheckCircle2 className="size-4 text-emerald-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-foreground">Public Profile</p>
-                    <Badge variant="outline" className="gap-1 rounded-full border-emerald-200 bg-emerald-50 px-2 py-0 text-[10px] font-medium text-emerald-700">
-                      <CheckCircle2 className="size-2.5" /> Connected
-                    </Badge>
-                  </div>
-                  {snapProfile ? (
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {snapProfile.displayName}
-                      {snapProfile.displayNameAr && <span> - {snapProfile.displayNameAr}</span>}
-                    </p>
-                  ) : (
-                    <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">{creative.publicProfileId}</p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setStep(0)}
-                  className="text-xs font-medium text-primary hover:underline"
-                >
-                  Change
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-100">
-                  <AlertCircle className="size-4 text-amber-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-foreground">Public Profile</p>
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Required</span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    No Public Profile configured. Set it up in Campaign Settings.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setStep(0)}
-                  className="text-xs font-medium text-primary hover:underline"
-                >
-                  Set up
-                </button>
-              </div>
-            )}
-          </SectionCard>
+          {/* ---- Your public Snapchat account ---- */}
+          <PublicProfileSelector
+            currentProfileId={creative.publicProfileId ?? ""}
+            snapProfile={snapProfile}
+            onSelect={(id) => updateNested("creative", { publicProfileId: id })}
+            onSetup={() => setStep(0)}
+            hasValidProfile={hasValidProfile}
+          />
 
           {/* ---- Catalog Active Banner ---- */}
           {catalogEnabled && (
@@ -553,50 +507,47 @@ export function StepCreative() {
             />
           )}
 
-          {/* ---- Placement & Brand Safety (combined) ---- */}
-          <SectionCard>
+          {/* ---- Ad Placement & Brand Safety ---- */}
+          <div className={cn("rounded-2xl transition-colors", placementExpanded ? "bg-muted/50 p-2" : "")}>
             <button
               type="button"
-              className="flex w-full items-center gap-2"
               onClick={() => setPlacementExpanded((v) => !v)}
+              className={cn(
+                "flex w-full items-center justify-between px-6 pb-3 pt-5 text-left transition-colors rounded-2xl",
+                !placementExpanded && "border border-border bg-card"
+              )}
             >
-              <LayoutGrid className="size-4 text-primary" />
-              <Label className="pointer-events-none text-sm font-semibold text-foreground">Placement & Brand Safety</Label>
-              <InfoTip text="Control where your ads appear and what content they run alongside on Snapchat." />
-              <div className="ml-auto flex items-center gap-2">
-                {!placementExpanded && (
-                  <span className="text-[11px] text-muted-foreground">
-                    {creative.brandSafety === "LIMITED_INVENTORY" ? "Limited" : "Full"} · {creative.placement === "CUSTOM" ? `Custom (${(creative.customPositions ?? []).length})` : "Automatic"}
-                  </span>
-                )}
-                {placementExpanded ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+              <div>
+                <span className="text-base font-bold text-foreground">Ad Placement & Brand Safety</span>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Choose your ad placements and surrounding content to ensure your brand identity remains protected.
+                </p>
               </div>
+              <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", placementExpanded && "rotate-180")} />
             </button>
 
             {placementExpanded && (
-            <>
+            <div className="mt-2 flex flex-col gap-4">
+
             {/* ── Content Safety ── */}
-            <div className="mb-5 mt-5">
-              <div className="mb-2.5 flex items-center gap-1.5">
-                <ShieldCheck className="size-3.5 text-muted-foreground" />
-                <Label className="text-xs font-semibold text-foreground">Content Safety</Label>
-                <InfoTip text="Controls what type of content your ads appear next to. This doesn't change your ad — it controls the environment around it." />
-              </div>
-              <div className="grid grid-cols-2 gap-2.5">
+            <div className="rounded-xl bg-card px-6 py-5">
+              <h3 className="text-sm font-bold text-foreground">Content Safety</h3>
+              <p className="mt-1 mb-4 text-xs text-muted-foreground">
+                Defines the type of content your ads appear next to. This doesn&apos;t change your ad—it controls its environment.
+              </p>
+              <div className="flex gap-6">
                 {([
                   {
                     val: "FULL_INVENTORY" as const,
-                    label: "Full Inventory",
-                    desc: "Your ads can appear alongside all Snapchat content for maximum reach.",
-                    icon: <Zap className="size-4" />,
-                    tradeoff: "More reach, less content control",
+                    label: "Full Access",
+                    desc: "Ads can appear next to all Snapchat content for maximum reach.",
+                    tradeoff: "Lower brand safety, larger audience",
                   },
                   {
                     val: "LIMITED_INVENTORY" as const,
-                    label: "Limited Inventory",
-                    desc: "Your ads only appear next to moderated, brand-safe content.",
-                    icon: <ShieldCheck className="size-4" />,
-                    tradeoff: "More brand safety, smaller audience",
+                    label: "Safe Access",
+                    desc: "Ads only appear next to moderate, brand-safe content.",
+                    tradeoff: "Greater safety, smaller audience",
                   },
                 ]).map((opt) => {
                   const selected = creative.brandSafety === opt.val;
@@ -614,76 +565,53 @@ export function StepCreative() {
                         }
                       }}
                       className={cn(
-                        "relative flex flex-col gap-2 rounded-xl border-2 px-3.5 py-3 text-left transition-all",
+                        "flex flex-1 flex-col gap-2 rounded-xl border px-5 py-4 text-left transition-all",
                         selected
-                          ? "border-primary bg-primary/[0.04] shadow-sm"
-                          : "border-border bg-background hover:border-primary/30"
+                          ? "border-[#a4ffe5] bg-[#e6fff9]"
+                          : "border-border bg-card hover:border-[#a4ffe5]"
                       )}
                     >
-                      <div className="flex items-center gap-2.5">
-                        <div className={cn(
-                          "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors",
-                          selected ? "bg-primary/10 text-primary" : "bg-muted/60 text-muted-foreground"
-                        )}>
-                          {opt.icon}
-                        </div>
-                        <span className={cn("text-xs font-semibold", selected ? "text-primary" : "text-foreground")}>{opt.label}</span>
-                        {selected && <CheckCircle2 className="ml-auto size-4 shrink-0 text-primary" />}
-                      </div>
-                      <p className="text-[11px] leading-snug text-muted-foreground">{opt.desc}</p>
-                      <span className={cn("text-[10px] font-medium", selected ? "text-primary/70" : "text-muted-foreground/60")}>{opt.tradeoff}</span>
+                      <span className={cn("text-sm font-bold", selected ? "text-[#004956]" : "text-foreground")}>{opt.label}</span>
+                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                      <span className="text-xs text-muted-foreground">{opt.tradeoff}</span>
                     </button>
                   );
                 })}
               </div>
-              {creative.brandSafety === "LIMITED_INVENTORY" && (
-                <p className="mt-2 flex items-center gap-1.5 text-[10px] text-blue-600">
-                  <ShieldCheck className="size-3 shrink-0" />
-                  Limited Inventory restricts some placements (like Between User Stories). Recommended for sensitive brands.
-                </p>
-              )}
             </div>
 
-            {/* ── Divider ── */}
-            <div className="mb-5 border-t border-border" />
-
             {/* ── Ad Placement ── */}
+
+            <div className="rounded-xl bg-card px-6 py-5">
+              <h3 className="text-sm font-bold text-foreground">Ad Placement</h3>
+              <p className="mt-1 mb-4 text-xs text-muted-foreground">
+                Where your ads appear on Snapchat. Auto-placement finds the best locations for performance, while manual lets you choose.
+              </p>
+
             {campaign.objective.objective === "SPONSORED_CHAT" ? (
-              <div>
-                <div className="mb-2.5 flex items-center gap-1.5">
-                  <LayoutGrid className="size-3.5 text-muted-foreground" />
-                  <Label className="text-xs font-semibold text-foreground">Ad Placement</Label>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">Locked</span>
+              <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100">
+                  <Check className="size-4 text-emerald-600" />
                 </div>
-                <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3">
-                  <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100">
-                    <Check className="size-4 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-foreground">Chat Feed</p>
-                    <p className="text-[11px] text-muted-foreground">Sponsored Ads are exclusively delivered in the Chat Feed</p>
-                  </div>
+                <div>
+                  <p className="text-xs font-medium text-foreground">Chat Feed</p>
+                  <p className="text-[11px] text-muted-foreground">Sponsored Ads are exclusively delivered in the Chat Feed</p>
                 </div>
               </div>
             ) : (
-            <div>
-              <div className="mb-2.5 flex items-center gap-1.5">
-                <LayoutGrid className="size-3.5 text-muted-foreground" />
-                <Label className="text-xs font-semibold text-foreground">Ad Placement</Label>
-                <InfoTip text="Where on Snapchat your ads are shown. Automatic lets Snap's algorithm find the best-performing surfaces. Custom lets you pick specific locations." />
-              </div>
-              <div className="grid grid-cols-2 gap-2.5">
+            <>
+              <div className="flex gap-6">
                 {([
                   {
                     val: "AUTOMATIC" as PlacementConfig,
                     label: "Automatic",
-                    desc: "Snapchat decides where to show your ads for the best results. Your ads appear across Stories, Spotlight, Discover, and more.",
+                    desc: "Snapchat optimizes placements for top results across Stories, Spotlight, Discover, and more.",
                     recommended: true,
                   },
                   {
                     val: "CUSTOM" as PlacementConfig,
-                    label: "Custom",
-                    desc: "You choose exactly which placements to use. Useful if you know your audience is in a specific surface.",
+                    label: "Manual",
+                    desc: "Select exactly where your ads appear. Useful if you know your audience is in a specific spot.",
                     recommended: false,
                   },
                 ]).map((opt) => {
@@ -694,51 +622,41 @@ export function StepCreative() {
                       type="button"
                       onClick={() => updateNested("creative", { placement: opt.val })}
                       className={cn(
-                        "relative flex flex-col items-start rounded-xl border-2 px-3.5 py-3 text-left transition-all",
+                        "flex flex-1 flex-col gap-2 rounded-xl border px-5 py-4 text-left transition-all",
                         selected
-                          ? "border-primary bg-primary/[0.04] shadow-sm"
-                          : "border-border bg-background hover:border-primary/30"
+                          ? "border-[#a4ffe5] bg-[#e6fff9]"
+                          : "border-border bg-card hover:border-[#a4ffe5]"
                       )}
                     >
                       <div className="flex w-full items-center justify-between">
-                        <span className={cn("text-xs font-semibold", selected ? "text-primary" : "text-foreground")}>{opt.label}</span>
-                        <div className="flex items-center gap-1.5">
-                          {opt.recommended && (
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Recommended</span>
-                          )}
-                          {selected && <CheckCircle2 className="size-4 text-primary" />}
-                        </div>
+                        <span className={cn("text-sm font-bold", selected ? "text-[#004956]" : "text-foreground")}>{opt.label}</span>
+                        {opt.recommended && (
+                          <span className="rounded-full bg-[#a4ffe5] px-2 py-0.5 text-[10px] font-medium text-[#004956]">Recommended</span>
+                        )}
                       </div>
-                      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{opt.desc}</p>
+                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
                     </button>
                   );
                 })}
               </div>
 
               {creative.placement === "AUTOMATIC" && (
-                <p className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                  <Sparkles className="size-3 shrink-0 text-emerald-500" />
-                  Snapchat typically delivers 20-40% more impressions with Automatic placement vs Custom.
-                </p>
+                <div className="mt-4 flex items-center gap-2 rounded-lg bg-[#e6fff9] px-4 py-3">
+                  <Sparkles className="size-4 shrink-0 text-[#004956]" />
+                  <p className="text-xs font-medium text-[#004956]">
+                    Automatic placement typically delivers 20-40% more impressions than manual placement.
+                  </p>
+                </div>
               )}
 
-              {/* Custom placements list */}
+              {/* Manual placements list */}
               {creative.placement === "CUSTOM" && (
-                <div className="mt-3 flex flex-col gap-1.5">
-                  {/* Explainer */}
-                  <div className="mb-1 rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2 dark:border-blue-900/40 dark:bg-blue-950/20">
-                    <p className="text-[11px] leading-relaxed text-blue-700/80 dark:text-blue-400/80">
-                      Select the surfaces where you want your ads to appear. Some placements are restricted based on your content safety setting or ad format. Greyed-out options can&apos;t be used with your current configuration.
+                <div className="mt-4 flex flex-col gap-3">
+                  <div className="rounded-lg bg-blue-50 px-4 py-3">
+                    <p className="text-xs text-blue-700">
+                      Select your placements. Some are restricted based on safety or format settings. Grayed-out options are incompatible with your current configuration.
                     </p>
                   </div>
-                  {creative.brandSafety === "LIMITED_INVENTORY" && (
-                    <div className="mb-1 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 dark:bg-amber-950/20">
-                      <ShieldCheck className="size-3.5 shrink-0 text-amber-500" />
-                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                        Limited Inventory mode — placements marked &quot;Full Inventory only&quot; are unavailable.
-                      </p>
-                    </div>
-                  )}
                   <div className="rounded-xl border border-border">
                     {SNAP_POSITIONS.map((pos, posIdx) => {
                       const positions = creative.customPositions ?? [];
@@ -841,11 +759,13 @@ export function StepCreative() {
                   )}
                 </div>
               )}
-            </div>
-            )}
             </>
             )}
-          </SectionCard>
+            </div>
+
+            </div>
+            )}
+          </div>
 
           {/* ---- Ads List ---- */}
           <SectionCard>
@@ -1139,6 +1059,121 @@ export function StepCreative() {
 }
 
 /* ================================================================== */
+/*  Public Profile Selector                                            */
+/* ================================================================== */
+
+const MOCK_PROFILES = [
+  { id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890", name: "Mahally", nameAr: "محلي" },
+  { id: "b2c3d4e5-f6a7-8901-bcde-f12345678901", name: "Salla Store", nameAr: "متجر سلة" },
+  { id: "c3d4e5f6-a7b8-9012-cdef-123456789012", name: "Fashion Hub", nameAr: "مركز الأزياء" },
+];
+
+function PublicProfileSelector({
+  currentProfileId,
+  snapProfile,
+  onSelect,
+  onSetup,
+  hasValidProfile,
+}: {
+  currentProfileId: string;
+  snapProfile: SnapPublicProfile | null;
+  onSelect: (id: string) => void;
+  onSetup: () => void;
+  hasValidProfile: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  // Build the list: real profile + mock ones
+  const profiles = [
+    ...(snapProfile ? [{ id: snapProfile.profileId, name: snapProfile.displayName, nameAr: snapProfile.displayNameAr ?? "" }] : []),
+    ...MOCK_PROFILES.filter((m) => m.id !== snapProfile?.profileId),
+  ];
+
+  const selected = profiles.find((p) => p.id === currentProfileId) ?? profiles[0];
+
+  return (
+    <div className="rounded-xl border border-border bg-card">
+      <div className="flex items-center justify-between px-6 py-5">
+        <div>
+          <p className="text-sm font-bold text-foreground">Your public Snapchat account</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Your public profile will appear in the advertisement, and it is advisable to match it with your store name.
+          </p>
+        </div>
+        <Switch checked={hasValidProfile || profiles.length > 0} disabled />
+      </div>
+
+      {(hasValidProfile || profiles.length > 0) && (
+        <div className="border-t border-border px-6 py-4">
+          <div className="relative">
+            {/* Selected profile trigger */}
+            <button
+              type="button"
+              onClick={() => setOpen(!open)}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-lg border border-border px-4 py-3 text-left transition-colors",
+                open && "ring-2 ring-[#a4ffe5]"
+              )}
+            >
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-orange-100">
+                <SnapchatLogo className="size-5 text-orange-500" />
+              </div>
+              <span className="flex-1 text-sm font-medium text-foreground">
+                {selected ? `${selected.name}${selected.nameAr ? ` - ${selected.nameAr}` : ""}` : "Select a profile"}
+              </span>
+              <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-180")} />
+            </button>
+
+            {/* Dropdown */}
+            {open && (
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-white shadow-lg">
+                {profiles.map((p) => {
+                  const isSelected = p.id === currentProfileId;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        onSelect(p.id);
+                        setOpen(false);
+                      }}
+                      className={cn(
+                        "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30",
+                        isSelected && "bg-[#e6fff9]"
+                      )}
+                    >
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-orange-100">
+                        <SnapchatLogo className="size-5 text-orange-500" />
+                      </div>
+                      <span className={cn("flex-1 text-sm font-medium", isSelected ? "text-[#004956]" : "text-foreground")}>
+                        {p.name}{p.nameAr ? ` - ${p.nameAr}` : ""}
+                      </span>
+                      {isSelected && <Check className="size-4 text-[#004956]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!hasValidProfile && profiles.length === 0 && (
+        <div className="border-t border-border px-6 py-4">
+          <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-4 py-3">
+            <AlertCircle className="size-4 shrink-0 text-amber-500" />
+            <p className="text-xs text-amber-700">
+              No Public Profile configured.{" "}
+              <button type="button" onClick={onSetup} className="font-medium underline">Set it up in Campaign Settings</button>
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================== */
 /*  Campaign Readiness Card                                           */
 /* ================================================================== */
 
@@ -1292,165 +1327,84 @@ function CampaignReadinessCard({
   const visibleFailCount = showAllChecks ? failingChecks.length : Math.min(failingChecks.length, 6);
 
   return (
-    <SectionCard className="overflow-hidden p-0">
+    <div className="rounded-xl bg-card p-6">
       {/* ── Header with progress ring ── */}
-      <div className="flex items-center gap-3 px-4 py-3.5">
+      <div className="mb-6 flex items-center gap-4">
         <ReadinessRing percent={overallPercent} />
         <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <Label className="text-sm font-semibold text-foreground">Campaign Readiness</Label>
-            <span className={cn("text-xs font-bold", readinessColor)}>{readinessLabel}</span>
-          </div>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <p className="text-sm font-bold text-foreground">Campaign Readiness</p>
+          <p className="text-xs text-muted-foreground">
             {allPassed
-              ? bpMet === bpTotal
-                ? "All requirements met and best practices followed"
-                : `All requirements met — ${bpTotal - bpMet} best practice${bpTotal - bpMet !== 1 ? "s" : ""} could improve performance`
-              : `${failingChecks.length} required item${failingChecks.length !== 1 ? "s" : ""} need${failingChecks.length === 1 ? "s" : ""} attention before launching`
+              ? "All requirements met"
+              : `${failingChecks.length} required items need attention before launch`
             }
           </p>
         </div>
       </div>
 
-      {/* ── Required checks (grouped by ad) ── */}
-      {failingChecks.length > 0 && (
-        <div className="border-t border-border px-4 py-3">
-          <div className="mb-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Required</span>
-              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-red-600">{failingChecks.length} remaining</span>
+      {/* ── Required Steps ── */}
+      <div className="mb-6">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">Required Steps</p>
+          <span className="text-xs font-bold text-[#004956]">{passingChecks}/{allChecks.length}</span>
+        </div>
+        <div className="flex flex-col gap-3">
+          {allChecks.slice(0, showAllChecks ? allChecks.length : 6).map((c, i) => (
+            <div key={i} className="flex items-center gap-3 px-3">
+              <div className={cn(
+                "flex size-5 shrink-0 items-center justify-center rounded-full border-2",
+                c.ok ? "border-[#004956] bg-[#004956]" : "border-muted-foreground/30"
+              )}>
+                {c.ok && <Check className="size-3 text-white" strokeWidth={3} />}
+              </div>
+              <p className={cn("text-xs font-medium", c.ok ? "text-muted-foreground line-through" : "text-foreground")}>
+                {c.label.replace(/^Ad \d+ /, "").replace(/^Creative \d+: /, "").replace(/^Snap \d+: /, "")}
+              </p>
             </div>
-            <span className="text-[11px] tabular-nums text-muted-foreground">{passingChecks}/{allChecks.length}</span>
-          </div>
-          <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className={cn("h-full rounded-full transition-all duration-500", allPassed ? "bg-emerald-500" : passingChecks / allChecks.length > 0.5 ? "bg-primary" : "bg-amber-500")}
-              style={{ width: `${allChecks.length > 0 ? (passingChecks / allChecks.length) * 100 : 0}%` }}
-            />
-          </div>
-          <div className="flex flex-col gap-2.5">
-            {groupedFailing.map((group) => {
-              const visibleItems = showAllChecks ? group.items : group.items.slice(0, 3);
-              const hiddenCount = group.items.length - visibleItems.length;
-              return (
-                <div key={group.group}>
-                  {groupedFailing.length > 1 && (
-                    <p className="mb-1 text-[10px] font-semibold text-muted-foreground">{group.group}</p>
-                  )}
-                  <div className="flex flex-col gap-0.5">
-                    {visibleItems.map((c, i) => (
-                      <div key={i} className="flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-red-50/50 dark:hover:bg-red-950/10">
-                        <div className="flex size-3.5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-red-400 bg-red-50">
-                          <div className="size-1 rounded-full bg-red-400" />
-                        </div>
-                        <span className="text-[11px] font-medium text-foreground">{c.label}</span>
-                      </div>
-                    ))}
-                    {!showAllChecks && hiddenCount > 0 && (
-                      <p className="pl-6 text-[10px] text-muted-foreground">+{hiddenCount} more</p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {failingChecks.length > 6 && (
+          ))}
+          {!showAllChecks && allChecks.length > 6 && (
             <button
               type="button"
-              onClick={() => setShowAllChecks(!showAllChecks)}
-              className="mt-2 w-full rounded-md bg-muted/40 py-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={() => setShowAllChecks(true)}
+              className="text-xs text-[#004956] underline px-3"
             >
-              {showAllChecks ? "Show less" : `Show all ${failingChecks.length} items`}
+              Show all {allChecks.length} items
             </button>
           )}
         </div>
-      )}
-
-      {/* ── All passed banner ── */}
-      {allPassed && (
-        <div className="border-t border-emerald-100 bg-emerald-50/60 px-4 py-2.5 dark:border-emerald-900/30 dark:bg-emerald-950/20">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
-            <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400">All {allChecks.length} required checks passed — ready to launch</span>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* ── Best Practices ── */}
       {bpTotal > 0 && (
-        <div className="border-t border-border px-4 py-3">
-          <div className="mb-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Best Practices</span>
-              <InfoTip text="These aren't required to launch, but following them typically improves ad performance and lowers cost per result." />
-            </div>
-            <span className={cn(
-              "rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums",
-              bpMet === bpTotal ? "bg-emerald-100 text-emerald-700" :
-              bpMet > 0 ? "bg-primary/10 text-primary" :
-              "bg-amber-100 text-amber-700"
-            )}>
-              {bpMet}/{bpTotal}
-            </span>
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">Best Practices</p>
+            <span className="text-xs font-bold text-[#004956]">{bpMet}/{bpTotal}</span>
           </div>
-          {/* Best practices progress */}
-          <div className="mb-3 h-1 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className={cn("h-full rounded-full transition-all duration-500", bpMet === bpTotal ? "bg-emerald-500" : "bg-amber-400")}
-              style={{ width: `${bpTotal > 0 ? (bpMet / bpTotal) * 100 : 0}%` }}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-3">
             {bestPractices.map((bp, i) => (
-              <div key={i} className={cn(
-                "flex items-start gap-2 rounded-lg px-2 py-1.5 transition-colors",
-                bp.met ? "bg-emerald-50/40 dark:bg-emerald-950/10" : "bg-amber-50/40 dark:bg-amber-950/10"
-              )}>
-                {bp.met ? (
-                  <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
-                ) : (
-                  <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-500" />
+              <div
+                key={i}
+                className={cn(
+                  "flex items-start gap-3 rounded-lg px-3 py-3",
+                  bp.met && "bg-[#e6fff9]"
                 )}
-                <div className="min-w-0 flex-1">
-                  <p className={cn("text-[11px] font-medium", bp.met ? "text-emerald-700 dark:text-emerald-400" : "text-foreground")}>{bp.label}</p>
-                  <p className="text-[10px] leading-relaxed text-muted-foreground">
-                    {bp.met ? bp.metTip : bp.tip}
-                  </p>
+              >
+                <div className={cn(
+                  "flex size-5 shrink-0 items-center justify-center rounded-full border-2 mt-0.5",
+                  bp.met ? "border-[#004956] bg-[#004956]" : "border-muted-foreground/30"
+                )}>
+                  {bp.met && <Check className="size-3 text-white" strokeWidth={3} />}
+                </div>
+                <div>
+                  <p className={cn("text-xs font-bold", bp.met ? "text-[#004956]" : "text-foreground")}>{bp.label}</p>
+                  <p className="text-[10px] text-muted-foreground">{bp.met ? bp.metTip : bp.tip}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      {/* ── Quick Stats Footer ── */}
-      <div className="flex items-center justify-between border-t border-border bg-muted/20 px-4 py-2.5">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-bold tabular-nums text-foreground">{ads.length}</span>
-            <span className="text-[10px] text-muted-foreground">Ad{ads.length !== 1 ? "s" : ""}</span>
-          </div>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-bold tabular-nums text-foreground">{totalCreatives}</span>
-            <span className="text-[10px] text-muted-foreground">Creative{totalCreatives !== 1 ? "s" : ""}</span>
-          </div>
-          {ads.some((a) => a.adFormat === "DYNAMIC") && (
-            <>
-              <div className="h-4 w-px bg-border" />
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold tabular-nums text-foreground">{ads.filter((a) => a.adFormat === "DYNAMIC").length}</span>
-                <span className="text-[10px] text-muted-foreground">Dynamic</span>
-              </div>
-            </>
-          )}
-        </div>
-        {!allPassed && (
-          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-semibold text-red-600">
-            Fix {failingChecks.length} issue{failingChecks.length !== 1 ? "s" : ""}
-          </span>
-        )}
-      </div>
-    </SectionCard>
+    </div>
   );
 }
