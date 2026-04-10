@@ -152,21 +152,6 @@ export function TikTokStepAudience() {
               tooltipText="Choose countries and/or cities where your ads will be shown. Maps to TikTok location_ids."
             />
 
-            {/* ---- Map Preview ---- */}
-            <LocationMapPreview
-              countryCodes={aud.locationIds}
-              cities={(aud.cities ?? [])
-                .map((id) => getCityById(id))
-                .filter((c): c is NonNullable<typeof c> => c != null)
-                .map((c) => ({
-                  id: c.id,
-                  name: c.name,
-                  countryCode: c.countryCode,
-                  lat: c.lat,
-                  lng: c.lng,
-                  radiusKm: 0,
-                }))}
-            />
           </SectionCard>
 
           {/* ---- 2. Demographics (shared: English/Arabic, Male/Female, age bands) ---- */}
@@ -469,12 +454,22 @@ export function TikTokStepAudience() {
         <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
           <div className="sticky top-20 flex flex-col gap-4">
 
-            {/* ---- Reach in selected locations (shared, location-only) ---- */}
+            {/* ---- Map + Audience Estimate (merged) ---- */}
             <LocationReachCard
               countryCount={aud.locationIds.length}
               countries={aud.locationIds}
               cityCount={(aud.cities ?? []).length}
-              accent="primary"
+              cities={(aud.cities ?? [])
+                .map((id) => getCityById(id))
+                .filter((c): c is NonNullable<typeof c> => c != null)
+                .map((c) => ({
+                  id: c.id,
+                  name: c.name,
+                  countryCode: c.countryCode,
+                  lat: c.lat,
+                  lng: c.lng,
+                  radiusKm: 0,
+                }))}
             />
 
             {/* ---- Delivery Eligibility (shared) ---- */}

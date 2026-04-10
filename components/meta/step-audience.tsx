@@ -358,17 +358,11 @@ export function MetaStepAudience() {
         <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
           <div className="sticky top-20 flex flex-col gap-4">
 
-            {/* Reach in selected locations (shared, location-only) */}
+            {/* Map + Audience Estimate (merged) */}
             <LocationReachCard
               countryCount={aud.countries.length}
               countries={aud.countries}
               cityCount={aud.cities.length}
-              accent="meta"
-            />
-
-            {/* Location Map Preview */}
-            <LocationMapPreview
-              countryCodes={aud.countries}
               cities={(aud.cities ?? [])
                 .map((id) => getCityById(id))
                 .filter((c): c is NonNullable<typeof c> => c != null)

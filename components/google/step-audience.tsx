@@ -1962,12 +1962,12 @@ export function GoogleStepAudience() {
         <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
           <div className="sticky top-20 flex flex-col gap-4">
 
-            {/* Location Reach (shared) */}
+            {/* Map + Audience Estimate (merged) */}
             <LocationReachCard
               countryCount={aud.locationIds.length}
               countries={aud.locationIds}
               cityCount={(aud.cityIds ?? []).length}
-              accent="primary"
+              cities={selectedCities}
             />
 
             {/* Delivery Check (shared) */}
@@ -1991,17 +1991,7 @@ export function GoogleStepAudience() {
               rows={targetingSummaryRows}
             />
 
-            {/* Location Preview (map-based visual confirmation) */}
-            <SectionCard className="p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <MapPin className="size-4 text-primary" />
-                <Label className="text-sm font-semibold text-foreground">Location Preview</Label>
-              </div>
-              <LocationMapPreview countryCodes={aud.locationIds} cities={selectedCities} />
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Visual preview only. Real reach depends on targeting depth, budget, bidding, and creative strength.
-              </p>
-            </SectionCard>
+            {/* Map is now inside LocationReachCard above */}
 
             {/* ---- Campaign-type specific cards (after summary) ---- */}
 

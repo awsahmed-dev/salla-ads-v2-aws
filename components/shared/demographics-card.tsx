@@ -1,74 +1,29 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Check } from "lucide-react";
 import {
   SUPPORTED_LANGUAGES,
   SUPPORTED_GENDERS,
   AGE_BANDS,
-  type AgeBandValue,
 } from "@/lib/demographics";
-import { Users, CheckCircle2 } from "lucide-react";
-import { InfoTip } from "@/components/shared/info-tip";
 
 export type DemographicsAccent = "primary" | "meta" | "dv360";
 
-const ACCENT_STYLES: Record<
-  DemographicsAccent,
-  { border: string; bg: string; text: string; check: string }
-> = {
-  primary: {
-    border: "border-primary",
-    bg: "bg-primary/5",
-    text: "text-primary",
-    check: "text-primary",
-  },
-  meta: {
-    border: "border-[#1877F2]",
-    bg: "bg-[#1877F2]/5",
-    text: "text-[#1877F2]",
-    check: "text-[#1877F2]",
-  },
-  dv360: {
-    border: "border-red-600",
-    bg: "bg-red-600/10",
-    text: "text-red-600",
-    check: "text-red-600",
-  },
-};
-
 export interface DemographicsCardProps {
-  /** Selected language codes (en, ar only). */
   languageCodes: string[];
   onLanguagesChange: (codes: string[]) => void;
-  /** Selected gender ids (MALE, FEMALE). At least one required on most platforms. */
   genderIds: string[];
   onGendersChange: (ids: string[]) => void;
-  /** Selected age band values (18_24, 25_34, ...). Same UX on all platforms. */
   ageBandValues: string[];
   onAgeBandsChange: (values: string[]) => void;
-  /** Visual accent. */
   accent?: DemographicsAccent;
-  /** Show "Required" next to Device Language. */
   languageRequired?: boolean;
-  /** Optional card title. */
   title?: string;
-  /** Optional tooltip for the card header. */
   headerTooltip?: string;
-  /** Optional className for wrapper. */
   className?: string;
 }
 
-/**
- * Unified demographics card: English/Arabic only, Male/Female only, same age-band experience.
- * Use on all platforms; map to/from platform state (ageMin/ageMax, API genders, etc.) in the parent.
- */
 export function DemographicsCard({
   languageCodes,
   onLanguagesChange,
@@ -76,14 +31,9 @@ export function DemographicsCard({
   onGendersChange,
   ageBandValues,
   onAgeBandsChange,
-  accent = "primary",
   languageRequired = false,
-  title = "Demographics",
-  headerTooltip = "Define who sees your ads by gender, age, and language.",
   className,
 }: DemographicsCardProps) {
-  const styles = ACCENT_STYLES[accent];
-
   const toggleLanguage = (code: string) => {
     if (languageCodes.includes(code)) {
       onLanguagesChange(languageCodes.filter((c) => c !== code));
@@ -113,50 +63,21 @@ export function DemographicsCard({
   };
 
   return (
-    <div className={cn("rounded-xl border border-border bg-card p-5", className)}>
-      <div className="mb-4 flex items-center gap-2">
-        <Users className={cn("size-4", styles.text)} />
-        <Label className="text-sm font-semibold text-foreground">{title}</Label>
-        <InfoTip text={headerTooltip} />
+    <div className={cn("overflow-hidden rounded-xl border border-border bg-card", className)}>
+      {/* Header */}
+      <div className="px-6 py-5">
+        <h3 className="text-base font-bold text-foreground">Audience</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Define who sees your ads by gender, age, and language.
+        </p>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-3">
-        {/* Gender — Male / Female only */}
+      {/* Content — 3 columns */}
+      <div className="flex items-start justify-between px-6 pb-6">
+        {/* Age Range */}
         <div>
-          <Label className="mb-2 flex items-center gap-1 text-xs font-semibold text-foreground">
-            Gender
-            <InfoTip text="Select at least one. Both selected = all genders." />
-          </Label>
-          <div className="flex gap-2">
-            {SUPPORTED_GENDERS.map((g) => {
-              const sel = genderIds.includes(g.id);
-              return (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => toggleGender(g.id)}
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                    sel
-                      ? `${styles.border} ${styles.bg} ${styles.text}`
-                      : "border-border bg-background text-foreground hover:opacity-80"
-                  )}
-                >
-                  {g.label}
-                  {sel && <CheckCircle2 className={cn("size-3", styles.check)} />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Age — bands (same experience everywhere) */}
-        <div>
-          <Label className="mb-2 flex items-center gap-1 text-xs font-semibold text-foreground">
-            Age Range
-            <InfoTip text="Select the age groups you want to reach. Minimum age is 18." />
-          </Label>
-          <div className="flex flex-wrap gap-1.5">
+          <p className="mb-2 text-sm font-medium text-foreground">Age Range</p>
+          <div className="flex flex-wrap gap-2">
             {AGE_BANDS.map((band) => {
               const sel = ageBandValues.includes(band.value);
               return (
@@ -165,10 +86,10 @@ export function DemographicsCard({
                   type="button"
                   onClick={() => toggleAgeBand(band.value)}
                   className={cn(
-                    "rounded-full border px-3 py-1 text-xs font-medium transition-all",
+                    "w-[50px] rounded-full border px-2 py-1.5 text-xs font-medium transition-all",
                     sel
-                      ? `${styles.border} ${styles.bg} ${styles.text}`
-                      : "border-border bg-background text-foreground hover:border-muted-foreground/40"
+                      ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956] shadow-sm"
+                      : "border-border bg-white text-foreground hover:border-border/80"
                   )}
                 >
                   {band.label}
@@ -178,35 +99,66 @@ export function DemographicsCard({
           </div>
         </div>
 
-        {/* Device Language — English / Arabic only */}
+        {/* Gender */}
         <div>
-          <Label className="mb-2 flex items-center gap-1 text-xs font-semibold text-foreground">
+          <p className="mb-2 text-sm font-medium text-foreground">Target Audience Gender</p>
+          <div className="flex gap-5 py-1.5">
+            {SUPPORTED_GENDERS.map((g) => {
+              const sel = genderIds.includes(g.id);
+              return (
+                <label
+                  key={g.id}
+                  className="flex cursor-pointer items-center gap-2"
+                  onClick={() => toggleGender(g.id)}
+                >
+                  <span
+                    className={cn(
+                      "flex size-5 items-center justify-center rounded",
+                      sel
+                        ? "bg-[#004956]"
+                        : "border border-[#004956]"
+                    )}
+                  >
+                    {sel && <Check className="size-3.5 text-white" strokeWidth={3} />}
+                  </span>
+                  <span className="text-sm font-medium text-foreground">{g.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Device Language */}
+        <div>
+          <p className="mb-2 text-sm font-medium text-foreground">
             Device Language
             {languageRequired && (
-              <span className="rounded bg-muted px-1.5 py-0 text-[10px] font-normal text-muted-foreground">
-                Required
-              </span>
+              <span className="ml-1 text-xs text-muted-foreground">(Required)</span>
             )}
-            <InfoTip text="Target users by device language. Required when targeting multiple countries." />
-          </Label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            {SUPPORTED_LANGUAGES.map((l) => (
-              <label
-                key={l.code}
-                className="flex cursor-pointer items-center gap-1.5"
-              >
-                <Checkbox
-                  checked={languageCodes.includes(l.code)}
-                  onCheckedChange={() => toggleLanguage(l.code)}
-                  className={cn(
-                    "data-[state=checked]:border-primary data-[state=checked]:bg-primary",
-                    accent === "meta" && "data-[state=checked]:border-[#1877F2] data-[state=checked]:bg-[#1877F2]",
-                    accent === "dv360" && "data-[state=checked]:border-red-600 data-[state=checked]:bg-red-600"
-                  )}
-                />
-                <span className="text-xs text-foreground">{l.label}</span>
-              </label>
-            ))}
+          </p>
+          <div className="flex gap-5 py-1.5">
+            {SUPPORTED_LANGUAGES.map((l) => {
+              const sel = languageCodes.includes(l.code);
+              return (
+                <label
+                  key={l.code}
+                  className="flex cursor-pointer items-center gap-2"
+                  onClick={() => toggleLanguage(l.code)}
+                >
+                  <span
+                    className={cn(
+                      "flex size-5 items-center justify-center rounded",
+                      sel
+                        ? "bg-[#004956]"
+                        : "border border-[#004956]"
+                    )}
+                  >
+                    {sel && <Check className="size-3.5 text-white" strokeWidth={3} />}
+                  </span>
+                  <span className="text-sm font-medium text-foreground">{l.label}</span>
+                </label>
+              );
+            })}
           </div>
         </div>
       </div>

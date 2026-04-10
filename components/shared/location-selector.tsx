@@ -233,59 +233,40 @@ export function LocationSelector({
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <MapPin className="size-4 text-muted-foreground" />
-          <Label className="text-sm font-semibold text-foreground">{label}</Label>
-          {tooltipText && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="size-3.5 cursor-help text-muted-foreground" />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs text-xs">{tooltipText}</TooltipContent>
-            </Tooltip>
-          )}
+      <div className="space-y-5">
+        {/* Header */}
+        <div>
+          <h3 className="text-base font-bold text-foreground">Geographic Location</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Set your ad&apos;s target locations</p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-border">
+        {/* Tabs — pill buttons */}
+        <div className="flex gap-2">
           {enableCityTargeting && (
             <button
               type="button"
               onClick={() => setTab("city")}
               className={cn(
-                "relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors",
-                tab === "city" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                "rounded-lg border px-5 py-2.5 text-xs font-medium transition-all",
+                tab === "city"
+                  ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956]"
+                  : "border-border bg-card text-foreground hover:border-border/80"
               )}
             >
-              Cities
-              {value.cities.length > 0 && (
-                <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs">
-                  {value.cities.length}
-                </Badge>
-              )}
-              {tab === "city" && (
-                <div className={cn("absolute inset-x-0 bottom-0 h-0.5", styles.underline)} />
-              )}
+              City
             </button>
           )}
           <button
             type="button"
             onClick={() => setTab("country")}
             className={cn(
-              "relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors",
-              tab === "country" ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              "rounded-lg border px-5 py-2.5 text-xs font-medium transition-all",
+              tab === "country"
+                ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956]"
+                : "border-border bg-card text-foreground hover:border-border/80"
             )}
           >
             Country / Region
-            {(value.regions ?? []).length > 0 && (
-              <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs">
-                {(value.regions ?? []).length}
-              </Badge>
-            )}
-            {tab === "country" && (
-              <div className={cn("absolute inset-x-0 bottom-0 h-0.5", styles.underline)} />
-            )}
           </button>
         </div>
 
@@ -406,22 +387,26 @@ export function LocationSelector({
         {/* ═══ City tab ═══ */}
         {enableCityTargeting && tab === "city" && (
           <>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search cities (e.g. Riyadh, Jeddah, Dammam)..."
-                value={citySearch}
-                onChange={(e) => setCitySearch(e.target.value)}
-                className="h-10 pl-9 text-sm"
-              />
+            <div>
+              <Label className="mb-2 block text-sm font-medium text-foreground">
+                Select target cities <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="(e.g., Jeddah, Riyadh)"
+                  value={citySearch}
+                  onChange={(e) => setCitySearch(e.target.value)}
+                  className="h-10 pl-9 text-sm"
+                />
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">{cityDescription}</p>
 
             {!citySearch.trim() ? (
               <div className="space-y-4">
                 <div>
-                  <p className="mb-2 text-xs font-medium text-muted-foreground">
-                    Quick select — Saudi Arabia
+                  <p className="mb-2 text-xs font-medium text-foreground">
+                    Quick Select - Saudi Arabia
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {getPopularCities().map((city) => {
@@ -432,12 +417,13 @@ export function LocationSelector({
                           type="button"
                           onClick={() => (isSelected ? removeCity(city.id) : addCity(city))}
                           className={cn(
-                            "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                            isSelected ? styles.selected : "border-border bg-background text-foreground hover:border-primary/30"
+                            "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors",
+                            isSelected
+                              ? "border-[#dbfff6] bg-[#e6fff9] text-[#004956]"
+                              : "border-border bg-white text-foreground hover:border-border/80"
                           )}
                         >
                           {city.name}
-                          {isSelected && " ✓"}
                         </button>
                       );
                     })}
@@ -492,15 +478,15 @@ export function LocationSelector({
 
             {/* Selected cities with optional radius */}
             {value.cities.length > 0 && (
-              <div className="mt-4 border-t border-border pt-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-sm font-medium text-foreground">
-                    Selected cities ({value.cities.length})
+              <div className="mt-2">
+                <div className="mb-2 flex items-center gap-2">
+                  <p className="text-sm font-bold text-foreground">
+                    Selected Cities ({value.cities.length})
                   </p>
                   <button
                     type="button"
                     onClick={clearAllCities}
-                    className="text-xs font-medium text-primary hover:underline"
+                    className="text-xs font-medium text-[#004956] underline"
                   >
                     Clear all
                   </button>

@@ -15,7 +15,6 @@ export type SupportedLanguageCode = (typeof SUPPORTED_LANGUAGES)[number]["code"]
 export const SUPPORTED_GENDERS = [
   { id: "MALE", label: "Male" },
   { id: "FEMALE", label: "Female" },
-  { id: "OTHER", label: "Other" },
 ] as const;
 
 export type SupportedGenderId = (typeof SUPPORTED_GENDERS)[number]["id"];

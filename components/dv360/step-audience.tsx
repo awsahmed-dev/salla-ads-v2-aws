@@ -238,23 +238,7 @@ export function DV360StepAudience() {
                 tooltipText="Maps to TARGETING_TYPE_GEO_REGION. Choose countries and/or cities where your ads will be shown."
               />
 
-              {/* ---- Map Preview ---- */}
-              <LocationMapPreview
-                countryCodes={audience.geoTargets.filter((g) => g.type === "country").map((g) => g.id)}
-                cities={audience.geoTargets
-                  .filter((g) => g.type === "city")
-                  .map((g) => {
-                    const meta = getCityById(g.id);
-                    return {
-                      id: g.id,
-                      name: g.name,
-                      countryCode: meta?.countryCode ?? "",
-                      lat: meta?.lat ?? 0,
-                      lng: meta?.lng ?? 0,
-                      radiusKm: g.radiusKm ?? 0,
-                    };
-                  })}
-              />
+              {/* Map moved to LocationReachCard in right column */}
             </SectionCard>
 
             {/* ---- 2. Demographics (shared: English/Arabic, Male/Female, age bands) ---- */}
@@ -943,7 +927,19 @@ export function DV360StepAudience() {
               countryCount={audience.geoTargets.filter((g) => g.type === "country").length}
               countries={audience.geoTargets.filter((g) => g.type === "country").map((g) => g.id)}
               cityCount={audience.geoTargets.filter((g) => g.type === "city").length}
-              accent="dv360"
+              cities={audience.geoTargets
+                .filter((g) => g.type === "city")
+                .map((g) => {
+                  const meta = getCityById(g.id);
+                  return {
+                    id: g.id,
+                    name: g.name,
+                    countryCode: meta?.countryCode ?? "",
+                    lat: meta?.lat ?? 0,
+                    lng: meta?.lng ?? 0,
+                    radiusKm: g.radiusKm ?? 0,
+                  };
+                })}
             />
 
             <DeliveryCheckCard
