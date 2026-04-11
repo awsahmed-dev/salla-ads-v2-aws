@@ -204,28 +204,17 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                     Pick one — we&apos;ll optimize everything for the best results.
                   </p>
 
-                  {/* Funnel stage indicator */}
-                  <div className="mt-5 inline-flex flex-wrap items-center rounded-full bg-[#f4f4f4] p-1">
-                    {(["awareness", "consideration", "conversion"] as const).map((stage) => {
-                      const f = FUNNEL_LABELS[stage];
-                      const FIcon = f.icon;
-                      const isActive = selectedObj.funnelStage === stage;
-                      return (
-                        <div
-                          key={stage}
-                          className={cn(
-                            "flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all",
-                            isActive
-                              ? "bg-white shadow-sm text-foreground"
-                              : "text-muted-foreground"
-                          )}
-                        >
-                          <FIcon className="size-3.5" />
-                          {f.label}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {/* Funnel stage badge — reflects the selected objective's stage */}
+                  {(() => {
+                    const f = FUNNEL_LABELS[selectedObj.funnelStage];
+                    const FIcon = f.icon;
+                    return (
+                      <div className={cn("mt-4 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium", f.color)}>
+                        <FIcon className="size-3.5" />
+                        {f.label}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* 3x2 Objective Grid */}
