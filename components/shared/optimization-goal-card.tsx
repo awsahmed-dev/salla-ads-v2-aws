@@ -62,8 +62,8 @@ export function OptimizationGoalCard({
           className={cn(
             "grid gap-6",
             goals.length <= 3
-              ? "grid-cols-3"
-              : "grid-cols-2 sm:grid-cols-3"
+              ? "grid-cols-1 sm:grid-cols-3"
+              : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3"
           )}
         >
           {goals.map((g) => {

@@ -108,7 +108,7 @@ export function PerformanceBoostCard({
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           {/* Salla logo */}
           <div
@@ -150,7 +150,7 @@ export function PerformanceBoostCard({
         </div>
 
         {/* Price + toggle */}
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex items-center gap-3 sm:shrink-0">
           <div className="text-right">
             <p className="text-xs text-muted-foreground">
               One-time payment

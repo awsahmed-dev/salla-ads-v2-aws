@@ -84,7 +84,7 @@ export function AttributionWindowCard({
       {/* Combined mode: horizontal cards */}
       {mode === "combined" && combinedOptions && onCombinedChange && (
         <div className="px-6 pb-6">
-          <div className="flex gap-6">
+          <div className="flex flex-col sm:flex-row gap-3">
             {combinedOptions.map((w) => {
               const isSelected = combinedValue === w.value;
               return (
@@ -157,14 +157,14 @@ export function AttributionWindowCard({
           </div>
 
           {/* Legend bar */}
-          <div className="mt-4 flex items-center gap-4 rounded-lg bg-muted/30 px-3 py-2">
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 rounded-lg bg-muted/30 px-3 py-2">
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <MousePointerClick className="size-3.5" />
+              <MousePointerClick className="size-3.5 shrink-0" />
               Click = User swipes up, then purchases later
             </span>
-            <span className="text-xs text-muted-foreground">&bull;</span>
+            <span className="hidden sm:block text-xs text-muted-foreground">&bull;</span>
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Eye className="size-3.5" />
+              <Eye className="size-3.5 shrink-0" />
               View = User sees the ad only, then purchases later
             </span>
           </div>

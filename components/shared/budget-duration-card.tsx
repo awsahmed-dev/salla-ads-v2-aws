@@ -288,7 +288,7 @@ export function BudgetDurationCard({
           <p className="mb-2 text-sm font-medium text-foreground">
             Payment Method
           </p>
-          <div className="flex gap-6">
+          <div className="flex flex-col sm:flex-row gap-3">
             {budgetTypes.map((m) => {
               const active = paymentMethod === m.value;
               const isPAYG = m.value === "pay_as_you_go";
@@ -348,7 +348,7 @@ export function BudgetDurationCard({
         </p>
 
         {!endDateOptional && !endDateRequired && (
-          <div className="mb-3 flex gap-1.5">
+          <div className="mb-3 flex flex-wrap gap-1.5">
             {[
               { days: 7, label: "1 Week" },
               { days: 14, label: "2 Weeks" },
@@ -384,7 +384,7 @@ export function BudgetDurationCard({
           </div>
         )}
 
-        <div className="flex gap-6">
+        <div className="flex flex-col sm:flex-row gap-4">
           {/* Start Date */}
           <div className="flex-1">
             <Label className="mb-2 block text-sm text-foreground">
@@ -606,8 +606,8 @@ export function BudgetDurationCard({
           {ai.enabled && autoIncreaseAvailable && (
             <div className="px-6 pb-5">
               {/* Increase every + amount */}
-              <div className="flex gap-6">
-                <div className="w-2/3">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="w-full sm:w-2/3">
                   <Label className="mb-2 block text-sm font-medium text-foreground">
                     Increase every:
                   </Label>
