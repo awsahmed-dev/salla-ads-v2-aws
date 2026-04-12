@@ -17,6 +17,9 @@ import {
   CalendarDays,
   Wallet,
   Banknote,
+  TrendingUp,
+  Sparkles,
+  Info,
 } from "lucide-react";
 
 /* ================================================================ */
@@ -347,27 +350,35 @@ export function BudgetDurationCard({
           Campaign Duration
         </p>
 
-        {!endDateOptional && !endDateRequired && (
+        {!endDateRequired && (
           <div className="mb-3 flex flex-wrap gap-1.5">
             {[
-              { days: 7, label: "1 Week" },
+              { days: -1, label: "Ongoing" },
               { days: 14, label: "2 Weeks" },
               { days: 30, label: "1 Month" },
               { days: 0, label: "Custom" },
             ].map((preset) => {
-              const active = preset.days === 0
-                ? customMode || (!isPreset(7) && !isPreset(14) && !isPreset(30))
-                : !customMode && isPreset(preset.days);
+              const active = preset.days === -1
+                ? endDateOptional
+                : preset.days === 0
+                  ? !endDateOptional && (customMode || (!isPreset(14) && !isPreset(30)))
+                  : !endDateOptional && !customMode && isPreset(preset.days);
               return (
                 <button
                   key={preset.label}
                   type="button"
                   onClick={() => {
-                    if (preset.days > 0) {
+                    if (preset.days === -1) {
+                      // Ongoing — no end date
                       setCustomMode(false);
+                      handleRunContinuouslyChange(true);
+                    } else if (preset.days > 0) {
+                      setCustomMode(false);
+                      if (endDateOptional) handleRunContinuouslyChange(false);
                       applyPreset(preset.days);
                     } else {
                       setCustomMode(true);
+                      if (endDateOptional) handleRunContinuouslyChange(false);
                     }
                   }}
                   className={cn(
@@ -378,9 +389,22 @@ export function BudgetDurationCard({
                   )}
                 >
                   {preset.label}
+                  {preset.days === -1 && (
+                    <span className="ml-1 text-[9px] font-bold uppercase text-[#004956]/60">Best</span>
+                  )}
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {/* Learning-phase nudge */}
+        {endDateOptional && (
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2">
+            <Sparkles className="mt-0.5 size-3 shrink-0 text-[#004956]" />
+            <p className="text-[11px] leading-relaxed text-[#004956]/80">
+              <span className="font-semibold text-[#004956]">Great choice.</span> Ongoing campaigns stay in the learning phase longer, resulting in up to 40% lower cost per result.
+            </p>
           </div>
         )}
 
@@ -441,17 +465,7 @@ export function BudgetDurationCard({
                 <span className="text-sm text-muted-foreground">Until manually paused</span>
               </div>
             )}
-            {showRunContinuously && !endDateRequired && (
-              <label className="mt-2 flex cursor-pointer items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={endDateOptional}
-                  onChange={(e) => handleRunContinuouslyChange(e.target.checked)}
-                  className="size-3 rounded border-muted-foreground/40 text-primary accent-primary"
-                />
-                <span className="text-xs text-muted-foreground">Run continuously (no end date)</span>
-              </label>
-            )}
+            {/* "Run continuously" is now controlled by the Ongoing preset button above */}
           </div>
         </div>
 
@@ -571,7 +585,58 @@ export function BudgetDurationCard({
       {/* ── Divider ── */}
       <div className="h-px bg-border/40" />
 
-      {/* ── 4. Budget Scheduling (Auto-Increase) ── */}
+      {/* ── 4. Salary Week Boost ── */}
+      {endDateOptional && budgetMode === "daily" && (
+        <div>
+          <div className="px-6 py-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                  <TrendingUp className="size-4 text-[#004956]" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Salary Week Boost</p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                    Automatically increase budget during peak purchasing days (25th–5th of each month) and reduce mid-month spend.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={ai.enabled && endDateOptional}
+                onCheckedChange={(checked) => updateAI({ enabled: checked })}
+              />
+            </div>
+
+            {ai.enabled && endDateOptional && (
+              <div className="mt-4 rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/30 p-4">
+                <div className="flex items-center gap-6">
+                  <div className="flex-1 text-center">
+                    <p className="text-lg font-bold text-[#004956]">2×</p>
+                    <p className="text-[10px] font-medium text-muted-foreground">Salary week</p>
+                    <p className="text-[10px] text-muted-foreground">25th – 5th</p>
+                  </div>
+                  <div className="h-8 w-px bg-border" />
+                  <div className="flex-1 text-center">
+                    <p className="text-lg font-bold text-muted-foreground">1×</p>
+                    <p className="text-[10px] font-medium text-muted-foreground">Regular</p>
+                    <p className="text-[10px] text-muted-foreground">6th – 24th</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-start gap-2 rounded-lg bg-white px-3 py-2">
+                  <Info className="mt-0.5 size-3 shrink-0 text-[#004956]" />
+                  <p className="text-[10px] leading-relaxed text-muted-foreground">
+                    Your daily budget of <span className="font-semibold text-foreground">SAR {dailyAmount.toLocaleString()}</span> will increase to <span className="font-semibold text-[#004956]">SAR {(dailyAmount * 2).toLocaleString()}</span> during salary week. The campaign stays active all month — no need to stop and restart.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="h-px bg-border/40" />
+        </div>
+      )}
+
+      {/* ── 5. Budget Scheduling (Auto-Increase) ── */}
       {showAutoIncrease && (
         <div>
           <div
