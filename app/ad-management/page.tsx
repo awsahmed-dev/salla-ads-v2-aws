@@ -99,11 +99,7 @@ export default function AdManagementPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="border-b border-border bg-background px-4 py-3 sm:px-6 lg:px-14">
-        <p className="text-xs text-muted-foreground">Marketing <span className="mx-1">›</span> Advertisements <span className="mx-1">›</span> <span className="font-medium text-foreground">Ad Management</span></p>
-      </div>
-
-      <div className="flex h-[calc(100vh-120px)] flex-col lg:flex-row">
+      <div className="flex h-[calc(100vh-60px)] flex-col lg:flex-row">
         {/* ═══ SIDEBAR ═══ */}
         <div className="flex w-full shrink-0 flex-col border-b border-border bg-background lg:w-[340px] lg:border-b-0 lg:border-r">
           {/* Filter bar — matches Figma: All(12) | 🔍 | Sort */}
