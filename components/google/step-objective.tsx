@@ -209,16 +209,7 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
           <div className="flex-1 overflow-y-auto">
             <div className={cn("mx-auto w-full max-w-3xl px-6 py-8", WIZARD_FOOTER_PADDING_BOTTOM)}>
 
-              {/* ---- Step 1: Campaign Goal ---- */}
-              <div className="mb-8">
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">1</span>
-                  <h2 className="text-lg font-bold text-foreground">Choose your campaign type</h2>
-                </div>
-                <p className="ml-9 text-sm text-muted-foreground">
-                  Select the Google Ads campaign type that best fits your marketing goal.
-                </p>
-              </div>
+
 
               {/* Funnel guide */}
               <div className="mb-6 flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-4 py-2.5">
@@ -360,16 +351,6 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
               </div>
 
-              {/* ---- Step 2: Campaign setup ---- */}
-              <div className="mb-6">
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">2</span>
-                  <h2 className="text-lg font-bold text-foreground">Campaign setup</h2>
-                </div>
-                <p className="ml-9 text-sm text-muted-foreground">
-                  Name your campaign and configure tracking.
-                </p>
-              </div>
 
               {/* ---- Campaign Name ---- */}
               <div className="mb-6 rounded-xl border border-border bg-card p-6">

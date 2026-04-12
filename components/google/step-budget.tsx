@@ -233,27 +233,6 @@ const CONVERSION_GOALS: {
   },
 ];
 
-function SectionPriorityHeader({
-  step,
-  title,
-  description,
-}: {
-  step: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-muted/20 px-4 py-3">
-      <div className="mb-1 flex items-center gap-2">
-        <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-          {step}
-        </Badge>
-        <p className="text-xs font-semibold text-foreground">{title}</p>
-      </div>
-      <p className="text-[11px] text-muted-foreground">{description}</p>
-    </div>
-  );
-}
 
 /* ================================================================== */
 /*  Component                                                         */
@@ -471,11 +450,6 @@ export function GoogleStepBudget() {
       <div className={cn("flex flex-col gap-6 lg:flex-row", WIZARD_FOOTER_PADDING_BOTTOM)}>
         {/* ============= LEFT COLUMN ============= */}
         <div className="flex flex-1 flex-col gap-5">
-          <SectionPriorityHeader
-            step="1"
-            title="Campaign budget setup (required)"
-            description="Set daily budget, run dates, and base campaign spend controls first."
-          />
 
           {/* Smart Budget Recommendation from Store Data */}
           {budgetRec && (
@@ -583,11 +557,6 @@ export function GoogleStepBudget() {
             </SectionCard>
           )}
 
-          <SectionPriorityHeader
-            step="2"
-            title="Optimization target (required)"
-            description="Tell Google what to optimize for, then choose bidding strategy."
-          />
 
           {/* ======================================================= */}
           {/* SECTION 2: Conversion Goal                               */}
