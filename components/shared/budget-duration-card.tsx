@@ -436,17 +436,15 @@ export function BudgetDurationCard({
             </div>
           </div>
 
-          {/* End Date */}
-          <div className="flex-1">
-            <div className="mb-2 flex items-center gap-2">
-              <Label className="text-sm text-foreground">
-                End Date
-              </Label>
-              {!endDateRequired && showRunContinuously && (
-                <span className="text-xs text-muted-foreground">(Optional)</span>
-              )}
-            </div>
-            {!endDateOptional ? (
+          {/* End Date — hidden when Ongoing is selected */}
+          {!endDateOptional && (
+            <div className="flex-1">
+              <div className="mb-2 flex items-center gap-2">
+                <Label className="text-sm text-foreground">End Date</Label>
+                {!endDateRequired && (
+                  <span className="text-xs text-muted-foreground">(Optional)</span>
+                )}
+              </div>
               <div className="relative">
                 <CalendarDays className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -460,14 +458,8 @@ export function BudgetDurationCard({
                   className="h-10 pl-10"
                 />
               </div>
-            ) : (
-              <div className="flex h-10 w-full items-center gap-2 rounded-lg border border-border bg-card px-3">
-                <CalendarDays className="size-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Until manually paused</span>
-              </div>
-            )}
-            {/* "Run continuously" is now controlled by the Ongoing preset button above */}
-          </div>
+            </div>
+          )}
         </div>
 
         {startDate && endDate && endDate > startDate && durationDays >= MIN_CAMPAIGN_DAYS && (
