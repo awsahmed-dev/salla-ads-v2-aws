@@ -3,8 +3,13 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { getDraftIndex, removeDraftMeta, formatRelativeTime, getStepLabel, type DraftMeta } from "@/lib/draft-index";
-import { Trash2, Clock, ChevronRight, Sparkles, ArrowRight } from "lucide-react";
+import { Trash2, Clock, ChevronRight, Sparkles, ArrowRight, FileText } from "lucide-react";
 import { SnapchatLogo } from "@/components/shared/snapchat-logo";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 export type Platform = "snapchat" | "tiktok" | "google" | "dv360" | "meta";
 
@@ -111,6 +116,8 @@ interface PlatformSelectionPageProps {
 
 export function PlatformSelectionPage({ onSelect, onResumeDraft, onTemplate }: PlatformSelectionPageProps) {
   const [drafts, setDrafts] = useState<DraftMeta[]>([]);
+  const [draftsSheetOpen, setDraftsSheetOpen] = useState(false);
+  const [draftFilter, setDraftFilter] = useState<Platform | "all">("all");
 
   useEffect(() => {
     setDrafts(getDraftIndex());
@@ -135,82 +142,160 @@ export function PlatformSelectionPage({ onSelect, onResumeDraft, onTemplate }: P
           </p>
         </div>
 
-        {/* ── Saved Drafts ── */}
+        {/* ── Drafts Bar ── */}
         {drafts.length > 0 && (
-          <section className="mb-10">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock className="size-4 text-muted-foreground" />
-                <h2 className="text-sm font-bold text-foreground">Continue Where You Left Off</h2>
-                <span className="rounded-full bg-[#e6fff9] px-2 py-0.5 text-xs font-medium text-[#004956]">
-                  {drafts.length}
-                </span>
+          <section className="mb-8">
+            <button
+              type="button"
+              onClick={() => { setDraftFilter("all"); setDraftsSheetOpen(true); }}
+              className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3.5 transition-all hover:border-[#a4ffe5] hover:shadow-sm"
+            >
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                <FileText className="size-4 text-[#004956]" />
               </div>
-              {drafts.length > 3 && (
-                <p className="text-xs text-muted-foreground">Scroll for more →</p>
-              )}
-            </div>
-            {/* Horizontal scrollable slider */}
-            <div className="-mx-6 px-6">
-              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none" style={{ scrollSnapType: "x mandatory" }}>
-              {drafts.map((draft) => (
-                <div
-                  key={draft.id}
-                  className="flex w-[280px] shrink-0 flex-col rounded-xl border border-border bg-card p-4 transition-all hover:border-[#a4ffe5] hover:shadow-md"
-                  style={{ scrollSnapAlign: "start" }}
-                >
-                  <div className="mb-3 flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-full bg-muted/60">
-                      {PLATFORM_LOGOS[draft.platform as Platform]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="truncate text-sm font-bold text-foreground">
-                        {draft.campaignName || "Untitled Campaign"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {PLATFORM_NAMES[draft.platform as Platform]} · {formatRelativeTime(draft.updatedAt)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Progress */}
-                  <div className="mb-3">
-                    <div className="mb-1 flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">{getStepLabel(draft.step)}</span>
-                      <span className="font-medium text-[#004956]">{draft.step}/{draft.totalSteps}</span>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-muted/60">
-                      <div
-                        className="h-full rounded-full bg-[#004956] transition-all"
-                        style={{ width: `${(draft.step / draft.totalSteps) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onResumeDraft?.(draft.platform as Platform, draft.id)}
-                      className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#a4ffe5] px-3 py-2 text-xs font-medium text-[#004956] transition-colors hover:bg-[#8af5d5]"
-                    >
-                      Resume
-                      <ArrowRight className="size-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDiscardDraft(draft.id)}
-                      className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold text-foreground">
+                  {drafts.length} draft{drafts.length !== 1 ? "s" : ""} in progress
+                </p>
+                <p className="text-xs text-muted-foreground">Continue where you left off</p>
               </div>
-            </div>
+              {/* Platform avatar preview */}
+              <div className="flex -space-x-2">
+                {Array.from(new Set(drafts.map((d) => d.platform))).slice(0, 3).map((p) => (
+                  <div key={p} className="flex size-7 items-center justify-center rounded-full border-2 border-white bg-muted/60 [&>svg]:size-4">
+                    {PLATFORM_LOGOS[p as Platform]}
+                  </div>
+                ))}
+              </div>
+              <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+            </button>
           </section>
         )}
+
+        {/* ── Drafts Sheet ── */}
+        <Sheet open={draftsSheetOpen} onOpenChange={setDraftsSheetOpen}>
+          <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[420px]">
+            {/* Branded header */}
+            <div className="bg-[#004956] px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+                  <FileText className="size-5 text-white" />
+                </div>
+                <div>
+                  <SheetTitle className="text-base font-bold text-white">Your Drafts</SheetTitle>
+                  <p className="mt-0.5 text-xs text-white/70">
+                    {drafts.length} campaign{drafts.length !== 1 ? "s" : ""} in progress
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Platform filter tabs */}
+            <div className="flex gap-1.5 overflow-x-auto border-b border-border bg-white px-4 py-3">
+              {(["all", ...Array.from(new Set(drafts.map((d) => d.platform)))] as (Platform | "all")[]).map((tab) => {
+                const count = tab === "all" ? drafts.length : drafts.filter((d) => d.platform === tab).length;
+                const active = draftFilter === tab;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setDraftFilter(tab)}
+                    className={cn(
+                      "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all",
+                      active
+                        ? "bg-[#a4ffe5] text-[#004956] shadow-sm"
+                        : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    {tab === "all" ? "All" : PLATFORM_NAMES[tab]}
+                    <span className={cn("tabular-nums text-[10px]", active ? "text-[#004956]/70" : "text-muted-foreground/60")}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Draft list */}
+            <div className="flex-1 overflow-y-auto bg-[#f8f8f8] px-4 py-3">
+              <div className="flex flex-col gap-2">
+                {drafts
+                  .filter((d) => draftFilter === "all" || d.platform === draftFilter)
+                  .map((draft) => (
+                    <div
+                      key={draft.id}
+                      className="overflow-hidden rounded-2xl border border-white bg-white shadow-sm transition-all hover:border-[#a4ffe5] hover:shadow-md"
+                    >
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        {/* Platform logo */}
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#f4f4f4] [&>svg]:size-5">
+                          {PLATFORM_LOGOS[draft.platform as Platform]}
+                        </div>
+
+                        {/* Name + meta */}
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate text-xs font-bold text-foreground">
+                            {draft.campaignName || "Untitled Campaign"}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {PLATFORM_NAMES[draft.platform as Platform]} · {formatRelativeTime(draft.updatedAt)}
+                          </p>
+                          {/* Progress bar */}
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted/40">
+                              <div
+                                className="h-full rounded-full bg-[#004956] transition-all"
+                                style={{ width: `${(draft.step / draft.totalSteps) * 100}%` }}
+                              />
+                            </div>
+                            <span className="shrink-0 text-[10px] font-semibold tabular-nums text-[#004956]">
+                              {draft.step}/{draft.totalSteps}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDraftsSheetOpen(false);
+                              setTimeout(() => onResumeDraft?.(draft.platform as Platform, draft.id), 200);
+                            }}
+                            className="flex items-center gap-1 rounded-lg bg-[#a4ffe5] px-3 py-1.5 text-[11px] font-semibold text-[#004956] transition-colors hover:bg-[#8af5d5]"
+                          >
+                            Resume
+                            <ArrowRight className="size-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDiscardDraft(draft.id)}
+                            className="flex size-7 items-center justify-center rounded-lg text-muted-foreground/40 transition-colors hover:bg-red-50 hover:text-red-500"
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-border bg-white px-5 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftsSheetOpen(false);
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#004956] py-3 text-sm font-bold text-white transition-colors hover:bg-[#003a44]"
+              >
+                <Sparkles className="size-4" />
+                Start New Campaign
+              </button>
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* ── Create New Campaign ── */}
         <section className="mb-10">

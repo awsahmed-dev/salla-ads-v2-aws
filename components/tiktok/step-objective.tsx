@@ -49,6 +49,7 @@ import {
   ExternalLink,
   Copy,
   ArrowLeftRight,
+  Sparkles,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
@@ -161,6 +162,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
   };
   const [showHowToConnect, setShowHowToConnect] = useState(false);
   const [showPixelHelp, setShowPixelHelp] = useState(false);
+  const [objectiveSheetOpen, setObjectiveSheetOpen] = useState(false);
 
   const handleCatalogToggle = (enabled: boolean) => {
     updateNested("objective", {
@@ -331,8 +333,8 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                         !o.active
                           ? "cursor-not-allowed opacity-40 border-border"
                           : selected
-                            ? "border-primary bg-primary/[0.04] shadow-sm"
-                            : "border-border bg-white hover:border-primary/40 hover:shadow-sm"
+                            ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                            : "border-border bg-white hover:border-[#a4ffe5] hover:shadow-sm"
                       )}
                     >
                       <div className={cn(
@@ -340,14 +342,14 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                         !o.active
                           ? "bg-muted text-muted-foreground"
                           : selected
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-[#f4f4f4] text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                            ? "bg-[#004956] text-white"
+                            : "bg-[#f4f4f4] text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
                       )}>
                         <OIcon className="size-5" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className={cn("text-sm font-bold", !o.active ? "text-muted-foreground" : selected ? "text-primary" : "text-foreground")}>{o.label}</span>
+                          <span className={cn("text-sm font-bold", !o.active ? "text-muted-foreground" : selected ? "text-[#004956]" : "text-foreground")}>{o.label}</span>
                           {!o.active && (
                             <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Soon</span>
                           )}
@@ -367,8 +369,124 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                       <span className="font-bold text-foreground">{selectedObj.label}</span> — {selectedObj.kpis.join(", ")}
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setObjectiveSheetOpen(true)}
+                    className="shrink-0 text-xs font-bold text-[#004956] underline decoration-[#a4ffe5] decoration-2 underline-offset-2 hover:decoration-[#004956]"
+                  >
+                    Learn more
+                  </button>
                 </div>
               </div>
+
+              {/* Objective Details Sheet */}
+              <Sheet open={objectiveSheetOpen} onOpenChange={setObjectiveSheetOpen}>
+                <SheetContent side="right" className="flex w-full flex-col sm:max-w-[420px] bg-white p-0">
+                  <div className="bg-[#004956] px-6 py-6">
+                    <div className="flex items-center gap-4">
+                      <div className="flex size-12 items-center justify-center rounded-2xl bg-white/15">
+                        <selectedObj.icon className="size-6 text-white" />
+                      </div>
+                      <div>
+                        <SheetTitle className="text-lg font-bold text-white">{selectedObj.label}</SheetTitle>
+                        <Badge className="mt-1 rounded-full border-0 bg-[#a4ffe5] px-2 py-0.5 text-xs font-medium text-[#004956]">
+                          {FUNNEL_LABELS[selectedObj.funnelStage].label}
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-sm text-white/70">{selectedObj.desc}</p>
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="mx-6 mt-6 flex h-[180px] items-center justify-center rounded-2xl bg-gradient-to-br from-[#004956] to-[#006d7a]">
+                      <div className="text-center">
+                        <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-white/20">
+                          <svg viewBox="0 0 24 24" className="ml-0.5 size-5 text-white" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                        </div>
+                        <p className="text-sm font-bold text-white">Tutorial Video</p>
+                        <p className="text-xs text-white/60">45 seconds — how to set up your campaign</p>
+                      </div>
+                    </div>
+                    <div className="space-y-6 px-6 py-6">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                          <p className="text-lg font-bold text-[#004956]">{config.allowedAdFormats?.length ?? 4}</p>
+                          <p className="text-xs font-medium text-muted-foreground">Ad Formats</p>
+                        </div>
+                        <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                          <p className="text-lg font-bold text-[#004956]">SAR 150</p>
+                          <p className="text-xs font-medium text-muted-foreground">Min Budget/day</p>
+                        </div>
+                        <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                          <p className="text-lg font-bold text-[#004956]">7+</p>
+                          <p className="text-xs font-medium text-muted-foreground">Days Recommended</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Best for</p>
+                        <p className="text-sm font-bold text-foreground">{selectedObj.bestFor}</p>
+                      </div>
+                      <div>
+                        <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Metrics</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedObj.kpis.map((kpi) => (
+                            <span key={kpi} className="rounded-full border border-[#a4ffe5] bg-[#e6fff9] px-4 py-1.5 text-xs font-medium text-[#004956]">{kpi}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Step-by-step guide</p>
+                        <div className="space-y-4">
+                          {[
+                            { title: "Set up tracking", desc: "Connect your TikTok Pixel or use Salla's automatic tracking." },
+                            { title: "Define your audience", desc: "Choose locations, demographics, and interests." },
+                            { title: "Set budget & schedule", desc: "Set daily budget and campaign duration." },
+                            { title: "Create your ad", desc: "Upload creatives. TikTok recommends 3-5 variations." },
+                            { title: "Launch & optimize", desc: "Review, launch, and monitor after 3-5 days." },
+                          ].map((s, i) => (
+                            <div key={i} className="flex items-start gap-3">
+                              <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#004956] text-xs font-bold text-white">{i + 1}</div>
+                              <div>
+                                <p className="text-sm font-bold text-foreground">{s.title}</p>
+                                <p className="text-xs text-muted-foreground">{s.desc}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="rounded-xl bg-[#e6fff9] p-4">
+                        <div className="mb-1 flex items-center gap-2">
+                          <Sparkles className="size-3.5 text-[#004956]" />
+                          <p className="text-xs font-bold text-[#004956]">Pro Tip</p>
+                        </div>
+                        <p className="text-xs leading-relaxed text-[#004956]/80">
+                          {selectedObj.funnelStage === "conversion"
+                            ? "Start broad and let TikTok's algorithm find your best customers. Narrow down after the learning phase."
+                            : selectedObj.funnelStage === "consideration"
+                              ? "Use video creatives — they drive 2x more engagement than static images on TikTok."
+                              : "Maximize reach by using broad targeting and keeping your audience interests wide."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border-t border-border p-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setObjectiveSheetOpen(false);
+                        setTimeout(() => {
+                          const input = document.querySelector('input[placeholder*="TikTok"]') as HTMLInputElement;
+                          if (input) { input.scrollIntoView({ behavior: 'smooth', block: 'center' }); input.focus(); }
+                        }, 300);
+                      }}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#004956] py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#003a44]"
+                    >
+                      <ArrowRight className="size-4" />
+                      Start Campaign
+                    </button>
+                    <p className="mt-2 text-center text-xs text-muted-foreground">You can change your objective at any time before launching.</p>
+                  </div>
+                </SheetContent>
+              </Sheet>
 
               {/* ── Campaign Setup ── */}
               <div className="border-t border-border bg-muted/30 px-4 sm:px-8 py-3">
@@ -381,12 +499,18 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                   <Label className="text-sm font-medium text-foreground">
                     Campaign Name <span className="text-red-500">*</span>
                   </Label>
-                  <span className={cn(
-                    "text-xs tabular-nums",
-                    obj.campaignName.length > 480 ? "text-amber-600" : "text-muted-foreground"
-                  )}>
-                    {obj.campaignName.length}/512
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const date = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                      const autoName = `${selectedObj.label} - TikTok - ${date}`;
+                      updateNested("objective", { campaignName: autoName });
+                    }}
+                    className="flex items-center gap-1 text-xs font-medium text-[#004956] hover:underline"
+                  >
+                    <Sparkles className="size-3" />
+                    Auto-generate
+                  </button>
                 </div>
                 <div className="relative">
                   <Input
@@ -395,8 +519,11 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                     onChange={(e) =>
                       updateNested("objective", { campaignName: e.target.value.slice(0, 512) })
                     }
-                    className="h-10 text-sm"
+                    className="h-10 pr-14 text-sm"
                   />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    {obj.campaignName.length}/512
+                  </span>
                 </div>
               </div>
 
@@ -406,8 +533,8 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                 <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <Tag className="size-5 text-primary" />
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                        <Tag className="size-5 text-[#004956]" />
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-foreground">
@@ -421,7 +548,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                     {/* Loading state while checking ad account */}
                     {catalogReady === null ? (
                       <div className="flex size-9 items-center justify-center">
-                        <span className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        <span className="size-4 animate-spin rounded-full border-2 border-[#a4ffe5] border-t-transparent" />
                       </div>
                     ) : (
                       <Switch
@@ -473,15 +600,15 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                         Connected Catalog
                       </Label>
                       <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
-                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
-                          <Store className="size-4 text-primary" />
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-[#e6fff9]">
+                          <Store className="size-4 text-[#004956]" />
                         </div>
                         <div className="flex-1">
                           <p className="text-xs font-medium text-foreground">My Salla Store</p>
                           <p className="text-xs text-muted-foreground">Auto-synced from your Salla product catalog</p>
                         </div>
                         <Badge variant="outline" className="gap-1 rounded-full px-2 text-xs">
-                          <CheckCircle2 className="size-2.5 text-primary" />
+                          <CheckCircle2 className="size-2.5 text-[#004956]" />
                           Connected
                         </Badge>
                       </div>
@@ -498,8 +625,8 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
               {needsPixel && (
               <div className="border-t border-border px-4 sm:px-8 py-5">
                 <div className="mb-4 flex items-start gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <Scan className="size-5 text-primary" />
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                    <Scan className="size-5 text-[#004956]" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -526,12 +653,12 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                     className={cn(
                       "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all",
                       obj.pixelMode === "salla_managed"
-                        ? "border-primary bg-primary/[0.04] shadow-sm"
-                        : "border-border bg-background hover:border-primary/40"
+                        ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                        : "border-border bg-background hover:border-[#a4ffe5]"
                     )}
                   >
                     <div className="absolute -top-2.5 right-3">
-                      <Badge className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground shadow-sm">
+                      <Badge className="rounded-full bg-[#004956] px-2 py-0.5 text-xs font-semibold text-white shadow-sm">
                         Recommended
                       </Badge>
                     </div>
@@ -539,18 +666,18 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                       <div className={cn(
                         "flex size-9 items-center justify-center rounded-lg transition-colors",
                         obj.pixelMode === "salla_managed"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                          ? "bg-[#004956] text-white"
+                          : "bg-muted text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
                       )}>
                         <ShieldCheck className="size-4" />
                       </div>
                       {obj.pixelMode === "salla_managed" && (
-                        <CheckCircle2 className="size-4 text-primary" />
+                        <CheckCircle2 className="size-4 text-[#004956]" />
                       )}
                     </div>
                     <p className={cn(
                       "text-sm font-semibold",
-                      obj.pixelMode === "salla_managed" ? "text-primary" : "text-foreground"
+                      obj.pixelMode === "salla_managed" ? "text-[#004956]" : "text-foreground"
                     )}>
                       Use Salla Pixel
                     </p>
@@ -566,26 +693,26 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                     className={cn(
                       "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all",
                       obj.pixelMode === "existing"
-                        ? "border-primary bg-primary/[0.04] shadow-sm"
-                        : "border-border bg-background hover:border-primary/40"
+                        ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                        : "border-border bg-background hover:border-[#a4ffe5]"
                     )}
                   >
                     <div className="mb-3 flex items-center justify-between">
                       <div className={cn(
                         "flex size-9 items-center justify-center rounded-lg transition-colors",
                         obj.pixelMode === "existing"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                          ? "bg-[#004956] text-white"
+                          : "bg-muted text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
                       )}>
                         <Link2 className="size-4" />
                       </div>
                       {obj.pixelMode === "existing" && (
-                        <CheckCircle2 className="size-4 text-primary" />
+                        <CheckCircle2 className="size-4 text-[#004956]" />
                       )}
                     </div>
                     <p className={cn(
                       "text-sm font-semibold",
-                      obj.pixelMode === "existing" ? "text-primary" : "text-foreground"
+                      obj.pixelMode === "existing" ? "text-[#004956]" : "text-foreground"
                     )}>
                       Connect Your Pixel
                     </p>
@@ -597,10 +724,10 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
 
                 {/* ---- Salla managed pixel detail ---- */}
                 {obj.pixelMode === "salla_managed" && (
-                  <div className="mt-4 rounded-lg border border-primary/20 bg-primary/[0.03] p-4">
+                  <div className="mt-4 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] p-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <ShieldCheck className="size-4 text-primary" />
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                        <ShieldCheck className="size-4 text-[#004956]" />
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-foreground">Salla handles everything automatically</p>
@@ -612,7 +739,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                             "Verify everything works before your campaign goes live",
                           ].map((item) => (
                             <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
-                              <CheckCircle2 className="mt-0.5 size-3 shrink-0 text-primary" />
+                              <CheckCircle2 className="mt-0.5 size-3 shrink-0 text-[#004956]" />
                               {item}
                             </li>
                           ))}
@@ -671,7 +798,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                           <button
                             type="button"
                             onClick={() => setShowPixelHelp(true)}
-                            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-[#a4ffe5] hover:text-[#004956]"
                           >
                             <CircleHelp className="size-3" />
                             How does this work?
@@ -679,7 +806,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                         </div>
 
                         {/* Salla BC ID — copyable */}
-                        <div className="rounded-lg border border-primary/20 bg-primary/[0.03] px-4 py-3">
+                        <div className="rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-4 py-3">
                           <p className="mb-1.5 text-[10px] font-medium text-foreground">Salla Business Center ID</p>
                           <div className="flex items-center gap-2">
                             <code className="flex-1 rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground">
@@ -705,13 +832,13 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                         {/* Step-by-step */}
                         <div className="flex flex-col gap-2.5">
                           {[
-                            { step: 1, text: "Open your TikTok Business Center", icon: <ExternalLink className="size-3 text-primary" /> },
-                            { step: 2, text: "Go to Assets → Pixels → select your Pixel", icon: <Scan className="size-3 text-primary" /> },
-                            { step: 3, text: "Click Partners → Add Partner → paste Salla's BC ID above", icon: <ArrowLeftRight className="size-3 text-primary" /> },
-                            { step: 4, text: "Confirm sharing — Salla will auto-detect and link it", icon: <CheckCircle2 className="size-3 text-primary" /> },
+                            { step: 1, text: "Open your TikTok Business Center", icon: <ExternalLink className="size-3 text-[#004956]" /> },
+                            { step: 2, text: "Go to Assets → Pixels → select your Pixel", icon: <Scan className="size-3 text-[#004956]" /> },
+                            { step: 3, text: "Click Partners → Add Partner → paste Salla's BC ID above", icon: <ArrowLeftRight className="size-3 text-[#004956]" /> },
+                            { step: 4, text: "Confirm sharing — Salla will auto-detect and link it", icon: <CheckCircle2 className="size-3 text-[#004956]" /> },
                           ].map((s) => (
                             <div key={s.step} className="flex items-start gap-2.5">
-                              <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                              <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#e6fff9]">
                                 {s.icon}
                               </div>
                               <div>
@@ -782,137 +909,6 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
               </div>
               )}
 
-              {/* ── Reach Objective Info ── */}
-              {isReach && (
-                <div className="border-t border-border px-4 sm:px-8 py-5">
-                  <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <Eye className="size-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Reach Campaign</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        Maximize the number of unique people who see your ad. TikTok will optimize delivery to show your ad to as many people as possible within your budget.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {[
-                      {
-                        title: "No pixel required",
-                        desc: "Reach campaigns don't need conversion tracking. You pay for impressions (CPM), not actions.",
-                      },
-                      {
-                        title: "Frequency control",
-                        desc: "Set how many times each person sees your ad to avoid ad fatigue and maximize unique reach.",
-                      },
-                      {
-                        title: "All ad formats supported",
-                        desc: "Use Single Video, Single Image, Carousel, or Spark Ads to reach your audience.",
-                      },
-                      {
-                        title: "Brand awareness focused",
-                        desc: "Best for product launches, brand awareness, and reaching new audiences at scale.",
-                      },
-                    ].map((item) => (
-                      <div key={item.title} className="rounded-lg border border-border bg-muted/20 p-3">
-                        <p className="text-xs font-medium text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ── Traffic Objective Info ── */}
-              {isTraffic && (
-                <div className="border-t border-border px-4 sm:px-8 py-5">
-                  <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <MousePointerClick className="size-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Traffic Campaign</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        Drive more visitors to your website or landing page. TikTok will optimize delivery to send the most people to your destination URL within your budget.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {[
-                      {
-                        title: "Pixel is optional",
-                        desc: "A pixel is not required but recommended for Landing Page View optimization and better audience insights.",
-                      },
-                      {
-                        title: "Two optimization goals",
-                        desc: "Choose between Clicks (maximize link clicks, CPC billing) or Landing Page View (higher-quality traffic, oCPM billing).",
-                      },
-                      {
-                        title: "All ad formats supported",
-                        desc: "Use Single Video, Single Image, Carousel, or Spark Ads to drive traffic to your site.",
-                      },
-                      {
-                        title: "Website promotion",
-                        desc: "Best for driving visitors to product pages, blog posts, promotions, or any landing page on your store.",
-                      },
-                    ].map((item) => (
-                      <div key={item.title} className="rounded-lg border border-border bg-muted/20 p-3">
-                        <p className="text-xs font-medium text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ── Video Views Objective Info ── */}
-              {isVideoViews && (
-                <div className="border-t border-border px-4 sm:px-8 py-5">
-                  <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <Play className="size-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Video Views Campaign</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        Get more people to watch your video content. TikTok will optimize delivery to show your videos to users most likely to watch them, billed by CPV (cost per view).
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {[
-                      {
-                        title: "No pixel required",
-                        desc: "Video Views campaigns optimize for views, not website actions. You pay per video view (CPV), not conversions.",
-                      },
-                      {
-                        title: "Two optimization goals",
-                        desc: "Choose Video View (2-second views for broad reach) or Focused View (6-second views for higher engagement).",
-                      },
-                      {
-                        title: "Video formats only",
-                        desc: "Use Single Video or Spark Ads. Image and carousel formats are not supported for Video Views campaigns.",
-                      },
-                      {
-                        title: "Brand & content promotion",
-                        desc: "Best for brand storytelling, product demos, content creators, and building video engagement at scale.",
-                      },
-                    ].map((item) => (
-                      <div key={item.title} className="rounded-lg border border-border bg-muted/20 p-3">
-                        <p className="text-xs font-medium text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ---- Lead Generation Section ---- */}
-              {isLeadGen && (
-                <LeadGenerationSection />
-              )}
-
               {/* ---- App Promotion Section ---- */}
               {isAppPromo && (
                 <AppPromotionSection />
@@ -925,7 +921,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
 
               <div className="px-4 sm:px-8 py-5">
                 <div className="mb-1 flex items-center gap-2">
-                  <User className="size-4 text-primary" />
+                  <User className="size-4 text-[#004956]" />
                   <p className="text-sm font-semibold text-foreground">TikTok Identity</p>
                   <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-xs font-normal">Required</Badge>
                   <InfoTip text="Connect your TikTok account so your ads show your real profile. This improves ad performance by up to 30% and enables Spark Ads. Salla connects via Business Center QR code." />
@@ -936,9 +932,9 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
 
                 <div className="flex flex-col gap-4">
                   {/* ---- Ad Account (auto-managed by Salla) ---- */}
-                  <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/[0.02] px-4 py-3">
-                    <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
-                      <CheckCircle2 className="size-4 text-primary" />
+                  <div className="flex items-center gap-3 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-4 py-3">
+                    <div className="flex size-9 items-center justify-center rounded-lg bg-[#e6fff9]">
+                      <CheckCircle2 className="size-4 text-[#004956]" />
                     </div>
                     <div className="flex-1">
                       <p className="text-xs font-semibold text-foreground">Salla Ad Account</p>
@@ -947,7 +943,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                       </p>
                     </div>
                     <Badge variant="outline" className="gap-1 rounded-full px-2 text-[10px]">
-                      <CheckCircle2 className="size-2.5 text-primary" />
+                      <CheckCircle2 className="size-2.5 text-[#004956]" />
                       Connected
                     </Badge>
                   </div>
@@ -967,8 +963,8 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                             <p className="text-xs font-semibold text-foreground">{identity.tiktokUsername}</p>
                             <p className="text-[10px] text-muted-foreground">TikTok Account linked via Business Center</p>
                           </div>
-                          <Badge variant="outline" className="gap-1 rounded-full border-primary/30 px-2 text-[10px]">
-                            <CheckCircle2 className="size-2.5 text-primary" />
+                          <Badge variant="outline" className="gap-1 rounded-full border-[#a4ffe5] px-2 text-[10px]">
+                            <CheckCircle2 className="size-2.5 text-[#004956]" />
                             Linked
                           </Badge>
                         </div>
@@ -1000,7 +996,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                           <button
                             type="button"
                             onClick={() => setShowHowToConnect(true)}
-                            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-[#a4ffe5] hover:text-[#004956]"
                           >
                             <CircleHelp className="size-3" />
                             How does this work?
@@ -1042,8 +1038,8 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                         </div>
 
                         {/* Why connect benefits */}
-                        <div className="flex items-start gap-2 rounded-md border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
-                          <Info className="mt-0.5 size-3 shrink-0 text-primary" />
+                        <div className="flex items-start gap-2 rounded-md border border-[#a4ffe5] bg-[#e6fff9] px-3 py-2.5">
+                          <Info className="mt-0.5 size-3 shrink-0 text-[#004956]" />
                           <p className="text-[10px] leading-relaxed text-muted-foreground">
                             <span className="font-medium text-foreground">Why connect?</span> Linking your TikTok account improves ad performance by up to 30% and unlocks Spark Ads — promoting your organic TikTok posts as paid ads for higher engagement and trust.
                           </p>
@@ -1067,7 +1063,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                           <button
                             type="button"
                             onClick={() => setShowHowToConnect(true)}
-                            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                            className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-[#a4ffe5] hover:text-[#004956]"
                           >
                             <PlayCircle className="size-3" />
                             Watch how
@@ -1096,8 +1092,8 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                                   {identity.linkStatus === "scanned" && (
                                     <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/90">
                                       <div className="flex flex-col items-center gap-1">
-                                        <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                                        <span className="text-[10px] font-medium text-primary">Confirming...</span>
+                                        <div className="size-6 animate-spin rounded-full border-2 border-[#a4ffe5] border-t-transparent" />
+                                        <span className="text-[10px] font-medium text-[#004956]">Confirming...</span>
                                       </div>
                                     </div>
                                   )}
@@ -1123,13 +1119,13 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                           <div className="flex flex-1 flex-col gap-3">
                             <div className="flex flex-col gap-3">
                               {[
-                                { step: 1, text: "Open the TikTok app on your phone", icon: <Smartphone className="size-3 text-primary" /> },
-                                { step: 2, text: "Tap your Profile, then the menu at the top right", icon: <User className="size-3 text-primary" /> },
-                                { step: 3, text: "Go to Settings and privacy, then QR code scanner", icon: <Globe className="size-3 text-primary" /> },
-                                { step: 4, text: "Point your camera at this QR code and approve", icon: <CheckCircle2 className="size-3 text-primary" /> },
+                                { step: 1, text: "Open the TikTok app on your phone", icon: <Smartphone className="size-3 text-[#004956]" /> },
+                                { step: 2, text: "Tap your Profile, then the menu at the top right", icon: <User className="size-3 text-[#004956]" /> },
+                                { step: 3, text: "Go to Settings and privacy, then QR code scanner", icon: <Globe className="size-3 text-[#004956]" /> },
+                                { step: 4, text: "Point your camera at this QR code and approve", icon: <CheckCircle2 className="size-3 text-[#004956]" /> },
                               ].map((s) => (
                                 <div key={s.step} className="flex items-start gap-2.5">
-                                  <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                                  <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#e6fff9]">
                                     {s.icon}
                                   </div>
                                   <div>
@@ -1168,7 +1164,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                                     },
                                   })
                                 }
-                                className="text-[10px] font-medium text-primary hover:underline"
+                                className="text-[10px] font-medium text-[#004956] hover:underline"
                               >
                                 Simulate successful scan (demo)
                               </button>
@@ -1186,8 +1182,8 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                       <div className="border-b border-border px-6 py-5">
                         <SheetHeader>
                           <SheetTitle className="flex items-center gap-2.5 text-base">
-                            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
-                              <Smartphone className="size-4 text-primary" />
+                            <div className="flex size-8 items-center justify-center rounded-lg bg-[#e6fff9]">
+                              <Smartphone className="size-4 text-[#004956]" />
                             </div>
                             How to connect your TikTok account
                           </SheetTitle>
@@ -1227,7 +1223,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                                 { step: 5, title: "Scan & approve", desc: "Point your camera at the QR code on this screen. TikTok will ask you to approve the connection from Salla — tap \"Confirm\"." },
                               ].map((s) => (
                                 <div key={s.step} className="flex items-start gap-3">
-                                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[11px] font-bold text-white">
                                     {s.step}
                                   </div>
                                   <div className="pt-0.5">
@@ -1276,8 +1272,8 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                       <div className="border-b border-border px-6 py-5">
                         <SheetHeader>
                           <SheetTitle className="flex items-center gap-2.5 text-base">
-                            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
-                              <Scan className="size-4 text-primary" />
+                            <div className="flex size-8 items-center justify-center rounded-lg bg-[#e6fff9]">
+                              <Scan className="size-4 text-[#004956]" />
                             </div>
                             How to share your TikTok Pixel
                           </SheetTitle>
@@ -1312,7 +1308,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                                 { step: 5, title: "Enter your Pixel ID here", desc: "Come back to this page and enter your Pixel ID. Click \"Verify\" — we'll confirm it's connected." },
                               ].map((s) => (
                                 <div key={s.step} className="flex items-start gap-3">
-                                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[11px] font-bold text-white">
                                     {s.step}
                                   </div>
                                   <div className="pt-0.5">
@@ -1370,8 +1366,8 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
               {isTraffic && (
                 <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="mb-4 flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <Scan className="size-5 text-primary" />
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                      <Scan className="size-5 text-[#004956]" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -1398,26 +1394,26 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                       className={cn(
                         "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all",
                         obj.pixelMode === "none"
-                          ? "border-primary bg-primary/[0.04] shadow-sm"
-                          : "border-border bg-background hover:border-primary/40"
+                          ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                          : "border-border bg-background hover:border-[#a4ffe5]"
                       )}
                     >
                       <div className="mb-3 flex items-center justify-between">
                         <div className={cn(
                           "flex size-9 items-center justify-center rounded-lg transition-colors",
                           obj.pixelMode === "none"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                            ? "bg-[#004956] text-white"
+                            : "bg-muted text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
                         )}>
                           <MousePointerClick className="size-4" />
                         </div>
                         {obj.pixelMode === "none" && (
-                          <CheckCircle2 className="size-4 text-primary" />
+                          <CheckCircle2 className="size-4 text-[#004956]" />
                         )}
                       </div>
                       <p className={cn(
                         "text-sm font-semibold",
-                        obj.pixelMode === "none" ? "text-primary" : "text-foreground"
+                        obj.pixelMode === "none" ? "text-[#004956]" : "text-foreground"
                       )}>
                         Skip Pixel
                       </p>
@@ -1433,12 +1429,12 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                       className={cn(
                         "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all",
                         obj.pixelMode === "salla_managed"
-                          ? "border-primary bg-primary/[0.04] shadow-sm"
-                          : "border-border bg-background hover:border-primary/40"
+                          ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                          : "border-border bg-background hover:border-[#a4ffe5]"
                       )}
                     >
                       <div className="absolute -top-2.5 right-3">
-                        <Badge className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground shadow-sm">
+                        <Badge className="rounded-full bg-[#004956] px-2 py-0.5 text-xs font-semibold text-white shadow-sm">
                           Recommended
                         </Badge>
                       </div>
@@ -1446,18 +1442,18 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                         <div className={cn(
                           "flex size-9 items-center justify-center rounded-lg transition-colors",
                           obj.pixelMode === "salla_managed"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                            ? "bg-[#004956] text-white"
+                            : "bg-muted text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
                         )}>
                           <ShieldCheck className="size-4" />
                         </div>
                         {obj.pixelMode === "salla_managed" && (
-                          <CheckCircle2 className="size-4 text-primary" />
+                          <CheckCircle2 className="size-4 text-[#004956]" />
                         )}
                       </div>
                       <p className={cn(
                         "text-sm font-semibold",
-                        obj.pixelMode === "salla_managed" ? "text-primary" : "text-foreground"
+                        obj.pixelMode === "salla_managed" ? "text-[#004956]" : "text-foreground"
                       )}>
                         Use Salla Pixel
                       </p>
@@ -1473,26 +1469,26 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                       className={cn(
                         "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all",
                         obj.pixelMode === "existing"
-                          ? "border-primary bg-primary/[0.04] shadow-sm"
-                          : "border-border bg-background hover:border-primary/40"
+                          ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                          : "border-border bg-background hover:border-[#a4ffe5]"
                       )}
                     >
                       <div className="mb-3 flex items-center justify-between">
                         <div className={cn(
                           "flex size-9 items-center justify-center rounded-lg transition-colors",
                           obj.pixelMode === "existing"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                            ? "bg-[#004956] text-white"
+                            : "bg-muted text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
                         )}>
                           <Link2 className="size-4" />
                         </div>
                         {obj.pixelMode === "existing" && (
-                          <CheckCircle2 className="size-4 text-primary" />
+                          <CheckCircle2 className="size-4 text-[#004956]" />
                         )}
                       </div>
                       <p className={cn(
                         "text-sm font-semibold",
-                        obj.pixelMode === "existing" ? "text-primary" : "text-foreground"
+                        obj.pixelMode === "existing" ? "text-[#004956]" : "text-foreground"
                       )}>
                         Connect Your Pixel
                       </p>
@@ -1504,10 +1500,10 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
 
                   {/* Salla managed pixel detail */}
                   {obj.pixelMode === "salla_managed" && (
-                    <div className="mt-4 rounded-lg border border-primary/20 bg-primary/[0.03] p-4">
+                    <div className="mt-4 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] p-4">
                       <div className="flex items-start gap-3">
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                          <ShieldCheck className="size-4 text-primary" />
+                        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                          <ShieldCheck className="size-4 text-[#004956]" />
                         </div>
                         <div>
                           <p className="text-xs font-semibold text-foreground">Salla handles everything automatically</p>
@@ -1519,7 +1515,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                               "Verify everything works before your campaign goes live",
                             ].map((item) => (
                               <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
-                                <CheckCircle2 className="mt-0.5 size-3 shrink-0 text-primary" />
+                                <CheckCircle2 className="mt-0.5 size-3 shrink-0 text-[#004956]" />
                                 {item}
                               </li>
                             ))}
@@ -1573,14 +1569,14 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                             <button
                               type="button"
                               onClick={() => setShowPixelHelp(true)}
-                              className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                              className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-[#a4ffe5] hover:text-[#004956]"
                             >
                               <CircleHelp className="size-3" />
                               How?
                             </button>
                           </div>
 
-                          <div className="rounded-lg border border-primary/20 bg-primary/[0.03] px-4 py-3">
+                          <div className="rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-4 py-3">
                             <p className="mb-1.5 text-[10px] font-medium text-foreground">Salla Business Center ID</p>
                             <div className="flex items-center gap-2">
                               <code className="flex-1 rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground">
@@ -1691,8 +1687,8 @@ function AppPromotionSection() {
       {/* App Promotion Info */}
       <div className="border-t border-border px-4 sm:px-8 py-5">
         <div className="flex items-start gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-            <Smartphone className="size-4 text-primary" />
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+            <Smartphone className="size-4 text-[#004956]" />
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">App Promotion</p>
@@ -1727,13 +1723,13 @@ function AppPromotionSection() {
                     className={cn(
                       "flex items-center gap-3 rounded-xl border-2 p-3 text-left transition-all",
                       selected
-                        ? "border-primary bg-primary/[0.03] shadow-sm"
-                        : "border-border bg-card hover:border-primary/40"
+                        ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                        : "border-border bg-card hover:border-[#a4ffe5]"
                     )}
                   >
                     <div className={cn(
                       "flex size-9 items-center justify-center rounded-lg",
-                      selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                      selected ? "bg-[#004956] text-white" : "bg-muted text-muted-foreground"
                     )}>
                       <Smartphone className="size-4" />
                     </div>
@@ -1741,7 +1737,7 @@ function AppPromotionSection() {
                       <p className="text-sm font-semibold text-foreground">{platform.label}</p>
                       <p className="text-xs text-muted-foreground">{platform.desc}</p>
                     </div>
-                    {selected && <CheckCircle2 className="ml-auto size-4 text-primary" />}
+                    {selected && <CheckCircle2 className="ml-auto size-4 text-[#004956]" />}
                   </button>
                 );
               })}
@@ -1810,26 +1806,3 @@ function AppPromotionSection() {
   );
 }
 
-function LeadGenerationSection() {
-  return (
-    <div className="border-t border-border px-4 sm:px-8 py-5">
-      <div className="flex items-start gap-3">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-          <ClipboardList className="size-4 text-primary" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-foreground">Lead Generation</p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-            Collect customer information through TikTok Instant Forms. Auto-filled fields increase completion rates.
-          </p>
-        </div>
-      </div>
-      <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
-        <Info className="mt-0.5 size-3.5 shrink-0 text-primary" />
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Your lead collection method and Instant Form will be configured in the <span className="font-medium text-foreground">Ad Design</span> step alongside your ad creative.
-        </p>
-      </div>
-    </div>
-  );
-}
