@@ -190,6 +190,7 @@ export function BudgetDurationCard({
 
   const isPreset = (days: number) => durationDays === days;
   const [customMode, setCustomMode] = useState(false);
+  const [salaryBoostEnabled, setSalaryBoostEnabled] = useState(false);
 
   /* Auto-increase computations */
   const autoIncreasePreview = (ai.enabled && autoIncreaseAvailable)
@@ -602,12 +603,12 @@ export function BudgetDurationCard({
                 </div>
               </div>
               <Switch
-                checked={ai.enabled && endDateOptional}
-                onCheckedChange={(checked) => updateAI({ enabled: checked })}
+                checked={salaryBoostEnabled}
+                onCheckedChange={setSalaryBoostEnabled}
               />
             </div>
 
-            {ai.enabled && endDateOptional && (
+            {salaryBoostEnabled && (
               <div className="mt-4 rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/30 p-4">
                 <div className="flex items-center gap-6">
                   <div className="flex-1 text-center">
