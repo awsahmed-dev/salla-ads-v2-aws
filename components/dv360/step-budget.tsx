@@ -197,6 +197,7 @@ export function DV360StepBudget() {
             endDateRequired={true}
             showAutoIncrease={false}
             showLifetimeToggle={false}
+            showSmartStart={true}
           />
 
           {/* ---- Bidding Strategy ---- */}

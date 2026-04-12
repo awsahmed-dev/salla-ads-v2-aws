@@ -420,7 +420,7 @@ export function BudgetDurationCard({
               <Input
                 type="date"
                 value={startDate}
-                min={earliestGoLive?.date ?? new Date().toISOString().split("T")[0]}
+                min={new Date().toISOString().split("T")[0]}
                 onChange={(e) => {
                   const newStart = e.target.value;
                   onStartDateChange(newStart);

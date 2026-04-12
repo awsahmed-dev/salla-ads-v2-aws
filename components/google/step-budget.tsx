@@ -530,6 +530,7 @@ export function GoogleStepBudget() {
             autoIncrease={autoIncrease}
             onAutoIncreaseChange={(ai) => updateNested("budget", { autoIncrease: ai })}
             onBulkUpdate={(updates) => updateNested("budget", updates)}
+            showSmartStart={true}
           />
 
           {/* Launch time window (v23) intentionally hidden in UI.
