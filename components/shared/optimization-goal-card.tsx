@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { SectionCard } from "@/components/shared/section-card";
+import { ArrowRight, Sparkles, AlertCircle } from "lucide-react";
 
 export interface GoalOption {
   value: string;
@@ -18,6 +19,8 @@ export interface GoalOption {
   locked?: boolean;
 }
 
+export type PixelReadiness = "none" | "new" | "established";
+
 interface OptimizationGoalCardProps {
   goals: GoalOption[];
   selectedGoal: string;
@@ -28,6 +31,7 @@ interface OptimizationGoalCardProps {
   apiBadge?: string;
   warnings?: React.ReactNode;
   infoTipText?: string;
+  pixelReadiness?: PixelReadiness;
   children?: React.ReactNode;
 }
 
@@ -39,8 +43,13 @@ export function OptimizationGoalCard({
   subtitle,
   warnings,
   infoTipText = "Choose the action you want to optimize. This determines how your budget is spent.",
+  pixelReadiness,
   children,
 }: OptimizationGoalCardProps) {
+  const isNewPixel = pixelReadiness === "new";
+  const selectedGoalObj = goals.find((g) => g.value === selectedGoal);
+  const isAdvancedGoalWithNewPixel = isNewPixel && selectedGoalObj?.requiresPixel && selectedGoal !== "PIXEL_PAGE_VIEW" && selectedGoal !== "LANDING_PAGE_VIEW";
+
   return (
     <SectionCard>
       {/* Header */}
@@ -55,6 +64,37 @@ export function OptimizationGoalCard({
 
       {subtitle && (
         <p className="mb-4 text-xs text-muted-foreground">{subtitle}</p>
+      )}
+
+      {/* Pixel readiness — progression path for new pixels */}
+      {isNewPixel && (
+        <div className="mb-4 rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/30 p-4">
+          <div className="flex items-start gap-2.5 mb-3">
+            <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+            <div>
+              <p className="text-xs font-semibold text-[#004956]">New pixel detected — build data first</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-[#004956]/70">
+                Your pixel is new and needs traffic data to optimize effectively. Follow this path for the best results:
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-2.5">
+            <div className="flex items-center gap-1.5">
+              <span className="flex size-5 items-center justify-center rounded-full bg-[#004956] text-[9px] font-bold text-white">1</span>
+              <span className="text-[11px] font-semibold text-foreground">Page Views</span>
+            </div>
+            <ArrowRight className="size-3 text-muted-foreground/40" />
+            <div className="flex items-center gap-1.5">
+              <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground">2</span>
+              <span className="text-[11px] text-muted-foreground">Add to Cart</span>
+            </div>
+            <ArrowRight className="size-3 text-muted-foreground/40" />
+            <div className="flex items-center gap-1.5">
+              <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground">3</span>
+              <span className="text-[11px] text-muted-foreground">Purchases</span>
+            </div>
+          </div>
+        </div>
       )}
 
       {layout === "grid" ? (
@@ -233,6 +273,22 @@ export function OptimizationGoalCard({
       )}
 
       {warnings}
+
+      {/* Warning when selecting advanced goal with new pixel */}
+      {isAdvancedGoalWithNewPixel && (
+        <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600" />
+          <div>
+            <p className="text-xs font-semibold text-amber-800">
+              Your pixel has limited data for &ldquo;{selectedGoalObj?.label}&rdquo;
+            </p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700">
+              Starting with <span className="font-semibold">Page Views</span> for 1–2 weeks builds the data the platform needs to find buyers. You can switch to {selectedGoalObj?.label} anytime.
+            </p>
+          </div>
+        </div>
+      )}
+
       {children}
     </SectionCard>
   );

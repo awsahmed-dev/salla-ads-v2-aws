@@ -576,6 +576,11 @@ export function StepBudget() {
             }}
             layout="grid"
             infoTipText="Choose what action you want to optimize for. This determines how your budget is spent."
+            pixelReadiness={
+              !hasPixelConfigured ? "none"
+              : pixelMode === "salla_managed" ? "new"
+              : "established"
+            }
             warnings={
               <>
                 {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && !hasPixelConfigured && (
