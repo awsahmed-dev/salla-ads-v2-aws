@@ -180,14 +180,6 @@ function TagPill({ label, onRemove }: { label: string; onRemove: () => void }) {
   );
 }
 
-function SectionGroupHeader({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-foreground">{title}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-    </div>
-  );
-}
 
 function isGenericSiteDomain(input: string): boolean {
   const normalized = input.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "");
@@ -556,38 +548,6 @@ export function GoogleStepAudience() {
         {/* LEFT COLUMN                                                   */}
         {/* ============================================================ */}
         <div className="flex flex-1 flex-col gap-5">
-          {/* Step header: title + description (align with other platforms) */}
-          <div className="mb-1">
-            <h2 className="text-xl font-bold tracking-tight text-foreground">Audience & targeting</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Define who sees your ads. Add locations, demographics, and audience signals to reach the right people.
-            </p>
-          </div>
-
-          {!isShopping && !isApp && (
-            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
-              <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                <span className="font-semibold text-foreground">Quick terms:</span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-muted-foreground">
-                  Signal
-                  <InfoTip text="A hint to guide Google AI toward likely converters. Signals are recommendations, not strict delivery limits." />
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-muted-foreground">
-                  Observation
-                  <InfoTip text="Track audience performance and adjust bids without restricting who can see your ads." />
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-muted-foreground">
-                  Targeting
-                  <InfoTip text="Restrict delivery to selected audiences only. Use when you intentionally want tighter reach." />
-                </span>
-              </div>
-            </div>
-          )}
-
-          <SectionGroupHeader
-            title="Required to launch"
-            description="Complete these basics first so your campaign can deliver."
-          />
 
           {/* ---- 1. Location (shared component — same UX as all platforms; maps to locationIds + cityIds) ---- */}
           <SectionCard>
@@ -696,15 +656,6 @@ export function GoogleStepAudience() {
           />}
 
           {!isApp && (<>
-          <SectionGroupHeader
-            title="Recommended for performance"
-            description={isPMax
-              ? "Add strong audience signals so PMax can learn faster."
-              : isSearch
-                ? "Build targeting quality to improve relevance and efficiency."
-                : "Add audience quality signals to improve delivery outcomes."
-            }
-          />
 
           {/* ---- 2b. Keywords (Search only) ---- */}
           {isSearch && (
@@ -1699,10 +1650,6 @@ export function GoogleStepAudience() {
             </SectionCard>
           )}
 
-          <SectionGroupHeader
-            title="Advanced controls"
-            description="Use these options after your core targeting is set."
-          />
 
           {/* ---- 4. Salla Smart Features (shared; hidden for App) ---- */}
           {!isApp && (
