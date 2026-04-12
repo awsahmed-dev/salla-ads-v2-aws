@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { PlatformSelectionPage, type Platform } from "@/components/shared/platform-selection-page";
 import { CampaignProvider } from "@/lib/snapchat/campaign-context";
 import { CampaignWizard } from "@/components/snapchat/campaign-wizard";
@@ -12,14 +11,10 @@ import { DV360CampaignProvider } from "@/lib/dv360/campaign-context";
 import { DV360CampaignWizard } from "@/components/dv360/campaign-wizard";
 import { MetaCampaignProvider } from "@/lib/meta/campaign-context";
 import { MetaCampaignWizard } from "@/components/meta/campaign-wizard";
-
-interface ActiveState {
-  platform: Platform;
-  draftId?: string;
-}
+import { useApp } from "@/lib/app-context";
 
 export function PlatformSwitcher() {
-  const [active, setActive] = useState<ActiveState | null>(null);
+  const { active, setActive } = useApp();
 
   const handleBack = () => setActive(null);
   const handleSelect = (platform: Platform) => setActive({ platform });

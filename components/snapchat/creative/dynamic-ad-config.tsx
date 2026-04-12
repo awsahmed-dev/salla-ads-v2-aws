@@ -292,84 +292,95 @@ export function DynamicAdConfig({
 
       {/* ═══════════ Product Set Picker Sheet ═══════════ */}
       <Sheet open={showSetPicker} onOpenChange={setShowSetPicker}>
-        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
-          <SheetHeader className="border-b border-border px-5 py-4">
-            <SheetTitle className="flex items-center gap-2 text-base">
-              <ShoppingBag className="size-5 text-primary" />
-              Select Product Set
-            </SheetTitle>
-            <p className="text-[13px] text-muted-foreground">
-              Choose which products Snapchat will use to generate dynamic ads.
-            </p>
-          </SheetHeader>
+        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[420px]">
 
-          {/* Search + Filter */}
-          <div className="flex flex-col gap-3 border-b border-border px-5 py-3">
+          {/* ── Branded header (matches Snapchat sheet style) ── */}
+          <div className="bg-[#004956] px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+                <ShoppingBag className="size-5 text-white" />
+              </div>
+              <div>
+                <SheetTitle className="text-base font-bold text-white">Select Product Set</SheetTitle>
+                <p className="mt-0.5 text-xs text-white/70">
+                  Choose which products Snapchat will use to generate dynamic ads.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Search + Filter ── */}
+          <div className="flex flex-col gap-3 border-b border-border bg-white px-4 py-3">
+            {/* Search */}
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search product sets..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-8 pl-8 text-xs"
+                className="h-9 rounded-full border-border bg-muted/40 pl-9 text-xs focus-visible:ring-[#a4ffe5]"
               />
               {search && (
-                <button type="button" onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-foreground">
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                >
                   <X className="size-3" />
                 </button>
               )}
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex gap-1.5">
-                {SET_CATEGORIES.map((cat) => {
-                  const count = cat.value === "all" ? productSets.length
-                    : cat.value === "seasonal" ? productSets.filter((s) => !!s.seasonalTag).length
-                    : cat.value === "category" ? productSets.filter((s) => s.id.startsWith("ps_cat_")).length
-                    : productSets.filter((s) => !s.seasonalTag && !s.id.startsWith("ps_cat_")).length;
-                  return (
-                    <button
-                      key={cat.value}
-                      type="button"
-                      onClick={() => setFilterTab(cat.value)}
-                      className={cn(
-                        "flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
-                        filterTab === cat.value
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                      )}
-                    >
-                      {cat.icon}
-                      {cat.label}
-                      <span className={cn("tabular-nums", filterTab === cat.value ? "text-primary-foreground/70" : "text-muted-foreground/60")}>{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
+
+            {/* Filter tabs */}
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+              {SET_CATEGORIES.map((cat) => {
+                const count =
+                  cat.value === "all" ? productSets.length
+                  : cat.value === "seasonal" ? productSets.filter((s) => !!s.seasonalTag).length
+                  : cat.value === "category" ? productSets.filter((s) => s.id.startsWith("ps_cat_")).length
+                  : productSets.filter((s) => !s.seasonalTag && !s.id.startsWith("ps_cat_")).length;
+                const active = filterTab === cat.value;
+                return (
+                  <button
+                    key={cat.value}
+                    type="button"
+                    onClick={() => setFilterTab(cat.value)}
+                    className={cn(
+                      "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-all",
+                      active
+                        ? "bg-[#a4ffe5] text-[#004956] shadow-sm"
+                        : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    {cat.icon}
+                    {cat.label}
+                    <span className={cn("tabular-nums text-[10px]", active ? "text-[#004956]/70" : "text-muted-foreground/60")}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-            {/* Tab explainer */}
-            <p className="text-[10px] leading-relaxed text-muted-foreground">
-              {filterTab === "all" && "All product sets from your store — smart, category-based, and seasonal."}
-              {filterTab === "standard" && "Auto-updating sets based on store performance — best sellers, new arrivals, on sale, etc."}
-              {filterTab === "category" && "Sets grouped by product category — clothing, electronics, perfume, etc."}
-              {filterTab === "seasonal" && "Curated sets for Saudi holidays and events — Ramadan, Eid, National Day, and more."}
-            </p>
           </div>
 
-          {/* Product Set List */}
-          <div className="flex-1 overflow-y-auto px-4 py-3">
+          {/* ── Product Set List ── */}
+          <div className="flex-1 overflow-y-auto bg-[#f8f8f8] px-4 py-3">
             {filteredSets.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Search className="mb-2 size-6 text-muted-foreground/40" />
-                <p className="text-sm font-medium text-muted-foreground">No matching sets</p>
-                <p className="text-xs text-muted-foreground/60">Try a different search or filter</p>
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="mb-3 flex size-12 items-center justify-center rounded-full bg-muted/60">
+                  <Search className="size-5 text-muted-foreground/50" />
+                </div>
+                <p className="text-sm font-semibold text-muted-foreground">No matching sets</p>
+                <p className="mt-0.5 text-xs text-muted-foreground/60">Try a different search or filter</p>
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                {/* Recommended banner for first-time selection */}
+                {/* Tip banner */}
                 {!config.productSetId && filterTab === "all" && !search && (
-                  <div className="mb-1 rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2 dark:border-blue-900/40 dark:bg-blue-950/20">
-                    <p className="text-[11px] font-medium text-blue-700 dark:text-blue-300">
-                      Tip: Start with <span className="font-bold">&quot;Best Sellers&quot;</span> or <span className="font-bold">&quot;On Sale&quot;</span> — these typically have the highest conversion rates for dynamic ads.
+                  <div className="mb-1 flex items-start gap-2.5 rounded-xl border border-[#a4ffe5] bg-[#e6fff9] px-3 py-2.5">
+                    <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                    <p className="text-[11px] font-medium leading-relaxed text-[#004956]">
+                      Start with <span className="font-bold">&quot;Best Sellers&quot;</span> or <span className="font-bold">&quot;On Sale&quot;</span> — they typically have the highest conversion rates for dynamic ads.
                     </p>
                   </div>
                 )}
@@ -395,26 +406,24 @@ export function DynamicAdConfig({
                         setShowSetPicker(false);
                       }}
                       className={cn(
-                        "group flex flex-col overflow-hidden rounded-xl border text-left transition-all",
+                        "group flex flex-col overflow-hidden rounded-2xl border text-left shadow-sm transition-all",
                         isEmpty
-                          ? "cursor-not-allowed border-border opacity-50"
+                          ? "cursor-not-allowed border-border bg-white opacity-50"
                           : isSelected
-                            ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                            : isRecommended
-                              ? "border-blue-200 bg-blue-50/20 hover:border-primary/40 hover:bg-primary/[0.03] dark:border-blue-900/30 dark:bg-blue-950/10"
-                              : "border-border hover:border-primary/30 hover:bg-muted/20"
+                            ? "border-[#a4ffe5] bg-[#e6fff9] shadow-md"
+                            : "border-white bg-white hover:border-[#a4ffe5] hover:shadow-md"
                       )}
                     >
-                      {/* Preview images */}
+                      {/* Preview image strip */}
                       {set.previewImages && set.previewImages.length > 0 ? (
-                        <div className="flex h-14 gap-px overflow-hidden">
+                        <div className="flex h-[72px] gap-px overflow-hidden rounded-t-2xl">
                           {set.previewImages.slice(0, 4).map((img, i) => (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               key={i}
                               src={img}
                               alt=""
-                              className="h-full flex-1 object-cover transition-transform group-hover:scale-105"
+                              className="h-full flex-1 object-cover transition-transform duration-300 group-hover:scale-105"
                               crossOrigin="anonymous"
                             />
                           ))}
@@ -423,80 +432,89 @@ export function DynamicAdConfig({
                               <div key={`ph-${i}`} className="flex h-full flex-1 items-center justify-center bg-muted/30">
                                 <ImageIcon className="size-3 text-muted-foreground/20" />
                               </div>
-                            ))
-                          }
+                            ))}
                         </div>
                       ) : (
-                        <div className="flex h-10 items-center justify-center gap-2 bg-muted/20">
+                        <div className="flex h-12 items-center justify-center gap-3 rounded-t-2xl bg-muted/20">
                           {[1, 2, 3, 4].map((n) => (
-                            <div key={n} className="flex size-6 items-center justify-center rounded bg-muted/40">
-                              <ImageIcon className="size-2.5 text-muted-foreground/25" />
+                            <div key={n} className="flex size-7 items-center justify-center rounded-lg bg-muted/50">
+                              <ImageIcon className="size-3 text-muted-foreground/25" />
                             </div>
                           ))}
                         </div>
                       )}
 
-                      <div className="flex items-center gap-3 px-3 py-2.5">
+                      {/* Card body */}
+                      <div className="flex items-center gap-3 px-3 py-3">
+                        {/* Set type icon */}
                         <div className={cn(
-                          "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors",
-                          isSelected ? "bg-primary/15" : "bg-muted"
+                          "flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors",
+                          isSelected ? "bg-[#004956] text-white" : "bg-[#f4f4f4] text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
                         )}>
-                          {set.seasonalTag ? (
-                            <Sparkles className={cn("size-4", isSelected ? "text-primary" : "text-muted-foreground")} />
-                          ) : set.autoRefresh ? (
-                            <TrendingUp className={cn("size-3.5", isSelected ? "text-primary" : "text-muted-foreground")} />
-                          ) : (
-                            <Package className={cn("size-3.5", isSelected ? "text-primary" : "text-muted-foreground")} />
-                          )}
+                          {set.seasonalTag
+                            ? <Sparkles className="size-4" />
+                            : set.autoRefresh
+                              ? <TrendingUp className="size-4" />
+                              : <Package className="size-4" />
+                          }
                         </div>
 
+                        {/* Name + meta */}
                         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <p className="truncate text-xs font-semibold text-foreground">{set.nameAr || set.name}</p>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <p className={cn("truncate text-xs font-bold", isSelected ? "text-[#004956]" : "text-foreground")}>
+                              {set.nameAr || set.name}
+                            </p>
                             {isRecommended && (
-                              <span className="shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-[8px] font-bold uppercase text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">Recommended</span>
+                              <span className="shrink-0 rounded-full bg-[#004956] px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+                                Recommended
+                              </span>
                             )}
                             {set.seasonalTag && (
                               <Badge
                                 variant="outline"
                                 className={cn(
-                                  "shrink-0 rounded-full px-1.5 py-0 text-[8px] font-medium capitalize",
-                                  SEASONAL_COLORS[set.seasonalTag] ?? "bg-muted"
+                                  "shrink-0 rounded-full px-1.5 py-0 text-[9px] font-medium capitalize",
+                                  SEASONAL_COLORS[set.seasonalTag] ?? "bg-muted text-muted-foreground"
                                 )}
                               >
                                 {set.seasonalTag.replace(/_/g, " ")}
                               </Badge>
                             )}
                           </div>
-                          <p className="line-clamp-1 text-[10px] text-muted-foreground">
+                          <p className="line-clamp-1 text-[11px] text-muted-foreground">
                             {set.descriptionAr || set.description}
                           </p>
-                          {/* Product count bar */}
-                          <div className="mt-0.5 flex items-center gap-2">
-                            <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted/50">
+                          {/* Count bar */}
+                          <div className="mt-1 flex items-center gap-2">
+                            <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted/40">
                               <div
-                                className={cn("h-full rounded-full transition-all", isSelected ? "bg-primary" : isEmpty ? "bg-red-300" : "bg-emerald-400")}
+                                className={cn(
+                                  "h-full rounded-full transition-all",
+                                  isSelected ? "bg-[#004956]" : isEmpty ? "bg-red-300" : "bg-[#a4ffe5]"
+                                )}
                                 style={{ width: `${barWidth}%` }}
                               />
                             </div>
-                            <span className={cn("shrink-0 text-[10px] font-semibold tabular-nums", isEmpty ? "text-red-500" : "text-foreground")}>
+                            <span className={cn("shrink-0 text-[11px] font-bold tabular-nums", isEmpty ? "text-red-500" : isSelected ? "text-[#004956]" : "text-foreground")}>
                               {set.productCount}
                             </span>
                             {set.autoRefresh && (
-                              <span className="flex shrink-0 items-center gap-0.5 text-[9px] text-emerald-600">
-                                <RefreshCw className="size-2" />
+                              <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-600">
+                                <RefreshCw className="size-2.5" />
                                 Auto
                               </span>
                             )}
                           </div>
                         </div>
 
+                        {/* Right indicator */}
                         {isSelected ? (
-                          <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary">
-                            <Check className="size-3 text-white" />
+                          <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#004956]">
+                            <Check className="size-3.5 text-white" />
                           </div>
                         ) : (
-                          <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                          <ArrowRight className="size-4 shrink-0 text-muted-foreground/30 transition-all group-hover:translate-x-0.5 group-hover:text-[#004956]" />
                         )}
                       </div>
                     </button>
@@ -506,13 +524,13 @@ export function DynamicAdConfig({
             )}
           </div>
 
-          {/* Footer summary */}
-          <div className="flex items-center justify-between border-t border-border bg-muted/30 px-5 py-3">
+          {/* ── Footer ── */}
+          <div className="flex items-center justify-between border-t border-border bg-white px-5 py-3">
             <p className="text-[11px] text-muted-foreground">
               {filteredSets.length} of {productSets.length} sets shown
             </p>
-            <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
-              <RefreshCw className="size-2.5 text-emerald-500" />
+            <p className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600">
+              <RefreshCw className="size-3" />
               Synced from Salla store
             </p>
           </div>

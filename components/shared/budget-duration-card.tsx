@@ -574,9 +574,8 @@ export function BudgetDurationCard({
       {/* ── 4. Budget Scheduling (Auto-Increase) ── */}
       {showAutoIncrease && (
         <div>
-          <button
-            type="button"
-            className="flex w-full items-center justify-between px-6 py-5"
+          <div
+            className="flex w-full cursor-pointer items-center justify-between px-6 py-5"
             onClick={() => {
               if (autoIncreaseAvailable) updateAI({ enabled: !ai.enabled });
             }}
@@ -593,7 +592,7 @@ export function BudgetDurationCard({
             ) : (
               <Switch checked={false} disabled />
             )}
-          </button>
+          </div>
 
           {!autoIncreaseAvailable && (
             <p className="px-6 -mt-3 pb-4 text-xs text-muted-foreground">

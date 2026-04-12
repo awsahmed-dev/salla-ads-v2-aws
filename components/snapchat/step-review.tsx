@@ -857,27 +857,37 @@ export function StepReview() {
 
     {/* Top Up Slider */}
     <Sheet open={topUpOpen} onOpenChange={setTopUpOpen}>
-      <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <CircleDollarSign className="size-5 text-primary" />
-            Top Up {paymentMethod === "wallet" ? "Store Wallet" : "Credit"}
-          </SheetTitle>
-        </SheetHeader>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+        {/* Branded header */}
+        <div className="bg-[#004956] px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+              <CircleDollarSign className="size-5 text-white" />
+            </div>
+            <div>
+              <SheetTitle className="text-base font-bold text-white">
+                Top Up {paymentMethod === "wallet" ? "Store Wallet" : "Credit"}
+              </SheetTitle>
+              <p className="mt-0.5 text-xs text-white/70">
+                Add funds to cover your campaign budget
+              </p>
+            </div>
+          </div>
+        </div>
 
-        <div className="flex-1 overflow-y-auto py-4">
-          <div className="rounded-xl border border-border bg-muted/30 p-4">
-            <p className="text-xs text-muted-foreground">{paymentMethod === "wallet" ? "Current balance" : "Available credit"}</p>
-            <p className="mt-0.5 text-2xl font-bold tabular-nums text-foreground">
-              {(paymentMethod === "wallet" ? walletBalance : creditAvailable).toLocaleString()} <span className="text-sm font-medium text-muted-foreground">SAR</span>
+        <div className="flex-1 overflow-y-auto px-5 py-5">
+          <div className="rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9] p-4">
+            <p className="text-xs text-[#004956]/70">{paymentMethod === "wallet" ? "Current balance" : "Available credit"}</p>
+            <p className="mt-0.5 text-2xl font-bold tabular-nums text-[#004956]">
+              {(paymentMethod === "wallet" ? walletBalance : creditAvailable).toLocaleString()} <span className="text-sm font-medium text-[#004956]/60">SAR</span>
             </p>
-            <div className="mt-3 h-px bg-border" />
+            <div className="mt-3 h-px bg-[#a4ffe5]/60" />
             <div className="mt-3 flex justify-between text-xs">
-              <span className="text-muted-foreground">Campaign cost</span>
-              <span className="font-semibold text-foreground">{totalWithVat.toLocaleString()} SAR</span>
+              <span className="text-[#004956]/70">Campaign cost</span>
+              <span className="font-semibold text-[#004956]">{totalWithVat.toLocaleString()} SAR</span>
             </div>
             <div className="mt-1 flex justify-between text-xs">
-              <span className="text-muted-foreground">Shortfall</span>
+              <span className="text-[#004956]/70">Shortfall</span>
               <span className="font-semibold text-amber-600">{shortfall.toLocaleString()} SAR</span>
             </div>
           </div>
@@ -891,8 +901,10 @@ export function StepReview() {
                   type="button"
                   onClick={() => setTopUpAmount(String(amt))}
                   className={cn(
-                    "rounded-lg border py-2 text-center text-xs font-medium transition-all",
-                    topUpAmount === String(amt) ? "border-primary bg-primary/5 text-primary" : "border-border text-foreground hover:border-primary/40"
+                    "rounded-xl border py-2.5 text-center text-xs font-semibold transition-all",
+                    topUpAmount === String(amt)
+                      ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956] shadow-sm"
+                      : "border-border text-foreground hover:border-[#a4ffe5] hover:bg-[#e6fff9]/50"
                   )}
                 >
                   {amt.toLocaleString()} SAR
@@ -925,25 +937,31 @@ export function StepReview() {
             <button
               type="button"
               onClick={() => setTopUpAmount(String(shortfall))}
-              className="mt-3 flex w-full items-center gap-2 rounded-lg border border-dashed border-primary/30 bg-primary/[0.02] px-3 py-2 text-left transition-colors hover:bg-primary/5"
+              className="mt-3 flex w-full items-center gap-2 rounded-xl border border-dashed border-[#a4ffe5] bg-[#e6fff9]/50 px-3 py-2.5 text-left transition-colors hover:bg-[#e6fff9]"
             >
-              <ArrowUpRight className="size-3.5 text-primary" />
+              <ArrowUpRight className="size-3.5 text-[#004956]" />
               <span className="text-[11px] text-muted-foreground">
-                Minimum: <span className="font-semibold text-primary">{shortfall.toLocaleString()} SAR</span>
+                Minimum: <span className="font-semibold text-[#004956]">{shortfall.toLocaleString()} SAR</span>
               </span>
             </button>
           )}
         </div>
 
-        <div className="border-t border-border pt-4">
-          <Button
-            className="w-full gap-2"
+        <div className="border-t border-border bg-white px-5 py-4">
+          <button
+            type="button"
+            className={cn(
+              "flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-colors",
+              !topUpAmount || Number(topUpAmount) <= 0
+                ? "cursor-not-allowed bg-muted text-muted-foreground"
+                : "bg-[#004956] text-white hover:bg-[#003a44]"
+            )}
             disabled={!topUpAmount || Number(topUpAmount) <= 0}
             onClick={() => { setTopUpOpen(false); setTopUpAmount(""); }}
           >
             <Wallet className="size-4" />
             Top Up {topUpAmount ? `${Number(topUpAmount).toLocaleString()} SAR` : ""}
-          </Button>
+          </button>
           <p className="mt-2 text-center text-[11px] text-muted-foreground">You will be redirected to complete the payment</p>
         </div>
       </SheetContent>

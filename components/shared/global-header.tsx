@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   Search,
@@ -9,7 +10,6 @@ import {
   Menu,
   Home,
   Package,
-  ShoppingBag,
   Shirt,
   Megaphone,
   BarChart3,
@@ -18,6 +18,9 @@ import {
   HelpCircle,
   ChevronRight,
 } from "lucide-react";
+import { useApp } from "@/lib/app-context";
+import { SnapchatLogo } from "@/components/shared/snapchat-logo";
+import type { Platform } from "@/components/shared/platform-selection-page";
 
 function SallaLogo() {
   return (
@@ -61,7 +64,85 @@ const SECONDARY_TABS = [
   { label: "Settings" },
 ];
 
+const PLATFORM_OPTIONS: { platform: Platform; label: string; logo: React.ReactNode }[] = [
+  {
+    platform: "snapchat",
+    label: "Snapchat",
+    logo: <SnapchatLogo className="size-5" />,
+  },
+  {
+    platform: "tiktok",
+    label: "TikTok",
+    logo: (
+      <svg viewBox="0 0 24 24" className="size-5" fill="currentColor">
+        <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.17 8.17 0 004.78 1.53V6.77a4.85 4.85 0 01-1.01-.08z"/>
+      </svg>
+    ),
+  },
+  {
+    platform: "google",
+    label: "Google Ads",
+    logo: (
+      <svg viewBox="0 0 24 24" className="size-5">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+    ),
+  },
+  {
+    platform: "dv360",
+    label: "YouTube",
+    logo: (
+      <svg viewBox="0 0 24 24" className="size-5" fill="#FF0000">
+        <path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+      </svg>
+    ),
+  },
+  {
+    platform: "meta",
+    label: "Meta",
+    logo: (
+      <svg viewBox="0 0 24 24" className="size-5" fill="#1877F2">
+        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+      </svg>
+    ),
+  },
+];
+
 export function GlobalHeader() {
+  const { active, setActive } = useApp();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Close picker when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    if (pickerOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [pickerOpen]);
+
+  function handleCreateAd() {
+    if (active) {
+      // Auto-save is already handled by the campaign context's debounced effect.
+      // Start a fresh campaign on the same platform (no draftId = new campaign).
+      setActive({ platform: active.platform });
+    } else {
+      // On dashboard — open the platform picker dropdown
+      setPickerOpen((v) => !v);
+    }
+  }
+
+  function handlePickPlatform(platform: Platform) {
+    setPickerOpen(false);
+    setActive({ platform });
+  }
+
   return (
     <header className="shrink-0">
       {/* Top bar — dark teal */}
@@ -137,14 +218,36 @@ export function GlobalHeader() {
         </nav>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="relative flex items-center gap-2 sm:gap-4" ref={pickerRef}>
           <button
             type="button"
-            className="flex h-10 items-center gap-1 rounded-lg border-2 border-[#a4ffe5] bg-[#a4ffe5] px-3 text-sm font-medium text-[#004956]"
+            onClick={handleCreateAd}
+            className="flex h-10 items-center gap-1 rounded-lg border-2 border-[#a4ffe5] bg-[#a4ffe5] px-3 text-sm font-medium text-[#004956] transition-colors hover:bg-[#8fffd8]"
           >
             <Plus className="size-4" />
             <span className="hidden sm:inline">Create Ad</span>
           </button>
+
+          {/* Platform picker dropdown — shown when no active campaign */}
+          {pickerOpen && (
+            <div className="absolute right-0 top-12 z-50 min-w-[180px] overflow-hidden rounded-xl border border-border bg-white shadow-lg">
+              <p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Choose Platform
+              </p>
+              {PLATFORM_OPTIONS.map(({ platform, label, logo }) => (
+                <button
+                  key={platform}
+                  type="button"
+                  onClick={() => handlePickPlatform(platform)}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
+                >
+                  <span className="flex size-6 shrink-0 items-center justify-center">{logo}</span>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
           <button
             type="button"
             className="hidden h-10 items-center gap-1 rounded-lg border border-[#a4ffe5] bg-white px-3 text-sm font-medium text-[#004956] md:flex"
