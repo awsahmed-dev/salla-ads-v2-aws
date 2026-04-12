@@ -688,7 +688,14 @@ export function BudgetDurationCard({
             {autoIncreaseAvailable ? (
               <Switch
                 checked={ai.enabled}
-                onCheckedChange={(checked) => updateAI({ enabled: checked })}
+                onCheckedChange={(checked) => {
+                  const updates: Partial<AutoIncreaseState> = { enabled: checked };
+                  // Auto-set safety cap to 3× daily when first enabled
+                  if (checked && ai.maxDailyBudget <= dailyAmount) {
+                    updates.maxDailyBudget = dailyAmount * 3;
+                  }
+                  updateAI(updates);
+                }}
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
@@ -920,9 +927,17 @@ export function BudgetDurationCard({
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">SAR</span>
                 </div>
-                <p className="mt-1.5 text-[10px] text-muted-foreground">
-                  Budget will never exceed this amount per day, regardless of scaling mode.
-                </p>
+                {ai.maxDailyBudget > 0 && ai.maxDailyBudget <= dailyAmount && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-amber-600">
+                    <AlertCircle className="size-3 shrink-0" />
+                    Cap is equal to your daily budget — auto-increase will have no effect. Set it higher (e.g. SAR {(dailyAmount * 3).toLocaleString()}).
+                  </p>
+                )}
+                {(ai.maxDailyBudget === 0 || ai.maxDailyBudget > dailyAmount) && (
+                  <p className="mt-1.5 text-[10px] text-muted-foreground">
+                    Budget will never exceed this amount per day, regardless of scaling mode.
+                  </p>
+                )}
               </div>
             </div>
           )}
