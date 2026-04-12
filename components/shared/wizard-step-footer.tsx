@@ -109,4 +109,4 @@ export function WizardStepFooter({
 }
 
 /** Bottom padding to add to step content so it isn't hidden behind the fixed footer. */
-export const WIZARD_FOOTER_PADDING_BOTTOM = "pb-32";
+export const WIZARD_FOOTER_PADDING_BOTTOM = "pb-40";
