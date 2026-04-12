@@ -21,12 +21,12 @@ export function CampaignReadinessCard({
   const total = checks.length;
 
   return (
-    <div className={cn("rounded-xl bg-card p-6", className)}>
+    <div className={cn("rounded-xl bg-card p-4 sm:p-6", className)}>
       {/* Header */}
       <div className="mb-4 flex items-center gap-4">
         {/* Progress ring */}
-        <div className="relative flex size-11 items-center justify-center">
-          <svg className="size-11 -rotate-90" viewBox="0 0 44 44">
+        <div className="relative flex size-10 sm:size-11 items-center justify-center">
+          <svg className="size-10 sm:size-11 -rotate-90" viewBox="0 0 44 44">
             <circle cx="22" cy="22" r="18" fill="none" stroke="#eee" strokeWidth="3" />
             <circle
               cx="22" cy="22" r="18" fill="none"

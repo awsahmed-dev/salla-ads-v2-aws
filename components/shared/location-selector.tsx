@@ -292,7 +292,7 @@ export function LocationSelector({
                     type="button"
                     onClick={() => toggleCountry(c.code)}
                     className={cn(
-                      "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition-colors",
+                      "flex items-center gap-2 rounded-lg border px-3 py-3 sm:py-2.5 text-left text-sm font-medium transition-colors",
                       selected ? styles.selected : cn("border-border bg-background text-foreground", styles.hover)
                     )}
                   >
@@ -363,7 +363,7 @@ export function LocationSelector({
                                 type="button"
                                 onClick={() => toggleRegion(r.id)}
                                 className={cn(
-                                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                                  "rounded-full border px-2.5 py-2 sm:py-1 text-xs font-medium transition-colors",
                                   sel
                                     ? styles.selected
                                     : "border-border bg-background text-foreground hover:border-primary/30"
@@ -417,7 +417,7 @@ export function LocationSelector({
                           type="button"
                           onClick={() => (isSelected ? removeCity(city.id) : addCity(city))}
                           className={cn(
-                            "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors",
+                            "rounded-full border px-3 py-2 sm:py-1.5 text-xs font-medium shadow-sm transition-colors",
                             isSelected
                               ? "border-[#dbfff6] bg-[#e6fff9] text-[#004956]"
                               : "border-border bg-white text-foreground hover:border-border/80"

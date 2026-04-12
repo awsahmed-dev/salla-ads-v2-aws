@@ -168,6 +168,7 @@ export function StepAudience() {
           )}>
             <button
               type="button"
+              aria-expanded={showAdvanced}
               onClick={() => setShowAdvanced(!showAdvanced)}
               className={cn(
                 "flex w-full items-center justify-between px-4 pb-3 pt-4 sm:px-6 sm:pt-5 text-left transition-colors rounded-2xl",
