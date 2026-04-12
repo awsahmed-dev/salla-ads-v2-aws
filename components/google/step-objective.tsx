@@ -252,8 +252,8 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                         !o.active
                           ? "cursor-not-allowed opacity-40 border-border"
                           : selected
-                            ? "border-primary bg-primary/[0.04] shadow-sm"
-                            : "border-border bg-white hover:border-primary/40 hover:shadow-sm"
+                            ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                            : "border-border bg-white hover:border-[#a4ffe5] hover:shadow-sm"
                       )}
                     >
                       <div className={cn(
@@ -261,14 +261,14 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                         !o.active
                           ? "bg-muted text-muted-foreground"
                           : selected
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-[#f4f4f4] text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                            ? "bg-[#004956] text-white"
+                            : "bg-[#f4f4f4] text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
                       )}>
                         <OIcon className="size-5" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className={cn("text-sm font-bold", !o.active ? "text-muted-foreground" : selected ? "text-primary" : "text-foreground")}>{o.label}</span>
+                          <span className={cn("text-sm font-bold", !o.active ? "text-muted-foreground" : selected ? "text-[#004956]" : "text-foreground")}>{o.label}</span>
                           {!o.active && (
                             <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Soon</span>
                           )}
@@ -291,7 +291,7 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                   <button
                     type="button"
                     onClick={() => setObjectiveSheetOpen(true)}
-                    className="shrink-0 text-xs font-bold text-primary underline decoration-primary/30 decoration-2 underline-offset-2 hover:decoration-primary"
+                    className="shrink-0 text-xs font-bold text-[#004956] underline decoration-[#a4ffe5] decoration-2 underline-offset-2 hover:decoration-[#004956]"
                   >
                     Learn more
                   </button>
@@ -301,14 +301,14 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
               {/* Objective Details Sheet */}
               <Sheet open={objectiveSheetOpen} onOpenChange={setObjectiveSheetOpen}>
                 <SheetContent side="right" className="flex w-full flex-col sm:max-w-[420px] bg-white p-0">
-                  <div className="bg-primary px-6 py-6">
+                  <div className="bg-[#004956] px-6 py-6">
                     <div className="flex items-center gap-4">
                       <div className="flex size-12 items-center justify-center rounded-2xl bg-white/15">
                         <selectedObj.icon className="size-6 text-white" />
                       </div>
                       <div>
                         <SheetTitle className="text-lg font-bold text-white">{selectedObj.label}</SheetTitle>
-                        <Badge className="mt-1 rounded-full border-0 bg-primary-foreground/20 px-2 py-0.5 text-xs font-medium text-white">
+                        <Badge className="mt-1 rounded-full border-0 bg-[#a4ffe5] px-2 py-0.5 text-xs font-medium text-[#004956]">
                           {FUNNEL_LABELS[selectedObj.funnelStage].label}
                         </Badge>
                       </div>
@@ -316,7 +316,7 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                     <p className="mt-3 text-sm text-white/70">{selectedObj.desc}</p>
                   </div>
                   <div className="flex-1 overflow-y-auto">
-                    <div className="mx-6 mt-6 flex h-[180px] items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80">
+                    <div className="mx-6 mt-6 flex h-[180px] items-center justify-center rounded-2xl bg-gradient-to-br from-[#004956] to-[#006d7a]">
                       <div className="text-center">
                         <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-white/20">
                           <svg viewBox="0 0 24 24" className="ml-0.5 size-5 text-white" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
@@ -328,15 +328,15 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                     <div className="space-y-6 px-6 py-6">
                       <div className="grid grid-cols-3 gap-3">
                         <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
-                          <p className="text-lg font-bold text-primary">{config.allowedAdFormats?.length ?? 3}</p>
+                          <p className="text-lg font-bold text-[#004956]">{config.allowedAdFormats?.length ?? 3}</p>
                           <p className="text-xs font-medium text-muted-foreground">Ad Formats</p>
                         </div>
                         <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
-                          <p className="text-lg font-bold text-primary">SAR 150</p>
+                          <p className="text-lg font-bold text-[#004956]">SAR 150</p>
                           <p className="text-xs font-medium text-muted-foreground">Min Budget/day</p>
                         </div>
                         <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
-                          <p className="text-lg font-bold text-primary">7+</p>
+                          <p className="text-lg font-bold text-[#004956]">7+</p>
                           <p className="text-xs font-medium text-muted-foreground">Days Recommended</p>
                         </div>
                       </div>
@@ -348,7 +348,7 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                         <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Metrics</p>
                         <div className="flex flex-wrap gap-2">
                           {selectedObj.kpis.map((kpi) => (
-                            <span key={kpi} className="rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">{kpi}</span>
+                            <span key={kpi} className="rounded-full border border-[#a4ffe5] bg-[#e6fff9] px-4 py-1.5 text-xs font-medium text-[#004956]">{kpi}</span>
                           ))}
                         </div>
                       </div>
@@ -363,7 +363,7 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                             { title: "Launch & optimize", desc: "Review, launch, and monitor after 3-5 days." },
                           ].map((s, i) => (
                             <div key={i} className="flex items-start gap-3">
-                              <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{i + 1}</div>
+                              <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#004956] text-xs font-bold text-white">{i + 1}</div>
                               <div>
                                 <p className="text-sm font-bold text-foreground">{s.title}</p>
                                 <p className="text-xs text-muted-foreground">{s.desc}</p>
@@ -372,12 +372,12 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                           ))}
                         </div>
                       </div>
-                      <div className="rounded-xl bg-primary/5 p-4">
+                      <div className="rounded-xl bg-[#e6fff9] p-4">
                         <div className="mb-1 flex items-center gap-2">
-                          <Sparkles className="size-3.5 text-primary" />
-                          <p className="text-xs font-bold text-primary">Pro Tip</p>
+                          <Sparkles className="size-3.5 text-[#004956]" />
+                          <p className="text-xs font-bold text-[#004956]">Pro Tip</p>
                         </div>
-                        <p className="text-xs leading-relaxed text-primary/80">
+                        <p className="text-xs leading-relaxed text-[#004956]/80">
                           {selectedObj.funnelStage === "conversion"
                             ? "Start broad and let Google's algorithm find your best customers. Narrow down after the learning phase."
                             : selectedObj.funnelStage === "consideration"
@@ -397,7 +397,7 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                           if (input) { input.scrollIntoView({ behavior: 'smooth', block: 'center' }); input.focus(); }
                         }, 300);
                       }}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#004956] py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#003a44]"
                     >
                       <ArrowRight className="size-4" />
                       Start Campaign
@@ -425,7 +425,7 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                       const autoName = `${selectedObj.label} - Google Ads - ${date}`;
                       updateNested("objective", { campaignName: autoName });
                     }}
-                    className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    className="flex items-center gap-1 text-xs font-medium text-[#004956] hover:underline"
                   >
                     <Sparkles className="size-3" />
                     Auto-generate
@@ -450,9 +450,9 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
               {isApp && (
                 <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="mb-3 flex items-center gap-2">
-                    <Smartphone className="size-4 text-primary" />
+                    <Smartphone className="size-4 text-[#004956]" />
                     <Label className="text-sm font-semibold text-foreground">App campaign setup</Label>
-                    <Badge className="rounded-full bg-primary/10 px-1.5 py-0 text-[10px] text-primary">Required</Badge>
+                    <Badge className="rounded-full bg-[#e6fff9] px-1.5 py-0 text-[10px] text-[#004956]">Required</Badge>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Info className="size-3.5 cursor-help text-muted-foreground" />
@@ -476,8 +476,8 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                           className={cn(
                             "flex flex-1 cursor-pointer items-center gap-3 rounded-xl border-2 p-3 transition-all",
                             obj.appSettings.appStore === store.value
-                              ? "border-primary bg-primary/5"
-                              : "border-border bg-background hover:border-primary/40"
+                              ? "border-[#a4ffe5] bg-[#e6fff9]"
+                              : "border-border bg-background hover:border-[#a4ffe5]"
                           )}
                         >
                           <input
@@ -487,11 +487,11 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                             onChange={() => updateNested("objective", { appSettings: { ...obj.appSettings, appStore: store.value } })}
                             className="sr-only"
                           />
-                          <div className={cn("flex size-8 items-center justify-center rounded-lg", obj.appSettings.appStore === store.value ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                          <div className={cn("flex size-8 items-center justify-center rounded-lg", obj.appSettings.appStore === store.value ? "bg-[#e6fff9] text-[#004956]" : "bg-muted text-muted-foreground")}>
                             <Smartphone className="size-4" />
                           </div>
                           <div>
-                            <p className={cn("text-xs font-semibold", obj.appSettings.appStore === store.value ? "text-primary" : "text-foreground")}>{store.label}</p>
+                            <p className={cn("text-xs font-semibold", obj.appSettings.appStore === store.value ? "text-[#004956]" : "text-foreground")}>{store.label}</p>
                             <p className="text-[10px] text-muted-foreground">{store.desc}</p>
                           </div>
                         </label>
@@ -584,8 +584,8 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                               ? "cursor-not-allowed border-border bg-muted/50 opacity-60"
                               : "cursor-pointer",
                             !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value
-                              ? "border-primary bg-primary/5"
-                              : !isDisabled ? "border-border bg-background hover:border-primary/40" : ""
+                              ? "border-[#a4ffe5] bg-[#e6fff9]"
+                              : !isDisabled ? "border-border bg-background hover:border-[#a4ffe5]" : ""
                           )}
                         >
                           <input
@@ -596,12 +596,12 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                             onChange={() => !isDisabled && updateNested("objective", { appSettings: { ...obj.appSettings, biddingStrategyGoalType: goal.value } })}
                             className="sr-only"
                           />
-                          <div className={cn("mt-0.5 flex size-6 items-center justify-center rounded", !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                          <div className={cn("mt-0.5 flex size-6 items-center justify-center rounded", !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value ? "bg-[#e6fff9] text-[#004956]" : "bg-muted text-muted-foreground")}>
                             {isDisabled ? <Lock className="size-3.5" /> : <goal.icon className="size-3.5" />}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
-                              <p className={cn("text-[11px] font-semibold", !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value ? "text-primary" : "text-foreground")}>{goal.label}</p>
+                              <p className={cn("text-[11px] font-semibold", !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value ? "text-[#004956]" : "text-foreground")}>{goal.label}</p>
                               {needsMmp && <Badge variant="outline" className="h-4 px-1 text-[9px] font-medium text-amber-600">Requires MMP</Badge>}
                             </div>
                             <p className="text-[10px] text-muted-foreground">{goal.desc}</p>
@@ -612,9 +612,9 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-3">
+                  <div className="rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 p-3">
                     <div className="flex items-start gap-2.5">
-                      <Sparkles className="mt-0.5 size-4 text-primary" />
+                      <Sparkles className="mt-0.5 size-4 text-[#004956]" />
                       <div>
                         <p className="text-xs font-semibold text-foreground">Automated targeting</p>
                         <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -631,8 +631,8 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                 <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <Store className="size-5 text-primary" />
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                        <Store className="size-5 text-[#004956]" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -673,8 +673,8 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                 <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <Store className="size-5 text-primary" />
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                        <Store className="size-5 text-[#004956]" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -699,15 +699,15 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                   {obj.merchantCenterConnected && (
                     <div className="mt-4 border-t border-border pt-4">
                       <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
-                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
-                          <Store className="size-4 text-primary" />
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-[#e6fff9]">
+                          <Store className="size-4 text-[#004956]" />
                         </div>
                         <div className="flex-1">
                           <p className="text-xs font-medium text-foreground">Salla Product Feed</p>
                           <p className="text-xs text-muted-foreground">Auto-synced from your Salla store to Merchant Center</p>
                         </div>
                         <Badge variant="outline" className="gap-1 rounded-full px-2 text-xs">
-                          <CheckCircle2 className="size-2.5 text-primary" />
+                          <CheckCircle2 className="size-2.5 text-[#004956]" />
                           Connected
                         </Badge>
                       </div>
@@ -729,8 +729,8 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
               {obj.objective === "SHOPPING" && obj.merchantCenterConnected && (
                 <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="mb-4 flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <ShoppingCart className="size-5 text-primary" />
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                      <ShoppingCart className="size-5 text-[#004956]" />
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-foreground">Shopping Settings</p>
@@ -772,13 +772,13 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                             className={cn(
                               "flex flex-col rounded-xl border-2 p-3 text-left transition-all",
                               isSelected
-                                ? "border-primary bg-primary/[0.04] shadow-sm"
-                                : "border-border bg-background hover:border-primary/40"
+                                ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                                : "border-border bg-background hover:border-[#a4ffe5]"
                             )}
                           >
                             <p className={cn(
                               "text-xs font-semibold",
-                              isSelected ? "text-primary" : "text-foreground"
+                              isSelected ? "text-[#004956]" : "text-foreground"
                             )}>
                               {p.label}
                             </p>
@@ -786,7 +786,7 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                               {p.desc}
                             </p>
                             {isSelected && (
-                              <CheckCircle2 className="mt-2 size-3.5 text-primary" />
+                              <CheckCircle2 className="mt-2 size-3.5 text-[#004956]" />
                             )}
                           </button>
                         );
@@ -845,10 +845,10 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                   </div>
 
                   {/* Salla Tip */}
-                  <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
-                    <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                  <div className="mt-4 flex items-start gap-2 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2.5">
+                    <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
                     <p className="text-xs leading-relaxed text-muted-foreground">
-                      <span className="font-semibold text-primary">Salla Tip:</span>{" "}
+                      <span className="font-semibold text-[#004956]">Salla Tip:</span>{" "}
                       Use <strong>Low priority</strong> as your catch-all campaign and <strong>High priority</strong> for time-limited sales. This structure ensures promotional bids take precedence without wasting budget.
                     </p>
                   </div>
@@ -859,15 +859,15 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
               {needsConversionTag && (
                 <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                      <ShieldCheck className="size-5 text-primary" />
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#e6fff9]">
+                      <ShieldCheck className="size-5 text-[#004956]" />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-foreground">
                           Conversion Tracking
                         </p>
-                        <Badge className="rounded-full bg-primary/10 px-1.5 py-0 text-xs font-medium text-primary">
+                        <Badge className="rounded-full bg-[#e6fff9] px-1.5 py-0 text-xs font-medium text-[#004956]">
                           Auto
                         </Badge>
                       </div>
@@ -883,7 +883,7 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                           "Pre-launch verification",
                         ].map((item) => (
                           <div key={item} className="flex items-center gap-1.5">
-                            <CheckCircle2 className="size-3 shrink-0 text-primary" />
+                            <CheckCircle2 className="size-3 shrink-0 text-[#004956]" />
                             <span className="text-xs text-muted-foreground">{item}</span>
                           </div>
                         ))}

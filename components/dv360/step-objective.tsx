@@ -171,8 +171,8 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                           !o.active
                             ? "cursor-not-allowed opacity-40 border-border"
                             : selected
-                              ? "border-primary bg-primary/[0.04] shadow-sm"
-                              : "border-border bg-white hover:border-primary/40 hover:shadow-sm"
+                              ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                              : "border-border bg-white hover:border-[#a4ffe5] hover:shadow-sm"
                         )}
                       >
                         <div className={cn(
@@ -180,14 +180,14 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                           !o.active
                             ? "bg-muted text-muted-foreground"
                             : selected
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-[#f4f4f4] text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                              ? "bg-[#004956] text-white"
+                              : "bg-[#f4f4f4] text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
                         )}>
                           <OIcon className="size-5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className={cn("text-sm font-bold", !o.active ? "text-muted-foreground" : selected ? "text-primary" : "text-foreground")}>{o.label}</span>
+                            <span className={cn("text-sm font-bold", !o.active ? "text-muted-foreground" : selected ? "text-[#004956]" : "text-foreground")}>{o.label}</span>
                             {!o.active && (
                               <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Soon</span>
                             )}
@@ -211,7 +211,7 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                       <button
                         type="button"
                         onClick={() => setObjectiveSheetOpen(true)}
-                        className="shrink-0 text-xs font-bold text-primary underline decoration-primary/30 decoration-2 underline-offset-2 hover:decoration-primary"
+                        className="shrink-0 text-xs font-bold text-[#004956] underline decoration-[#a4ffe5] decoration-2 underline-offset-2 hover:decoration-[#004956]"
                       >
                         Learn more
                       </button>
@@ -222,14 +222,14 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                 {/* Objective Details Sheet */}
                 <Sheet open={objectiveSheetOpen} onOpenChange={setObjectiveSheetOpen}>
                   <SheetContent side="right" className="flex w-full flex-col sm:max-w-[420px] bg-white p-0">
-                    <div className="bg-primary px-6 py-6">
+                    <div className="bg-[#004956] px-6 py-6">
                       <div className="flex items-center gap-4">
                         <div className="flex size-12 items-center justify-center rounded-2xl bg-white/15">
                           <selectedObj.icon className="size-6 text-white" />
                         </div>
                         <div>
                           <SheetTitle className="text-lg font-bold text-white">{selectedObj.label}</SheetTitle>
-                          <Badge className="mt-1 rounded-full border-0 bg-primary-foreground/20 px-2 py-0.5 text-xs font-medium text-white">
+                          <Badge className="mt-1 rounded-full border-0 bg-[#a4ffe5] px-2 py-0.5 text-xs font-medium text-[#004956]">
                             {FUNNEL_LABELS[selectedObj.funnelStage].label}
                           </Badge>
                         </div>
@@ -237,7 +237,7 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                       <p className="mt-3 text-sm text-white/70">{selectedObj.desc}</p>
                     </div>
                     <div className="flex-1 overflow-y-auto">
-                      <div className="mx-6 mt-6 flex h-[180px] items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80">
+                      <div className="mx-6 mt-6 flex h-[180px] items-center justify-center rounded-2xl bg-gradient-to-br from-[#004956] to-[#006d7a]">
                         <div className="text-center">
                           <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-white/20">
                             <svg viewBox="0 0 24 24" className="ml-0.5 size-5 text-white" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
@@ -249,15 +249,15 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                       <div className="space-y-6 px-6 py-6">
                         <div className="grid grid-cols-3 gap-3">
                           <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
-                            <p className="text-lg font-bold text-primary">3</p>
+                            <p className="text-lg font-bold text-[#004956]">3</p>
                             <p className="text-xs font-medium text-muted-foreground">Ad Formats</p>
                           </div>
                           <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
-                            <p className="text-lg font-bold text-primary">SAR 150</p>
+                            <p className="text-lg font-bold text-[#004956]">SAR 150</p>
                             <p className="text-xs font-medium text-muted-foreground">Min Budget/day</p>
                           </div>
                           <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
-                            <p className="text-lg font-bold text-primary">7+</p>
+                            <p className="text-lg font-bold text-[#004956]">7+</p>
                             <p className="text-xs font-medium text-muted-foreground">Days Recommended</p>
                           </div>
                         </div>
@@ -269,7 +269,7 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                           <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Metrics</p>
                           <div className="flex flex-wrap gap-2">
                             {selectedObj.kpis.map((kpi) => (
-                              <span key={kpi} className="rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">{kpi}</span>
+                              <span key={kpi} className="rounded-full border border-[#a4ffe5] bg-[#e6fff9] px-4 py-1.5 text-xs font-medium text-[#004956]">{kpi}</span>
                             ))}
                           </div>
                         </div>
@@ -284,7 +284,7 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                               { title: "Launch & optimize", desc: "Review, launch, and monitor performance after 3-5 days." },
                             ].map((s, i) => (
                               <div key={i} className="flex items-start gap-3">
-                                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{i + 1}</div>
+                                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#004956] text-xs font-bold text-white">{i + 1}</div>
                                 <div>
                                   <p className="text-sm font-bold text-foreground">{s.title}</p>
                                   <p className="text-xs text-muted-foreground">{s.desc}</p>
@@ -293,12 +293,12 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                             ))}
                           </div>
                         </div>
-                        <div className="rounded-xl bg-primary/5 p-4">
+                        <div className="rounded-xl bg-[#e6fff9] p-4">
                           <div className="mb-1 flex items-center gap-2">
-                            <Sparkles className="size-3.5 text-primary" />
-                            <p className="text-xs font-bold text-primary">Pro Tip</p>
+                            <Sparkles className="size-3.5 text-[#004956]" />
+                            <p className="text-xs font-bold text-[#004956]">Pro Tip</p>
                           </div>
-                          <p className="text-xs leading-relaxed text-primary/80">
+                          <p className="text-xs leading-relaxed text-[#004956]/80">
                             {selectedObj.funnelStage === "conversion"
                               ? "Start broad and let DV360's algorithm find your best customers. Narrow down after the learning phase."
                               : selectedObj.funnelStage === "consideration"
@@ -318,7 +318,7 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                             if (input) { input.scrollIntoView({ behavior: 'smooth', block: 'center' }); input.focus(); }
                           }, 300);
                         }}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#004956] py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#003a44]"
                       >
                         <ArrowRight className="size-4" />
                         Start Campaign
@@ -346,7 +346,7 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                         const autoName = `${selectedObj!.label} - YouTube - ${date}`;
                         updateNested("objective", { campaignName: autoName });
                       }}
-                      className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                      className="flex items-center gap-1 text-xs font-medium text-[#004956] hover:underline"
                     >
                       <Sparkles className="size-3" />
                       Auto-generate

@@ -38,7 +38,7 @@ export function WizardStepFooter({
   return (
     <footer
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-40 bg-white",
+        "fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.05)]",
         className
       )}
       role="navigation"
@@ -109,4 +109,4 @@ export function WizardStepFooter({
 }
 
 /** Bottom padding to add to step content so it isn't hidden behind the fixed footer. */
-export const WIZARD_FOOTER_PADDING_BOTTOM = "pb-24";
+export const WIZARD_FOOTER_PADDING_BOTTOM = "pb-32";
