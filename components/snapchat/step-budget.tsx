@@ -942,7 +942,8 @@ export function StepBudget() {
                   { label: "Est. cost per result", value: `SAR ${suggestedBid.min.toFixed(2)} - ${suggestedBid.max.toFixed(2)}` },
                 ]
               }
-              disclaimer="Estimates based on similar Snapchat campaigns. Actual results may vary based on creative quality and competition."
+              badge="Estimate"
+              disclaimer="Based on similar campaigns. Actual results vary."
             />
 
             {/* Card C: Configuration Check (shared) */}
