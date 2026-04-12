@@ -341,10 +341,35 @@ export function BudgetDurationCard({
             })}
           </div>
           {paymentMethod === "prepaid" && (
-            <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-amber-600">
-              <AlertCircle className="size-3 shrink-0" />
-              Prepaid requires an end date. Full budget charged upfront.
-            </p>
+            <div className="mt-3 rounded-xl border border-border bg-muted/20 p-4">
+              <div className="flex flex-col gap-2.5">
+                {/* Upfront charge */}
+                {startDate && endDate && durationDays >= 1 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Upfront charge</span>
+                    <span className="text-sm font-bold tabular-nums text-foreground">
+                      SAR {(dailyAmount * durationDays).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+                <div className="h-px bg-border/40" />
+                {/* Key points */}
+                <div className="flex flex-col gap-1.5">
+                  <p className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                    <CalendarDays className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+                    Prepaid campaigns require a fixed end date
+                  </p>
+                  <p className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                    <Wallet className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+                    Full budget is charged when the campaign launches
+                  </p>
+                  <p className="flex items-start gap-2 text-[11px] text-[#004956]">
+                    <Banknote className="mt-0.5 size-3 shrink-0 text-[#004956]" />
+                    <span>If you stop early, <span className="font-semibold">unspent budget is automatically refunded</span> to your account</span>
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}
