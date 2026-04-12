@@ -731,7 +731,6 @@ export function StepBudget() {
                   combinedOptions={CONVERSION_WINDOWS.map((w) => ({
                     value: w.value,
                     label: w.label,
-                    desc: w.desc,
                     clickWindow: w.clickWindow,
                     viewWindow: w.viewWindow,
                     recommended: w.recommended,
@@ -739,15 +738,7 @@ export function StepBudget() {
                   }))}
                   combinedValue={budget.conversionWindow}
                   onCombinedChange={(v) => updateNested("budget", { conversionWindow: v as ConversionWindow })}
-                  apiBadge="conversion_window"
-                  infoTipText="How long after seeing or clicking your ad should a conversion count? A wider window gives Snap more data to optimize."
-                  goalContext={
-                    budget.optimizationGoal === "PIXEL_PURCHASE"
-                      ? "Purchases often happen days after the first ad — use the wider window."
-                      : budget.optimizationGoal === "PIXEL_ADD_TO_CART"
-                        ? "Add-to-cart events can be delayed — the wider window captures more."
-                        : undefined
-                  }
+                  tip="Wider windows capture more conversions. Purchases often happen days after the first ad."
                 />
               )}
 
