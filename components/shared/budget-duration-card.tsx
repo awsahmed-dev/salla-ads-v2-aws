@@ -288,7 +288,7 @@ export function BudgetDurationCard({
           <p className="mb-2 text-sm font-medium text-foreground">
             Payment Method
           </p>
-          <div className="flex gap-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
             {budgetTypes.map((m) => {
               const active = paymentMethod === m.value;
               const isPAYG = m.value === "pay_as_you_go";
@@ -384,7 +384,7 @@ export function BudgetDurationCard({
           </div>
         )}
 
-        <div className="flex gap-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
           {/* Start Date */}
           <div className="flex-1">
             <Label className="mb-2 block text-sm text-foreground">
@@ -534,7 +534,7 @@ export function BudgetDurationCard({
         </p>
 
         {/* Strength bar */}
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <div className="flex gap-0.5 rounded-lg border-2 border-white">
             {STRENGTH_BAR_COLORS.map((color, i) => (
               <div
@@ -549,7 +549,7 @@ export function BudgetDurationCard({
           <span className="rounded-full bg-[#e4faf5] px-2 py-0.5 text-xs font-medium text-[#004d5a]">
             {currentTier.label}
           </span>
-          <p className="text-xs text-muted-foreground">
+          <p className="min-w-0 text-xs text-muted-foreground">
             {tierIndex >= strengthTiers.length - 1
               ? "A higher budget delivers high-impact reach and keeps you ahead of competitors."
               : tierIndex >= strengthTiers.length - 2
