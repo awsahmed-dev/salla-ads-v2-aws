@@ -316,6 +316,7 @@ export function MetaStepBudget() {
             autoIncrease={autoIncrease}
             onAutoIncreaseChange={(ai) => updateBudget({ autoIncrease: ai })}
             onBulkUpdate={(updates) => updateBudget(updates as Partial<typeof budget>)}
+            showSmartStart={true}
           />
 
 

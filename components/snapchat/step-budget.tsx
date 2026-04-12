@@ -908,6 +908,8 @@ export function StepBudget() {
               isOngoing={budget.endDateOptional}
               totalBudget={totalBudget}
               autoIncreaseEnabled={autoIncrease.enabled}
+              autoIncreaseMode={autoIncrease.mode}
+              paymentMethod={budget.paymentMethod}
               boostEnabled={budget.performanceBoost}
               boostAmount={299}
               startDate={budget.startDate}
@@ -955,9 +957,11 @@ export function StepBudget() {
             <ConfigCheckCard
               configRows={[
                 { label: "Budget type", value: budget.type === "lifetime" ? "Lifetime" : "Daily" },
+                { label: "Payment", value: budget.paymentMethod === "prepaid" ? "Prepaid" : "Pay as You Go" },
                 { label: "End date", value: budget.endDateOptional ? "Ongoing" : budget.endDate ? new Date(budget.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Not set" },
                 { label: "Goal", value: goalLabel.charAt(0).toUpperCase() + goalLabel.slice(1) },
                 { label: "Bid", value: budget.bidStrategy === "AUTO_BID" ? "Auto Bid" : `${budget.bidStrategy === "TARGET_COST" ? "Target Cost" : "Max Bid"}: SAR ${budget.bidAmount}` },
+                ...(autoIncrease.enabled ? [{ label: "Auto-increase", value: autoIncrease.mode === "performance" ? "By ROAS" : `+${autoIncrease.pct}% / ${autoIncrease.intervalDays}d` }] : []),
                 ...(objectiveConfig.hasConversionWindow ? [{ label: "Attribution", value: CONVERSION_WINDOWS.find((w) => w.value === budget.conversionWindow)?.label ?? "Set" }] : []),
                 ...(budget.frequencyCapEnabled ? [{ label: "Frequency cap", value: `${budget.frequencyCapCount}× / ${Math.round(budget.frequencyCapInterval / 24)} days` }] : []),
               ]}
@@ -973,6 +977,10 @@ export function StepBudget() {
                 ...(budget.frequencyCapEnabled && campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1
                   ? [{ label: "Frequency cap", status: "error" as const, text: "Mixed ad formats — unify or disable cap" }]
                   : []),
+              ]}
+              tips={[
+                ...(!budget.endDateOptional ? [{ text: "Ongoing campaigns perform up to 40% better. Switch to Ongoing for the best results." }] : []),
+                ...(budget.amount < (suggestedDaily ?? 400) ? [{ text: `Increasing your budget to SAR ${suggestedDaily ?? 400}/day could significantly improve delivery and reach.` }] : []),
               ]}
             />
 
