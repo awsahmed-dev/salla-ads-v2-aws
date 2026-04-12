@@ -56,6 +56,7 @@ import { BidStrategyCard, type BidInput } from "@/components/shared/bid-strategy
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
 import { ConversionEventCard } from "@/components/shared/conversion-event-card";
+import { OptimizationGoalCard } from "@/components/shared/optimization-goal-card";
 import { fmt } from "@/components/shared/fmt";
 
 /* ================================================================== */
@@ -259,6 +260,12 @@ export function GoogleStepBudget() {
   };
 
   /* UI state */
+  const [cpaMode, setCpaMode] = useState<"auto" | "manual">(
+    budget.targetCpa > 0 ? "manual" : "auto"
+  );
+  const [roasMode, setRoasMode] = useState<"auto" | "manual">(
+    budget.targetRoas > 0 && budget.targetRoas !== 400 ? "manual" : "auto"
+  );
   const endDateRequired = budget.paymentMethod === "prepaid";
   const hasFinalUrlTextAutomation = budget.assetAutomationSettings.some(
     (entry) =>
@@ -304,9 +311,8 @@ export function GoogleStepBudget() {
     if (isApp) {
       return CONVERSION_GOALS.filter((g) => g.value === "APP_INSTALL" || g.value === "IN_APP_PURCHASE");
     }
-    return CONVERSION_GOALS.filter(
-      (g) => g.value === "PURCHASE" || g.value === "BEGIN_CHECKOUT" || g.value === "ADD_TO_CART"
-    );
+    const ORDER: ConversionGoal[] = ["ADD_TO_CART", "BEGIN_CHECKOUT", "PURCHASE"];
+    return ORDER.map((v) => CONVERSION_GOALS.find((g) => g.value === v)!).filter(Boolean);
   }, [isApp]);
   const defaultConversionGoal: ConversionGoal = isApp ? "APP_INSTALL" : "PURCHASE";
 
@@ -340,18 +346,17 @@ export function GoogleStepBudget() {
   };
 
   const googleBidInputs: BidInput[] = [
+    // For PMax MAXIMIZE_CONVERSIONS: optional CPA is handled via toggle children (not here)
     ...(activeStrategy?.showTargetCpa &&
-    (effectiveBiddingStrategy === "MAXIMIZE_CONVERSIONS" || effectiveBiddingStrategy === "TARGET_CPA")
+    effectiveBiddingStrategy === "MAXIMIZE_CONVERSIONS" &&
+    !isPMax
       ? [
           {
-            label: `Target Cost per Purchase (CPA) ${effectiveBiddingStrategy === "MAXIMIZE_CONVERSIONS" ? "(Optional)" : "(Required)"}`,
-            desc:
-              effectiveBiddingStrategy === "MAXIMIZE_CONVERSIONS"
-                ? "Leave empty to let Google optimize freely, or set a target to control costs. Setting a target may limit volume."
-                : "Set your target cost per acquisition. Google will optimize bids to meet this target on average.",
+            label: "Target Cost per Acquisition (CPA)",
+            desc: "Set your target cost per acquisition. Google will optimize bids to meet this target on average.",
             value: budget.targetCpa || undefined,
             onChange: (v: number) => updateNested("budget", { targetCpa: Math.max(0, v) }),
-            suggestedRange: isPMax ? undefined : suggestedBid,
+            suggestedRange: suggestedBid,
             prefix: "SAR",
             min: 0.01,
             step: 1,
@@ -359,21 +364,47 @@ export function GoogleStepBudget() {
           },
         ]
       : []),
-    ...(activeStrategy?.showTargetRoas &&
-    (effectiveBiddingStrategy === "MAXIMIZE_CONVERSION_VALUE" || effectiveBiddingStrategy === "TARGET_ROAS")
+    ...(activeStrategy?.showTargetCpa && effectiveBiddingStrategy === "TARGET_CPA"
       ? [
           {
-            label: `Target ROAS ${effectiveBiddingStrategy === "MAXIMIZE_CONVERSION_VALUE" ? "(Optional)" : "(Required)"}`,
-            desc:
-              effectiveBiddingStrategy === "MAXIMIZE_CONVERSION_VALUE"
-                ? "Leave empty to maximize total revenue, or set a target ROAS to balance volume and profitability."
-                : "Set your target return on ad spend. Google will optimize bids to achieve this ROAS.",
+            label: "Target Cost per Acquisition (CPA)",
+            desc: "Set your target cost per acquisition. Google will optimize bids to meet this target on average.",
+            value: budget.targetCpa || undefined,
+            onChange: (v: number) => updateNested("budget", { targetCpa: Math.max(0, v) }),
+            suggestedRange: isPMax ? undefined : suggestedBid,
+            prefix: "SAR",
+            min: 0.01,
+            step: 1,
+          },
+        ]
+      : []),
+    // For PMax MAXIMIZE_CONVERSION_VALUE: optional ROAS is handled via toggle children (not here)
+    ...(activeStrategy?.showTargetRoas &&
+    effectiveBiddingStrategy === "MAXIMIZE_CONVERSION_VALUE" &&
+    !isPMax
+      ? [
+          {
+            label: "Target ROAS",
+            desc: "Leave empty to maximize total revenue, or set a target ROAS to balance volume and profitability.",
             value: budget.targetRoas || 400,
             onChange: (v: number) => updateNested("budget", { targetRoas: Math.max(0, v) }),
             suffix: "%",
             min: 100,
             step: 50,
             tip: "Recommended: 200%-500%. Very high ROAS targets can reduce delivery.",
+          },
+        ]
+      : []),
+    ...(activeStrategy?.showTargetRoas && effectiveBiddingStrategy === "TARGET_ROAS"
+      ? [
+          {
+            label: "Target ROAS",
+            desc: "Set your target return on ad spend. Google will optimize bids to achieve this ROAS.",
+            value: budget.targetRoas || 400,
+            onChange: (v: number) => updateNested("budget", { targetRoas: Math.max(0, v) }),
+            suffix: "%",
+            min: 100,
+            step: 50,
           },
         ]
       : []),
@@ -454,7 +485,251 @@ export function GoogleStepBudget() {
 
 
           {/* ======================================================= */}
-          {/* SECTION 1: Budget, Duration & Payment (shared card)      */}
+          {/* SECTION 1: Conversion Goal                               */}
+          {/* ======================================================= */}
+          <OptimizationGoalCard
+            goals={conversionGoalsForObjective.map((g) => ({
+              value: g.value,
+              label: g.label,
+              desc: g.desc,
+              icon: g.icon,
+              recommended: g.recommended,
+              billingLabel: g.funnelStage,
+            }))}
+            selectedGoal={budget.conversionGoal}
+            onGoalChange={(v) => {
+              const goal = v as ConversionGoal;
+              const recommendedStrategy = getRecommendedStrategyForGoal(goal);
+              updateNested("budget", {
+                conversionGoal: goal,
+                biddingStrategy: recommendedStrategy,
+                ...(recommendedStrategy === "MAXIMIZE_CONVERSIONS" && budget.targetCpa <= 0
+                  ? { targetCpa: 25 }
+                  : {}),
+                ...(recommendedStrategy === "MAXIMIZE_CONVERSION_VALUE" && budget.targetRoas <= 0
+                  ? { targetRoas: 400 }
+                  : {}),
+              });
+            }}
+            layout="grid"
+            infoTipText={
+              isApp
+                ? "The action you want to optimize for. Start with App Install, then move to In-App Purchase once you have enough data."
+                : "The action you want customers to take. Purchase is recommended for e-commerce. Use Add to Cart if you have fewer than 30 purchases per month."
+            }
+          />
+
+          {/* ======================================================= */}
+          {/* SECTION 3: Bidding Strategy (shared card)                */}
+          {/* ======================================================= */}
+          <BidStrategyCard
+            strategies={availableStrategies}
+            selectedStrategy={effectiveBiddingStrategy}
+            onStrategyChange={(v) => {
+              updateNested("budget", {
+                biddingStrategy: v as BiddingStrategy,
+                ...(v === "TARGET_CPA" && { targetCpa: budget.targetCpa || 25 }),
+                ...(v === "TARGET_CPC" && { targetCpc: budget.targetCpc || 2 }),
+                ...(v === "TARGET_ROAS" && { targetRoas: budget.targetRoas || 400 }),
+              });
+            }}
+            layout={isPMax ? "buttons" : "cards"}
+            infoTipText={
+              isPMax
+                ? "Choose how Google should optimize your bids. Add an optional target to guide delivery."
+                : isShopping
+                  ? "Smart Bidding lets Google set bids automatically. Use Manual CPC if you want per-product-group control."
+                  : "Choose how Google should bid in the ad auction. Each strategy optimizes for different outcomes."
+            }
+            bidInputs={googleBidInputs}
+          >
+
+            {/* PMax optional CPA target toggle */}
+            {isPMax && effectiveBiddingStrategy === "MAXIMIZE_CONVERSIONS" && (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-foreground">Target CPA</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    Let Google optimize freely, or set a cost-per-acquisition target to guide spend.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setCpaMode("auto"); updateNested("budget", { targetCpa: 0 }); }}
+                    className={cn(
+                      "flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all",
+                      cpaMode === "auto"
+                        ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956]"
+                        : "border-border bg-card text-muted-foreground hover:border-[#a4ffe5]/60 hover:text-foreground"
+                    )}
+                  >
+                    Auto (Recommended)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCpaMode("manual")}
+                    className={cn(
+                      "flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all",
+                      cpaMode === "manual"
+                        ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956]"
+                        : "border-border bg-card text-muted-foreground hover:border-[#a4ffe5]/60 hover:text-foreground"
+                    )}
+                  >
+                    Set a Target
+                  </button>
+                </div>
+                {cpaMode === "manual" && (
+                  <div className="rounded-xl border border-border bg-muted/10 p-4">
+                    <Label className="text-xs font-semibold text-foreground">Target Cost per Acquisition</Label>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      Google will try to keep your CPA at or below this amount on average.
+                    </p>
+                    <div className="mt-3 relative">
+                      <Input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={budget.targetCpa || ""}
+                        onChange={(e) => updateNested("budget", { targetCpa: Math.max(0, Number(e.target.value)) })}
+                        className="h-10 pr-14 text-sm"
+                        placeholder="e.g. 30"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+                        SAR
+                      </span>
+                    </div>
+                    {suggestedBid && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-[11px] text-muted-foreground">Suggested:</span>
+                        <span className="rounded-full bg-[#e6fff9] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#004956]">
+                          SAR {suggestedBid.min} – {suggestedBid.max}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PMax optional ROAS target toggle */}
+            {isPMax && effectiveBiddingStrategy === "MAXIMIZE_CONVERSION_VALUE" && (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-foreground">Target ROAS</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    Let Google maximize total revenue, or set a return-on-ad-spend target to balance volume and profitability.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setRoasMode("auto"); updateNested("budget", { targetRoas: 0 }); }}
+                    className={cn(
+                      "flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all",
+                      roasMode === "auto"
+                        ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956]"
+                        : "border-border bg-card text-muted-foreground hover:border-[#a4ffe5]/60 hover:text-foreground"
+                    )}
+                  >
+                    Auto (Recommended)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRoasMode("manual")}
+                    className={cn(
+                      "flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-semibold transition-all",
+                      roasMode === "manual"
+                        ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956]"
+                        : "border-border bg-card text-muted-foreground hover:border-[#a4ffe5]/60 hover:text-foreground"
+                    )}
+                  >
+                    Set a Target
+                  </button>
+                </div>
+                {roasMode === "manual" && (
+                  <div className="rounded-xl border border-border bg-muted/10 p-4">
+                    <Label className="text-xs font-semibold text-foreground">Target ROAS</Label>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      Google will optimize bids to achieve this return on ad spend.
+                    </p>
+                    <div className="mt-3 relative">
+                      <Input
+                        type="number"
+                        min={100}
+                        step={50}
+                        value={budget.targetRoas || ""}
+                        onChange={(e) => updateNested("budget", { targetRoas: Math.max(0, Number(e.target.value)) })}
+                        className="h-10 pr-14 text-sm"
+                        placeholder="e.g. 400"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+                        %
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-[11px] text-muted-foreground">Suggested:</span>
+                      <span className="rounded-full bg-[#e6fff9] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#004956]">
+                        200% – 500%
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isDemandGen && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
+                <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  <span className="font-semibold text-primary">Salla Tip for Demand Gen:</span>{" "}
+                  Google recommends a daily budget of at least <strong>15x your expected CPA</strong>. Start with <strong>Maximize Conversions</strong> to build data, then switch to <strong>Target CPA</strong> once you have 50+ conversions in 30 days.
+                </p>
+              </div>
+            )}
+
+            {isShopping && effectiveBiddingStrategy !== "MANUAL_CPC" && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
+                <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  <span className="font-semibold text-primary">Shopping bidding guide:</span>{" "}
+                  Start with <strong>Manual CPC</strong> if you have fewer than 30 conversions/month for precise bid control per product group. Switch to <strong>Target ROAS</strong> once you have 50+ monthly conversions. Most Salla stores see best results with Target ROAS at 300-500%.
+                </p>
+              </div>
+            )}
+
+            {isSearch && (
+              <div className="mt-3 rounded-lg border border-primary/20 bg-primary/[0.03] p-3">
+                <div className="flex items-start gap-2.5">
+                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                  <div>
+                    <p className="text-[11px] font-semibold text-primary">Search bidding guide for e-commerce</p>
+                    <div className="mt-1.5 space-y-1">
+                      <p className="text-[10px] text-muted-foreground"><strong>New store (&lt;50 conversions/month):</strong> Start with Maximize Clicks to build traffic data, then switch to Maximize Conversions.</p>
+                      <p className="text-[10px] text-muted-foreground"><strong>Growing store (50-200 conversions):</strong> Use Maximize Conversions. Optionally add a Target CPA once your CPA stabilizes over 2-3 weeks.</p>
+                      <p className="text-[10px] text-muted-foreground"><strong>Established store (200+ conversions):</strong> Use Target ROAS or Maximize Conversion Value for maximum revenue efficiency.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {(budget.biddingStrategy === "TARGET_CPA" || budget.biddingStrategy === "TARGET_ROAS" || budget.biddingStrategy === "MAXIMIZE_CONVERSION_VALUE") && (
+              <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/40 px-4 py-3">
+                <Sparkles className="mt-0.5 size-4 shrink-0 text-[#004956]" />
+                <p className="text-[11px] leading-relaxed text-[#004956]/80">
+                  {budget.biddingStrategy === "TARGET_ROAS"
+                    ? <><span className="font-semibold text-[#004956]">Needs data first.</span> Target ROAS works best with 50+ monthly conversions. Start with Maximize Conversions, then switch once data is stable.</>
+                    : budget.biddingStrategy === "TARGET_CPA"
+                    ? <><span className="font-semibold text-[#004956]">Needs data first.</span> Target CPA works best with 30+ monthly conversions. Leave empty initially, then set a target once your CPA stabilizes.</>
+                    : <><span className="font-semibold text-[#004956]">New store?</span> Maximize Conversion Value works best with 50+ monthly conversions. Start with Maximize Conversions if you&apos;re just launching.</>}
+                </p>
+              </div>
+            )}
+          </BidStrategyCard>
+
+          {/* ======================================================= */}
+          {/* SECTION 3: Budget, Duration & Payment (shared card)      */}
           {/* ======================================================= */}
           <BudgetDurationCard
             budgetTypes={BUDGET_TYPES}
@@ -482,15 +757,11 @@ export function GoogleStepBudget() {
             showSmartStart={true}
           />
 
-          {/* Launch time window (v23) intentionally hidden in UI.
-              Backend can manage precise start/end times while advertisers set only dates. */}
-
           {isDemandGen && (
             <SectionCard>
               <div className="mb-2 flex items-center gap-2">
                 <Gauge className="size-4 text-primary" />
                 <Label className="text-sm font-semibold text-foreground">Demand Gen budget mode</Label>
-                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">v23</Badge>
                 <InfoTip text="Demand Gen can run on daily budget or campaign total budget (CUSTOM period)." />
               </div>
               <p className="mb-3 text-xs text-muted-foreground">
@@ -532,135 +803,6 @@ export function GoogleStepBudget() {
               )}
             </SectionCard>
           )}
-
-
-          {/* ======================================================= */}
-          {/* SECTION 2: Conversion Goal                               */}
-          {/* ======================================================= */}
-          <ConversionEventCard
-            title="Conversion Goal"
-            events={conversionGoalsForObjective}
-            selectedEvent={budget.conversionGoal}
-            onEventChange={(v) => {
-              const goal = v as ConversionGoal;
-              const recommendedStrategy = getRecommendedStrategyForGoal(goal);
-              updateNested("budget", {
-                conversionGoal: goal,
-                biddingStrategy: recommendedStrategy,
-                ...(recommendedStrategy === "MAXIMIZE_CONVERSIONS" && budget.targetCpa <= 0
-                  ? { targetCpa: 25 }
-                  : {}),
-                ...(recommendedStrategy === "MAXIMIZE_CONVERSION_VALUE" && budget.targetRoas <= 0
-                  ? { targetRoas: 400 }
-                  : {}),
-              });
-            }}
-            infoTipText="The action you want customers to take. Purchase is recommended for e-commerce. Use Add to Cart if you have fewer than 30 purchases per month."
-            tip={
-              isApp
-                ? "We auto-align bid strategy to your selected goal. Start with App Install, then move to In-App Purchase."
-                : "We auto-align bid strategy to your selected goal. Start with Purchase, or use mid-funnel goals when volume is low."
-            }
-          />
-
-          {/* ======================================================= */}
-          {/* SECTION 3: Bidding Strategy (shared card)                */}
-          {/* ======================================================= */}
-          <BidStrategyCard
-            strategies={availableStrategies}
-            selectedStrategy={effectiveBiddingStrategy}
-            onStrategyChange={(v) => {
-              updateNested("budget", {
-                biddingStrategy: v as BiddingStrategy,
-                ...(v === "TARGET_CPA" && { targetCpa: budget.targetCpa || 25 }),
-                ...(v === "TARGET_CPC" && { targetCpc: budget.targetCpc || 2 }),
-                ...(v === "TARGET_ROAS" && { targetRoas: budget.targetRoas || 400 }),
-              });
-            }}
-            billingContext={[
-              {
-                label: "Billing model",
-                value:
-                  effectiveBiddingStrategy === "MANUAL_CPC"
-                    ? "Manual CPC"
-                    : effectiveBiddingStrategy === "TARGET_CPC"
-                      ? "Smart Bidding (CPC)"
-                    : effectiveBiddingStrategy === "MAXIMIZE_CONVERSIONS" || effectiveBiddingStrategy === "TARGET_CPA"
-                      ? "Smart Bidding (CPA)"
-                      : "Smart Bidding (ROAS)",
-              },
-            ]}
-            layout={isPMax ? "buttons" : "cards"}
-            infoTipText={
-              isPMax
-                ? "PMax uses two core strategies: Maximize Conversions or Maximize Conversion Value. Optional CPA/ROAS targets can guide delivery."
-                : isShopping
-                  ? "Shopping supports Smart Bidding (recommended) or Manual CPC. Use Manual CPC for precise per-product-group control; use Smart Bidding to let Google optimize bids automatically."
-                  : "Choose how Google should bid in the ad auction. Each strategy optimizes for different outcomes."
-            }
-            bidInputs={googleBidInputs}
-          >
-
-            {isDemandGen && (
-              <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
-                <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  <span className="font-semibold text-primary">Salla Tip for Demand Gen:</span>{" "}
-                  Google recommends a daily budget of at least <strong>15x your expected CPA</strong>. Start with <strong>Maximize Conversions</strong> to build data, then switch to <strong>Target CPA</strong> once you have 50+ conversions in 30 days.
-                </p>
-              </div>
-            )}
-
-            {isShopping && effectiveBiddingStrategy !== "MANUAL_CPC" && (
-              <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
-                <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  <span className="font-semibold text-primary">Shopping bidding guide:</span>{" "}
-                  Start with <strong>Manual CPC</strong> if you have fewer than 30 conversions/month for precise bid control per product group. Switch to <strong>Target ROAS</strong> once you have 50+ monthly conversions. Most Salla stores see best results with Target ROAS at 300-500%.
-                </p>
-              </div>
-            )}
-
-            {isSearch && (
-              <div className="mt-3 rounded-lg border border-primary/20 bg-primary/[0.03] p-3">
-                <div className="flex items-start gap-2.5">
-                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                  <div>
-                    <p className="text-[11px] font-semibold text-primary">Search bidding guide for e-commerce</p>
-                    <div className="mt-1.5 space-y-1">
-                      <p className="text-[10px] text-muted-foreground"><strong>New store (&lt;50 conversions/month):</strong> Start with Maximize Clicks to build traffic data, then switch to Maximize Conversions.</p>
-                      <p className="text-[10px] text-muted-foreground"><strong>Growing store (50-200 conversions):</strong> Use Maximize Conversions. Optionally add a Target CPA once your CPA stabilizes over 2-3 weeks.</p>
-                      <p className="text-[10px] text-muted-foreground"><strong>Established store (200+ conversions):</strong> Use Target ROAS or Maximize Conversion Value for maximum revenue efficiency.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {(budget.biddingStrategy === "TARGET_CPA" || budget.biddingStrategy === "TARGET_ROAS" || budget.biddingStrategy === "MAXIMIZE_CONVERSION_VALUE") && (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
-                <div className="flex items-start gap-2.5">
-                  <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                  <div>
-                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Learning period required</p>
-                    <p className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
-                      {budget.biddingStrategy === "TARGET_ROAS"
-                        ? "Target ROAS needs 50+ conversions per month to optimize effectively. We recommend starting with Maximize Conversions until you have enough data, then switching to Target ROAS."
-                        : budget.biddingStrategy === "TARGET_CPA"
-                        ? "Target CPA needs 30+ conversions per month to optimize. Start without a target CPA to let Google learn, then add a target once your CPA stabilizes."
-                        : "Maximize Conversion Value works best with 50+ conversions per month. Consider starting with Maximize Conversions if your store is new."}
-                    </p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <Sparkles className="size-3 text-amber-600" />
-                      <p className="text-[10px] font-medium text-amber-700">
-                        Salla Tip: Most stores need 2-4 weeks of data collection before smart bidding stabilizes.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </BidStrategyCard>
 
           {/* ======================================================= */}
           {/* PERFORMANCE BOOST (Salla Upsell)                         */}
