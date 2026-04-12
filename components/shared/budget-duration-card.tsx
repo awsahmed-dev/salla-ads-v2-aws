@@ -200,8 +200,9 @@ export function BudgetDurationCard({
   const [salaryBoostEnabled, setSalaryBoostEnabled] = useState(false);
 
   /* Auto-increase computations */
-  const autoIncreasePreview = (ai.enabled && autoIncreaseAvailable)
-    ? Array.from({ length: Math.floor(durationDays / ai.intervalDays) }, (_, i) => {
+  const previewDays = endDateOptional ? 30 : durationDays;
+  const autoIncreasePreview = (ai.enabled && autoIncreaseAvailable && (ai.mode ?? "schedule") === "schedule")
+    ? Array.from({ length: Math.floor(previewDays / ai.intervalDays) }, (_, i) => {
         const day = (i + 1) * ai.intervalDays;
         const uncapped = Math.round(dailyAmount * Math.pow(1 + ai.pct / 100, i + 1));
         return { day, budget: Math.min(uncapped, ai.maxDailyBudget) };
@@ -209,13 +210,13 @@ export function BudgetDurationCard({
     : [];
 
   const projectedTotalSpend = (() => {
-    if (!ai.enabled || !autoIncreaseAvailable) return budgetMode === "daily" ? dailyAmount * durationDays : amount;
+    if (!ai.enabled || !autoIncreaseAvailable || (ai.mode ?? "schedule") !== "schedule") return budgetMode === "daily" ? dailyAmount * previewDays : amount;
     let total = 0;
     let currentDaily = dailyAmount;
-    for (let d = 1; d <= durationDays; d++) {
+    for (let d = 1; d <= previewDays; d++) {
       total += Math.min(currentDaily, ai.maxDailyBudget);
       const stepIndex = Math.floor(d / ai.intervalDays);
-      if (d % ai.intervalDays === 0 && d < durationDays) {
+      if (d % ai.intervalDays === 0 && d < previewDays) {
         currentDaily = Math.round(dailyAmount * Math.pow(1 + ai.pct / 100, stepIndex));
       }
     }
@@ -252,9 +253,7 @@ export function BudgetDurationCard({
         updates.type = "daily";
         updates.amount = Math.max(minAmount, Math.round(amount / Math.max(1, durationDays)));
       }
-      if (checked && ai.enabled) {
-        updates.autoIncrease = { ...ai, enabled: false };
-      }
+      /* Auto-increase is now allowed for ongoing campaigns — no longer disabled */
       onBulkUpdate(updates);
     } else {
       onEndDateOptionalChange?.(checked);
@@ -557,8 +556,9 @@ export function BudgetDurationCard({
             type="number"
             min={currentMin}
             max={maxAmount}
-            value={amount}
-            onChange={(e) => onAmountChange(Math.max(currentMin, Math.min(maxAmount, Number(e.target.value))))}
+            value={amount || ""}
+            onChange={(e) => onAmountChange(e.target.value === "" ? 0 : Math.min(maxAmount, Number(e.target.value)))}
+            onBlur={() => { if (amount < currentMin) onAmountChange(currentMin); }}
             className="h-10 pr-10 text-sm"
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
@@ -598,12 +598,18 @@ export function BudgetDurationCard({
           </p>
         </div>
 
-        {budgetMode === "daily" && !endDateOptional && endDate && (
+        {budgetMode === "daily" && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Est. total: <span className="font-semibold text-foreground">SAR {(ai.enabled && autoIncreaseAvailable ? projectedTotalSpend : dailyAmount * durationDays).toLocaleString()}</span> over {durationDays}d
-            {ai.enabled && autoIncreaseAvailable && (
-              <span className="ml-1 text-[#004956]">(incl. auto-increase)</span>
-            )}
+            {endDateOptional ? (
+              <>Est. monthly: <span className="font-semibold text-foreground">SAR {(dailyAmount * 30).toLocaleString()}</span>/month</>
+            ) : endDate ? (
+              <>
+                Est. total: <span className="font-semibold text-foreground">SAR {(ai.enabled && autoIncreaseAvailable && (ai.mode ?? "schedule") === "schedule" ? projectedTotalSpend : dailyAmount * durationDays).toLocaleString()}</span> over {durationDays}d
+                {ai.enabled && autoIncreaseAvailable && (ai.mode ?? "schedule") === "schedule" && (
+                  <span className="ml-1 text-[#004956]">(incl. auto-increase)</span>
+                )}
+              </>
+            ) : null}
           </p>
         )}
       </div>
