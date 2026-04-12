@@ -1364,13 +1364,6 @@ export function GoogleStepReview() {
         <div className={cn("flex flex-col gap-6 lg:flex-row lg:items-start", WIZARD_FOOTER_PADDING_BOTTOM)}>
           {/* ============ LEFT COLUMN ============ */}
           <div className="flex flex-1 flex-col gap-4">
-            <div>
-              <h2 className="text-lg font-bold text-foreground">Review & Launch</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Review your {objConfig.label} campaign settings below. Expand any section to see details or edit.
-              </p>
-            </div>
-
             {criticalFails.length > 0 && (
               <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                 <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600" />
@@ -1746,14 +1739,6 @@ export function GoogleStepReview() {
         {/* LEFT COLUMN                                                   */}
         {/* ============================================================ */}
         <div className="flex flex-1 flex-col gap-5">
-              <div>
-                <h2 className="text-base font-bold text-foreground">Review & Launch</h2>
-                <p className="text-xs text-muted-foreground">
-                  Review your {objConfig.label} campaign settings and launch when ready.
-                </p>
-              </div>
-            </div>
-
             {/* Readiness checks */}
             <div className="mb-6 rounded-xl border border-border bg-card p-5 shadow-sm">
               <div className="mb-3 flex items-center justify-between">
@@ -2162,6 +2147,7 @@ export function GoogleStepReview() {
                   </label>
                 </div>
               </div>
+        </div>
         </div>
 
         {/* ============================================================ */}

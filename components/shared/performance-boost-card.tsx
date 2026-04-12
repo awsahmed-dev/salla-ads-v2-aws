@@ -108,8 +108,9 @@ export function PerformanceBoostCard({
       }}
     >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        {/* Left: icon + title + description */}
+        <div className="flex items-start gap-4">
           {/* Salla logo */}
           <div
             className={cn(
@@ -126,7 +127,7 @@ export function PerformanceBoostCard({
               )}
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-base font-bold text-foreground">
                 Campaign Performance Boost by Salla
@@ -149,24 +150,17 @@ export function PerformanceBoostCard({
           </div>
         </div>
 
-        {/* Price + toggle */}
-        <div className="flex items-center gap-3 sm:shrink-0">
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">
-              One-time payment
-            </p>
-            <div className="mt-0.5 flex items-center justify-end gap-1.5">
+        {/* Price + toggle — own row on mobile, right-side on desktop */}
+        <div className="flex items-center justify-between gap-3 sm:shrink-0 sm:justify-end">
+          <div className="sm:text-right">
+            <p className="text-xs text-muted-foreground">One-time payment</p>
+            <div className="mt-0.5 flex items-center gap-1.5 sm:justify-end">
               <span className="text-sm font-medium text-muted-foreground line-through">
                 {ORIGINAL_PRICE}
               </span>
               <span className="text-xs text-muted-foreground">&bull;</span>
               <SarSymbol className="size-3.5 text-foreground" />
-              <span
-                className={cn(
-                  "text-xl font-bold tabular-nums tracking-tight",
-                  enabled ? "text-foreground" : "text-foreground"
-                )}
-              >
+              <span className="text-xl font-bold tabular-nums tracking-tight text-foreground">
                 {CURRENT_PRICE}
               </span>
             </div>
