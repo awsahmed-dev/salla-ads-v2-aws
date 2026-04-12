@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { SectionCard } from "@/components/shared/section-card";
+import { ArrowRight, Sparkles, AlertCircle } from "lucide-react";
 
 export interface GoalOption {
   value: string;
@@ -18,6 +19,8 @@ export interface GoalOption {
   locked?: boolean;
 }
 
+export type PixelReadiness = "none" | "new" | "established";
+
 interface OptimizationGoalCardProps {
   goals: GoalOption[];
   selectedGoal: string;
@@ -28,6 +31,7 @@ interface OptimizationGoalCardProps {
   apiBadge?: string;
   warnings?: React.ReactNode;
   infoTipText?: string;
+  pixelReadiness?: PixelReadiness;
   children?: React.ReactNode;
 }
 
@@ -39,8 +43,13 @@ export function OptimizationGoalCard({
   subtitle,
   warnings,
   infoTipText = "Choose the action you want to optimize. This determines how your budget is spent.",
+  pixelReadiness,
   children,
 }: OptimizationGoalCardProps) {
+  const isNewPixel = pixelReadiness === "new";
+  const selectedGoalObj = goals.find((g) => g.value === selectedGoal);
+  const isAdvancedGoalWithNewPixel = isNewPixel && selectedGoalObj?.requiresPixel && selectedGoal !== "PIXEL_PAGE_VIEW" && selectedGoal !== "LANDING_PAGE_VIEW";
+
   return (
     <SectionCard>
       {/* Header */}
@@ -55,6 +64,16 @@ export function OptimizationGoalCard({
 
       {subtitle && (
         <p className="mb-4 text-xs text-muted-foreground">{subtitle}</p>
+      )}
+
+      {/* Pixel readiness — progression path for new pixels */}
+      {isNewPixel && (
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/30 px-4 py-3">
+          <Sparkles className="size-4 shrink-0 text-[#004956]" />
+          <p className="text-[11px] text-[#004956]/80">
+            <span className="font-semibold text-[#004956]">New pixel?</span> Start with Page Views to build data, then scale up.
+          </p>
+        </div>
       )}
 
       {layout === "grid" ? (
@@ -233,6 +252,17 @@ export function OptimizationGoalCard({
       )}
 
       {warnings}
+
+      {/* Warning when selecting advanced goal with new pixel */}
+      {isAdvancedGoalWithNewPixel && (
+        <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5">
+          <AlertCircle className="size-3.5 shrink-0 text-amber-600" />
+          <p className="text-[11px] text-amber-700">
+            Consider starting with <span className="font-semibold">Page Views</span> first — your pixel needs data to optimize for {selectedGoalObj?.label?.toLowerCase()}.
+          </p>
+        </div>
+      )}
+
       {children}
     </SectionCard>
   );

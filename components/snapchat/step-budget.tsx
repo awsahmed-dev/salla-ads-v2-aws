@@ -86,13 +86,14 @@ const ALL_OPTIMIZATION_GOALS: {
   costHint?: string;
   }[] = [
   {
-    value: "PIXEL_PURCHASE",
-    label: "Purchases",
-    desc: "Optimized for people most likely to buy from your store.",
-    icon: <ShoppingCart className="size-4" />,
+    value: "PIXEL_PAGE_VIEW",
+    label: "Page Views",
+    desc: "Drive visitors to your store. Best starting point.",
+    icon: <Eye className="size-4" />,
     recommended: { SALES: true },
     requiresPixel: true,
-    costHint: "Higher cost per action, highest return",
+    bestFor: "New stores and new pixels — builds data for advanced goals",
+    costHint: "Lowest cost, broadest reach",
   },
   {
     value: "PIXEL_ADD_TO_CART",
@@ -100,15 +101,17 @@ const ALL_OPTIMIZATION_GOALS: {
     desc: "Target shoppers likely to add products to their cart.",
     icon: <TrendingUp className="size-4" />,
     requiresPixel: true,
+    bestFor: "Stores with 50+ daily page views on their pixel",
     costHint: "Moderate cost per action",
   },
   {
-    value: "PIXEL_PAGE_VIEW",
-    label: "Page Views",
-    desc: "Drive visitors to your store pages. Ideal for new stores.",
-    icon: <Eye className="size-4" />,
+    value: "PIXEL_PURCHASE",
+    label: "Purchases",
+    desc: "Optimized for people most likely to buy.",
+    icon: <ShoppingCart className="size-4" />,
     requiresPixel: true,
-    costHint: "Lower cost per action, broader reach",
+    bestFor: "Stores with established pixel data and 10+ weekly purchases",
+    costHint: "Higher cost per action, highest return",
   },
   {
     value: "SWIPES",
@@ -576,6 +579,11 @@ export function StepBudget() {
             }}
             layout="grid"
             infoTipText="Choose what action you want to optimize for. This determines how your budget is spent."
+            pixelReadiness={
+              !hasPixelConfigured ? "none"
+              : pixelMode === "salla_managed" ? "new"
+              : "established"
+            }
             warnings={
               <>
                 {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && !hasPixelConfigured && (
@@ -586,14 +594,7 @@ export function StepBudget() {
                     </p>
                   </div>
                 )}
-                {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && hasPixelConfigured && (
-                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                    <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-                    <p className="text-xs text-emerald-700">
-                      Snap Pixel connected — all pixel-based goals available.
-                    </p>
-                  </div>
-                )}
+                {/* Pixel connected status removed — already shown in Step 0 */}
                 {OPTIMIZATION_GOALS.some((g) => g.requiresMMP) && (
                   <div className="mt-3 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2">
                     <Lock className="mt-0.5 size-3.5 shrink-0 text-orange-600" />
@@ -731,7 +732,6 @@ export function StepBudget() {
                   combinedOptions={CONVERSION_WINDOWS.map((w) => ({
                     value: w.value,
                     label: w.label,
-                    desc: w.desc,
                     clickWindow: w.clickWindow,
                     viewWindow: w.viewWindow,
                     recommended: w.recommended,
@@ -739,15 +739,7 @@ export function StepBudget() {
                   }))}
                   combinedValue={budget.conversionWindow}
                   onCombinedChange={(v) => updateNested("budget", { conversionWindow: v as ConversionWindow })}
-                  apiBadge="conversion_window"
-                  infoTipText="How long after seeing or clicking your ad should a conversion count? A wider window gives Snap more data to optimize."
-                  goalContext={
-                    budget.optimizationGoal === "PIXEL_PURCHASE"
-                      ? "Purchases often happen days after the first ad — use the wider window."
-                      : budget.optimizationGoal === "PIXEL_ADD_TO_CART"
-                        ? "Add-to-cart events can be delayed — the wider window captures more."
-                        : undefined
-                  }
+                  tip="Wider windows capture more conversions. Purchases often happen days after the first ad."
                 />
               )}
 
@@ -864,19 +856,27 @@ export function StepBudget() {
                         </div>
 
                         {/* Summary */}
-                        <div className="flex items-center gap-2 rounded-lg bg-primary/5 px-3 py-2">
-                          <Users className="size-3.5 text-primary" />
-                          <p className="text-xs font-medium text-primary">
+                        <div className="flex items-center gap-2 rounded-lg bg-[#e6fff9] px-3 py-2">
+                          <Users className="size-3.5 text-[#004956]" />
+                          <p className="text-xs font-medium text-[#004956]">
                             Each person sees your ad up to <span className="font-bold">{budget.frequencyCapCount}x</span> every <span className="font-bold">{budget.frequencyCapInterval === 24 ? "day" : `${budget.frequencyCapInterval / 24} days`}</span>
                           </p>
                         </div>
 
-                        {/* Mixed formats warning */}
+                        {/* Single format requirement — always visible */}
+                        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                          <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+                          <p className="text-[11px] leading-relaxed text-amber-700">
+                            Frequency cap requires all ads to use <span className="font-semibold">one ad format</span> (e.g. all Single Image or all Video). Mixed formats are not supported by Snapchat when frequency cap is active.
+                          </p>
+                        </div>
+
+                        {/* Mixed formats error — shows when actually mixed */}
                         {campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1 && (
                           <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
                             <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-red-600" />
                             <p className="text-[11px] leading-relaxed text-red-700">
-                              Frequency cap requires all ads to use the same format. Fix in <span className="font-semibold">Ad Design</span> or disable this.
+                              Your ads currently use mixed formats. Fix in <span className="font-semibold">Ad Design</span> or disable frequency cap.
                             </p>
                           </div>
                         )}
@@ -908,6 +908,8 @@ export function StepBudget() {
               isOngoing={budget.endDateOptional}
               totalBudget={totalBudget}
               autoIncreaseEnabled={autoIncrease.enabled}
+              autoIncreaseMode={autoIncrease.mode}
+              paymentMethod={budget.paymentMethod}
               boostEnabled={budget.performanceBoost}
               boostAmount={299}
               startDate={budget.startDate}
@@ -916,7 +918,7 @@ export function StepBudget() {
 
             {/* Card B: Estimated Results (shared) */}
             <EstimatedResultsCard
-              badge="Predicted"
+              badge="Estimate"
               rows={
                 budget.optimizationGoal.startsWith("PIXEL_") ? [
                   { label: `Daily ${goalLabel}`, value: `${fmt(Math.round(dailyAmount / suggestedBid.max))} - ${fmt(Math.round(dailyAmount / suggestedBid.min))}` },
@@ -948,16 +950,18 @@ export function StepBudget() {
                   { label: "Est. cost per result", value: `SAR ${suggestedBid.min.toFixed(2)} - ${suggestedBid.max.toFixed(2)}` },
                 ]
               }
-              disclaimer="Estimates based on similar Snapchat campaigns. Actual results may vary based on creative quality and competition."
+              disclaimer="Based on similar campaigns. Actual results vary."
             />
 
             {/* Card C: Configuration Check (shared) */}
             <ConfigCheckCard
               configRows={[
                 { label: "Budget type", value: budget.type === "lifetime" ? "Lifetime" : "Daily" },
+                { label: "Payment", value: budget.paymentMethod === "prepaid" ? "Prepaid" : "Pay as You Go" },
                 { label: "End date", value: budget.endDateOptional ? "Ongoing" : budget.endDate ? new Date(budget.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Not set" },
                 { label: "Goal", value: goalLabel.charAt(0).toUpperCase() + goalLabel.slice(1) },
                 { label: "Bid", value: budget.bidStrategy === "AUTO_BID" ? "Auto Bid" : `${budget.bidStrategy === "TARGET_COST" ? "Target Cost" : "Max Bid"}: SAR ${budget.bidAmount}` },
+                ...(autoIncrease.enabled ? [{ label: "Auto-increase", value: autoIncrease.mode === "performance" ? "By ROAS" : `+${autoIncrease.pct}% / ${autoIncrease.intervalDays}d` }] : []),
                 ...(objectiveConfig.hasConversionWindow ? [{ label: "Attribution", value: CONVERSION_WINDOWS.find((w) => w.value === budget.conversionWindow)?.label ?? "Set" }] : []),
                 ...(budget.frequencyCapEnabled ? [{ label: "Frequency cap", value: `${budget.frequencyCapCount}× / ${Math.round(budget.frequencyCapInterval / 24)} days` }] : []),
               ]}
@@ -973,6 +977,10 @@ export function StepBudget() {
                 ...(budget.frequencyCapEnabled && campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1
                   ? [{ label: "Frequency cap", status: "error" as const, text: "Mixed ad formats — unify or disable cap" }]
                   : []),
+              ]}
+              tips={[
+                ...(!budget.endDateOptional ? [{ text: "Ongoing campaigns perform up to 40% better. Switch to Ongoing for the best results." }] : []),
+                ...(budget.amount < (suggestedDaily ?? 400) ? [{ text: `Increasing your budget to SAR ${suggestedDaily ?? 400}/day could significantly improve delivery and reach.` }] : []),
               ]}
             />
 

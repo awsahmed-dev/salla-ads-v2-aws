@@ -30,6 +30,7 @@ import {
   Trash2,
   Star,
   Tag,
+  ArrowRight,
 } from "lucide-react";
 import { type SallaProduct, PREVIEW_PRODUCTS, formatSAR } from "@/lib/salla/store-api";
 import { type CollectionTile, type AdGroup, type DynamicTemplateConfig, makeDefaultDynamicTemplate } from "@/lib/snapchat/campaign-types";
@@ -121,20 +122,25 @@ export function ProductPickerSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-xl">
-        <SheetHeader className="shrink-0 border-b border-border px-5 pb-3 pt-5">
-          <SheetTitle className="flex items-center gap-2 text-base">
-            <Store className="size-4 text-primary" />
-            Browse Store Products
-          </SheetTitle>
-          <SheetDescription className="text-xs">
-            Select up to {remainingSlots} product{remainingSlots !== 1 ? "s" : ""} — image, title, and URL auto-fill from your catalog.
-          </SheetDescription>
-        </SheetHeader>
+        {/* Branded header */}
+        <div className="bg-[#004956] px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+              <Store className="size-5 text-white" />
+            </div>
+            <div>
+              <SheetTitle className="text-base font-bold text-white">Browse Store Products</SheetTitle>
+              <SheetDescription className="mt-0.5 text-xs text-white/70">
+                Select up to {remainingSlots} product{remainingSlots !== 1 ? "s" : ""} — image, title, and URL auto-fill from your catalog.
+              </SheetDescription>
+            </div>
+          </div>
+        </div>
 
         {/* Selected products strip */}
         {selectedProducts.length > 0 && (
-          <div className="flex shrink-0 items-center gap-2 border-b border-primary/20 bg-primary/[0.03] px-4 py-2">
-            <span className="shrink-0 text-[11px] font-semibold text-primary">{selectedProducts.length} selected</span>
+          <div className="flex shrink-0 items-center gap-2 border-b border-[#a4ffe5]/40 bg-[#e6fff9] px-4 py-2">
+            <span className="shrink-0 text-[11px] font-semibold text-[#004956]">{selectedProducts.length} selected</span>
             <div className="flex flex-1 gap-1.5 overflow-x-auto">
               {selectedProducts.map((p) => (
                 <button
@@ -611,18 +617,23 @@ export function CollectionTilesSection({
 
               {/* Product Set Picker Sheet */}
               <Sheet open={dynamicSetPicker} onOpenChange={setDynamicSetPicker}>
-                <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
-                  <SheetHeader className="shrink-0 border-b border-border px-5 pb-3 pt-5">
-                    <SheetTitle className="flex items-center gap-2 text-base">
-                      <ShoppingBag className="size-4 text-primary" />
-                      Select Product Set
-                    </SheetTitle>
-                    <SheetDescription className="text-xs">
-                      Choose which products auto-fill your collection tiles.
-                    </SheetDescription>
-                  </SheetHeader>
+                <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[420px]">
+                  {/* Branded header */}
+                  <div className="bg-[#004956] px-6 py-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+                        <ShoppingBag className="size-5 text-white" />
+                      </div>
+                      <div>
+                        <SheetTitle className="text-base font-bold text-white">Select Product Set</SheetTitle>
+                        <SheetDescription className="mt-0.5 text-xs text-white/70">
+                          Choose which products auto-fill your collection tiles.
+                        </SheetDescription>
+                      </div>
+                    </div>
+                  </div>
 
-                  <div className="flex-1 overflow-y-auto px-4 py-3">
+                  <div className="flex-1 overflow-y-auto bg-[#f8f8f8] px-4 py-3">
                     <div className="flex flex-col gap-2">
                       {productSets.map((set) => {
                         const isSelected = dynamicConfig.productSetId === set.id;
@@ -638,26 +649,26 @@ export function CollectionTilesSection({
                               setDynamicSetPicker(false);
                             }}
                             className={cn(
-                              "group flex flex-col overflow-hidden rounded-xl border text-left transition-all",
+                              "group flex flex-col overflow-hidden rounded-2xl border text-left shadow-sm transition-all",
                               isEmpty
-                                ? "cursor-not-allowed border-border opacity-50"
+                                ? "cursor-not-allowed border-border bg-white opacity-50"
                                 : isSelected
-                                  ? "border-primary bg-primary/[0.04] ring-1 ring-primary/20"
-                                  : "border-border hover:border-primary/30"
+                                  ? "border-[#a4ffe5] bg-[#e6fff9] shadow-md"
+                                  : "border-white bg-white hover:border-[#a4ffe5] hover:shadow-md"
                             )}
                           >
                             {set.previewImages && set.previewImages.length > 0 && (
-                              <div className="flex h-14 gap-px overflow-hidden">
+                              <div className="flex h-16 gap-px overflow-hidden rounded-t-2xl">
                                 {set.previewImages.slice(0, 4).map((img, i) => (
                                   // eslint-disable-next-line @next/next/no-img-element
-                                  <img key={i} src={img} alt="" className="h-full flex-1 object-cover" crossOrigin="anonymous" />
+                                  <img key={i} src={img} alt="" className="h-full flex-1 object-cover transition-transform duration-300 group-hover:scale-105" crossOrigin="anonymous" />
                                 ))}
                               </div>
                             )}
-                            <div className="flex items-center gap-3 px-3 py-2.5">
+                            <div className="flex items-center gap-3 px-3 py-3">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <p className="text-xs font-semibold text-foreground">{set.nameAr || set.name}</p>
+                                  <p className={cn("text-xs font-bold", isSelected ? "text-[#004956]" : "text-foreground")}>{set.nameAr || set.name}</p>
                                   {set.seasonalTag && (
                                     <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{set.seasonalTag}</Badge>
                                   )}
@@ -665,8 +676,14 @@ export function CollectionTilesSection({
                                 <p className="mt-0.5 text-[11px] text-muted-foreground">{set.descriptionAr || set.description}</p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className={cn("text-xs font-semibold tabular-nums", isEmpty ? "text-red-500" : "text-foreground")}>{set.productCount}{isEmpty ? " (empty)" : ""}</span>
-                                {isSelected && <CheckCircle2 className="size-4 text-primary" />}
+                                <span className={cn("text-xs font-bold tabular-nums", isEmpty ? "text-red-500" : isSelected ? "text-[#004956]" : "text-foreground")}>{set.productCount}{isEmpty ? " (empty)" : ""}</span>
+                                {isSelected ? (
+                                  <div className="flex size-5 items-center justify-center rounded-full bg-[#004956]">
+                                    <CheckCircle2 className="size-3.5 text-white" />
+                                  </div>
+                                ) : (
+                                  <ArrowRight className="size-3.5 text-muted-foreground/30 transition-all group-hover:translate-x-0.5 group-hover:text-[#004956]" />
+                                )}
                               </div>
                             </div>
                           </button>
@@ -675,7 +692,7 @@ export function CollectionTilesSection({
                     </div>
                   </div>
 
-                  <div className="shrink-0 border-t border-border bg-muted/30 px-4 py-3">
+                  <div className="shrink-0 border-t border-border bg-white px-4 py-3">
                     <p className="text-center text-[11px] text-muted-foreground">
                       {productSets.length} product sets · Synced from your Salla store
                     </p>

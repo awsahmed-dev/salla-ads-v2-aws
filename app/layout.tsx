@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { GlobalHeader } from '@/components/shared/global-header'
+import { AppProvider } from '@/lib/app-context'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -34,8 +35,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
-        <GlobalHeader />
-        {children}
+        <AppProvider>
+          <GlobalHeader />
+          {children}
+        </AppProvider>
         <Analytics />
       </body>
     </html>

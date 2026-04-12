@@ -13,6 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -21,7 +26,6 @@ import {
 import {
   Info,
   CheckCircle2,
-  ArrowRight,
   Zap,
   ShoppingCart,
   Sparkles,
@@ -39,6 +43,7 @@ import {
   Eye,
   MousePointerClick,
   DollarSign,
+  ArrowRight,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -136,6 +141,7 @@ const FUNNEL_LABELS: Record<string, { label: string; color: string; icon: React.
 
 export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested } = useGoogleCampaign();
+  const [objectiveSheetOpen, setObjectiveSheetOpen] = useState(false);
   const obj = campaign.objective;
   const config = OBJECTIVE_CONFIGS[obj.objective] ?? OBJECTIVE_CONFIGS.PERFORMANCE_MAX;
   const selectedObj = CAMPAIGN_OBJECTIVES.find((o) => o.value === obj.objective)!;
@@ -207,181 +213,234 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
-            <div className={cn("mx-auto w-full max-w-3xl px-6 py-8", WIZARD_FOOTER_PADDING_BOTTOM)}>
+            <div className={cn("mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8", WIZARD_FOOTER_PADDING_BOTTOM)}>
 
-
-
-              {/* Funnel guide */}
-              <div className="mb-6 flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-4 py-2.5">
-                {(["awareness", "consideration", "conversion"] as const).map((stage, i) => {
-                  const f = FUNNEL_LABELS[stage];
-                  const FIcon = f.icon;
-                  const isActive = selectedObj.funnelStage === stage;
-                  return (
-                    <div key={stage} className="flex items-center gap-2">
-                      {i > 0 && <ArrowRight className="size-3 text-border" />}
-                      <div className={cn(
-                        "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all",
-                        isActive ? f.color : "border-transparent text-muted-foreground"
-                      )}>
-                        <FIcon className="size-3" />
+              {/* ── Single merged card ── */}
+              <div className="overflow-hidden rounded-2xl bg-card">
+                {/* Header */}
+                <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-6">
+                  <h2 className="text-xl font-bold text-foreground">What&apos;s your campaign goal?</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Pick one — we&apos;ll optimize everything for the best results.
+                  </p>
+                  {/* Funnel stage badge */}
+                  {(() => {
+                    const f = FUNNEL_LABELS[selectedObj.funnelStage];
+                    const FIcon = f.icon;
+                    return (
+                      <div className={cn("mt-4 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium", f.color)}>
+                        <FIcon className="size-3.5" />
                         {f.label}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })()}
+                </div>
 
               {/* Objective Cards */}
-              <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 px-4 sm:px-8 pb-6 sm:pb-8">
                 {CAMPAIGN_OBJECTIVES.map((o) => {
-                  const isActive = o.active;
-                  const isSelected = o.value === obj.objective;
+                  const selected = obj.objective === o.value;
                   const OIcon = o.icon;
                   return (
                     <button
-                      type="button"
                       key={o.value}
-                      disabled={!isActive}
-                      onClick={() => isActive && handleObjectiveChange(o.value)}
+                      type="button"
+                      disabled={!o.active}
+                      onClick={() => o.active && handleObjectiveChange(o.value)}
                       className={cn(
-                        "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all duration-200",
-                        !isActive
-                          ? "cursor-not-allowed border-border bg-muted/50 opacity-60"
-                          : isSelected
-                            ? "border-primary bg-primary/[0.04] shadow-sm shadow-primary/10"
-                            : "border-border bg-card hover:border-primary/40 hover:shadow-sm"
+                        "group relative flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-all",
+                        !o.active
+                          ? "cursor-not-allowed opacity-40 border-border"
+                          : selected
+                            ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                            : "border-border bg-white hover:border-[#a4ffe5] hover:shadow-sm"
                       )}
                     >
-                      {/* Coming Soon badge */}
-                      {!isActive && (
-                        <div className="absolute -top-2.5 right-3">
-                          <Badge variant="outline" className="gap-1 rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                            <Lock className="size-2.5" />
-                            Coming Soon
-                          </Badge>
-                        </div>
-                      )}
-
-                      {/* Icon + checkmark */}
-                      <div className="mb-3 flex items-center justify-between">
-                        <div className={cn(
-                          "flex size-10 items-center justify-center rounded-xl transition-colors",
-                          !isActive
-                            ? "bg-muted text-muted-foreground"
-                            : isSelected
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
-                        )}>
-                          <OIcon className="size-5" />
-                        </div>
-                        {isSelected && isActive && <CheckCircle2 className="size-5 text-primary" />}
-                      </div>
-
-                      {/* Title */}
-                      <p className={cn(
-                        "text-sm font-semibold transition-colors",
-                        !isActive ? "text-muted-foreground" : isSelected ? "text-primary" : "text-foreground"
+                      <div className={cn(
+                        "flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors",
+                        !o.active
+                          ? "bg-muted text-muted-foreground"
+                          : selected
+                            ? "bg-[#004956] text-white"
+                            : "bg-[#f4f4f4] text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
                       )}>
-                        {o.label}
-                      </p>
-
-                      {/* Description */}
-                      <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground line-clamp-2">
-                        {o.desc}
-                      </p>
-
-                      {/* Channels */}
-                      {o.channels && (
-                        <p className={cn(
-                          "mt-1.5 text-[10px] leading-snug",
-                          !isActive ? "text-muted-foreground/30" : "text-muted-foreground/70"
-                        )}>
-                          {o.channels}
-                        </p>
-                      )}
-
-                      {/* KPIs */}
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {o.kpis.map((kpi) => (
-                          <span key={kpi} className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            {kpi}
-                          </span>
-                        ))}
+                        <OIcon className="size-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className={cn("text-sm font-bold", !o.active ? "text-muted-foreground" : selected ? "text-[#004956]" : "text-foreground")}>{o.label}</span>
+                          {!o.active && (
+                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Soon</span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2">{o.desc}</p>
                       </div>
                     </button>
                   );
                 })}
               </div>
 
-              {/* ---- Selected Objective Summary ---- */}
-              <div className="mb-8 rounded-xl border border-primary/20 bg-primary/[0.02] overflow-hidden">
-                <div className="flex items-center gap-3 px-5 py-3.5 border-b border-primary/10">
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                    <selectedObj.icon className="size-4" />
-                  </div>
+              {/* Selected objective detail bar */}
+              <div className="border-t border-border bg-[#f4f4f4] px-4 sm:px-8 py-4">
+                <div className="flex items-center gap-4">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground">{selectedObj.label}</p>
-                    <p className="text-[11px] text-muted-foreground">{selectedObj.desc}</p>
-                    {isPMax && (
-                      <div className="mt-1">
-                        <Badge variant="outline" className="rounded-full px-2 py-0 text-[10px]">
-                          PMax mode: {obj.feedEnabled ? "Retail (Catalog)" : "Standard"}
-                        </Badge>
-                      </div>
-                    )}
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-bold text-foreground">{selectedObj.label}</span> — {selectedObj.kpis.join(", ")}
+                    </p>
                   </div>
-                  <Badge variant="outline" className={cn("rounded-full border text-[10px] font-semibold", FUNNEL_LABELS[selectedObj.funnelStage].color)}>
-                    {FUNNEL_LABELS[selectedObj.funnelStage].label}
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-3 divide-x divide-primary/10 px-1 py-3">
-                  <div className="px-4 text-center">
-                    <p className="text-[10px] text-muted-foreground">Best for</p>
-                    <p className="mt-0.5 text-[11px] font-medium text-foreground">{selectedObj.bestFor}</p>
-                  </div>
-                  <div className="px-4 text-center">
-                    <p className="text-[10px] text-muted-foreground">Key metrics</p>
-                    <p className="mt-0.5 text-[11px] font-medium text-foreground">{selectedObj.kpis.join(", ")}</p>
-                  </div>
-                  <div className="px-4 text-center">
-                    <p className="text-[10px] text-muted-foreground">Features</p>
-                    <p className="mt-0.5 text-[11px] font-medium text-foreground">{getObjectiveFeatures(obj.objective).length} available</p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setObjectiveSheetOpen(true)}
+                    className="shrink-0 text-xs font-bold text-[#004956] underline decoration-[#a4ffe5] decoration-2 underline-offset-2 hover:decoration-[#004956]"
+                  >
+                    Learn more
+                  </button>
                 </div>
               </div>
 
+              {/* Objective Details Sheet */}
+              <Sheet open={objectiveSheetOpen} onOpenChange={setObjectiveSheetOpen}>
+                <SheetContent side="right" className="flex w-full flex-col sm:max-w-[420px] bg-white p-0">
+                  <div className="bg-[#004956] px-6 py-6">
+                    <div className="flex items-center gap-4">
+                      <div className="flex size-12 items-center justify-center rounded-2xl bg-white/15">
+                        <selectedObj.icon className="size-6 text-white" />
+                      </div>
+                      <div>
+                        <SheetTitle className="text-lg font-bold text-white">{selectedObj.label}</SheetTitle>
+                        <Badge className="mt-1 rounded-full border-0 bg-[#a4ffe5] px-2 py-0.5 text-xs font-medium text-[#004956]">
+                          {FUNNEL_LABELS[selectedObj.funnelStage].label}
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-sm text-white/70">{selectedObj.desc}</p>
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="mx-6 mt-6 flex h-[180px] items-center justify-center rounded-2xl bg-gradient-to-br from-[#004956] to-[#006d7a]">
+                      <div className="text-center">
+                        <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-white/20">
+                          <svg viewBox="0 0 24 24" className="ml-0.5 size-5 text-white" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                        </div>
+                        <p className="text-sm font-bold text-white">Tutorial Video</p>
+                        <p className="text-xs text-white/60">45 seconds — how to set up your campaign</p>
+                      </div>
+                    </div>
+                    <div className="space-y-6 px-6 py-6">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                          <p className="text-lg font-bold text-[#004956]">{config.allowedAdFormats?.length ?? 3}</p>
+                          <p className="text-xs font-medium text-muted-foreground">Ad Formats</p>
+                        </div>
+                        <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                          <p className="text-lg font-bold text-[#004956]">SAR 150</p>
+                          <p className="text-xs font-medium text-muted-foreground">Min Budget/day</p>
+                        </div>
+                        <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                          <p className="text-lg font-bold text-[#004956]">7+</p>
+                          <p className="text-xs font-medium text-muted-foreground">Days Recommended</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Best for</p>
+                        <p className="text-sm font-bold text-foreground">{selectedObj.bestFor}</p>
+                      </div>
+                      <div>
+                        <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Metrics</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedObj.kpis.map((kpi) => (
+                            <span key={kpi} className="rounded-full border border-[#a4ffe5] bg-[#e6fff9] px-4 py-1.5 text-xs font-medium text-[#004956]">{kpi}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Step-by-step guide</p>
+                        <div className="space-y-4">
+                          {[
+                            { title: "Set up tracking", desc: "Connect your Google Ads conversion tag or use Salla's automatic tracking." },
+                            { title: "Define your audience", desc: "Choose locations, demographics, and interests." },
+                            { title: "Set budget & schedule", desc: "Set daily budget and campaign duration." },
+                            { title: "Create your ad", desc: "Upload creatives. Google recommends multiple asset variations." },
+                            { title: "Launch & optimize", desc: "Review, launch, and monitor after 3-5 days." },
+                          ].map((s, i) => (
+                            <div key={i} className="flex items-start gap-3">
+                              <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#004956] text-xs font-bold text-white">{i + 1}</div>
+                              <div>
+                                <p className="text-sm font-bold text-foreground">{s.title}</p>
+                                <p className="text-xs text-muted-foreground">{s.desc}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="rounded-xl bg-[#e6fff9] p-4">
+                        <div className="mb-1 flex items-center gap-2">
+                          <Sparkles className="size-3.5 text-[#004956]" />
+                          <p className="text-xs font-bold text-[#004956]">Pro Tip</p>
+                        </div>
+                        <p className="text-xs leading-relaxed text-[#004956]/80">
+                          {selectedObj.funnelStage === "conversion"
+                            ? "Start broad and let Google's algorithm find your best customers. Narrow down after the learning phase."
+                            : selectedObj.funnelStage === "consideration"
+                              ? "Use video creatives — they drive 2x more engagement than static images."
+                              : "Maximize reach by using Automatic placement and keeping your audience broad."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border-t border-border p-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setObjectiveSheetOpen(false);
+                        setTimeout(() => {
+                          const input = document.querySelector('input[placeholder*="Google"]') as HTMLInputElement;
+                          if (input) { input.scrollIntoView({ behavior: 'smooth', block: 'center' }); input.focus(); }
+                        }, 300);
+                      }}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#004956] py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#003a44]"
+                    >
+                      <ArrowRight className="size-4" />
+                      Start Campaign
+                    </button>
+                    <p className="mt-2 text-center text-xs text-muted-foreground">You can change your objective at any time before launching.</p>
+                  </div>
+                </SheetContent>
+              </Sheet>
 
-              {/* ---- Campaign Name ---- */}
-              <div className="mb-6 rounded-xl border border-border bg-card p-6">
-                <Label className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                  Campaign Name
-                  <span className="text-destructive">*</span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="size-3.5 cursor-help text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs text-xs">
-                      A descriptive name helps you find this campaign later. Include the objective, target, and date — e.g. &apos;Search - Perfume - Apr 2026&apos;.
-                    </TooltipContent>
-                  </Tooltip>
-                </Label>
-                <Input
-                  placeholder="e.g. Summer Collection - Performance Max"
-                  value={obj.campaignName}
-                  onChange={(e) =>
-                    updateNested("objective", { campaignName: e.target.value.slice(0, 512) })
-                  }
-                  className="h-11 text-sm"
-                />
-                <div className="mt-1.5 flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    Give your campaign a descriptive name to easily identify it later.
-                  </p>
-                  <span className={cn(
-                    "text-xs tabular-nums",
-                    obj.campaignName.length > 480 ? "text-amber-600" : "text-muted-foreground"
-                  )}>
+              {/* ── Campaign Setup ── */}
+              <div className="border-t border-border bg-muted/30 px-4 sm:px-8 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Campaign Setup</p>
+              </div>
+
+              {/* Campaign Name */}
+              <div className="px-4 sm:px-8 pt-4 pb-6">
+                <div className="mb-2 flex items-center justify-between">
+                  <Label className="text-sm font-medium text-foreground">
+                    Campaign Name <span className="text-red-500">*</span>
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const date = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                      const autoName = `${selectedObj.label} - Google Ads - ${date}`;
+                      updateNested("objective", { campaignName: autoName });
+                    }}
+                    className="flex items-center gap-1 text-xs font-medium text-[#004956] hover:underline"
+                  >
+                    <Sparkles className="size-3" />
+                    Auto-generate
+                  </button>
+                </div>
+                <div className="relative">
+                  <Input
+                    placeholder="e.g. Summer Collection - Performance Max"
+                    value={obj.campaignName}
+                    onChange={(e) =>
+                      updateNested("objective", { campaignName: e.target.value.slice(0, 512) })
+                    }
+                    className="h-11 text-sm"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
                     {obj.campaignName.length}/512
                   </span>
                 </div>
@@ -389,11 +448,11 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
 
               {/* ---- App Campaign Setup (APP only) —— in Step 0 so campaign type is defined before audience ---- */}
               {isApp && (
-                <div className="mb-6 rounded-xl border border-border bg-card p-6">
+                <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="mb-3 flex items-center gap-2">
-                    <Smartphone className="size-4 text-primary" />
+                    <Smartphone className="size-4 text-[#004956]" />
                     <Label className="text-sm font-semibold text-foreground">App campaign setup</Label>
-                    <Badge className="rounded-full bg-primary/10 px-1.5 py-0 text-[10px] text-primary">Required</Badge>
+                    <Badge className="rounded-full bg-[#e6fff9] px-1.5 py-0 text-[10px] text-[#004956]">Required</Badge>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Info className="size-3.5 cursor-help text-muted-foreground" />
@@ -417,8 +476,8 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                           className={cn(
                             "flex flex-1 cursor-pointer items-center gap-3 rounded-xl border-2 p-3 transition-all",
                             obj.appSettings.appStore === store.value
-                              ? "border-primary bg-primary/5"
-                              : "border-border bg-background hover:border-primary/40"
+                              ? "border-[#a4ffe5] bg-[#e6fff9]"
+                              : "border-border bg-background hover:border-[#a4ffe5]"
                           )}
                         >
                           <input
@@ -428,11 +487,11 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                             onChange={() => updateNested("objective", { appSettings: { ...obj.appSettings, appStore: store.value } })}
                             className="sr-only"
                           />
-                          <div className={cn("flex size-8 items-center justify-center rounded-lg", obj.appSettings.appStore === store.value ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                          <div className={cn("flex size-8 items-center justify-center rounded-lg", obj.appSettings.appStore === store.value ? "bg-[#e6fff9] text-[#004956]" : "bg-muted text-muted-foreground")}>
                             <Smartphone className="size-4" />
                           </div>
                           <div>
-                            <p className={cn("text-xs font-semibold", obj.appSettings.appStore === store.value ? "text-primary" : "text-foreground")}>{store.label}</p>
+                            <p className={cn("text-xs font-semibold", obj.appSettings.appStore === store.value ? "text-[#004956]" : "text-foreground")}>{store.label}</p>
                             <p className="text-[10px] text-muted-foreground">{store.desc}</p>
                           </div>
                         </label>
@@ -525,8 +584,8 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                               ? "cursor-not-allowed border-border bg-muted/50 opacity-60"
                               : "cursor-pointer",
                             !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value
-                              ? "border-primary bg-primary/5"
-                              : !isDisabled ? "border-border bg-background hover:border-primary/40" : ""
+                              ? "border-[#a4ffe5] bg-[#e6fff9]"
+                              : !isDisabled ? "border-border bg-background hover:border-[#a4ffe5]" : ""
                           )}
                         >
                           <input
@@ -537,12 +596,12 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                             onChange={() => !isDisabled && updateNested("objective", { appSettings: { ...obj.appSettings, biddingStrategyGoalType: goal.value } })}
                             className="sr-only"
                           />
-                          <div className={cn("mt-0.5 flex size-6 items-center justify-center rounded", !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                          <div className={cn("mt-0.5 flex size-6 items-center justify-center rounded", !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value ? "bg-[#e6fff9] text-[#004956]" : "bg-muted text-muted-foreground")}>
                             {isDisabled ? <Lock className="size-3.5" /> : <goal.icon className="size-3.5" />}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
-                              <p className={cn("text-[11px] font-semibold", !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value ? "text-primary" : "text-foreground")}>{goal.label}</p>
+                              <p className={cn("text-[11px] font-semibold", !isDisabled && obj.appSettings.biddingStrategyGoalType === goal.value ? "text-[#004956]" : "text-foreground")}>{goal.label}</p>
                               {needsMmp && <Badge variant="outline" className="h-4 px-1 text-[9px] font-medium text-amber-600">Requires MMP</Badge>}
                             </div>
                             <p className="text-[10px] text-muted-foreground">{goal.desc}</p>
@@ -553,9 +612,9 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-3">
+                  <div className="rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 p-3">
                     <div className="flex items-start gap-2.5">
-                      <Sparkles className="mt-0.5 size-4 text-primary" />
+                      <Sparkles className="mt-0.5 size-4 text-[#004956]" />
                       <div>
                         <p className="text-xs font-semibold text-foreground">Automated targeting</p>
                         <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -569,11 +628,11 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
 
               {/* ---- PMax Retail Catalog Mode (optional) ---- */}
               {supportsCatalogMode && (
-                <div className="mb-6 rounded-xl border border-border bg-card p-6">
+                <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <Store className="size-5 text-primary" />
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                        <Store className="size-5 text-[#004956]" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -611,11 +670,11 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
 
               {/* ---- Merchant Center Connection (Shopping / PMax with feed) ---- */}
               {requiresCatalogConnection && (
-                <div className="mb-6 rounded-xl border border-border bg-card p-6">
+                <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <Store className="size-5 text-primary" />
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                        <Store className="size-5 text-[#004956]" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -640,15 +699,15 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                   {obj.merchantCenterConnected && (
                     <div className="mt-4 border-t border-border pt-4">
                       <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
-                        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
-                          <Store className="size-4 text-primary" />
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-[#e6fff9]">
+                          <Store className="size-4 text-[#004956]" />
                         </div>
                         <div className="flex-1">
                           <p className="text-xs font-medium text-foreground">Salla Product Feed</p>
                           <p className="text-xs text-muted-foreground">Auto-synced from your Salla store to Merchant Center</p>
                         </div>
                         <Badge variant="outline" className="gap-1 rounded-full px-2 text-xs">
-                          <CheckCircle2 className="size-2.5 text-primary" />
+                          <CheckCircle2 className="size-2.5 text-[#004956]" />
                           Connected
                         </Badge>
                       </div>
@@ -668,10 +727,10 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
 
               {/* ---- Shopping Campaign Settings ---- */}
               {obj.objective === "SHOPPING" && obj.merchantCenterConnected && (
-                <div className="mb-6 rounded-xl border border-border bg-card p-6">
+                <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="mb-4 flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <ShoppingCart className="size-5 text-primary" />
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#e6fff9]">
+                      <ShoppingCart className="size-5 text-[#004956]" />
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-foreground">Shopping Settings</p>
@@ -713,13 +772,13 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                             className={cn(
                               "flex flex-col rounded-xl border-2 p-3 text-left transition-all",
                               isSelected
-                                ? "border-primary bg-primary/[0.04] shadow-sm"
-                                : "border-border bg-background hover:border-primary/40"
+                                ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                                : "border-border bg-background hover:border-[#a4ffe5]"
                             )}
                           >
                             <p className={cn(
                               "text-xs font-semibold",
-                              isSelected ? "text-primary" : "text-foreground"
+                              isSelected ? "text-[#004956]" : "text-foreground"
                             )}>
                               {p.label}
                             </p>
@@ -727,7 +786,7 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                               {p.desc}
                             </p>
                             {isSelected && (
-                              <CheckCircle2 className="mt-2 size-3.5 text-primary" />
+                              <CheckCircle2 className="mt-2 size-3.5 text-[#004956]" />
                             )}
                           </button>
                         );
@@ -786,10 +845,10 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                   </div>
 
                   {/* Salla Tip */}
-                  <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
-                    <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                  <div className="mt-4 flex items-start gap-2 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2.5">
+                    <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
                     <p className="text-xs leading-relaxed text-muted-foreground">
-                      <span className="font-semibold text-primary">Salla Tip:</span>{" "}
+                      <span className="font-semibold text-[#004956]">Salla Tip:</span>{" "}
                       Use <strong>Low priority</strong> as your catch-all campaign and <strong>High priority</strong> for time-limited sales. This structure ensures promotional bids take precedence without wasting budget.
                     </p>
                   </div>
@@ -798,17 +857,17 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
 
               {/* ---- Google Ads Conversion Tracking (auto-managed by Salla) ---- */}
               {needsConversionTag && (
-                <div className="mb-6 rounded-xl border border-primary/20 bg-primary/[0.02] p-5">
+                <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                      <ShieldCheck className="size-5 text-primary" />
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#e6fff9]">
+                      <ShieldCheck className="size-5 text-[#004956]" />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-foreground">
                           Conversion Tracking
                         </p>
-                        <Badge className="rounded-full bg-primary/10 px-1.5 py-0 text-xs font-medium text-primary">
+                        <Badge className="rounded-full bg-[#e6fff9] px-1.5 py-0 text-xs font-medium text-[#004956]">
                           Auto
                         </Badge>
                       </div>
@@ -824,7 +883,7 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                           "Pre-launch verification",
                         ].map((item) => (
                           <div key={item} className="flex items-center gap-1.5">
-                            <CheckCircle2 className="size-3 shrink-0 text-primary" />
+                            <CheckCircle2 className="size-3 shrink-0 text-[#004956]" />
                             <span className="text-xs text-muted-foreground">{item}</span>
                           </div>
                         ))}
@@ -834,33 +893,7 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
               )}
 
-              {/* ---- Objective Feature Cards (info section) ---- */}
-              <div className="mb-6 rounded-xl border border-border bg-card p-6">
-                <div className="flex items-start gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    {obj.objective === "PERFORMANCE_MAX" && <Zap className="size-5 text-primary" />}
-                    {obj.objective === "SHOPPING" && <ShoppingCart className="size-5 text-primary" />}
-                    {obj.objective === "DEMAND_GEN" && <Sparkles className="size-5 text-primary" />}
-                    {obj.objective === "SEARCH" && <Search className="size-5 text-primary" />}
-                    {obj.objective === "DISPLAY" && <LayoutGrid className="size-5 text-primary" />}
-                    {obj.objective === "APP" && <Smartphone className="size-5 text-primary" />}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{config.label} Campaign</p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                      {config.description}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {getObjectiveFeatures(obj.objective).map((item) => (
-                    <div key={item.title} className="rounded-lg border border-border bg-muted/20 p-3">
-                      <p className="text-xs font-medium text-foreground">{item.title}</p>
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            </div>{/* close merged card */}
 
             </div>
           </div>
@@ -885,74 +918,3 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
-function getObjectiveFeatures(objective: string): { title: string; desc: string }[] {
-  switch (objective) {
-    case "PERFORMANCE_MAX":
-      return [
-        { title: "All Google channels", desc: "Your ads run across Search, Display, YouTube, Discover, Gmail, and Maps from a single campaign." },
-        { title: "AI-powered optimization", desc: "Google's AI automatically finds the best-performing combination of your assets across all channels." },
-        { title: "Asset groups", desc: "Provide headlines, descriptions, images, and videos. Google creates the best ad combinations automatically." },
-        { title: "Audience signals", desc: "Provide audience hints to help Google's AI find your ideal customers faster." },
-      ];
-    case "SHOPPING":
-      return [
-        { title: "Product listings", desc: "Show your products with images, prices, and store name directly in Google Shopping results." },
-        { title: "Merchant Center feed", desc: "Your Salla product catalog syncs to Google Merchant Center for real-time product data." },
-        { title: "Smart bidding", desc: "Automatically bid to maximize conversions or target a specific return on ad spend." },
-        { title: "Local inventory", desc: "Show product availability for nearby shoppers when using local inventory feeds." },
-      ];
-    case "DEMAND_GEN":
-      return [
-        { title: "Visual storytelling", desc: "Engage users with rich image and video ads on YouTube, Discover feed, and Gmail." },
-        { title: "Lookalike audiences", desc: "Reach new users similar to your existing customers using Google's audience insights." },
-        { title: "Multi-format ads", desc: "Create carousel, single image, and video ads that adapt to each placement automatically." },
-        { title: "Full-funnel", desc: "Drive awareness and consideration with engaging creatives that lead to conversions." },
-      ];
-    case "SEARCH":
-      return [
-        { title: "Intent-based targeting", desc: "Reach people actively searching for your products and services on Google." },
-        { title: "Keyword targeting", desc: "Choose specific keywords to trigger your ads when users search for those terms." },
-        { title: "Responsive search ads", desc: "Provide multiple headlines and descriptions. Google tests combinations to find the best performers." },
-        { title: "Ad extensions", desc: "Add sitelinks, callouts, and structured snippets to make your ads more prominent." },
-      ];
-    case "DISPLAY":
-      return [
-        { title: "Massive reach", desc: "Show visual ads across 3 million+ websites and apps in the Google Display Network." },
-        { title: "Responsive display ads", desc: "Provide assets and Google automatically creates ads that fit any ad space." },
-        { title: "Audience targeting", desc: "Target users by interests, demographics, or retarget visitors who have been to your store." },
-        { title: "Brand awareness", desc: "Build awareness with visually engaging ads that appear alongside relevant content." },
-      ];
-    case "APP":
-      return [
-        { title: "Cross-channel promotion", desc: "Promote your app across Search, Play Store, YouTube, Discover, and Display Network." },
-        { title: "Automated optimization", desc: "Google AI optimizes your bids, targeting, and ad creatives to drive app installs." },
-        { title: "In-app actions", desc: "Optimize for specific in-app events like purchases, sign-ups, or level completions." },
-        { title: "Simple setup", desc: "Just provide text, images, and a budget. Google creates and optimizes ads automatically." },
-      ];
-    default:
-      return [];
-  }
-}
-
-function getObjectiveHelp(objective: string): string {
-  switch (objective) {
-    case "PERFORMANCE_MAX":
-      return "Performance Max is the best all-in-one campaign for Salla merchants. It uses Google AI to show your ads across all channels and automatically optimizes for conversions.";
-    case "SHOPPING":
-      return "Shopping campaigns are ideal for Salla stores with a product catalog. Your products appear with images and prices directly in Google Shopping results.";
-    case "DEMAND_GEN":
-      return "Demand Gen campaigns are great for building brand awareness with engaging visual ads on YouTube, Discover, and Gmail. Best for product launches and reaching new audiences.";
-    case "SEARCH":
-      return "Search campaigns let you target people actively looking for your products. Best when you know what keywords your customers use to find products like yours.";
-    case "DISPLAY":
-      return "Display campaigns show visual ads across millions of websites. Great for retargeting store visitors and building brand awareness at scale.";
-    case "APP":
-      return "App campaigns drive installs and engagement for your mobile app. Google automatically optimizes across all channels to maximize app downloads.";
-    default:
-      return "Select a campaign type to see recommendations for your Salla store.";
-  }
-}

@@ -483,6 +483,7 @@ export function TikTokStepBudget() {
             autoIncrease={autoIncrease}
             onAutoIncreaseChange={(ai) => updateNested("budget", { autoIncrease: ai })}
             onBulkUpdate={(updates) => updateNested("budget", updates)}
+            showSmartStart={true}
           />
 
 

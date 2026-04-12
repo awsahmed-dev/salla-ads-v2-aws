@@ -10,6 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -27,7 +32,6 @@ import {
   Info,
   Tag,
   CheckCircle2,
-  ArrowRight,
   Scan,
   Plus,
   Link2,
@@ -39,8 +43,9 @@ import {
   Play,
   Users,
   Smartphone,
-  Zap,
   TrendingUp,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import {
   META_OBJECTIVE_CONFIGS,
@@ -152,14 +157,10 @@ const SPECIAL_AD_OPTIONS: { value: MetaSpecialAdCategory; label: string; desc: s
 export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested } = useMetaCampaign();
   const obj = campaign.objective;
+  const [objectiveSheetOpen, setObjectiveSheetOpen] = useState(false);
 
   const config = META_OBJECTIVE_CONFIGS[obj.objective] ?? META_OBJECTIVE_CONFIGS.OUTCOME_SALES;
   const selectedObj = CAMPAIGN_OBJECTIVES.find((o) => o.value === obj.objective)!;
-  const isSales = obj.objective === "OUTCOME_SALES";
-  const isTraffic = obj.objective === "OUTCOME_TRAFFIC";
-  const isAwareness = obj.objective === "OUTCOME_AWARENESS";
-  const isEngagement = obj.objective === "OUTCOME_ENGAGEMENT";
-  const isLeads = obj.objective === "OUTCOME_LEADS";
   const isAppPromo = obj.objective === "OUTCOME_APP_PROMOTION";
   const needsPixel = config.pixelRequirement === "required";
   const optionalPixel = config.pixelRequirement === "optional";
@@ -217,237 +218,288 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
-            <div className={cn("mx-auto w-full max-w-3xl px-6 py-8", WIZARD_FOOTER_PADDING_BOTTOM)}>
+            <div className={cn("mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8", WIZARD_FOOTER_PADDING_BOTTOM)}>
 
-              {/* ---- Step 1: Campaign Goal ---- */}
-              <div className="mb-8">
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-[#1877F2] text-xs font-bold text-white">1</span>
-                  <h2 className="text-lg font-bold text-foreground">Choose your goal</h2>
-                </div>
-                <p className="ml-9 text-sm text-muted-foreground">
-                  What do you want to achieve? Ads will run on both Facebook and Instagram.
-                </p>
-              </div>
-
-              {/* Funnel guide */}
-              <div className="mb-6 flex items-center gap-2 rounded-xl border border-border bg-muted/20 px-4 py-2.5">
-                {(["awareness", "consideration", "conversion"] as const).map((stage, i) => {
-                  const f = FUNNEL_LABELS[stage];
-                  const FIcon = f.icon;
-                  const isActive = selectedObj.funnelStage === stage;
-                  return (
-                    <div key={stage} className="flex items-center gap-2">
-                      {i > 0 && <ArrowRight className="size-3 text-border" />}
-                      <div className={cn(
-                        "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all",
-                        isActive ? f.color : "border-transparent text-muted-foreground"
-                      )}>
-                        <FIcon className="size-3" />
+              {/* ── Single merged card ── */}
+              <div className="overflow-hidden rounded-2xl bg-card">
+                {/* Header */}
+                <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-6">
+                  <h2 className="text-xl font-bold text-foreground">What&apos;s your campaign goal?</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Pick one — we&apos;ll optimize everything for the best results.
+                  </p>
+                  {/* Funnel stage badge */}
+                  {(() => {
+                    const f = FUNNEL_LABELS[selectedObj.funnelStage];
+                    const FIcon = f.icon;
+                    return (
+                      <div className={cn("mt-4 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium", f.color)}>
+                        <FIcon className="size-3.5" />
                         {f.label}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })()}
+                </div>
 
-              {/* Objective Cards */}
-              <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {CAMPAIGN_OBJECTIVES.map((o) => {
-                  const isActive = o.active;
-                  const isSelected = o.value === obj.objective;
-                  const OIcon = o.icon;
-                  return (
-                    <button
-                      type="button"
-                      key={o.value}
-                      disabled={!isActive}
-                      onClick={() => isActive && handleObjectiveChange(o.value)}
-                      className={cn(
-                        "group relative flex flex-col rounded-xl border-2 p-4 text-left transition-all duration-200",
-                        !isActive
-                          ? "cursor-not-allowed border-border bg-muted/50 opacity-60"
-                          : isSelected
-                            ? "border-[#1877F2] bg-[#1877F2]/[0.04] shadow-sm shadow-[#1877F2]/10"
-                            : "border-border bg-card hover:border-[#1877F2]/40 hover:shadow-sm"
-                      )}
-                    >
-                      {/* Icon + checkmark */}
-                      <div className="mb-3 flex items-center justify-between">
+                {/* Objective Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 px-4 sm:px-8 pb-6 sm:pb-8">
+                  {CAMPAIGN_OBJECTIVES.map((o) => {
+                    const selected = obj.objective === o.value;
+                    const OIcon = o.icon;
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        disabled={!o.active}
+                        onClick={() => o.active && handleObjectiveChange(o.value)}
+                        className={cn(
+                          "group relative flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-all",
+                          !o.active
+                            ? "cursor-not-allowed opacity-40 border-border"
+                            : selected
+                              ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                              : "border-border bg-white hover:border-[#a4ffe5] hover:shadow-sm"
+                        )}
+                      >
                         <div className={cn(
-                          "flex size-10 items-center justify-center rounded-xl transition-colors",
-                          !isActive
+                          "flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors",
+                          !o.active
                             ? "bg-muted text-muted-foreground"
-                            : isSelected
-                              ? "bg-[#1877F2] text-white"
-                              : "bg-muted text-muted-foreground group-hover:bg-[#1877F2]/10 group-hover:text-[#1877F2]"
+                            : selected
+                              ? "bg-[#004956] text-white"
+                              : "bg-[#f4f4f4] text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
                         )}>
                           <OIcon className="size-5" />
                         </div>
-                        {isSelected && isActive && <CheckCircle2 className="size-5 text-[#1877F2]" />}
-                      </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn("text-sm font-bold", !o.active ? "text-muted-foreground" : selected ? "text-[#004956]" : "text-foreground")}>{o.label}</span>
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2">{o.desc}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
 
-                      {/* Title */}
-                      <p className={cn(
-                        "text-sm font-semibold transition-colors",
-                        !isActive ? "text-muted-foreground" : isSelected ? "text-[#1877F2]" : "text-foreground"
-                      )}>
-                        {o.label}
+                {/* Detail bar */}
+                <div className="border-t border-border bg-[#f4f4f4] px-4 sm:px-8 py-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">
+                        <span className="font-bold text-foreground">{selectedObj.label}</span> — {selectedObj.kpis.join(", ")}
                       </p>
-
-                      {/* Description */}
-                      <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground line-clamp-2">
-                        {o.desc}
-                      </p>
-
-                      {/* KPIs */}
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {o.kpis.map((kpi) => (
-                          <span key={kpi} className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            {kpi}
-                          </span>
-                        ))}
-                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setObjectiveSheetOpen(true)}
+                      className="shrink-0 text-xs font-bold text-[#004956] underline decoration-[#a4ffe5] decoration-2 underline-offset-2 hover:decoration-[#004956]"
+                    >
+                      Learn more
                     </button>
-                  );
-                })}
-              </div>
+                  </div>
+                </div>
 
-              {/* ---- Selected Objective Summary ---- */}
-              <div className="mb-8 rounded-xl border border-[#1877F2]/20 bg-[#1877F2]/[0.02] overflow-hidden">
-                <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[#1877F2]/10">
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-[#1877F2] text-white">
-                    <selectedObj.icon className="size-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground">{selectedObj.label}</p>
-                    <p className="text-[11px] text-muted-foreground">{selectedObj.desc}</p>
-                  </div>
-                  <Badge variant="outline" className={cn("rounded-full border text-[10px] font-semibold", FUNNEL_LABELS[selectedObj.funnelStage].color)}>
-                    {FUNNEL_LABELS[selectedObj.funnelStage].label}
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-3 divide-x divide-[#1877F2]/10 px-1 py-3">
-                  <div className="px-4 text-center">
-                    <p className="text-[10px] text-muted-foreground">Best for</p>
-                    <p className="mt-0.5 text-[11px] font-medium text-foreground">{selectedObj.bestFor}</p>
-                  </div>
-                  <div className="px-4 text-center">
-                    <p className="text-[10px] text-muted-foreground">Key metrics</p>
-                    <p className="mt-0.5 text-[11px] font-medium text-foreground">{selectedObj.kpis.join(", ")}</p>
-                  </div>
-                  <div className="px-4 text-center">
-                    <p className="text-[10px] text-muted-foreground">Placements</p>
-                    <p className="mt-0.5 text-[11px] font-medium text-foreground">{config.allowedAdFormats.length} formats</p>
-                  </div>
-                </div>
-              </div>
+                {/* Objective Details Sheet */}
+                <Sheet open={objectiveSheetOpen} onOpenChange={setObjectiveSheetOpen}>
+                  <SheetContent side="right" className="flex w-full flex-col sm:max-w-[420px] bg-white p-0">
+                    <div className="bg-[#004956] px-6 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="flex size-12 items-center justify-center rounded-2xl bg-white/15">
+                          <selectedObj.icon className="size-6 text-white" />
+                        </div>
+                        <div>
+                          <SheetTitle className="text-lg font-bold text-white">{selectedObj.label}</SheetTitle>
+                          <Badge className="mt-1 rounded-full border-0 bg-[#a4ffe5] px-2 py-0.5 text-xs font-medium text-[#004956]">
+                            {FUNNEL_LABELS[selectedObj.funnelStage].label}
+                          </Badge>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-sm text-white/70">{selectedObj.desc}</p>
+                    </div>
+                    <div className="flex-1 overflow-y-auto">
+                      <div className="mx-6 mt-6 flex h-[180px] items-center justify-center rounded-2xl bg-gradient-to-br from-[#004956] to-[#006d7a]">
+                        <div className="text-center">
+                          <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-white/20">
+                            <svg viewBox="0 0 24 24" className="ml-0.5 size-5 text-white" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                          </div>
+                          <p className="text-sm font-bold text-white">Tutorial Video</p>
+                          <p className="text-xs text-white/60">45 seconds — how to set up your campaign</p>
+                        </div>
+                      </div>
+                      <div className="space-y-6 px-6 py-6">
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                            <p className="text-lg font-bold text-[#004956]">{config.allowedAdFormats?.length ?? 3}</p>
+                            <p className="text-xs font-medium text-muted-foreground">Ad Formats</p>
+                          </div>
+                          <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                            <p className="text-lg font-bold text-[#004956]">SAR 150</p>
+                            <p className="text-xs font-medium text-muted-foreground">Min Budget/day</p>
+                          </div>
+                          <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                            <p className="text-lg font-bold text-[#004956]">7+</p>
+                            <p className="text-xs font-medium text-muted-foreground">Days Recommended</p>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Best for</p>
+                          <p className="text-sm font-bold text-foreground">{selectedObj.bestFor}</p>
+                        </div>
+                        <div>
+                          <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Metrics</p>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedObj.kpis.map((kpi) => (
+                              <span key={kpi} className="rounded-full border border-[#a4ffe5] bg-[#e6fff9] px-4 py-1.5 text-xs font-medium text-[#004956]">{kpi}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Step-by-step guide</p>
+                          <div className="space-y-4">
+                            {[
+                              { title: "Set up tracking", desc: "Connect your Meta Pixel or use Salla's automatic tracking." },
+                              { title: "Define your audience", desc: "Choose locations, demographics, and interests." },
+                              { title: "Set budget & schedule", desc: "Set daily budget and campaign duration." },
+                              { title: "Create your ad", desc: "Upload creatives. Meta recommends 3-5 variations." },
+                              { title: "Launch & optimize", desc: "Review, launch, and monitor after 3-5 days." },
+                            ].map((s, i) => (
+                              <div key={i} className="flex items-start gap-3">
+                                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#004956] text-xs font-bold text-white">{i + 1}</div>
+                                <div>
+                                  <p className="text-sm font-bold text-foreground">{s.title}</p>
+                                  <p className="text-xs text-muted-foreground">{s.desc}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-xl bg-[#e6fff9] p-4">
+                          <div className="mb-1 flex items-center gap-2">
+                            <Sparkles className="size-3.5 text-[#004956]" />
+                            <p className="text-xs font-bold text-[#004956]">Pro Tip</p>
+                          </div>
+                          <p className="text-xs leading-relaxed text-[#004956]/80">
+                            {selectedObj.funnelStage === "conversion"
+                              ? "Start broad and let Meta's algorithm find your best customers. Narrow down after the learning phase."
+                              : selectedObj.funnelStage === "consideration"
+                                ? "Use video creatives — they drive 2x more engagement than static images on Facebook and Instagram."
+                                : "Maximize reach by using Advantage+ placement and keeping your audience broad."}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="border-t border-border p-6">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setObjectiveSheetOpen(false);
+                          setTimeout(() => {
+                            const input = document.querySelector('input[placeholder*="Meta"]') as HTMLInputElement;
+                            if (input) { input.scrollIntoView({ behavior: 'smooth', block: 'center' }); input.focus(); }
+                          }, 300);
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#004956] py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#003a44]"
+                      >
+                        <ArrowRight className="size-4" />
+                        Start Campaign
+                      </button>
+                      <p className="mt-2 text-center text-xs text-muted-foreground">You can change your objective at any time before launching.</p>
+                    </div>
+                  </SheetContent>
+                </Sheet>
 
-              {/* ---- Step 2: Campaign Setup ---- */}
-              <div className="mb-6">
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="flex size-6 items-center justify-center rounded-full bg-[#1877F2] text-xs font-bold text-white">2</span>
-                  <h2 className="text-lg font-bold text-foreground">Campaign setup</h2>
+                {/* Campaign Setup section label */}
+                <div className="border-t border-border bg-muted/30 px-4 sm:px-8 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Campaign Setup</p>
                 </div>
-                <p className="ml-9 text-sm text-muted-foreground">
-                  Name your campaign and configure tracking.
-                </p>
-              </div>
 
-              {/* ---- Campaign Name ---- */}
-              <div className="mb-6 rounded-xl border border-border bg-card p-6">
-                <Label className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                  Campaign Name
-                  <span className="text-destructive">*</span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="size-3.5 cursor-help text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs text-xs">
-                      This name appears in your Salla dashboard and Meta Ads Manager.
-                    </TooltipContent>
-                  </Tooltip>
-                </Label>
-                <Input
-                  placeholder="e.g. Summer Collection - Meta Sales Campaign"
-                  value={obj.campaignName}
-                  onChange={(e) =>
-                    updateNested("objective", { campaignName: e.target.value.slice(0, 512) })
-                  }
-                  className="h-11 text-sm"
-                />
-                <div className="mt-1.5 flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    Give your campaign a descriptive name to easily identify it later.
-                  </p>
-                  <span className={cn(
-                    "text-xs tabular-nums",
-                    obj.campaignName.length > 480 ? "text-amber-600" : "text-muted-foreground"
-                  )}>
-                    {obj.campaignName.length}/512
-                  </span>
+                {/* ---- Campaign Name ---- */}
+                <div className="px-4 sm:px-8 pt-4 pb-6">
+                  <div className="mb-2 flex items-center justify-between">
+                    <Label className="text-sm font-medium text-foreground">
+                      Campaign Name <span className="text-red-500">*</span>
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const date = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                        const autoName = `${selectedObj.label} - Meta - ${date}`;
+                        updateNested("objective", { campaignName: autoName });
+                      }}
+                      className="flex items-center gap-1 text-xs font-medium text-[#004956] hover:underline"
+                    >
+                      <Sparkles className="size-3" />
+                      Auto-generate
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      placeholder="e.g. Summer Collection - Meta Sales Campaign"
+                      value={obj.campaignName}
+                      onChange={(e) =>
+                        updateNested("objective", { campaignName: e.target.value.slice(0, 512) })
+                      }
+                      className="h-11 text-sm"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                      {obj.campaignName.length}/512
+                    </span>
+                  </div>
                 </div>
-              </div>
 
               {/* ---- Salla Product Catalog (only for Sales) ---- */}
               {config.catalogAvailable && (
-                <div className="mb-6 flex flex-col gap-4">
-                  <div className="rounded-xl border border-border bg-card p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
-                          <Tag className="size-5 text-[#1877F2]" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">
-                            Salla Product Catalog
-                          </p>
-                          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                            Show personalized product ads from your Salla catalog across Facebook and Instagram.
-                          </p>
-                        </div>
+                <div className="border-t border-border px-4 sm:px-8 py-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
+                        <Tag className="size-5 text-[#1877F2]" />
                       </div>
-                      <Switch
-                        checked={obj.catalogEnabled}
-                        onCheckedChange={handleCatalogToggle}
-                      />
-                    </div>
-
-                    {obj.catalogEnabled && (
-                      <div className="mt-4 border-t border-border pt-4">
-                        <Label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                          Connected Catalog
-                        </Label>
-                        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
-                          <div className="flex size-8 items-center justify-center rounded-lg bg-[#1877F2]/10">
-                            <Store className="size-4 text-[#1877F2]" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-xs font-medium text-foreground">My Salla Store</p>
-                            <p className="text-xs text-muted-foreground">Auto-synced to Meta Commerce Manager</p>
-                          </div>
-                          <Badge variant="outline" className="gap-1 rounded-full px-2 text-xs">
-                            <CheckCircle2 className="size-2.5 text-[#1877F2]" />
-                            Connected
-                          </Badge>
-                        </div>
-                        <p className="mt-1.5 text-xs text-muted-foreground">
-                          Your products sync automatically to your Meta product catalog. No manual setup needed.
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          Salla Product Catalog
+                        </p>
+                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                          Show personalized product ads from your Salla catalog across Facebook and Instagram.
                         </p>
                       </div>
-                    )}
+                    </div>
+                    <Switch
+                      checked={obj.catalogEnabled}
+                      onCheckedChange={handleCatalogToggle}
+                    />
                   </div>
-                </div>
-              )}
 
-              {/* ---- Sales Objective -- Full Configuration ---- */}
-              {isSales && (
-                <SalesObjectiveSection />
+                  {obj.catalogEnabled && (
+                    <div className="mt-4 border-t border-border pt-4">
+                      <Label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                        Connected Catalog
+                      </Label>
+                      <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                        <div className="flex size-8 items-center justify-center rounded-lg bg-[#1877F2]/10">
+                          <Store className="size-4 text-[#1877F2]" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-foreground">My Salla Store</p>
+                          <p className="text-xs text-muted-foreground">Auto-synced to Meta Commerce Manager</p>
+                        </div>
+                        <Badge variant="outline" className="gap-1 rounded-full px-2 text-xs">
+                          <CheckCircle2 className="size-2.5 text-[#1877F2]" />
+                          Connected
+                        </Badge>
+                      </div>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Your products sync automatically to your Meta product catalog. No manual setup needed.
+                      </p>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* ---- Meta Pixel (required for Sales, optional for Traffic) ---- */}
               {(needsPixel || optionalPixel) && (
-                <div className="mb-6 rounded-xl border border-border bg-card p-6">
+                <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="mb-4 flex items-start gap-3">
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
                       <Scan className="size-5 text-[#1877F2]" />
@@ -633,89 +685,12 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
               )}
 
-              {/* ---- Awareness / Engagement / Leads info banners ---- */}
-              {isAwareness && (
-                <div className="mb-6 rounded-xl border border-border bg-card p-6">
-                  <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
-                      <Eye className="size-5 text-[#1877F2]" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Awareness Campaign</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        No pixel needed. Meta will optimize to show your ads to the maximum number of people within your target audience.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {[
-                      { title: "No pixel required", desc: "Awareness campaigns optimize for reach and impressions, not website actions." },
-                      { title: "Broad reach", desc: "Maximize unique users or impressions across Facebook and Instagram." },
-                      { title: "Brand recall", desc: "Optimize for estimated ad recall lift to measure brand awareness impact." },
-                      { title: "Best for launches", desc: "Ideal for product launches, brand building, and announcements." },
-                    ].map((item) => (
-                      <div key={item.title} className="rounded-lg border border-border bg-muted/20 p-3">
-                        <p className="text-xs font-medium text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {isEngagement && (
-                <div className="mb-6 rounded-xl border border-border bg-card p-6">
-                  <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
-                      <Play className="size-5 text-[#1877F2]" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Engagement Campaign</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        Get more video views (ThruPlay), post engagement, or conversations via Messenger, WhatsApp, and Instagram Direct.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {[
-                      { title: "ThruPlay video views", desc: "Maximize 15-second+ video views or complete plays for shorter videos." },
-                      { title: "Post engagement", desc: "Increase likes, comments, and shares on your posts." },
-                      { title: "Conversations", desc: "Start conversations via Messenger, WhatsApp, or Instagram Direct." },
-                      { title: "Content promotion", desc: "Best for brand storytelling, product demos, and building community." },
-                    ].map((item) => (
-                      <div key={item.title} className="rounded-lg border border-border bg-muted/20 p-3">
-                        <p className="text-xs font-medium text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {isLeads && (
-                <div className="mb-6 space-y-4">
-                  <div className="rounded-xl border border-border bg-card p-6">
-                    <div className="flex items-start gap-3">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
-                        <Users className="size-5 text-[#1877F2]" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Lead Generation Campaign</p>
-                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                          Collect leads through Meta Instant Forms, Messenger conversations, or your website. Conversion location and placements are configured in the Ad Design step.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {isAppPromo && (
                 <AppPromotionSection />
               )}
 
               {/* ---- Special Ad Categories ---- */}
-              <div className="mb-6 rounded-xl border border-border bg-card p-6">
+              <div className="border-t border-border px-4 sm:px-8 py-5">
                 <div className="mb-4 flex items-start gap-3">
                   <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
                     <AlertCircle className="size-5 text-amber-600" />
@@ -769,7 +744,7 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
               </div>
 
               {/* ---- Facebook Page & Instagram Account (required by API) ---- */}
-              <div className="rounded-xl border border-border bg-card p-6">
+              <div className="border-t border-border px-4 sm:px-8 py-5">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex size-10 items-center justify-center rounded-lg bg-[#1877F2]/10">
                     <Store className="size-5 text-[#1877F2]" />
@@ -825,6 +800,7 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
               </div>
 
+              </div>{/* close merged card */}
             </div>
           </div>
           <WizardStepFooter
@@ -856,24 +832,9 @@ function AppPromotionSection() {
   };
 
   return (
-    <div className="mb-6 space-y-4">
-      {/* Info Panel */}
-      <div className="rounded-xl border border-border bg-card p-6">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
-            <Smartphone className="size-5 text-[#1877F2]" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">App Promotion Campaign</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              Drive app installs and in-app events across Facebook and Instagram. Connect your app via Meta SDK for conversion tracking.
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <>
       {/* App Settings */}
-      <div className="rounded-xl border border-border bg-card p-6">
+      <div className="border-t border-border px-4 sm:px-8 py-5">
         <Label className="mb-4 block text-sm font-semibold text-foreground">App Settings</Label>
 
         <div className="space-y-4">
@@ -942,69 +903,7 @@ function AppPromotionSection() {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
-/* ================================================================ */
-/* Sales Objective Section                                          */
-/* Full Meta Marketing API alignment for OUTCOME_SALES              */
-/* ================================================================ */
-
-function SalesObjectiveSection() {
-  const { campaign, updateNested } = useMetaCampaign();
-  const obj = campaign.objective;
-
-  return (
-    <div className="mb-6 space-y-4">
-
-      {/* ---- Sales Info Panel ---- */}
-      <div className="rounded-xl border border-border bg-card p-6">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
-            <ShoppingBag className="size-5 text-[#1877F2]" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Sales Campaign</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              Drive purchases on your website or from your product catalog. Meta will optimize ad delivery across Facebook and Instagram to reach people most likely to buy.
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {[
-            {
-              title: "Meta Pixel required",
-              desc: "Pixel fires Purchase, AddToCart, and InitiateCheckout events on your store for conversion tracking.",
-              icon: <Scan className="size-3.5 text-[#1877F2]" />,
-            },
-            {
-              title: "Conversion API (CAPI)",
-              desc: "Server-side events complement the pixel for reliable tracking even with browser restrictions.",
-              icon: <ShieldCheck className="size-3.5 text-[#1877F2]" />,
-            },
-            {
-              title: "Dynamic product ads",
-              desc: "Connect your Salla catalog to show personalized products to people who browsed your store.",
-              icon: <Tag className="size-3.5 text-[#1877F2]" />,
-            },
-            {
-              title: "Advantage+ Shopping",
-              desc: "Meta's AI-powered campaign type that automates audience, creative, and placement decisions.",
-              icon: <Zap className="size-3.5 text-[#1877F2]" />,
-            },
-          ].map((item) => (
-            <div key={item.title} className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/20 p-3">
-              <div className="mt-0.5">{item.icon}</div>
-              <div>
-                <p className="text-xs font-medium text-foreground">{item.title}</p>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-    </div>
-  );
-}

@@ -196,7 +196,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
             <div className={cn("mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8", WIZARD_FOOTER_PADDING_BOTTOM)}>
 
               {/* ── Goal Selection ── */}
-              <div className="mb-10 overflow-hidden rounded-2xl bg-card">
+              <div className="overflow-hidden rounded-2xl bg-card">
                 {/* Header */}
                 <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-6">
                   <h2 className="text-xl font-bold text-foreground">What&apos;s your campaign goal?</h2>
@@ -204,28 +204,17 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                     Pick one — we&apos;ll optimize everything for the best results.
                   </p>
 
-                  {/* Funnel stage indicator */}
-                  <div className="mt-5 inline-flex flex-wrap items-center rounded-full bg-[#f4f4f4] p-1">
-                    {(["awareness", "consideration", "conversion"] as const).map((stage) => {
-                      const f = FUNNEL_LABELS[stage];
-                      const FIcon = f.icon;
-                      const isActive = selectedObj.funnelStage === stage;
-                      return (
-                        <div
-                          key={stage}
-                          className={cn(
-                            "flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all",
-                            isActive
-                              ? "bg-white shadow-sm text-foreground"
-                              : "text-muted-foreground"
-                          )}
-                        >
-                          <FIcon className="size-3.5" />
-                          {f.label}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {/* Funnel stage badge — reflects the selected objective's stage */}
+                  {(() => {
+                    const f = FUNNEL_LABELS[selectedObj.funnelStage];
+                    const FIcon = f.icon;
+                    return (
+                      <div className={cn("mt-4 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium", f.color)}>
+                        <FIcon className="size-3.5" />
+                        {f.label}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* 3x2 Objective Grid */}
@@ -288,7 +277,6 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                     </button>
                   </div>
                 </div>
-              </div>
 
               {/* Objective Details Sheet */}
               <Sheet open={objectiveSheetOpen} onOpenChange={setObjectiveSheetOpen}>
@@ -426,16 +414,12 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
               </Sheet>
 
               {/* ── Campaign Setup ── */}
-              <div className="overflow-hidden rounded-2xl bg-card">
-                <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-6">
-                  <h2 className="text-xl font-bold text-foreground">Campaign Setup</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Name your campaign and configure tracking.
-                  </p>
-                </div>
+              <div className="border-t border-border bg-muted/30 px-4 sm:px-8 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Campaign Setup</p>
+              </div>
 
                 {/* Campaign Name */}
-                <div className="px-4 sm:px-8 pb-6">
+                <div className="px-4 sm:px-8 pt-4 pb-6">
                   <div className="mb-2 flex items-center justify-between">
                     <Label className="text-sm font-medium text-foreground">
                       Campaign Name <span className="text-red-500">*</span>
@@ -706,7 +690,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
 
               {/* App Configuration */}
               {obj.objective === "APP_PROMOTION" && obj.appSettings && (
-                <div className="mb-4 rounded-xl border border-border bg-card p-5">
+                <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="mb-4 flex items-start gap-3">
                     <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                       <Smartphone className="size-4 text-primary" />
@@ -826,6 +810,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                     const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId);
                     const hasValue = profileId.length > 0;
                     return (
+                      <div className="px-4 sm:px-8 pb-6 sm:pb-8">
                       <div className="flex items-start gap-3.5">
                         <div className={cn(
                           "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors",
@@ -880,6 +865,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                             )}
                           </div>
                         </div>
+                      </div>
                       </div>
                     );
                   })()
