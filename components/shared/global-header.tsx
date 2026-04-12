@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
   Search,
@@ -57,11 +59,11 @@ const PRIMARY_TABS = [
 ];
 
 const SECONDARY_TABS = [
-  { label: "Dashboard", active: true },
-  { label: "Ad Management" },
-  { label: "Media Library" },
-  { label: "Invoices" },
-  { label: "Settings" },
+  { label: "Dashboard", href: "/" },
+  { label: "Ad Management", href: "/ad-management" },
+  { label: "Media Library", href: "" },
+  { label: "Invoices", href: "" },
+  { label: "Settings", href: "" },
 ];
 
 const PLATFORM_OPTIONS: { platform: Platform; label: string; logo: React.ReactNode }[] = [
@@ -113,6 +115,7 @@ const PLATFORM_OPTIONS: { platform: Platform; label: string; logo: React.ReactNo
 
 export function GlobalHeader() {
   const { active, setActive } = useApp();
+  const pathname = usePathname();
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
@@ -201,20 +204,30 @@ export function GlobalHeader() {
       <div className="flex h-14 items-center gap-4 border-b border-border bg-white px-4 sm:h-16 sm:gap-6 sm:px-6 lg:px-14">
         {/* Secondary tabs */}
         <nav className="flex flex-1 items-center gap-2 overflow-x-auto scrollbar-none sm:gap-4">
-          {SECONDARY_TABS.map((tab) => (
-            <button
-              key={tab.label}
-              type="button"
-              className={cn(
-                "shrink-0 px-0.5 py-2 text-sm font-medium transition-colors sm:text-base",
-                tab.active
-                  ? "border-b-2 border-[#004956] font-bold text-[#004956]"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {SECONDARY_TABS.map((tab) => {
+            const isActive = tab.href === "/" ? pathname === "/" : tab.href ? pathname.startsWith(tab.href) : false;
+            return tab.href ? (
+              <Link
+                key={tab.label}
+                href={tab.href}
+                className={cn(
+                  "shrink-0 px-0.5 py-2 text-sm font-medium transition-colors sm:text-base",
+                  isActive
+                    ? "border-b-2 border-[#004956] font-bold text-[#004956]"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab.label}
+              </Link>
+            ) : (
+              <span
+                key={tab.label}
+                className="shrink-0 px-0.5 py-2 text-sm font-medium text-muted-foreground/50 sm:text-base cursor-not-allowed"
+              >
+                {tab.label}
+              </span>
+            );
+          })}
         </nav>
 
         {/* Action buttons */}

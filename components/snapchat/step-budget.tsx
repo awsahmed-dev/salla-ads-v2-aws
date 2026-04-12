@@ -856,19 +856,27 @@ export function StepBudget() {
                         </div>
 
                         {/* Summary */}
-                        <div className="flex items-center gap-2 rounded-lg bg-primary/5 px-3 py-2">
-                          <Users className="size-3.5 text-primary" />
-                          <p className="text-xs font-medium text-primary">
+                        <div className="flex items-center gap-2 rounded-lg bg-[#e6fff9] px-3 py-2">
+                          <Users className="size-3.5 text-[#004956]" />
+                          <p className="text-xs font-medium text-[#004956]">
                             Each person sees your ad up to <span className="font-bold">{budget.frequencyCapCount}x</span> every <span className="font-bold">{budget.frequencyCapInterval === 24 ? "day" : `${budget.frequencyCapInterval / 24} days`}</span>
                           </p>
                         </div>
 
-                        {/* Mixed formats warning */}
+                        {/* Single format requirement — always visible */}
+                        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                          <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+                          <p className="text-[11px] leading-relaxed text-amber-700">
+                            Frequency cap requires all ads to use <span className="font-semibold">one ad format</span> (e.g. all Single Image or all Video). Mixed formats are not supported by Snapchat when frequency cap is active.
+                          </p>
+                        </div>
+
+                        {/* Mixed formats error — shows when actually mixed */}
                         {campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1 && (
                           <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
                             <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-red-600" />
                             <p className="text-[11px] leading-relaxed text-red-700">
-                              Frequency cap requires all ads to use the same format. Fix in <span className="font-semibold">Ad Design</span> or disable this.
+                              Your ads currently use mixed formats. Fix in <span className="font-semibold">Ad Design</span> or disable frequency cap.
                             </p>
                           </div>
                         )}
@@ -910,7 +918,7 @@ export function StepBudget() {
 
             {/* Card B: Estimated Results (shared) */}
             <EstimatedResultsCard
-              badge="Predicted"
+              badge="Estimate"
               rows={
                 budget.optimizationGoal.startsWith("PIXEL_") ? [
                   { label: `Daily ${goalLabel}`, value: `${fmt(Math.round(dailyAmount / suggestedBid.max))} - ${fmt(Math.round(dailyAmount / suggestedBid.min))}` },
@@ -942,7 +950,7 @@ export function StepBudget() {
                   { label: "Est. cost per result", value: `SAR ${suggestedBid.min.toFixed(2)} - ${suggestedBid.max.toFixed(2)}` },
                 ]
               }
-              disclaimer="Estimates based on similar Snapchat campaigns. Actual results may vary based on creative quality and competition."
+              disclaimer="Based on similar campaigns. Actual results vary."
             />
 
             {/* Card C: Configuration Check (shared) */}

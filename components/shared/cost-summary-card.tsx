@@ -51,7 +51,7 @@ export function CostSummaryCard({
   const showAdSpendRow = !isOngoing && (adSpend !== budgetAmount || autoIncreaseEnabled);
 
   return (
-    <div className="rounded-lg bg-card p-6">
+    <div className="rounded-lg bg-card p-4 sm:p-6">
       <h3 className="mb-4 text-lg font-medium text-[#004d5a]">
         Campaign Budget Summary
       </h3>

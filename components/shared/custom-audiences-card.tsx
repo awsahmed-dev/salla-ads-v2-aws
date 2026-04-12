@@ -67,7 +67,7 @@ export function CustomAudiencesCard({
   return (
     <div className={cn("rounded-xl border border-border bg-card", className)}>
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-5">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-5">
         <div>
           <h3 className="text-base font-bold text-foreground">Custom Audiences</h3>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -84,9 +84,9 @@ export function CustomAudiencesCard({
       </div>
 
       {/* Content */}
-      <div className="px-6 pb-6">
+      <div className="px-4 sm:px-6 pb-6">
         {/* Include / Exclude tabs */}
-        <div className="mb-6 flex h-[37px] rounded-xl bg-[#f4f4f4] p-0.5">
+        <div className="mb-6 flex min-h-[37px] rounded-xl bg-[#f4f4f4] p-0.5">
           <button
             type="button"
             onClick={() => setMode("include")}

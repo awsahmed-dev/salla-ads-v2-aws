@@ -38,7 +38,7 @@ export function ConfigCheckCard({
   tips,
 }: ConfigCheckCardProps) {
   return (
-    <div className="rounded-lg bg-card p-6">
+    <div className="rounded-lg bg-card p-4 sm:p-6">
       {/* Title + status */}
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-lg font-medium text-[#004d5a]">
