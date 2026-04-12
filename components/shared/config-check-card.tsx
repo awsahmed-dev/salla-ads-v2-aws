@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { CheckCircle2, AlertTriangle, XCircle, Sparkles } from "lucide-react";
 
 export interface ConfigRow {
   label: string;
@@ -14,9 +14,16 @@ export interface CheckItem {
   text: string;
 }
 
+export interface BestPracticeTip {
+  text: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}
+
 interface ConfigCheckCardProps {
   configRows: ConfigRow[];
   checkItems?: CheckItem[];
+  tips?: BestPracticeTip[];
 }
 
 const statusIcon = {
@@ -28,6 +35,7 @@ const statusIcon = {
 export function ConfigCheckCard({
   configRows,
   checkItems,
+  tips,
 }: ConfigCheckCardProps) {
   return (
     <div className="rounded-lg bg-card p-6">
@@ -94,6 +102,32 @@ export function ConfigCheckCard({
                   >
                     {item.text}
                   </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Best Practice Tips */}
+      {tips && tips.length > 0 && (
+        <>
+          <div className="my-4 h-px bg-border" />
+          <div className="flex flex-col gap-2">
+            {tips.map((tip, i) => (
+              <div key={i} className="flex items-start gap-2 rounded-lg bg-[#e6fff9]/50 px-3 py-2">
+                <Sparkles className="mt-0.5 size-3 shrink-0 text-[#004956]" />
+                <div className="flex-1">
+                  <p className="text-[11px] leading-relaxed text-[#004956]/80">{tip.text}</p>
+                  {tip.actionLabel && tip.onAction && (
+                    <button
+                      type="button"
+                      onClick={tip.onAction}
+                      className="mt-1 text-[11px] font-semibold text-[#004956] underline decoration-[#a4ffe5] underline-offset-2 hover:decoration-[#004956]"
+                    >
+                      {tip.actionLabel}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

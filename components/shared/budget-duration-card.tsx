@@ -35,16 +35,16 @@ export interface BudgetTypeOption {
 
 export interface AutoIncreaseState {
   enabled: boolean;
-  mode: "schedule" | "performance";
+  mode?: "schedule" | "performance";
   /* Schedule mode */
   pct: number;
   intervalDays: number;
   maxDailyBudget: number;
   /* Performance (ROAS) mode */
-  scaleUpRoas: number;
-  scaleUpPct: number;
-  scaleDownRoas: number;
-  scaleDownPct: number;
+  scaleUpRoas?: number;
+  scaleUpPct?: number;
+  scaleDownRoas?: number;
+  scaleDownPct?: number;
 }
 
 export interface BudgetDurationCardProps {
