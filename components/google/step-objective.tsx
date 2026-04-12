@@ -13,6 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -38,6 +43,7 @@ import {
   Eye,
   MousePointerClick,
   DollarSign,
+  ArrowRight,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -135,6 +141,7 @@ const FUNNEL_LABELS: Record<string, { label: string; color: string; icon: React.
 
 export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested } = useGoogleCampaign();
+  const [objectiveSheetOpen, setObjectiveSheetOpen] = useState(false);
   const obj = campaign.objective;
   const config = OBJECTIVE_CONFIGS[obj.objective] ?? OBJECTIVE_CONFIGS.PERFORMANCE_MAX;
   const selectedObj = CAMPAIGN_OBJECTIVES.find((o) => o.value === obj.objective)!;
@@ -281,8 +288,124 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                       <span className="font-bold text-foreground">{selectedObj.label}</span> — {selectedObj.kpis.join(", ")}
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setObjectiveSheetOpen(true)}
+                    className="shrink-0 text-xs font-bold text-primary underline decoration-primary/30 decoration-2 underline-offset-2 hover:decoration-primary"
+                  >
+                    Learn more
+                  </button>
                 </div>
               </div>
+
+              {/* Objective Details Sheet */}
+              <Sheet open={objectiveSheetOpen} onOpenChange={setObjectiveSheetOpen}>
+                <SheetContent side="right" className="flex w-full flex-col sm:max-w-[420px] bg-white p-0">
+                  <div className="bg-primary px-6 py-6">
+                    <div className="flex items-center gap-4">
+                      <div className="flex size-12 items-center justify-center rounded-2xl bg-white/15">
+                        <selectedObj.icon className="size-6 text-white" />
+                      </div>
+                      <div>
+                        <SheetTitle className="text-lg font-bold text-white">{selectedObj.label}</SheetTitle>
+                        <Badge className="mt-1 rounded-full border-0 bg-primary-foreground/20 px-2 py-0.5 text-xs font-medium text-white">
+                          {FUNNEL_LABELS[selectedObj.funnelStage].label}
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-sm text-white/70">{selectedObj.desc}</p>
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="mx-6 mt-6 flex h-[180px] items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80">
+                      <div className="text-center">
+                        <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-white/20">
+                          <svg viewBox="0 0 24 24" className="ml-0.5 size-5 text-white" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                        </div>
+                        <p className="text-sm font-bold text-white">Tutorial Video</p>
+                        <p className="text-xs text-white/60">45 seconds — how to set up your campaign</p>
+                      </div>
+                    </div>
+                    <div className="space-y-6 px-6 py-6">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                          <p className="text-lg font-bold text-primary">{config.allowedAdFormats?.length ?? 3}</p>
+                          <p className="text-xs font-medium text-muted-foreground">Ad Formats</p>
+                        </div>
+                        <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                          <p className="text-lg font-bold text-primary">SAR 150</p>
+                          <p className="text-xs font-medium text-muted-foreground">Min Budget/day</p>
+                        </div>
+                        <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                          <p className="text-lg font-bold text-primary">7+</p>
+                          <p className="text-xs font-medium text-muted-foreground">Days Recommended</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Best for</p>
+                        <p className="text-sm font-bold text-foreground">{selectedObj.bestFor}</p>
+                      </div>
+                      <div>
+                        <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Metrics</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedObj.kpis.map((kpi) => (
+                            <span key={kpi} className="rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">{kpi}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Step-by-step guide</p>
+                        <div className="space-y-4">
+                          {[
+                            { title: "Set up tracking", desc: "Connect your Google Ads conversion tag or use Salla's automatic tracking." },
+                            { title: "Define your audience", desc: "Choose locations, demographics, and interests." },
+                            { title: "Set budget & schedule", desc: "Set daily budget and campaign duration." },
+                            { title: "Create your ad", desc: "Upload creatives. Google recommends multiple asset variations." },
+                            { title: "Launch & optimize", desc: "Review, launch, and monitor after 3-5 days." },
+                          ].map((s, i) => (
+                            <div key={i} className="flex items-start gap-3">
+                              <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{i + 1}</div>
+                              <div>
+                                <p className="text-sm font-bold text-foreground">{s.title}</p>
+                                <p className="text-xs text-muted-foreground">{s.desc}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="rounded-xl bg-primary/5 p-4">
+                        <div className="mb-1 flex items-center gap-2">
+                          <Sparkles className="size-3.5 text-primary" />
+                          <p className="text-xs font-bold text-primary">Pro Tip</p>
+                        </div>
+                        <p className="text-xs leading-relaxed text-primary/80">
+                          {selectedObj.funnelStage === "conversion"
+                            ? "Start broad and let Google's algorithm find your best customers. Narrow down after the learning phase."
+                            : selectedObj.funnelStage === "consideration"
+                              ? "Use video creatives — they drive 2x more engagement than static images."
+                              : "Maximize reach by using Automatic placement and keeping your audience broad."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border-t border-border p-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setObjectiveSheetOpen(false);
+                        setTimeout(() => {
+                          const input = document.querySelector('input[placeholder*="Google"]') as HTMLInputElement;
+                          if (input) { input.scrollIntoView({ behavior: 'smooth', block: 'center' }); input.focus(); }
+                        }, 300);
+                      }}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      <ArrowRight className="size-4" />
+                      Start Campaign
+                    </button>
+                    <p className="mt-2 text-center text-xs text-muted-foreground">You can change your objective at any time before launching.</p>
+                  </div>
+                </SheetContent>
+              </Sheet>
 
               {/* ── Campaign Setup ── */}
               <div className="border-t border-border bg-muted/30 px-4 sm:px-8 py-3">
@@ -770,34 +893,6 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
               )}
 
-              {/* ---- Objective Feature Cards (info section) ---- */}
-              <div className="border-t border-border px-4 sm:px-8 py-5">
-                <div className="flex items-start gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    {obj.objective === "PERFORMANCE_MAX" && <Zap className="size-5 text-primary" />}
-                    {obj.objective === "SHOPPING" && <ShoppingCart className="size-5 text-primary" />}
-                    {obj.objective === "DEMAND_GEN" && <Sparkles className="size-5 text-primary" />}
-                    {obj.objective === "SEARCH" && <Search className="size-5 text-primary" />}
-                    {obj.objective === "DISPLAY" && <LayoutGrid className="size-5 text-primary" />}
-                    {obj.objective === "APP" && <Smartphone className="size-5 text-primary" />}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{config.label} Campaign</p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                      {config.description}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {getObjectiveFeatures(obj.objective).map((item) => (
-                    <div key={item.title} className="rounded-lg border border-border bg-muted/20 p-3">
-                      <p className="text-xs font-medium text-foreground">{item.title}</p>
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
             </div>{/* close merged card */}
 
             </div>
@@ -823,74 +918,3 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
-function getObjectiveFeatures(objective: string): { title: string; desc: string }[] {
-  switch (objective) {
-    case "PERFORMANCE_MAX":
-      return [
-        { title: "All Google channels", desc: "Your ads run across Search, Display, YouTube, Discover, Gmail, and Maps from a single campaign." },
-        { title: "AI-powered optimization", desc: "Google's AI automatically finds the best-performing combination of your assets across all channels." },
-        { title: "Asset groups", desc: "Provide headlines, descriptions, images, and videos. Google creates the best ad combinations automatically." },
-        { title: "Audience signals", desc: "Provide audience hints to help Google's AI find your ideal customers faster." },
-      ];
-    case "SHOPPING":
-      return [
-        { title: "Product listings", desc: "Show your products with images, prices, and store name directly in Google Shopping results." },
-        { title: "Merchant Center feed", desc: "Your Salla product catalog syncs to Google Merchant Center for real-time product data." },
-        { title: "Smart bidding", desc: "Automatically bid to maximize conversions or target a specific return on ad spend." },
-        { title: "Local inventory", desc: "Show product availability for nearby shoppers when using local inventory feeds." },
-      ];
-    case "DEMAND_GEN":
-      return [
-        { title: "Visual storytelling", desc: "Engage users with rich image and video ads on YouTube, Discover feed, and Gmail." },
-        { title: "Lookalike audiences", desc: "Reach new users similar to your existing customers using Google's audience insights." },
-        { title: "Multi-format ads", desc: "Create carousel, single image, and video ads that adapt to each placement automatically." },
-        { title: "Full-funnel", desc: "Drive awareness and consideration with engaging creatives that lead to conversions." },
-      ];
-    case "SEARCH":
-      return [
-        { title: "Intent-based targeting", desc: "Reach people actively searching for your products and services on Google." },
-        { title: "Keyword targeting", desc: "Choose specific keywords to trigger your ads when users search for those terms." },
-        { title: "Responsive search ads", desc: "Provide multiple headlines and descriptions. Google tests combinations to find the best performers." },
-        { title: "Ad extensions", desc: "Add sitelinks, callouts, and structured snippets to make your ads more prominent." },
-      ];
-    case "DISPLAY":
-      return [
-        { title: "Massive reach", desc: "Show visual ads across 3 million+ websites and apps in the Google Display Network." },
-        { title: "Responsive display ads", desc: "Provide assets and Google automatically creates ads that fit any ad space." },
-        { title: "Audience targeting", desc: "Target users by interests, demographics, or retarget visitors who have been to your store." },
-        { title: "Brand awareness", desc: "Build awareness with visually engaging ads that appear alongside relevant content." },
-      ];
-    case "APP":
-      return [
-        { title: "Cross-channel promotion", desc: "Promote your app across Search, Play Store, YouTube, Discover, and Display Network." },
-        { title: "Automated optimization", desc: "Google AI optimizes your bids, targeting, and ad creatives to drive app installs." },
-        { title: "In-app actions", desc: "Optimize for specific in-app events like purchases, sign-ups, or level completions." },
-        { title: "Simple setup", desc: "Just provide text, images, and a budget. Google creates and optimizes ads automatically." },
-      ];
-    default:
-      return [];
-  }
-}
-
-function getObjectiveHelp(objective: string): string {
-  switch (objective) {
-    case "PERFORMANCE_MAX":
-      return "Performance Max is the best all-in-one campaign for Salla merchants. It uses Google AI to show your ads across all channels and automatically optimizes for conversions.";
-    case "SHOPPING":
-      return "Shopping campaigns are ideal for Salla stores with a product catalog. Your products appear with images and prices directly in Google Shopping results.";
-    case "DEMAND_GEN":
-      return "Demand Gen campaigns are great for building brand awareness with engaging visual ads on YouTube, Discover, and Gmail. Best for product launches and reaching new audiences.";
-    case "SEARCH":
-      return "Search campaigns let you target people actively looking for your products. Best when you know what keywords your customers use to find products like yours.";
-    case "DISPLAY":
-      return "Display campaigns show visual ads across millions of websites. Great for retargeting store visitors and building brand awareness at scale.";
-    case "APP":
-      return "App campaigns drive installs and engagement for your mobile app. Google automatically optimizes across all channels to maximize app downloads.";
-    default:
-      return "Select a campaign type to see recommendations for your Salla store.";
-  }
-}

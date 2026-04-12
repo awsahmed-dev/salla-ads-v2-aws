@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useMetaCampaign } from "@/lib/meta/campaign-context";
 import { cn } from "@/lib/utils";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
@@ -8,6 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Tooltip,
   TooltipContent,
@@ -37,9 +43,9 @@ import {
   Play,
   Users,
   Smartphone,
-  Zap,
   TrendingUp,
   Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import {
   META_OBJECTIVE_CONFIGS,
@@ -151,14 +157,10 @@ const SPECIAL_AD_OPTIONS: { value: MetaSpecialAdCategory; label: string; desc: s
 export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested } = useMetaCampaign();
   const obj = campaign.objective;
+  const [objectiveSheetOpen, setObjectiveSheetOpen] = useState(false);
 
   const config = META_OBJECTIVE_CONFIGS[obj.objective] ?? META_OBJECTIVE_CONFIGS.OUTCOME_SALES;
   const selectedObj = CAMPAIGN_OBJECTIVES.find((o) => o.value === obj.objective)!;
-  const isSales = obj.objective === "OUTCOME_SALES";
-  const isTraffic = obj.objective === "OUTCOME_TRAFFIC";
-  const isAwareness = obj.objective === "OUTCOME_AWARENESS";
-  const isEngagement = obj.objective === "OUTCOME_ENGAGEMENT";
-  const isLeads = obj.objective === "OUTCOME_LEADS";
   const isAppPromo = obj.objective === "OUTCOME_APP_PROMOTION";
   const needsPixel = config.pixelRequirement === "required";
   const optionalPixel = config.pixelRequirement === "optional";
@@ -288,8 +290,124 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
                         <span className="font-bold text-foreground">{selectedObj.label}</span> — {selectedObj.kpis.join(", ")}
                       </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setObjectiveSheetOpen(true)}
+                      className="shrink-0 text-xs font-bold text-primary underline decoration-primary/30 decoration-2 underline-offset-2 hover:decoration-primary"
+                    >
+                      Learn more
+                    </button>
                   </div>
                 </div>
+
+                {/* Objective Details Sheet */}
+                <Sheet open={objectiveSheetOpen} onOpenChange={setObjectiveSheetOpen}>
+                  <SheetContent side="right" className="flex w-full flex-col sm:max-w-[420px] bg-white p-0">
+                    <div className="bg-primary px-6 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="flex size-12 items-center justify-center rounded-2xl bg-white/15">
+                          <selectedObj.icon className="size-6 text-white" />
+                        </div>
+                        <div>
+                          <SheetTitle className="text-lg font-bold text-white">{selectedObj.label}</SheetTitle>
+                          <Badge className="mt-1 rounded-full border-0 bg-primary-foreground/20 px-2 py-0.5 text-xs font-medium text-white">
+                            {FUNNEL_LABELS[selectedObj.funnelStage].label}
+                          </Badge>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-sm text-white/70">{selectedObj.desc}</p>
+                    </div>
+                    <div className="flex-1 overflow-y-auto">
+                      <div className="mx-6 mt-6 flex h-[180px] items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80">
+                        <div className="text-center">
+                          <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-white/20">
+                            <svg viewBox="0 0 24 24" className="ml-0.5 size-5 text-white" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                          </div>
+                          <p className="text-sm font-bold text-white">Tutorial Video</p>
+                          <p className="text-xs text-white/60">45 seconds — how to set up your campaign</p>
+                        </div>
+                      </div>
+                      <div className="space-y-6 px-6 py-6">
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                            <p className="text-lg font-bold text-primary">{config.allowedAdFormats?.length ?? 3}</p>
+                            <p className="text-xs font-medium text-muted-foreground">Ad Formats</p>
+                          </div>
+                          <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                            <p className="text-lg font-bold text-primary">SAR 150</p>
+                            <p className="text-xs font-medium text-muted-foreground">Min Budget/day</p>
+                          </div>
+                          <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                            <p className="text-lg font-bold text-primary">7+</p>
+                            <p className="text-xs font-medium text-muted-foreground">Days Recommended</p>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Best for</p>
+                          <p className="text-sm font-bold text-foreground">{selectedObj.bestFor}</p>
+                        </div>
+                        <div>
+                          <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Metrics</p>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedObj.kpis.map((kpi) => (
+                              <span key={kpi} className="rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">{kpi}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Step-by-step guide</p>
+                          <div className="space-y-4">
+                            {[
+                              { title: "Set up tracking", desc: "Connect your Meta Pixel or use Salla's automatic tracking." },
+                              { title: "Define your audience", desc: "Choose locations, demographics, and interests." },
+                              { title: "Set budget & schedule", desc: "Set daily budget and campaign duration." },
+                              { title: "Create your ad", desc: "Upload creatives. Meta recommends 3-5 variations." },
+                              { title: "Launch & optimize", desc: "Review, launch, and monitor after 3-5 days." },
+                            ].map((s, i) => (
+                              <div key={i} className="flex items-start gap-3">
+                                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{i + 1}</div>
+                                <div>
+                                  <p className="text-sm font-bold text-foreground">{s.title}</p>
+                                  <p className="text-xs text-muted-foreground">{s.desc}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-xl bg-primary/5 p-4">
+                          <div className="mb-1 flex items-center gap-2">
+                            <Sparkles className="size-3.5 text-primary" />
+                            <p className="text-xs font-bold text-primary">Pro Tip</p>
+                          </div>
+                          <p className="text-xs leading-relaxed text-primary/80">
+                            {selectedObj.funnelStage === "conversion"
+                              ? "Start broad and let Meta's algorithm find your best customers. Narrow down after the learning phase."
+                              : selectedObj.funnelStage === "consideration"
+                                ? "Use video creatives — they drive 2x more engagement than static images on Facebook and Instagram."
+                                : "Maximize reach by using Advantage+ placement and keeping your audience broad."}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="border-t border-border p-6">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setObjectiveSheetOpen(false);
+                          setTimeout(() => {
+                            const input = document.querySelector('input[placeholder*="Meta"]') as HTMLInputElement;
+                            if (input) { input.scrollIntoView({ behavior: 'smooth', block: 'center' }); input.focus(); }
+                          }, 300);
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+                      >
+                        <ArrowRight className="size-4" />
+                        Start Campaign
+                      </button>
+                      <p className="mt-2 text-center text-xs text-muted-foreground">You can change your objective at any time before launching.</p>
+                    </div>
+                  </SheetContent>
+                </Sheet>
 
                 {/* Campaign Setup section label */}
                 <div className="border-t border-border bg-muted/30 px-4 sm:px-8 py-3">
@@ -377,11 +495,6 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
                     </div>
                   )}
                 </div>
-              )}
-
-              {/* ---- Sales Objective -- Full Configuration ---- */}
-              {isSales && (
-                <SalesObjectiveSection />
               )}
 
               {/* ---- Meta Pixel (required for Sales, optional for Traffic) ---- */}
@@ -572,81 +685,6 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
               )}
 
-              {/* ---- Awareness / Engagement / Leads info banners ---- */}
-              {isAwareness && (
-                <div className="border-t border-border px-4 sm:px-8 py-5">
-                  <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
-                      <Eye className="size-5 text-[#1877F2]" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Awareness Campaign</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        No pixel needed. Meta will optimize to show your ads to the maximum number of people within your target audience.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {[
-                      { title: "No pixel required", desc: "Awareness campaigns optimize for reach and impressions, not website actions." },
-                      { title: "Broad reach", desc: "Maximize unique users or impressions across Facebook and Instagram." },
-                      { title: "Brand recall", desc: "Optimize for estimated ad recall lift to measure brand awareness impact." },
-                      { title: "Best for launches", desc: "Ideal for product launches, brand building, and announcements." },
-                    ].map((item) => (
-                      <div key={item.title} className="rounded-lg border border-border bg-muted/20 p-3">
-                        <p className="text-xs font-medium text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {isEngagement && (
-                <div className="border-t border-border px-4 sm:px-8 py-5">
-                  <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
-                      <Play className="size-5 text-[#1877F2]" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Engagement Campaign</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        Get more video views (ThruPlay), post engagement, or conversations via Messenger, WhatsApp, and Instagram Direct.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {[
-                      { title: "ThruPlay video views", desc: "Maximize 15-second+ video views or complete plays for shorter videos." },
-                      { title: "Post engagement", desc: "Increase likes, comments, and shares on your posts." },
-                      { title: "Conversations", desc: "Start conversations via Messenger, WhatsApp, or Instagram Direct." },
-                      { title: "Content promotion", desc: "Best for brand storytelling, product demos, and building community." },
-                    ].map((item) => (
-                      <div key={item.title} className="rounded-lg border border-border bg-muted/20 p-3">
-                        <p className="text-xs font-medium text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {isLeads && (
-                <div className="border-t border-border px-4 sm:px-8 py-5">
-                  <div className="flex items-start gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
-                      <Users className="size-5 text-[#1877F2]" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Lead Generation Campaign</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        Collect leads through Meta Instant Forms, Messenger conversations, or your website. Conversion location and placements are configured in the Ad Design step.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {isAppPromo && (
                 <AppPromotionSection />
               )}
@@ -795,21 +833,6 @@ function AppPromotionSection() {
 
   return (
     <>
-      {/* Info Panel */}
-      <div className="border-t border-border px-4 sm:px-8 py-5">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
-            <Smartphone className="size-5 text-[#1877F2]" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">App Promotion Campaign</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              Drive app installs and in-app events across Facebook and Instagram. Connect your app via Meta SDK for conversion tracking.
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* App Settings */}
       <div className="border-t border-border px-4 sm:px-8 py-5">
         <Label className="mb-4 block text-sm font-semibold text-foreground">App Settings</Label>
@@ -884,60 +907,3 @@ function AppPromotionSection() {
   );
 }
 
-/* ================================================================ */
-/* Sales Objective Section                                          */
-/* Full Meta Marketing API alignment for OUTCOME_SALES              */
-/* ================================================================ */
-
-function SalesObjectiveSection() {
-  const { campaign, updateNested } = useMetaCampaign();
-  const obj = campaign.objective;
-
-  return (
-    <div className="border-t border-border px-4 sm:px-8 py-5">
-      <div className="flex items-start gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
-          <ShoppingBag className="size-5 text-[#1877F2]" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-foreground">Sales Campaign</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-            Drive purchases on your website or from your product catalog. Meta will optimize ad delivery across Facebook and Instagram to reach people most likely to buy.
-          </p>
-        </div>
-      </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {[
-          {
-            title: "Meta Pixel required",
-            desc: "Pixel fires Purchase, AddToCart, and InitiateCheckout events on your store for conversion tracking.",
-            icon: <Scan className="size-3.5 text-[#1877F2]" />,
-          },
-          {
-            title: "Conversion API (CAPI)",
-            desc: "Server-side events complement the pixel for reliable tracking even with browser restrictions.",
-            icon: <ShieldCheck className="size-3.5 text-[#1877F2]" />,
-          },
-          {
-            title: "Dynamic product ads",
-            desc: "Connect your Salla catalog to show personalized products to people who browsed your store.",
-            icon: <Tag className="size-3.5 text-[#1877F2]" />,
-          },
-          {
-            title: "Advantage+ Shopping",
-            desc: "Meta's AI-powered campaign type that automates audience, creative, and placement decisions.",
-            icon: <Zap className="size-3.5 text-[#1877F2]" />,
-          },
-        ].map((item) => (
-          <div key={item.title} className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/20 p-3">
-            <div className="mt-0.5">{item.icon}</div>
-            <div>
-              <p className="text-xs font-medium text-foreground">{item.title}</p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{item.desc}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}

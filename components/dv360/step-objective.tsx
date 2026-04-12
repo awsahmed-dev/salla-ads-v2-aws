@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useDV360Campaign } from "@/lib/dv360/campaign-context";
 import { DV360_OBJECTIVE_CONFIGS, type DV360Objective } from "@/lib/dv360/campaign-types";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   Eye,
   PlayCircle,
@@ -16,8 +18,8 @@ import {
   TrendingUp,
   Globe,
   Target,
-  AlertCircle,
   Sparkles,
+  ArrowRight,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -113,7 +115,8 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
     });
   };
 
-  const selectedObj = CAMPAIGN_OBJECTIVES.find((o) => o.value === obj.objective);
+  const [objectiveSheetOpen, setObjectiveSheetOpen] = useState(false);
+  const selectedObj = CAMPAIGN_OBJECTIVES.find((o) => o.value === obj.objective)!;
   const canProceed =
     obj.campaignName.trim().length > 0 &&
     (needsConversionTracking ? !!obj.floodlightActivityId.trim() : true);
@@ -205,9 +208,125 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                           <span className="font-bold text-foreground">{selectedObj.label}</span> — {selectedObj.kpis.join(", ")}
                         </p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setObjectiveSheetOpen(true)}
+                        className="shrink-0 text-xs font-bold text-primary underline decoration-primary/30 decoration-2 underline-offset-2 hover:decoration-primary"
+                      >
+                        Learn more
+                      </button>
                     </div>
                   </div>
                 )}
+
+                {/* Objective Details Sheet */}
+                <Sheet open={objectiveSheetOpen} onOpenChange={setObjectiveSheetOpen}>
+                  <SheetContent side="right" className="flex w-full flex-col sm:max-w-[420px] bg-white p-0">
+                    <div className="bg-primary px-6 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="flex size-12 items-center justify-center rounded-2xl bg-white/15">
+                          <selectedObj.icon className="size-6 text-white" />
+                        </div>
+                        <div>
+                          <SheetTitle className="text-lg font-bold text-white">{selectedObj.label}</SheetTitle>
+                          <Badge className="mt-1 rounded-full border-0 bg-primary-foreground/20 px-2 py-0.5 text-xs font-medium text-white">
+                            {FUNNEL_LABELS[selectedObj.funnelStage].label}
+                          </Badge>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-sm text-white/70">{selectedObj.desc}</p>
+                    </div>
+                    <div className="flex-1 overflow-y-auto">
+                      <div className="mx-6 mt-6 flex h-[180px] items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80">
+                        <div className="text-center">
+                          <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-white/20">
+                            <svg viewBox="0 0 24 24" className="ml-0.5 size-5 text-white" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                          </div>
+                          <p className="text-sm font-bold text-white">Tutorial Video</p>
+                          <p className="text-xs text-white/60">45 seconds — how to set up your campaign</p>
+                        </div>
+                      </div>
+                      <div className="space-y-6 px-6 py-6">
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                            <p className="text-lg font-bold text-primary">3</p>
+                            <p className="text-xs font-medium text-muted-foreground">Ad Formats</p>
+                          </div>
+                          <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                            <p className="text-lg font-bold text-primary">SAR 150</p>
+                            <p className="text-xs font-medium text-muted-foreground">Min Budget/day</p>
+                          </div>
+                          <div className="rounded-xl bg-[#f4f4f4] p-4 text-center">
+                            <p className="text-lg font-bold text-primary">7+</p>
+                            <p className="text-xs font-medium text-muted-foreground">Days Recommended</p>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Best for</p>
+                          <p className="text-sm font-bold text-foreground">{selectedObj.bestFor}</p>
+                        </div>
+                        <div>
+                          <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Metrics</p>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedObj.kpis.map((kpi) => (
+                              <span key={kpi} className="rounded-full border border-primary/30 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">{kpi}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Step-by-step guide</p>
+                          <div className="space-y-4">
+                            {[
+                              { title: "Set up tracking", desc: "Connect your Floodlight tag or use Salla's automatic conversion tracking." },
+                              { title: "Define your audience", desc: "Choose locations, demographics, and audience segments." },
+                              { title: "Set budget & schedule", desc: "Set daily or campaign budget and flight dates." },
+                              { title: "Create your ad", desc: "Upload video creatives for YouTube placements." },
+                              { title: "Launch & optimize", desc: "Review, launch, and monitor performance after 3-5 days." },
+                            ].map((s, i) => (
+                              <div key={i} className="flex items-start gap-3">
+                                <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{i + 1}</div>
+                                <div>
+                                  <p className="text-sm font-bold text-foreground">{s.title}</p>
+                                  <p className="text-xs text-muted-foreground">{s.desc}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-xl bg-primary/5 p-4">
+                          <div className="mb-1 flex items-center gap-2">
+                            <Sparkles className="size-3.5 text-primary" />
+                            <p className="text-xs font-bold text-primary">Pro Tip</p>
+                          </div>
+                          <p className="text-xs leading-relaxed text-primary/80">
+                            {selectedObj.funnelStage === "conversion"
+                              ? "Start broad and let DV360's algorithm find your best customers. Narrow down after the learning phase."
+                              : selectedObj.funnelStage === "consideration"
+                                ? "Use video creatives — they drive 2x more engagement on YouTube."
+                                : "Maximize reach by using broad targeting and bumper ads for maximum frequency."}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="border-t border-border p-6">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setObjectiveSheetOpen(false);
+                          setTimeout(() => {
+                            const input = document.querySelector('input[placeholder*="YouTube"]') as HTMLInputElement;
+                            if (input) { input.scrollIntoView({ behavior: 'smooth', block: 'center' }); input.focus(); }
+                          }, 300);
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+                      >
+                        <ArrowRight className="size-4" />
+                        Start Campaign
+                      </button>
+                      <p className="mt-2 text-center text-xs text-muted-foreground">You can change your objective at any time before launching.</p>
+                    </div>
+                  </SheetContent>
+                </Sheet>
 
                 {/* ---- Campaign Setup section label ---- */}
                 <div className="border-t border-border bg-muted/30 px-4 sm:px-8 py-3">
@@ -282,132 +401,6 @@ export function DV360StepObjective({ onCancel }: { onCancel?: () => void }) {
                       placeholder="Floodlight Activity ID (e.g., 12345678)"
                       className="h-10 font-mono text-xs"
                     />
-                  </div>
-                )}
-
-                {/* ---- Awareness Objective Info ---- */}
-                {obj.objective === "AWARENESS" && (
-                  <div className="border-t border-border px-4 sm:px-8 py-5">
-                    <div className="mb-3 flex items-center gap-2">
-                      <div className="flex size-8 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/30">
-                        <Eye className="size-4 text-red-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Awareness Campaign Features</p>
-                        <p className="text-[10px] text-muted-foreground">Optimized for maximum reach, impressions, and brand recall</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { label: "Target CPM", desc: "DV360 auto-bids to reach the most unique users at your target cost per 1,000 impressions" },
-                        { label: "Frequency Control", desc: "Set target frequency to control how many times each viewer sees your ad per week" },
-                        { label: "Multi-Format Reach", desc: "Combine Skippable, Non-Skippable, and Bumper ads to maximize unique reach" },
-                      ].map((f) => (
-                        <div key={f.label} className="rounded-lg border border-red-200/50 bg-background px-3 py-2.5 dark:border-red-800/30">
-                          <p className="text-[11px] font-semibold text-foreground">{f.label}</p>
-                          <p className="mt-0.5 text-[9px] leading-relaxed text-muted-foreground">{f.desc}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
-                      DV360 will use <code className="rounded bg-red-100 px-1 text-[9px] dark:bg-red-900/30">LINE_ITEM_TYPE_YOUTUBE_AND_PARTNERS_REACH</code> line items with Target CPM or Maximize Lift bidding to deliver maximum brand exposure within your budget.
-                    </p>
-                  </div>
-                )}
-
-                {/* ---- Consideration Objective Info ---- */}
-                {obj.objective === "CONSIDERATION" && (
-                  <div className="border-t border-border px-4 sm:px-8 py-5">
-                    <div className="mb-3 flex items-center gap-2">
-                      <div className="flex size-8 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                        <PlayCircle className="size-4 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Consideration Campaign Features</p>
-                        <p className="text-[10px] text-muted-foreground">Optimized for video views and audience engagement</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { label: "CPV Bidding", desc: "Pay only when viewers watch 30s or interact with your ad" },
-                        { label: "View-Through Rate", desc: "Optimize towards users most likely to watch your video" },
-                        { label: "In-Feed + Shorts", desc: "Appear in YouTube search, home feed, and Shorts" },
-                      ].map((f) => (
-                        <div key={f.label} className="rounded-lg border border-blue-200/50 bg-background px-3 py-2.5 dark:border-blue-800/30">
-                          <p className="text-[11px] font-semibold text-foreground">{f.label}</p>
-                          <p className="mt-0.5 text-[9px] leading-relaxed text-muted-foreground">{f.desc}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
-                      DV360 will use <code className="rounded bg-blue-100 px-1 text-[9px] dark:bg-blue-900/30">LINE_ITEM_TYPE_YOUTUBE_AND_PARTNERS_VIEW</code> line items with Manual CPV or Target CPM bidding to maximize video views within your budget.
-                    </p>
-                  </div>
-                )}
-
-                {/* ---- Conversion Objective Info ---- */}
-                {obj.objective === "CONVERSION" && (
-                  <div className="border-t border-border px-4 sm:px-8 py-5">
-                    <div className="mb-3 flex items-center gap-2">
-                      <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-                        <MousePointerClick className="size-4 text-emerald-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Conversion Campaign Features</p>
-                        <p className="text-[10px] text-muted-foreground">Optimized for online actions like purchases, sign-ups, and leads</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { label: "Smart Bidding", desc: "Maximize Conversions or Target CPA automatically bids to drive the most actions" },
-                        { label: "Floodlight Tracking", desc: "Track purchases, leads, and sign-ups through DV360 Floodlight activities" },
-                        { label: "Action Ads", desc: "In-Stream and In-Feed formats with prominent CTAs to drive clicks" },
-                      ].map((f) => (
-                        <div key={f.label} className="rounded-lg border border-emerald-200/50 bg-background px-3 py-2.5 dark:border-emerald-800/30">
-                          <p className="text-[11px] font-semibold text-foreground">{f.label}</p>
-                          <p className="mt-0.5 text-[9px] leading-relaxed text-muted-foreground">{f.desc}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-3 flex items-start gap-2 rounded-lg bg-emerald-100/50 px-3 py-2 dark:bg-emerald-900/20">
-                      <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-                      <p className="text-[10px] leading-relaxed text-muted-foreground">
-                        <span className="font-semibold text-emerald-700 dark:text-emerald-400">Floodlight required:</span> DV360 uses Floodlight activities to track conversions. Make sure your Floodlight tag is installed on your Salla store before launching. Maps to <code className="rounded bg-emerald-100 px-1 text-[9px] dark:bg-emerald-900/30">LINE_ITEM_TYPE_YOUTUBE_AND_PARTNERS_ACTION</code>.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* ---- Performance Objective Info ---- */}
-                {obj.objective === "PERFORMANCE" && (
-                  <div className="border-t border-border px-4 sm:px-8 py-5">
-                    <div className="mb-3 flex items-center gap-2">
-                      <div className="flex size-8 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/30">
-                        <TrendingUp className="size-4 text-orange-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Performance Campaign Features</p>
-                        <p className="text-[10px] text-muted-foreground">Fully automated, AI-optimized across all YouTube placements</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { label: "AI Multi-Format", desc: "DV360 automatically selects the best format (In-Stream, Bumper, Shorts, In-Feed) per user" },
-                        { label: "Target ROAS", desc: "Optimize for return on ad spend -- set a target ROAS and DV360 maximizes revenue" },
-                        { label: "Full Automation", desc: "AI handles placements, bidding, and format mix to maximize conversions at scale" },
-                      ].map((f) => (
-                        <div key={f.label} className="rounded-lg border border-orange-200/50 bg-background px-3 py-2.5 dark:border-orange-800/30">
-                          <p className="text-[11px] font-semibold text-foreground">{f.label}</p>
-                          <p className="mt-0.5 text-[9px] leading-relaxed text-muted-foreground">{f.desc}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-3 flex items-start gap-2 rounded-lg bg-orange-100/50 px-3 py-2 dark:bg-orange-900/20">
-                      <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-orange-600" />
-                      <p className="text-[10px] leading-relaxed text-muted-foreground">
-                        <span className="font-semibold text-orange-700 dark:text-orange-400">Simple line items:</span> Performance uses <code className="rounded bg-orange-100 px-1 text-[9px] dark:bg-orange-900/30">LINE_ITEM_TYPE_YOUTUBE_AND_PARTNERS_SIMPLE</code> which gives DV360 full control over ad delivery. Provide multiple video assets and let the AI optimize the format mix. Floodlight tracking required.
-                      </p>
-                    </div>
                   </div>
                 )}
 
