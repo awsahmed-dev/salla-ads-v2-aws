@@ -483,15 +483,11 @@ export function BudgetDurationCard({
           </p>
         )}
 
-        {showSmartStart && earliestGoLive && startDate &&
-          (startDate === earliestGoLive.date || startDate === new Date().toISOString().split("T")[0]) && (
+        {showSmartStart && startDate && (
           <div className="mt-2 flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2">
-            <div className={cn(
-              "size-2 shrink-0 rounded-full",
-              earliestGoLive.sameDayPossible ? "bg-emerald-500" : "bg-amber-500"
-            )} />
+            <div className="size-2 shrink-0 rounded-full bg-amber-500" />
             <p className="text-xs text-muted-foreground">
-              Go-live: <span className="font-semibold text-foreground">{earliestGoLive.label}</span> <span className="text-muted-foreground/70">(~8h review)</span>
+              Your campaign will go live after <span className="font-semibold text-foreground">Salla review</span> and <span className="font-semibold text-foreground">platform approval</span>
             </p>
           </div>
         )}
