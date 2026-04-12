@@ -451,32 +451,7 @@ export function GoogleStepBudget() {
         {/* ============= LEFT COLUMN ============= */}
         <div className="flex flex-1 flex-col gap-5">
 
-          {/* Smart Budget Recommendation from Store Data */}
-          {budgetRec && (
-            <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/[0.03] to-primary/[0.06] p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <Sparkles className="size-4.5 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex items-center gap-2">
-                    <p className="text-xs font-semibold text-foreground">Smart Budget Recommendation</p>
-                    <Badge variant="outline" className="h-4 px-1.5 text-[9px]">{budgetRec.storeMaturity === "new" ? "New Store" : budgetRec.storeMaturity === "growing" ? "Growing Store" : "Established Store"}</Badge>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">{budgetRec.reasoning}</p>
-                  <button
-                    type="button"
-                    className="mt-2 inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10"
-                    onClick={() => {
-                      updateNested("budget", { amount: budgetRec.dailyBudget, biddingStrategy: budgetRec.biddingStrategy as BiddingStrategy });
-                    }}
-                  >
-                    Apply: SAR {budgetRec.dailyBudget}/day + {budgetRec.biddingStrategy === "TARGET_SPEND" ? "Maximize Clicks" : budgetRec.biddingStrategy === "MAXIMIZE_CONVERSIONS" ? "Maximize Conversions" : "Target ROAS"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+
 
           {/* ======================================================= */}
           {/* SECTION 1: Budget, Duration & Payment (shared card)      */}
