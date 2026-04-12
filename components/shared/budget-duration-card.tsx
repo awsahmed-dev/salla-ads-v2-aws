@@ -35,9 +35,16 @@ export interface BudgetTypeOption {
 
 export interface AutoIncreaseState {
   enabled: boolean;
+  mode: "schedule" | "performance";
+  /* Schedule mode */
   pct: number;
   intervalDays: number;
   maxDailyBudget: number;
+  /* Performance (ROAS) mode */
+  scaleUpRoas: number;
+  scaleUpPct: number;
+  scaleDownRoas: number;
+  scaleDownPct: number;
 }
 
 export interface BudgetDurationCardProps {
@@ -158,7 +165,7 @@ export function BudgetDurationCard({
   onBulkUpdate,
 }: BudgetDurationCardProps) {
   const MIN_CAMPAIGN_DAYS = minCampaignDays;
-  const ai = autoIncrease ?? { enabled: false, pct: 20, intervalDays: 7, maxDailyBudget: amount * 3 };
+  const ai = autoIncrease ?? { enabled: false, mode: "schedule" as const, pct: 20, intervalDays: 7, maxDailyBudget: amount * 3, scaleUpRoas: 3, scaleUpPct: 20, scaleDownRoas: 1.5, scaleDownPct: 10 };
   const autoIncreaseAvailable = showAutoIncrease && budgetMode === "daily";
 
   const durationDays =
@@ -666,54 +673,208 @@ export function BudgetDurationCard({
 
           {ai.enabled && autoIncreaseAvailable && (
             <div className="px-6 pb-5">
-              {/* Increase every + amount */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="w-full sm:w-2/3">
-                  <Label className="mb-2 block text-sm font-medium text-foreground">
-                    Increase every:
-                  </Label>
-                  <Select
-                    value={ai.intervalDays.toString()}
-                    onValueChange={(v) => updateAI({ intervalDays: Number(v) })}
+              {/* Mode toggle: By Schedule | By Performance */}
+              <div className="mb-4 inline-flex rounded-lg bg-muted/50 p-0.5">
+                {([
+                  { value: "schedule" as const, label: "By Schedule", icon: CalendarDays },
+                  { value: "performance" as const, label: "By Performance", icon: TrendingUp },
+                ] as const).map((tab) => (
+                  <button
+                    key={tab.value}
+                    type="button"
+                    onClick={() => updateAI({ mode: tab.value })}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all",
+                      (ai.mode ?? "schedule") === tab.value
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
                   >
-                    <SelectTrigger className="h-10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="3">3 Days</SelectItem>
-                      <SelectItem value="5">5 Days</SelectItem>
-                      <SelectItem value="7">7 Days</SelectItem>
-                      <SelectItem value="14">14 Days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex-1">
-                  <Label className="mb-2 block text-sm font-medium text-foreground">
-                    Increase Amount
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      min={5}
-                      max={100}
-                      step={5}
-                      value={ai.pct || ""}
-                      onChange={(e) => updateAI({ pct: e.target.value === "" ? 0 : Math.min(100, Number(e.target.value)) })}
-                      onBlur={() => {
-                        if (ai.pct < 5) updateAI({ pct: 5 });
-                      }}
-                      className="h-10 pr-8 text-sm"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                      %
-                    </span>
-                  </div>
-                </div>
+                    <tab.icon className="size-3" />
+                    {tab.label}
+                  </button>
+                ))}
               </div>
 
-              {/* Safety Cap — mandatory */}
+              {/* ── Schedule mode ── */}
+              {(ai.mode ?? "schedule") === "schedule" && (
+                <>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="w-full sm:w-2/3">
+                      <Label className="mb-2 block text-xs font-medium text-foreground">Increase every:</Label>
+                      <Select
+                        value={ai.intervalDays.toString()}
+                        onValueChange={(v) => updateAI({ intervalDays: Number(v) })}
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="3">3 Days</SelectItem>
+                          <SelectItem value="5">5 Days</SelectItem>
+                          <SelectItem value="7">7 Days</SelectItem>
+                          <SelectItem value="14">14 Days</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex-1">
+                      <Label className="mb-2 block text-xs font-medium text-foreground">Increase by</Label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min={5}
+                          max={100}
+                          step={5}
+                          value={ai.pct || ""}
+                          onChange={(e) => updateAI({ pct: e.target.value === "" ? 0 : Math.min(100, Number(e.target.value)) })}
+                          onBlur={() => { if (ai.pct < 5) updateAI({ pct: 5 }); }}
+                          className="h-10 pr-8 text-sm"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary table */}
+                  {autoIncreasePreview.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-foreground">Day 1</span>
+                        <span className="text-xs font-medium tabular-nums text-foreground">SAR {dailyAmount.toFixed(2)}</span>
+                      </div>
+                      {autoIncreasePreview.slice(0, 3).map((step) => (
+                        <div key={step.day} className="flex items-center justify-between">
+                          <span className="text-xs text-foreground">Day {step.day}</span>
+                          <span className="text-xs font-medium tabular-nums text-foreground">SAR {step.budget.toFixed(2)}</span>
+                        </div>
+                      ))}
+                      {!endDateOptional && (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-foreground">VAT</span>
+                            <span className="text-xs font-medium tabular-nums text-foreground">SAR {vatAmount.toFixed(2)}</span>
+                          </div>
+                          <div className="h-px bg-border/40" />
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-foreground">Estimated Total</span>
+                            <span className="text-xs font-bold tabular-nums text-foreground">SAR {(projectedTotalSpend + vatAmount).toFixed(2)}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {(ai.pct >= 50 || finalAutoIncreaseDailyBudget > dailyAmount * 5) && (
+                    <p className="mt-3 flex items-center gap-1.5 text-xs text-amber-600">
+                      <AlertCircle className="size-3 shrink-0" />
+                      Spend may reach SAR {finalAutoIncreaseDailyBudget.toLocaleString()}/day. Monitor and adjust as needed.
+                    </p>
+                  )}
+                </>
+              )}
+
+              {/* ── Performance (ROAS) mode ── */}
+              {(ai.mode ?? "schedule") === "performance" && (
+                <>
+                  <div className="rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/30 p-4">
+                    <div className="flex items-start gap-2 mb-4">
+                      <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                      <p className="text-[11px] leading-relaxed text-[#004956]/80">
+                        Budget adjusts automatically based on your campaign&apos;s return on ad spend. Scale up when performing well, pull back when not.
+                      </p>
+                    </div>
+
+                    {/* Scale UP */}
+                    <div className="mb-4">
+                      <p className="mb-2 text-xs font-semibold text-foreground">📈 Scale up when ROAS exceeds</p>
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              min={1}
+                              max={20}
+                              step={0.5}
+                              value={ai.scaleUpRoas || ""}
+                              onChange={(e) => updateAI({ scaleUpRoas: e.target.value === "" ? 0 : Number(e.target.value) })}
+                              onBlur={() => { if ((ai.scaleUpRoas ?? 0) < 1) updateAI({ scaleUpRoas: 1 }); }}
+                              className="h-10 pr-8 text-sm"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">×</span>
+                          </div>
+                          <p className="mt-1 text-[10px] text-muted-foreground">ROAS threshold</p>
+                        </div>
+                        <div className="flex-1">
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              min={5}
+                              max={100}
+                              step={5}
+                              value={ai.scaleUpPct || ""}
+                              onChange={(e) => updateAI({ scaleUpPct: e.target.value === "" ? 0 : Math.min(100, Number(e.target.value)) })}
+                              onBlur={() => { if ((ai.scaleUpPct ?? 0) < 5) updateAI({ scaleUpPct: 5 }); }}
+                              className="h-10 pr-8 text-sm"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                          </div>
+                          <p className="mt-1 text-[10px] text-muted-foreground">Increase by</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Scale DOWN */}
+                    <div>
+                      <p className="mb-2 text-xs font-semibold text-foreground">📉 Scale down when ROAS drops below</p>
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              min={0.5}
+                              max={10}
+                              step={0.5}
+                              value={ai.scaleDownRoas || ""}
+                              onChange={(e) => updateAI({ scaleDownRoas: e.target.value === "" ? 0 : Number(e.target.value) })}
+                              onBlur={() => { if ((ai.scaleDownRoas ?? 0) < 0.5) updateAI({ scaleDownRoas: 0.5 }); }}
+                              className="h-10 pr-8 text-sm"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">×</span>
+                          </div>
+                          <p className="mt-1 text-[10px] text-muted-foreground">ROAS threshold</p>
+                        </div>
+                        <div className="flex-1">
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              min={5}
+                              max={50}
+                              step={5}
+                              value={ai.scaleDownPct || ""}
+                              onChange={(e) => updateAI({ scaleDownPct: e.target.value === "" ? 0 : Math.min(50, Number(e.target.value)) })}
+                              onBlur={() => { if ((ai.scaleDownPct ?? 0) < 5) updateAI({ scaleDownPct: 5 }); }}
+                              className="h-10 pr-8 text-sm"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                          </div>
+                          <p className="mt-1 text-[10px] text-muted-foreground">Decrease by</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Example */}
+                  <div className="mt-3 rounded-lg bg-muted/30 px-3 py-2.5">
+                    <p className="text-[10px] leading-relaxed text-muted-foreground">
+                      <span className="font-semibold text-foreground">Example:</span> With SAR {dailyAmount} daily budget — if ROAS is {ai.scaleUpRoas ?? 3}× or higher, budget increases to <span className="font-semibold text-[#004956]">SAR {Math.round(dailyAmount * (1 + (ai.scaleUpPct ?? 20) / 100))}</span>. If ROAS drops below {ai.scaleDownRoas ?? 1.5}×, budget decreases to <span className="font-semibold text-foreground">SAR {Math.round(dailyAmount * (1 - (ai.scaleDownPct ?? 10) / 100))}</span>.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Safety Cap — shared by both modes */}
               <div className="mt-4">
-                <Label className="mb-2 block text-sm text-foreground">
+                <Label className="mb-2 block text-xs font-medium text-foreground">
                   Safety Cap (Daily Maximum) <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
@@ -723,61 +884,15 @@ export function BudgetDurationCard({
                     max={500000}
                     value={ai.maxDailyBudget || ""}
                     onChange={(e) => updateAI({ maxDailyBudget: e.target.value === "" ? 0 : Math.min(500000, Number(e.target.value)) })}
-                    onBlur={() => {
-                      if (ai.maxDailyBudget < dailyAmount) updateAI({ maxDailyBudget: dailyAmount });
-                    }}
+                    onBlur={() => { if (ai.maxDailyBudget < dailyAmount) updateAI({ maxDailyBudget: dailyAmount }); }}
                     className="h-10 pr-10 text-sm"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-                    SAR
-                  </span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">SAR</span>
                 </div>
-                {endDateOptional && (
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">
-                    Budget will increase until it reaches this cap, then stay flat. Required for ongoing campaigns.
-                  </p>
-                )}
-              </div>
-
-              {/* Summary table */}
-              {autoIncreasePreview.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-foreground">Day 1</span>
-                    <span className="text-xs font-medium tabular-nums text-foreground">
-                      SAR {dailyAmount.toFixed(2)}
-                    </span>
-                  </div>
-                  {autoIncreasePreview.slice(0, 3).map((step) => (
-                    <div key={step.day} className="flex items-center justify-between">
-                      <span className="text-xs text-foreground">Day {step.day}</span>
-                      <span className="text-xs font-medium tabular-nums text-foreground">
-                        SAR {step.budget.toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-foreground">VAT</span>
-                    <span className="text-xs font-medium tabular-nums text-foreground">
-                      SAR {vatAmount.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="h-px bg-border/40" />
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-foreground">Estimated Total</span>
-                    <span className="text-xs font-bold tabular-nums text-foreground">
-                      SAR {(projectedTotalSpend + vatAmount).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {(ai.pct >= 50 || finalAutoIncreaseDailyBudget > dailyAmount * 5) && (
-                <p className="mt-3 flex items-center gap-1.5 text-xs text-amber-600">
-                  <AlertCircle className="size-3 shrink-0" />
-                  Spend may reach SAR {finalAutoIncreaseDailyBudget.toLocaleString()}/day. Monitor and adjust as needed.
+                <p className="mt-1.5 text-[10px] text-muted-foreground">
+                  Budget will never exceed this amount per day, regardless of scaling mode.
                 </p>
-              )}
+              </div>
             </div>
           )}
         </div>
