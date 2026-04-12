@@ -704,8 +704,11 @@ export function BudgetDurationCard({
                       min={5}
                       max={100}
                       step={5}
-                      value={ai.pct}
-                      onChange={(e) => updateAI({ pct: Math.max(5, Math.min(100, Number(e.target.value))) })}
+                      value={ai.pct || ""}
+                      onChange={(e) => updateAI({ pct: e.target.value === "" ? 0 : Math.min(100, Number(e.target.value)) })}
+                      onBlur={() => {
+                        if (ai.pct < 5) updateAI({ pct: 5 });
+                      }}
                       className="h-10 pr-8 text-sm"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
@@ -725,8 +728,11 @@ export function BudgetDurationCard({
                     type="number"
                     min={dailyAmount}
                     max={500000}
-                    value={ai.maxDailyBudget}
-                    onChange={(e) => updateAI({ maxDailyBudget: Math.max(dailyAmount, Math.min(500000, Number(e.target.value))) })}
+                    value={ai.maxDailyBudget || ""}
+                    onChange={(e) => updateAI({ maxDailyBudget: e.target.value === "" ? 0 : Math.min(500000, Number(e.target.value)) })}
+                    onBlur={() => {
+                      if (ai.maxDailyBudget < dailyAmount) updateAI({ maxDailyBudget: dailyAmount });
+                    }}
                     className="h-10 pr-10 text-sm"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
