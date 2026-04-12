@@ -49,6 +49,7 @@ import {
   ExternalLink,
   Copy,
   ArrowLeftRight,
+  Sparkles,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
@@ -381,12 +382,18 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                   <Label className="text-sm font-medium text-foreground">
                     Campaign Name <span className="text-red-500">*</span>
                   </Label>
-                  <span className={cn(
-                    "text-xs tabular-nums",
-                    obj.campaignName.length > 480 ? "text-amber-600" : "text-muted-foreground"
-                  )}>
-                    {obj.campaignName.length}/512
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const date = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                      const autoName = `${selectedObj.label} - TikTok - ${date}`;
+                      updateNested("objective", { campaignName: autoName });
+                    }}
+                    className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    <Sparkles className="size-3" />
+                    Auto-generate
+                  </button>
                 </div>
                 <div className="relative">
                   <Input
@@ -395,8 +402,11 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                     onChange={(e) =>
                       updateNested("objective", { campaignName: e.target.value.slice(0, 512) })
                     }
-                    className="h-10 text-sm"
+                    className="h-10 pr-14 text-sm"
                   />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    {obj.campaignName.length}/512
+                  </span>
                 </div>
               </div>
 
