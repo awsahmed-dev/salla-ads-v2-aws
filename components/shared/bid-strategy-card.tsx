@@ -179,10 +179,10 @@ export function BidStrategyCard({
               step={input.step ?? 0.01}
               value={input.value ?? ""}
               onChange={(e) => input.onChange(Number(e.target.value))}
-              className="h-10 pr-10 text-sm"
+              className="h-10 pr-14 text-sm"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-              {input.prefix ?? "SAR"}
+              {input.suffix ?? input.prefix ?? "SAR"}
             </span>
           </div>
 

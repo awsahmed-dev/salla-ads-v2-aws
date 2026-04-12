@@ -895,11 +895,9 @@ export function GoogleStepAudience() {
 
           {/* ---- 3. Interests (In-Market & Affinity) -- hidden for Shopping and App ---- */}
           {!isShopping && !isApp && <SectionCard>
-            <div className="mb-3 flex items-center gap-2">
+            <div className="mb-1 flex items-center gap-2">
               <Target className="size-4 text-primary" />
-              <Label className="text-sm font-semibold text-foreground">Suggested Interests & Audience Segments</Label>
-              {isPMax && <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Prototype data</Badge>}
-              {isSearch && <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Observation</Badge>}
+              <Label className="text-sm font-semibold text-foreground">Audience Interests</Label>
               <InfoTip text={isPMax
                 ? "Audience signals help Google AI learn faster, but they do not strictly limit delivery."
                 : isSearch
@@ -907,43 +905,24 @@ export function GoogleStepAudience() {
                   : "Reach people by interests and purchase intent. Keep segments focused on your category."
               } />
             </div>
-            <p className="mb-3 text-xs text-muted-foreground">
+            <p className="mb-4 text-xs text-muted-foreground">
               {isPMax
-                ? "Optional: select segments to signal which audiences are most relevant. Google can expand beyond these automatically."
+                ? "Optional — select segments to guide Google's AI toward your best audiences. It can still expand beyond them."
                 : isSearch
-                  ? "Optional: add audience segments on top of your keywords. In Observation mode, ads still show broadly while you optimize by segment."
-                  : "Optional: leave empty to keep broad interest reach."
+                  ? "Optional — add audiences on top of your keywords. Ads show broadly while you collect optimization data."
+                  : "Optional — leave empty to keep broad interest reach."
               }
             </p>
 
             {isPMax && (
-              <p className="mb-3 text-[11px] text-muted-foreground">
-                Sample list for prototype only. Full Google audience catalog will be connected at launch.
-              </p>
-            )}
-
-            {isPMax && (
-              <ObjectiveExplainer
-                className="mb-4"
-                cards={[
-                  {
-                    title: "In-Market = ready to buy now",
-                    description: "People actively comparing products or planning to purchase soon.",
-                    icon: <ShoppingBag className="size-3.5 text-primary" />,
-                  },
-                  {
-                    title: "Affinity = ongoing interests",
-                    description: "People with long-term interests (broader audience, good for discovery).",
-                    icon: <Heart className="size-3.5 text-primary" />,
-                  },
-                ]}
-                stepsTitle="Simple way to use this"
-                steps={[
-                  "Start with 3-6 In-Market segments most relevant to your products.",
-                  "Add 1-3 Affinity segments only if you want broader reach.",
-                  "Leave empty if you are testing broad discovery.",
-                ]}
-              />
+              <div className="mb-4 flex items-start gap-3 rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/40 px-4 py-3">
+                <Sparkles className="mt-0.5 size-4 shrink-0 text-[#004956]" />
+                <div className="text-[11px] leading-relaxed text-[#004956]/80 space-y-1">
+                  <p><span className="font-semibold text-[#004956]">In-Market</span> — people actively comparing or ready to buy.</p>
+                  <p><span className="font-semibold text-[#004956]">Affinity</span> — people with longer-term related interests.</p>
+                  <p className="text-muted-foreground pt-0.5">Start with 3–6 In-Market segments. Add Affinity only for broader reach.</p>
+                </div>
+              </div>
             )}
 
             {/* Audience mode selector (Search only) */}
@@ -999,22 +978,22 @@ export function GoogleStepAudience() {
               </div>
             )}
 
-            {/* In-Market (unified section) */}
-            <div className="mb-4">
+            {/* In-Market */}
+            <div className="mb-3">
               <InterestTargetingCard
                 options={IN_MARKET_SEGMENTS}
                 value={aud.inMarketSegments}
                 onChange={(ids) =>
                   updateNested("audience", { inMarketSegments: ids })
                 }
-                sectionLabel={isPMax ? "In-Market (People ready to buy now)" : "In-Market Segments"}
+                sectionLabel="In-Market"
                 accent="primary"
-                searchPlaceholder={isPMax ? "Choose high-intent audiences..." : "Search in-market segments..."}
+                searchPlaceholder="Search in-market segments..."
                 showClearAll={false}
               />
             </div>
 
-            {/* Affinity (unified section) */}
+            {/* Affinity */}
             <div>
               <InterestTargetingCard
                 options={AFFINITY_SEGMENTS}
@@ -1022,12 +1001,18 @@ export function GoogleStepAudience() {
                 onChange={(ids) =>
                   updateNested("audience", { affinitySegments: ids })
                 }
-                sectionLabel={isPMax ? "Affinity (People with related interests)" : "Affinity Segments"}
+                sectionLabel="Affinity"
                 accent="primary"
-                searchPlaceholder={isPMax ? "Choose broader interest audiences..." : "Search affinity segments..."}
+                searchPlaceholder="Search affinity segments..."
                 showClearAll={false}
               />
             </div>
+
+            {isPMax && (
+              <p className="mt-3 text-[10px] text-muted-foreground/60">
+                Sample segment list — full Google audience catalog will be connected at launch.
+              </p>
+            )}
 
             {(aud.inMarketSegments.length > 0 || aud.affinitySegments.length > 0) && (
               <div className="mt-3">
@@ -1092,13 +1077,13 @@ export function GoogleStepAudience() {
           {isPMax && (
             <>
               <SectionCard>
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-1 flex items-center gap-2">
                   <Search className="size-4 text-primary" />
-                  <Label className="text-sm font-semibold text-foreground">Search Themes & Audience Signals</Label>
-                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">PMax</Badge>
+                  <Label className="text-sm font-semibold text-foreground">Search Themes</Label>
+                  <InfoTip text="Search themes help PMax find the right audience across all channels. Add up to 25 phrases your ideal customer would search." />
                 </div>
-                <p className="mb-2 text-xs text-muted-foreground">
-                  Add up to 25 search themes that describe what your ideal customer searches for. These help Google find the right audience across all channels.
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Add phrases your ideal customer searches for — Google uses these to find the right audience across all channels.
                 </p>
                 <div className="flex gap-2">
                   <Input placeholder="e.g. buy abayas online" value={themeInput} onChange={(e) => setThemeInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSearchTheme())} className="h-9 flex-1 text-sm" />
@@ -1132,32 +1117,22 @@ export function GoogleStepAudience() {
               </SectionCard>
 
               <SectionCard>
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-1 flex items-center gap-2">
                   <Target className="size-4 text-primary" />
                   <Label className="text-sm font-semibold text-foreground">Custom Segments</Label>
-                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">PMax</Badge>
-                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">Optional signal</Badge>
                   <InfoTip text="Add intent phrases and similar sites to guide who PMax should learn from first. Google can still expand beyond them." />
                 </div>
-                <ObjectiveExplainer
-                  className="mb-3"
-                  cards={[
-                    {
-                      title: "Search phrases = stronger intent",
-                      description: "Use phrases people search right before purchase.",
-                    },
-                    {
-                      title: "Similar sites = broader discovery",
-                      description: "Use competitor/category sites to expand reach.",
-                    },
-                  ]}
-                  stepsTitle="Starter setup"
-                  steps={[
-                    "Start with search phrases first.",
-                    "Add 3-5 similar sites only if you need more reach.",
-                    "Keep terms relevant to your exact category.",
-                  ]}
-                />
+                <p className="mb-4 text-xs text-muted-foreground">
+                  Optional — guide Google&apos;s AI with phrases and sites that signal your best customers.
+                </p>
+                <div className="mb-4 flex items-start gap-3 rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/40 px-4 py-3">
+                  <Sparkles className="mt-0.5 size-4 shrink-0 text-[#004956]" />
+                  <div className="text-[11px] leading-relaxed text-[#004956]/80 space-y-1">
+                    <p><span className="font-semibold text-[#004956]">Search phrases</span> — terms people search right before buying (stronger intent).</p>
+                    <p><span className="font-semibold text-[#004956]">Similar sites</span> — competitor or category domains for broader discovery.</p>
+                    <p className="text-muted-foreground pt-0.5">Start with phrases first. Add 3–5 sites only if you need more reach.</p>
+                  </div>
+                </div>
 
                 <div className="mb-4">
                   <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
@@ -1237,59 +1212,30 @@ export function GoogleStepAudience() {
               </SectionCard>
 
               <SectionCard>
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-1 flex items-center gap-2">
                   <UserPlus className="size-4 text-primary" />
                   <Label className="text-sm font-semibold text-foreground">Your Data (Remarketing)</Label>
-                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">Optional signal</Badge>
                   <InfoTip text="Use your own customer lists as high-quality signals so PMax can find similar converters sooner." />
                 </div>
-                <ObjectiveExplainer
-                  className="mb-3"
-                  highlight={
-                    <>
-                      <span className="font-semibold text-primary">Simple setup:</span> start with <strong>Purchasers</strong> + <strong>Cart Abandoners</strong> if your budget is limited.
-                    </>
-                  }
-                  secondary="Use 2-3 high-intent lists at launch, then expand once conversion volume is stable."
-                />
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {REMARKETING_AUDIENCES.map((rm) => {
-                    const selected = aud.audienceSignals.includes(rm.id);
-                    const meta = REMARKETING_AUDIENCE_META[rm.id];
-                    return (
-                      <label
-                        key={rm.id}
-                        className={cn(
-                          "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-all",
-                          selected ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/40"
-                        )}
-                      >
-                        <Checkbox checked={selected} onCheckedChange={() => updateNested("audience", { audienceSignals: toggleInArray(aud.audienceSignals, rm.id) })} />
-                        <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                          <span className={cn("truncate text-xs font-medium", selected ? "text-primary" : "text-foreground")}>{rm.name}</span>
-                          {meta && (
-                            <span className="flex shrink-0 items-center gap-1">
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "rounded-full px-1.5 py-0 text-[9px]",
-                                  meta.intent === "High intent" ? "border-emerald-300 text-emerald-700" :
-                                    meta.intent === "Mid intent" ? "border-amber-300 text-amber-700" :
-                                      "border-border text-muted-foreground"
-                                )}
-                              >
-                                {meta.intent}
-                              </Badge>
-                              <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">{meta.freshness}</Badge>
-                              {meta.starter && <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">Starter</Badge>}
-                            </span>
-                          )}
-                        </div>
-                      </label>
-                    );
-                  })}
+                <p className="mb-4 text-xs text-muted-foreground">
+                  Optional — select lists to signal your best converters. PMax expands beyond them automatically.
+                </p>
+                <div className="mb-4 flex items-start gap-3 rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/40 px-4 py-3">
+                  <Sparkles className="mt-0.5 size-4 shrink-0 text-[#004956]" />
+                  <p className="text-[11px] leading-relaxed text-[#004956]/80">
+                    Start with <span className="font-semibold text-[#004956]">Purchasers</span> + <span className="font-semibold text-[#004956]">Cart Abandoners</span> for the highest signal quality. Add more lists once conversion volume grows.
+                  </p>
                 </div>
-                <p className="mt-2 text-[11px] text-muted-foreground">
+                <InterestTargetingCard
+                  options={REMARKETING_AUDIENCES.map((rm) => ({ id: rm.id, label: rm.name }))}
+                  value={aud.audienceSignals}
+                  onChange={(ids) => updateNested("audience", { audienceSignals: ids })}
+                  sectionLabel="Audience lists"
+                  searchPlaceholder="Search audience lists..."
+                  accent="primary"
+                  showClearAll={false}
+                />
+                <p className="mt-2 text-[10px] text-muted-foreground/60">
                   PMax treats these lists as signals to guide learning, not strict delivery limits.
                 </p>
               </SectionCard>
