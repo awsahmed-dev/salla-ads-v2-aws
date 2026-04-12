@@ -159,7 +159,7 @@ export function BudgetDurationCard({
 }: BudgetDurationCardProps) {
   const MIN_CAMPAIGN_DAYS = minCampaignDays;
   const ai = autoIncrease ?? { enabled: false, pct: 20, intervalDays: 7, maxDailyBudget: amount * 3 };
-  const autoIncreaseAvailable = showAutoIncrease && budgetMode === "daily" && !endDateOptional;
+  const autoIncreaseAvailable = showAutoIncrease && budgetMode === "daily";
 
   const durationDays =
     startDate && endDate
@@ -636,7 +636,7 @@ export function BudgetDurationCard({
         </div>
       )}
 
-      {/* ── 5. Budget Scheduling (Auto-Increase) ── */}
+      {/* ── 5. Auto-Increase Budget ── */}
       {showAutoIncrease && (
         <div>
           <div
@@ -645,9 +645,14 @@ export function BudgetDurationCard({
               if (autoIncreaseAvailable) updateAI({ enabled: !ai.enabled });
             }}
           >
-            <p className="text-sm font-medium text-foreground">
-              Budget Scheduling
-            </p>
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                Auto-Increase Budget
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Gradually scale your daily budget over time
+              </p>
+            </div>
             {autoIncreaseAvailable ? (
               <Switch
                 checked={ai.enabled}
@@ -661,9 +666,7 @@ export function BudgetDurationCard({
 
           {!autoIncreaseAvailable && (
             <p className="px-6 -mt-3 pb-4 text-xs text-muted-foreground">
-              {budgetMode === "lifetime"
-                ? "Switch to Daily budget to enable."
-                : "Set a fixed end date to enable."}
+              Switch to Daily budget to enable.
             </p>
           )}
 
@@ -711,10 +714,10 @@ export function BudgetDurationCard({
                 </div>
               </div>
 
-              {/* Safety Cap */}
+              {/* Safety Cap — mandatory */}
               <div className="mt-4">
                 <Label className="mb-2 block text-sm text-foreground">
-                  Safety Cap (Daily Maximum)
+                  Safety Cap (Daily Maximum) <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
                   <Input
@@ -729,6 +732,11 @@ export function BudgetDurationCard({
                     SAR
                   </span>
                 </div>
+                {endDateOptional && (
+                  <p className="mt-1.5 text-[10px] text-muted-foreground">
+                    Budget will increase until it reaches this cap, then stay flat. Required for ongoing campaigns.
+                  </p>
+                )}
               </div>
 
               {/* Summary table */}
