@@ -43,10 +43,12 @@ export function CostSummaryCard({
   endDate,
 }: CostSummaryCardProps) {
   const adSpend = totalBudget;
+  const dailyVat = Math.round(budgetAmount * VAT_RATE);
+  const dailyTotal = budgetAmount + dailyVat;
   const totalWithBoost = adSpend + (boostEnabled ? boostAmount : 0);
   const vat = Math.round(totalWithBoost * VAT_RATE);
   const grandTotal = totalWithBoost + vat;
-  const showAdSpendRow = adSpend !== budgetAmount || autoIncreaseEnabled;
+  const showAdSpendRow = !isOngoing && (adSpend !== budgetAmount || autoIncreaseEnabled);
 
   return (
     <div className="rounded-lg bg-card p-6">
@@ -83,8 +85,8 @@ export function CostSummaryCard({
           </div>
         )}
 
-        {/* Ad spend total (only if different from daily or auto-increase) */}
-        {showAdSpendRow && !isOngoing && (
+        {/* ── Fixed-end campaigns: show total ad spend ── */}
+        {showAdSpendRow && (
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
               Ad spend{autoIncreaseEnabled ? ` (incl. ${autoIncreaseMode === "performance" ? "ROAS scaling" : "auto-increase"})` : ""}
@@ -95,12 +97,12 @@ export function CostSummaryCard({
           </div>
         )}
 
-        {/* Ongoing monthly estimate */}
+        {/* ── Ongoing campaigns: show daily cost breakdown ── */}
         {isOngoing && (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Est. monthly spend</span>
+            <span className="text-sm text-muted-foreground">VAT (15%)</span>
             <span className="text-sm font-bold tabular-nums text-foreground">
-              SAR {(budgetAmount * 30).toLocaleString()}
+              SAR {dailyVat.toLocaleString()}/day
             </span>
           </div>
         )}
@@ -115,26 +117,42 @@ export function CostSummaryCard({
           </div>
         )}
 
-        {/* VAT */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">VAT (15%)</span>
-          <span className="text-sm font-bold tabular-nums text-foreground">
-            SAR {vat.toLocaleString()}
-          </span>
-        </div>
+        {/* ── Fixed-end: VAT on total ── */}
+        {!isOngoing && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">VAT (15%)</span>
+            <span className="text-sm font-bold tabular-nums text-foreground">
+              SAR {vat.toLocaleString()}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Divider + Total */}
       <div className="my-4 h-px bg-border" />
 
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-bold text-foreground">
-          {isOngoing ? "Est. monthly total" : "Total (incl. VAT)"}
-        </span>
-        <span className="text-base font-bold tabular-nums text-[#004d5a]">
-          SAR {isOngoing ? ((budgetAmount * 30 + (boostEnabled ? boostAmount : 0)) * 1.15).toLocaleString(undefined, { maximumFractionDigits: 0 }) : grandTotal.toLocaleString()}
-        </span>
-      </div>
+      {isOngoing ? (
+        /* ── Ongoing: daily total ── */
+        <div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold text-foreground">Daily total (incl. VAT)</span>
+            <span className="text-base font-bold tabular-nums text-[#004d5a]">
+              SAR {dailyTotal.toLocaleString()}/day
+            </span>
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            Charged daily. You can pause or stop anytime — no commitment.
+          </p>
+        </div>
+      ) : (
+        /* ── Fixed-end: grand total ── */
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-bold text-foreground">Total (incl. VAT)</span>
+          <span className="text-base font-bold tabular-nums text-[#004d5a]">
+            SAR {grandTotal.toLocaleString()}
+          </span>
+        </div>
+      )}
 
       {/* Date range */}
       {startDate && (
