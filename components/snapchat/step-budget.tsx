@@ -86,13 +86,14 @@ const ALL_OPTIMIZATION_GOALS: {
   costHint?: string;
   }[] = [
   {
-    value: "PIXEL_PURCHASE",
-    label: "Purchases",
-    desc: "Optimized for people most likely to buy from your store.",
-    icon: <ShoppingCart className="size-4" />,
+    value: "PIXEL_PAGE_VIEW",
+    label: "Page Views",
+    desc: "Drive visitors to your store. Best starting point.",
+    icon: <Eye className="size-4" />,
     recommended: { SALES: true },
     requiresPixel: true,
-    costHint: "Higher cost per action, highest return",
+    bestFor: "New stores and new pixels — builds data for advanced goals",
+    costHint: "Lowest cost, broadest reach",
   },
   {
     value: "PIXEL_ADD_TO_CART",
@@ -100,15 +101,17 @@ const ALL_OPTIMIZATION_GOALS: {
     desc: "Target shoppers likely to add products to their cart.",
     icon: <TrendingUp className="size-4" />,
     requiresPixel: true,
+    bestFor: "Stores with 50+ daily page views on their pixel",
     costHint: "Moderate cost per action",
   },
   {
-    value: "PIXEL_PAGE_VIEW",
-    label: "Page Views",
-    desc: "Drive visitors to your store pages. Ideal for new stores.",
-    icon: <Eye className="size-4" />,
+    value: "PIXEL_PURCHASE",
+    label: "Purchases",
+    desc: "Optimized for people most likely to buy.",
+    icon: <ShoppingCart className="size-4" />,
     requiresPixel: true,
-    costHint: "Lower cost per action, broader reach",
+    bestFor: "Stores with established pixel data and 10+ weekly purchases",
+    costHint: "Higher cost per action, highest return",
   },
   {
     value: "SWIPES",
@@ -591,14 +594,7 @@ export function StepBudget() {
                     </p>
                   </div>
                 )}
-                {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && hasPixelConfigured && (
-                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                    <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-                    <p className="text-xs text-emerald-700">
-                      Snap Pixel connected — all pixel-based goals available.
-                    </p>
-                  </div>
-                )}
+                {/* Pixel connected status removed — already shown in Step 0 */}
                 {OPTIMIZATION_GOALS.some((g) => g.requiresMMP) && (
                   <div className="mt-3 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2">
                     <Lock className="mt-0.5 size-3.5 shrink-0 text-orange-600" />

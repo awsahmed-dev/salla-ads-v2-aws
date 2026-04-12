@@ -68,32 +68,11 @@ export function OptimizationGoalCard({
 
       {/* Pixel readiness — progression path for new pixels */}
       {isNewPixel && (
-        <div className="mb-4 rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/30 p-4">
-          <div className="flex items-start gap-2.5 mb-3">
-            <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
-            <div>
-              <p className="text-xs font-semibold text-[#004956]">New pixel detected — build data first</p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-[#004956]/70">
-                Your pixel is new and needs traffic data to optimize effectively. Follow this path for the best results:
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-2.5">
-            <div className="flex items-center gap-1.5">
-              <span className="flex size-5 items-center justify-center rounded-full bg-[#004956] text-[9px] font-bold text-white">1</span>
-              <span className="text-[11px] font-semibold text-foreground">Page Views</span>
-            </div>
-            <ArrowRight className="size-3 text-muted-foreground/40" />
-            <div className="flex items-center gap-1.5">
-              <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground">2</span>
-              <span className="text-[11px] text-muted-foreground">Add to Cart</span>
-            </div>
-            <ArrowRight className="size-3 text-muted-foreground/40" />
-            <div className="flex items-center gap-1.5">
-              <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-muted-foreground">3</span>
-              <span className="text-[11px] text-muted-foreground">Purchases</span>
-            </div>
-          </div>
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/30 px-4 py-3">
+          <Sparkles className="size-4 shrink-0 text-[#004956]" />
+          <p className="text-[11px] text-[#004956]/80">
+            <span className="font-semibold text-[#004956]">New pixel?</span> Start with Page Views to build data, then scale up.
+          </p>
         </div>
       )}
 
@@ -276,16 +255,11 @@ export function OptimizationGoalCard({
 
       {/* Warning when selecting advanced goal with new pixel */}
       {isAdvancedGoalWithNewPixel && (
-        <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600" />
-          <div>
-            <p className="text-xs font-semibold text-amber-800">
-              Your pixel has limited data for &ldquo;{selectedGoalObj?.label}&rdquo;
-            </p>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700">
-              Starting with <span className="font-semibold">Page Views</span> for 1–2 weeks builds the data the platform needs to find buyers. You can switch to {selectedGoalObj?.label} anytime.
-            </p>
-          </div>
+        <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5">
+          <AlertCircle className="size-3.5 shrink-0 text-amber-600" />
+          <p className="text-[11px] text-amber-700">
+            Consider starting with <span className="font-semibold">Page Views</span> first — your pixel needs data to optimize for {selectedGoalObj?.label?.toLowerCase()}.
+          </p>
         </div>
       )}
 
