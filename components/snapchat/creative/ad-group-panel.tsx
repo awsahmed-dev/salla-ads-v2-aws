@@ -361,8 +361,8 @@ export function AdGroupPanel({
 
           {/* ── Ad Content ── */}
           {ad.adFormat !== "DYNAMIC" && (
-            <div className={cn("border-t border-border px-6", ad.adFormat === "SINGLE" ? "py-3" : "py-5")}>
-              {ad.adFormat !== "SINGLE" && (
+            <div className={cn("border-t border-border px-6", (ad.adFormat === "SINGLE" || ad.adFormat === "COLLECTION" || ad.adFormat === "STORY") ? "py-3" : "py-5")}>
+              {ad.adFormat !== "SINGLE" && ad.adFormat !== "COLLECTION" && (
                 <div className="mb-4 flex items-center justify-between">
                   <p className="text-sm font-bold text-foreground">
                     {ad.adFormat === "INFLUENCER" ? "Ad content" : "Ad Content"}
@@ -376,14 +376,13 @@ export function AdGroupPanel({
                         type="button"
                         onClick={addAsset}
                         disabled={!canAddAsset}
-                        className="flex items-center gap-1 text-xs font-medium text-[#004956] hover:underline disabled:opacity-50"
+                        className="flex items-center gap-1 text-xs font-medium text-primary hover:underline disabled:opacity-50"
                       >
                         <Plus className="size-3" />
                         Add Story
                       </button>
                     </div>
                   )}
-                  <ChevronDown className="size-4 text-muted-foreground" />
                 </div>
               )}
 
@@ -480,7 +479,7 @@ export function AdGroupPanel({
 
           {/* ── Collection Tiles ── */}
           {ad.adFormat === "COLLECTION" && (
-            <div className="border-t border-border px-4 py-4">
+            <div className="border-t border-border px-6 py-4">
               <CollectionTilesSection
                 ad={ad}
                 tileCount={tileCount}
@@ -493,7 +492,7 @@ export function AdGroupPanel({
 
           {/* ── Discover Tile (Story Ads) ── */}
           {ad.adFormat === "STORY" && (
-            <div className="border-t border-border px-4 py-4">
+            <div className="border-t border-border px-6 py-4">
               <DiscoverTileSection ad={ad} onUpdate={onUpdate} />
             </div>
           )}

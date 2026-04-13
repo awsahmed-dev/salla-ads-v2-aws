@@ -163,10 +163,11 @@ export function CreativeCard({
   );
 
   const isInfluencer = (asset.mediaSource ?? "upload") === "ad_code";
-  const isSingleFormat = adFormat === "SINGLE" || adFormat === "DYNAMIC";
+  const isSingleFormat = adFormat === "SINGLE" || adFormat === "DYNAMIC" || adFormat === "COLLECTION";
   const showUrl = !isLeadGen && !isAppInstall && !isSnapAd && !isDeepLink;
   const showCta = !isCollection && !isSnapAd;
   const showAdvancedWebView = !isSnapAd && !isDeepLink && !isLeadGen && !isAppInstall && !isInfluencer;
+  const showLinkTypePills = (isSingleFormat || isStory) && showUrl && !isDeepLink;
 
   const mergeWebView = (patch: Partial<NonNullable<CreativeAsset["webViewProperties"]>>) =>
     onUpdate({
@@ -215,7 +216,7 @@ export function CreativeCard({
   return (
     <div className={cn(
       "rounded-lg border transition-all",
-      isSingleFormat ? "bg-white" : "bg-background",
+      (isSingleFormat || isStory) ? "bg-white" : "bg-background",
       isExpanded ? "border-primary/30 shadow-sm" : isComplete ? "border-emerald-200 hover:border-emerald-300" : "border-border hover:border-primary/20"
     )}>
       {/* ── Header ── */}
@@ -275,11 +276,14 @@ export function CreativeCard({
         <div className={cn("flex flex-col gap-0", !isSingleFormat && "border-t border-border")}>
 
           {/* ── Single Format: Link Type first (product-first flow) ── */}
-          {isSingleFormat && showUrl && !isDeepLink && (
+          {showLinkTypePills && (
             <div className="flex flex-col gap-4 px-3 py-3">
               {/* Link type pills */}
               <div className="flex flex-col gap-2">
                 <Label className="text-sm font-medium text-foreground">Link type</Label>
+                {isStory && (
+                  <p className="text-[11px] text-muted-foreground">Each snap links to its own swipe-up URL</p>
+                )}
                 <div className="flex flex-wrap gap-2">
                   {([
                     { value: "store", label: "Store" },
@@ -315,7 +319,7 @@ export function CreativeCard({
               </div>
 
               {/* Link + CTA row */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className={cn("grid gap-4", showCta ? "grid-cols-2" : "grid-cols-1")}>
                 <div className="flex flex-col gap-2">
                   <Label className="text-sm font-medium text-foreground">Link</Label>
                   {linkType === "store" ? (
@@ -408,7 +412,7 @@ export function CreativeCard({
           )}
 
           {/* ── Media Upload ── */}
-          <div className={cn("px-3 py-3", isSingleFormat && showUrl && !isDeepLink && "border-t border-border")}>
+          <div className={cn("px-3 py-3", showLinkTypePills && "border-t border-border")}>
             {isInfluencer ? (
               <div className="flex flex-col gap-2.5">
                 <div className="flex items-center gap-1.5">
@@ -602,8 +606,8 @@ export function CreativeCard({
             </div>
           </div>
 
-          {/* ── CTA & Destination (non-Single formats) ── */}
-          {(showCta || showUrl || isDeepLink) && (!isSingleFormat || !showUrl || isDeepLink) && (
+          {/* ── CTA & Destination (fallback for non-pills formats) ── */}
+          {(showCta || showUrl || isDeepLink) && !showLinkTypePills && (
             <div className="flex flex-col gap-4 border-t border-border px-3 py-3">
               <div className={cn("grid gap-2", showCta && !isCollection ? "grid-cols-2" : "grid-cols-1")}>
                   {showCta && (
@@ -727,7 +731,7 @@ export function CreativeCard({
                 className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary/[0.04] py-1.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/[0.08]"
               >
                 <CopyCheck className="size-3" />
-                Apply brand, headline, CTA & URL to all creatives
+                Apply brand, headline, CTA & URL to all {isStory ? "snaps" : "creatives"}
               </button>
             </div>
           )}
@@ -743,11 +747,26 @@ export function CreativeCard({
               {showAdvanced ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
             </button>
 
-            {showAdvanced && isSingleFormat && showAdvancedWebView && (
+            {showAdvanced && (isSingleFormat || isStory) && showAdvancedWebView && (
               <div className="flex flex-col gap-4 px-3 pb-4">
                 {/* Toggle options */}
                 <div className="flex flex-col gap-0 rounded-lg border border-border">
-                  <div className="flex items-center justify-between px-3 py-2.5">
+                  {showCta && (
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium text-foreground">CTA Button Color</span>
+                        <span className="text-[11px] leading-tight text-muted-foreground">Auto picks a color from your media, or use Snapchat&apos;s default grey</span>
+                      </div>
+                      <Select value={asset.ctaColorDisplayMode || "AUTO"} onValueChange={(v) => onUpdate({ ctaColorDisplayMode: v as "AUTO" | "DEFAULT" })}>
+                        <SelectTrigger className="h-7 w-24 text-[11px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AUTO">Auto</SelectItem>
+                          <SelectItem value="DEFAULT">Default</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className={cn("flex items-center justify-between px-3 py-2.5", showCta && "border-t border-border")}>
                     <div className="flex flex-col gap-0.5">
                       <span className="text-xs font-medium text-foreground">Preload Webpage</span>
                       <span className="text-[11px] leading-tight text-muted-foreground">Loads your page while the ad plays for instant swipe-up</span>
@@ -796,8 +815,8 @@ export function CreativeCard({
               </div>
             )}
 
-            {/* Fallback: original layout for non-Single formats */}
-            {showAdvanced && (!isSingleFormat || !showAdvancedWebView) && (
+            {/* Fallback: original layout for non-Single/Story formats */}
+            {showAdvanced && ((!isSingleFormat && !isStory) || !showAdvancedWebView) && (
               <div className="flex flex-col gap-0 px-3 pb-3">
                 <div className="flex flex-col gap-0 rounded-lg border border-border">
                   {showCta && (
