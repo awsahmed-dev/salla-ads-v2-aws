@@ -163,7 +163,7 @@ export function CreativeCard({
   );
 
   const isInfluencer = (asset.mediaSource ?? "upload") === "ad_code";
-  const isSingleFormat = adFormat === "SINGLE" || adFormat === "DYNAMIC" || adFormat === "COLLECTION";
+  const isSingleFormat = adFormat === "SINGLE" || adFormat === "DYNAMIC" || adFormat === "COLLECTION" || adFormat === "INFLUENCER";
   const showUrl = !isLeadGen && !isAppInstall && !isSnapAd && !isDeepLink;
   const showCta = !isCollection && !isSnapAd;
   const showAdvancedWebView = !isSnapAd && !isDeepLink && !isLeadGen && !isAppInstall && !isInfluencer;
@@ -815,15 +815,15 @@ export function CreativeCard({
               </div>
             )}
 
-            {/* Fallback: original layout for non-Single/Story formats */}
+            {/* Fallback: toggle+description style for formats without webview options */}
             {showAdvanced && ((!isSingleFormat && !isStory) || !showAdvancedWebView) && (
-              <div className="flex flex-col gap-0 px-3 pb-3">
+              <div className="flex flex-col gap-4 px-3 pb-4">
                 <div className="flex flex-col gap-0 rounded-lg border border-border">
                   {showCta && (
                     <div className="flex items-center justify-between px-3 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <Label className="text-xs text-foreground">CTA Button Color</Label>
-                        <InfoTip text="Auto picks a color from your media for the swipe-up button. Default uses Snapchat's standard grey." />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium text-foreground">CTA Button Color</span>
+                        <span className="text-[11px] leading-tight text-muted-foreground">Auto picks a color from your media, or use Snapchat&apos;s default grey</span>
                       </div>
                       <Select value={asset.ctaColorDisplayMode || "AUTO"} onValueChange={(v) => onUpdate({ ctaColorDisplayMode: v as "AUTO" | "DEFAULT" })}>
                         <SelectTrigger className="h-7 w-24 text-[11px]"><SelectValue /></SelectTrigger>
@@ -836,9 +836,9 @@ export function CreativeCard({
                   )}
                   {!isSnapAd && (
                     <div className={cn("flex items-center justify-between px-3 py-2.5", showCta && "border-t border-border")}>
-                      <div className="flex items-center gap-1.5">
-                        <Label className="text-xs text-foreground">Shareable</Label>
-                        <InfoTip text="Allow viewers to share this ad with friends via chat or stories. Increases organic reach but gives less control." />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium text-foreground">Shareable</span>
+                        <span className="text-[11px] leading-tight text-muted-foreground">Let viewers share this ad with friends via chat</span>
                       </div>
                       <Switch checked={asset.shareable} onCheckedChange={(v) => onUpdate({ shareable: v })} />
                     </div>
@@ -846,31 +846,27 @@ export function CreativeCard({
                 </div>
 
                 {showAdvancedWebView && (
-                  <div className="mt-3 flex flex-col gap-0 rounded-lg border border-border">
-                    <div className="bg-muted/30 px-3 py-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Swipe-Up Behavior</p>
-                    </div>
-                    <div className="flex items-center justify-between border-t border-border px-3 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <Label className="text-xs text-foreground">In-App Browser</Label>
-                        <InfoTip text="Opens your landing page inside Snapchat instead of the external browser. Keeps users in the app for a faster, smoother experience." />
+                  <div className="flex flex-col gap-0 rounded-lg border border-border">
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium text-foreground">Open in Snapchat Browser</span>
+                        <span className="text-[11px] leading-tight text-muted-foreground">Keeps users inside Snapchat for a smoother experience</span>
                       </div>
                       <Switch checked={asset.webViewProperties?.useSnapBrowser ?? true} onCheckedChange={(v) => mergeWebView({ useSnapBrowser: v })} />
                     </div>
                     <div className="flex items-center justify-between border-t border-border px-3 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <Label className="text-xs text-foreground">Preload Page</Label>
-                        <InfoTip text="Starts loading the landing page while the ad is showing so it opens instantly on swipe-up. Recommended for faster load times." />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium text-foreground">Preload Webpage</span>
+                        <span className="text-[11px] leading-tight text-muted-foreground">Loads your page while the ad plays for instant swipe-up</span>
                       </div>
                       <Switch checked={asset.webViewProperties?.preloadEnabled ?? true} onCheckedChange={(v) => mergeWebView({ preloadEnabled: v })} />
                     </div>
-                    <div className="flex flex-col gap-1 border-t border-border px-3 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <Label className="text-xs text-foreground">App Deep Link</Label>
-                        <InfoTip text="If the user has your app installed, this URI opens the content directly in your app. Otherwise, the web URL is used as fallback." />
+                    <div className="flex flex-col gap-2 border-t border-border px-3 py-2.5">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium text-foreground">App Deep Link</span>
+                        <span className="text-[11px] leading-tight text-muted-foreground">Opens content directly in your app if installed</span>
                       </div>
-                      <Input placeholder="myapp://product/123" value={asset.webViewProperties?.deepLinkUrl || ""} onChange={(e) => mergeWebView({ deepLinkUrl: e.target.value })} className="mt-1 h-7 text-xs font-mono" />
-                      <p className="text-[10px] text-muted-foreground">Optional — leave empty if you don&apos;t have a mobile app</p>
+                      <Input placeholder="myapp://product/123" value={asset.webViewProperties?.deepLinkUrl || ""} onChange={(e) => mergeWebView({ deepLinkUrl: e.target.value })} className="h-7 text-xs font-mono" />
                     </div>
                   </div>
                 )}
