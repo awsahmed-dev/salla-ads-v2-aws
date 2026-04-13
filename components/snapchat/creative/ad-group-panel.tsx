@@ -361,12 +361,10 @@ export function AdGroupPanel({
 
           {/* ── Ad Content ── */}
           {ad.adFormat !== "DYNAMIC" && (
-            <div className={cn("border-t border-border px-6", (ad.adFormat === "SINGLE" || ad.adFormat === "COLLECTION" || ad.adFormat === "STORY") ? "py-3" : "py-5")}>
-              {ad.adFormat !== "SINGLE" && ad.adFormat !== "COLLECTION" && (
+            <div className={cn("border-t border-border px-6", (ad.adFormat === "SINGLE" || ad.adFormat === "COLLECTION" || ad.adFormat === "STORY" || ad.adFormat === "INFLUENCER") ? "py-3" : "py-5")}>
+              {ad.adFormat !== "SINGLE" && ad.adFormat !== "COLLECTION" && ad.adFormat !== "INFLUENCER" && (
                 <div className="mb-4 flex items-center justify-between">
-                  <p className="text-sm font-bold text-foreground">
-                    {ad.adFormat === "INFLUENCER" ? "Ad content" : "Ad Content"}
-                  </p>
+                  <p className="text-sm font-bold text-foreground">Ad Content</p>
                   {ad.adFormat === "STORY" && (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
