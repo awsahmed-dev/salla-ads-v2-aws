@@ -21,7 +21,6 @@ import {
   AlertCircle,
   LayoutGrid,
   ShieldCheck,
-  Layers,
   FileText,
   Sparkles,
   ImagePlus,
@@ -769,16 +768,11 @@ export function StepCreative() {
 
           {/* ---- Ads List ---- */}
           <SectionCard>
-            <div className="mb-1 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Layers className="size-4 text-primary" />
-                <Label className="text-sm font-semibold text-foreground">Ads</Label>
-                <Badge variant="secondary" className="text-xs">{ads.length} ad{ads.length !== 1 ? "s" : ""}</Badge>
-                <InfoTip text="Each ad has its own format and creative variations. You can mix formats (e.g. Single Image + Collection) in the same campaign. Snapchat recommends 3-5 ads for optimal delivery." />
-              </div>
+            <div className="mb-1">
+              <Label className="text-base font-bold text-foreground">Campaign Content</Label>
             </div>
-            <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-              Add one or more ads with different formats and creatives. Snapchat auto-optimizes delivery across them.
+            <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
+              Create multiple ads with different video and text options. The system will automatically shift budget toward your top-performing ads.
             </p>
 
             {ads.length === 0 && !catalogEnabled && (
@@ -882,7 +876,7 @@ export function StepCreative() {
                   />
                 ))}
 
-                <div className="rounded-xl border-2 border-dashed border-border transition-all">
+                <div className="rounded-xl border-2 border-dashed border-border transition-all hover:border-primary/30">
                   {catalogEnabled ? (
                     <button
                       type="button"
@@ -897,11 +891,16 @@ export function StepCreative() {
                   <button
                     type="button"
                     onClick={() => setShowNewAdPicker((v) => !v)}
-                    className="flex w-full items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/[0.03]"
+                    className="flex w-full flex-col items-center gap-1 px-4 py-4 transition-colors hover:bg-primary/[0.03]"
                   >
-                    <Plus className="size-4" />
-                    Add Ad
-                    {showNewAdPicker ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                    <div className="flex items-center gap-2">
+                      <div className="flex size-6 items-center justify-center rounded-full bg-primary/10">
+                        <Plus className="size-3.5 text-primary" />
+                      </div>
+                      <span className="text-sm font-semibold text-primary">Add Another Ad</span>
+                      {showNewAdPicker ? <ChevronUp className="size-3.5 text-primary" /> : <ChevronDown className="size-3.5 text-primary" />}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">A/B test different creatives or formats to find what works best</span>
                   </button>
                   {showNewAdPicker && (
                     <div className="border-t border-border px-4 pb-4 pt-3">
@@ -1244,11 +1243,9 @@ function CampaignReadinessCard({
   /* ── Best-practice signals ── */
   const hasMultipleAds = ads.length >= 2;
   const nonDynamicAds = ads.filter((a) => a.adFormat !== "DYNAMIC");
-  const avgCreativesPerAd = nonDynamicAds.length > 0
-    ? nonDynamicAds.reduce((s, a) => s + a.assets.length, 0) / nonDynamicAds.length
-    : 0;
-  const hasEnoughCreatives = catalogEnabled || avgCreativesPerAd >= 3;
-  const hasVideoCreative = catalogEnabled || ads.some((a) => a.assets.some((asset) => asset.mediaType === "VIDEO"));
+  const hasVideoAd = catalogEnabled || ads.some((a) => a.assets.some((asset) => asset.mediaType === "VIDEO"));
+  const hasImageAd = catalogEnabled || ads.some((a) => a.assets.some((asset) => asset.mediaType === "IMAGE"));
+  const hasBothMediaTypes = hasVideoAd && hasImageAd;
   const hasMultipleFormats = new Set(ads.map((a) => a.adFormat)).size >= 2;
 
   const bestPractices: { label: string; met: boolean; tip: string; metTip: string }[] = [];
@@ -1258,31 +1255,22 @@ function CampaignReadinessCard({
       label: "Multiple ads",
       met: hasMultipleAds,
       tip: objective === "SALES"
-        ? "Create 2+ ads to A/B test creatives and find the best-performing sales driver"
+        ? "Each ad supports one creative — add 2+ ads with different visuals or formats to find the best-performing sales driver"
         : objective === "LEADS"
-          ? "Test different lead form approaches across multiple ads"
-          : "Create 2+ ads to test different formats or creatives",
-      metTip: `${ads.length} ads — great for testing`,
+          ? "Each ad supports one creative — add multiple ads to test different lead form approaches"
+          : "Each ad supports one creative — add 2+ ads to test different formats and creatives",
+      metTip: `${ads.length} ads — great for A/B testing`,
     });
   }
 
   if (!catalogEnabled) {
     bestPractices.push({
-      label: "3+ creatives per ad",
-      met: hasEnoughCreatives,
-      tip: objective === "SALES"
-        ? "Snap recommends 3-5 creative variations — test different product angles and CTAs"
-        : "Snap recommends 3-5 creative variations for optimal delivery",
-      metTip: `~${Math.round(avgCreativesPerAd)} creatives per ad`,
-    });
-
-    bestPractices.push({
-      label: "Video creative included",
-      met: hasVideoCreative,
+      label: "Video + Image ads",
+      met: hasBothMediaTypes,
       tip: objective === "ENGAGEMENT"
-        ? "Video ads generate 3x more engagement than static images on Snapchat"
-        : "Video ads get 2x more engagement than static images on Snapchat",
-      metTip: "Video creatives detected",
+        ? "Create one video ad and one image ad — video gets 3x more engagement, images provide broader reach"
+        : "Create both a video ad and an image ad — video drives engagement while images extend your reach",
+      metTip: "Both video and image ads included",
     });
   }
 

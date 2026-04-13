@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Upload, Trash2 } from "lucide-react";
+import { ImageUp, Upload, Trash2, Download } from "lucide-react";
 import { MediaLibrarySheet, type MediaLibraryContext } from "@/components/shared/media-library-sheet";
 
 /**
@@ -175,23 +175,33 @@ export function UploadZone({
   // ----- Empty state (no media yet) -----
   return (
     <>
-      <button
-        type="button"
-        onClick={openAction}
+      <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
         className={cn(
           "flex w-full flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors",
-          dragOver ? "border-primary bg-primary/5" : "border-border bg-muted/10 hover:border-primary/40 hover:bg-muted/20",
-          compact ? "gap-1 py-3" : "gap-1.5 py-6"
+          dragOver ? "border-primary bg-primary/5" : "border-border bg-white hover:border-primary/40",
+          compact ? "gap-2 py-4" : "gap-4 p-6"
         )}
       >
-        <Upload className={cn("text-muted-foreground", compact ? "size-4" : "size-5")} />
-        <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-xs")}>{label}</span>
-        <span className={cn("text-center text-muted-foreground", compact ? "text-[11px]" : "text-xs")}>{sublabel}</span>
+        <ImageUp className={cn("text-muted-foreground", compact ? "size-5" : "size-8")} />
+        <div className={cn("flex flex-col items-center text-center w-full", compact ? "gap-0.5" : "gap-1")}>
+          <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-sm")}>{label}</span>
+          <span className={cn("text-muted-foreground", compact ? "text-[11px]" : "text-xs")}>{sublabel}</span>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          onClick={openAction}
+        >
+          Add
+          <Download className="size-3.5" />
+        </Button>
         <input ref={inputRef} type="file" accept={accept} multiple={multiSelect} className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-      </button>
+      </div>
       {enableLibrary && (
         <MediaLibrarySheet
           open={sheetOpen}
