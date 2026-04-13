@@ -1,7 +1,7 @@
 export { SnapchatAdPreview } from "./ad-preview";
 export { CreativeCard, CharCounter } from "./creative-card";
 export { UploadZone } from "@/components/shared/upload-zone";
-export { CollectionTilesSection, TileCard, ProductPickerDialog, ProductPickerSheet } from "./collection-tiles";
+export { CollectionTilesSection, ProductPickerDialog, ProductPickerSheet } from "./collection-tiles";
 export { OfferDisclaimerSection } from "./offer-disclaimer-section";
 export { DynamicAdConfig } from "./dynamic-ad-config";
 export { DiscoverTileSection } from "./discover-tile-section";
