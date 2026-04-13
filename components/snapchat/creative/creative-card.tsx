@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -29,6 +30,7 @@ import {
   Info,
   Sparkles,
   CopyCheck,
+  X,
 } from "lucide-react";
 import { UploadZone } from "@/components/shared/upload-zone";
 import {
@@ -39,6 +41,7 @@ import {
   DEEP_LINK_CTA_OPTIONS,
 } from "./constants";
 import { InfoTip } from "@/components/shared/info-tip";
+import { LinkPickerSheet } from "./link-picker-sheet";
 import type {
   CreativeAsset,
   AdFormat,
@@ -92,6 +95,10 @@ export function CreativeCard({
   const isDeepLink = destination === "DEEP_LINK";
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [sallaProduct, setSallaProduct] = useState<any>(null);
+  const [linkType, setLinkType] = useState<"store" | "product" | "category" | "landing_page" | "custom">(() => asset.websiteUrl ? "custom" : "store");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerMode, setPickerMode] = useState<"product" | "category" | "landing_page">("product");
+  const [pickerLabel, setPickerLabel] = useState<string>("");
 
   useEffect(() => {
     if (asset.websiteUrl && isSallaStoreUrl(asset.websiteUrl)) {
@@ -156,9 +163,22 @@ export function CreativeCard({
   );
 
   const isInfluencer = (asset.mediaSource ?? "upload") === "ad_code";
+  const isSingleFormat = adFormat === "SINGLE" || adFormat === "DYNAMIC";
   const showUrl = !isLeadGen && !isAppInstall && !isSnapAd && !isDeepLink;
   const showCta = !isCollection && !isSnapAd;
   const showAdvancedWebView = !isSnapAd && !isDeepLink && !isLeadGen && !isAppInstall && !isInfluencer;
+
+  const mergeWebView = (patch: Partial<NonNullable<CreativeAsset["webViewProperties"]>>) =>
+    onUpdate({
+      webViewProperties: {
+        ...asset.webViewProperties,
+        url: asset.websiteUrl,
+        useSnapBrowser: asset.webViewProperties?.useSnapBrowser ?? true,
+        preloadEnabled: asset.webViewProperties?.preloadEnabled ?? true,
+        blockPreload: asset.webViewProperties?.blockPreload ?? false,
+        ...patch,
+      },
+    });
 
   const hasContent = !!(asset.brandName || asset.headline || asset.cta || asset.websiteUrl);
   const canApplyToAll = total > 1 && hasContent && !!onApplyToAll;
@@ -194,65 +214,201 @@ export function CreativeCard({
 
   return (
     <div className={cn(
-      "rounded-lg border bg-background transition-all",
+      "rounded-lg border transition-all",
+      isSingleFormat ? "bg-white" : "bg-background",
       isExpanded ? "border-primary/30 shadow-sm" : isComplete ? "border-emerald-200 hover:border-emerald-300" : "border-border hover:border-primary/20"
     )}>
       {/* ── Header ── */}
-      <div
-        className={cn("flex items-center gap-2 px-3 py-2 cursor-pointer", isExpanded && "bg-primary/[0.02]")}
-        onClick={onToggleExpand}
-      >
-        {isStory && <GripVertical className="size-3.5 cursor-grab text-muted-foreground" onClick={(e) => e.stopPropagation()} />}
-        <div className="flex items-center gap-1.5">
-          {isComplete ? (
-            <CheckCircle2 className="size-3 text-emerald-500" />
-          ) : hasMedia ? (
-            asset.mediaType === "VIDEO" ? <Film className="size-3 text-primary" /> : <ImageIcon className="size-3 text-primary" />
-          ) : (
-            <div className="flex size-3 items-center justify-center rounded-full border-[1.5px] border-amber-400">
-              <div className="size-1 rounded-full bg-amber-400" />
-            </div>
-          )}
-          <span className="text-xs font-semibold text-foreground">
-            {isStory ? `Snap ${index + 1}` : `Creative ${index + 1}`}
-          </span>
-        </div>
-
-        {/* Collapsed summary */}
-        {!isExpanded && (
-          <div className="flex flex-1 items-center gap-2 min-w-0">
-            <span className="truncate text-[11px] text-muted-foreground">
-              {summaryParts.join(" · ")}
+      {!isSingleFormat && (
+        <div
+          className={cn("flex items-center gap-2 px-3 py-2 cursor-pointer", isExpanded && "bg-primary/[0.02]")}
+          onClick={onToggleExpand}
+        >
+          {isStory && <GripVertical className="size-3.5 cursor-grab text-muted-foreground" onClick={(e) => e.stopPropagation()} />}
+          <div className="flex items-center gap-1.5">
+            {isComplete ? (
+              <CheckCircle2 className="size-3 text-emerald-500" />
+            ) : hasMedia ? (
+              asset.mediaType === "VIDEO" ? <Film className="size-3 text-primary" /> : <ImageIcon className="size-3 text-primary" />
+            ) : (
+              <div className="flex size-3 items-center justify-center rounded-full border-[1.5px] border-amber-400">
+                <div className="size-1 rounded-full bg-amber-400" />
+              </div>
+            )}
+            <span className="text-xs font-semibold text-foreground">
+              {isStory ? `Snap ${index + 1}` : `Creative ${index + 1}`}
             </span>
-            {/* Completion dots */}
-            <div className="flex shrink-0 items-center gap-0.5" title={completionChecks.map((c) => `${c.ok ? "✓" : "○"} ${c.label}`).join(", ")}>
-              {completionChecks.map((c, i) => (
-                <div key={i} className={cn("size-1.5 rounded-full", c.ok ? "bg-emerald-400" : "bg-muted-foreground/25")} />
-              ))}
-            </div>
           </div>
-        )}
 
-        <div className="ml-auto flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-          {isStory && (
-            <>
-              <button type="button" disabled={index === 0} onClick={() => onMove("up")} className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronUp className="size-3" /></button>
-              <button type="button" disabled={index === total - 1} onClick={() => onMove("down")} className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronDown className="size-3" /></button>
-            </>
+          {/* Collapsed summary */}
+          {!isExpanded && (
+            <div className="flex flex-1 items-center gap-2 min-w-0">
+              <span className="truncate text-[11px] text-muted-foreground">
+                {summaryParts.join(" · ")}
+              </span>
+              {/* Completion dots */}
+              <div className="flex shrink-0 items-center gap-0.5" title={completionChecks.map((c) => `${c.ok ? "✓" : "○"} ${c.label}`).join(", ")}>
+                {completionChecks.map((c, i) => (
+                  <div key={i} className={cn("size-1.5 rounded-full", c.ok ? "bg-emerald-400" : "bg-muted-foreground/25")} />
+                ))}
+              </div>
+            </div>
           )}
-          <button type="button" onClick={onDuplicate} className="rounded p-0.5 text-muted-foreground hover:text-foreground" title="Duplicate"><Copy className="size-3" /></button>
-          <button type="button" onClick={onRemove} className="rounded p-0.5 text-muted-foreground hover:text-destructive"><Trash2 className="size-3" /></button>
-          <button type="button" onClick={onToggleExpand} className="rounded p-0.5 text-muted-foreground hover:text-foreground">
-            {isExpanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-          </button>
+
+          <div className="ml-auto flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+            {isStory && (
+              <>
+                <button type="button" disabled={index === 0} onClick={() => onMove("up")} className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronUp className="size-3" /></button>
+                <button type="button" disabled={index === total - 1} onClick={() => onMove("down")} className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"><ChevronDown className="size-3" /></button>
+              </>
+            )}
+            <button type="button" onClick={onDuplicate} className="rounded p-0.5 text-muted-foreground hover:text-foreground" title="Duplicate"><Copy className="size-3" /></button>
+            <button type="button" onClick={onRemove} className="rounded p-0.5 text-muted-foreground hover:text-destructive"><Trash2 className="size-3" /></button>
+            <button type="button" onClick={onToggleExpand} className="rounded p-0.5 text-muted-foreground hover:text-foreground">
+              {isExpanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {isExpanded && (
-        <div className="flex flex-col gap-0 border-t border-border">
+      {(isExpanded || isSingleFormat) && (
+        <div className={cn("flex flex-col gap-0", !isSingleFormat && "border-t border-border")}>
 
-          {/* ── Section 1: Media ── */}
-          <div className="px-3 py-3">
+          {/* ── Single Format: Link Type first (product-first flow) ── */}
+          {isSingleFormat && showUrl && !isDeepLink && (
+            <div className="flex flex-col gap-4 px-3 py-3">
+              {/* Link type pills */}
+              <div className="flex flex-col gap-2">
+                <Label className="text-sm font-medium text-foreground">Link type</Label>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { value: "store", label: "Store" },
+                    { value: "product", label: "Product" },
+                    { value: "category", label: "Category" },
+                    { value: "landing_page", label: "Landing page" },
+                    { value: "custom", label: "Custom URL" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        if (opt.value === "product" || opt.value === "category" || opt.value === "landing_page") {
+                          setPickerMode(opt.value);
+                          setPickerOpen(true);
+                        } else {
+                          setLinkType(opt.value);
+                          setPickerLabel("");
+                          if (opt.value === "store") onUpdate({ websiteUrl: "" });
+                        }
+                      }}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-lg border px-4 py-2 text-xs font-medium transition-colors",
+                        linkType === opt.value
+                          ? "border-primary/60 bg-primary/[0.06] text-primary"
+                          : "border-border bg-white text-foreground hover:border-primary/30"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Link + CTA row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium text-foreground">Link</Label>
+                  {linkType === "store" ? (
+                    <div className="flex h-10 items-center justify-between rounded-lg border border-border bg-muted/40 px-3">
+                      <span className="truncate text-sm text-muted-foreground">https://store.salla.sa</span>
+                      <button
+                        type="button"
+                        title="UTM parameters are auto-appended for tracking"
+                        className="group/utm flex shrink-0 items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-200"
+                      >
+                        Auto UTM
+                        <Info className="size-2.5 text-emerald-500 transition-colors group-hover/utm:text-emerald-700" />
+                      </button>
+                    </div>
+                  ) : linkType === "product" || linkType === "category" || linkType === "landing_page" ? (
+                    <div
+                      onClick={() => { setPickerMode(linkType as "product" | "category" | "landing_page"); setPickerOpen(true); }}
+                      className={cn(
+                        "flex h-10 cursor-pointer items-center justify-between rounded-lg border px-3 transition-colors hover:border-primary/40",
+                        asset.websiteUrl ? "border-primary/40 bg-primary/5" : "border-border bg-muted/40"
+                      )}
+                    >
+                      {asset.websiteUrl ? (
+                        <>
+                          <span className="truncate text-sm text-foreground">{pickerLabel || asset.websiteUrl}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onUpdate({ websiteUrl: "" }); setPickerLabel(""); }}
+                            className="shrink-0 ml-2 rounded p-0.5 text-muted-foreground hover:text-destructive"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">
+                          {linkType === "product" ? "Select a product..." : linkType === "category" ? "Select a category..." : "Select a page..."}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <Input
+                      placeholder="https://yourstore.com/product"
+                      type="url"
+                      value={asset.websiteUrl}
+                      onChange={(e) => onUpdate({ websiteUrl: e.target.value })}
+                      className={cn("h-10 text-sm", asset.websiteUrl && !asset.websiteUrl.startsWith("https://") && "border-red-400")}
+                    />
+                  )}
+                  {linkType === "custom" && asset.websiteUrl && !asset.websiteUrl.startsWith("https://") && (
+                    <p className="text-[10px] text-red-600">URL must start with https://</p>
+                  )}
+                </div>
+                {showCta && (
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium text-foreground">
+                      CTA button <span className="text-destructive">*</span>
+                    </Label>
+                    <Select value={asset.cta} onValueChange={(v) => onUpdate({ cta: v as WebViewCTA })}>
+                      <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select call to action text" /></SelectTrigger>
+                      <SelectContent>
+                        <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Recommended</div>
+                        {CTA_OPTIONS.filter(c => ["SHOP_NOW", "ORDER_NOW", "GET_NOW", "BOOK_NOW", "MORE"].includes(c.value)).map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                        <div className="my-1 border-t border-border" />
+                        <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">More Options</div>
+                        {CTA_OPTIONS.filter(c => !["SHOP_NOW", "ORDER_NOW", "GET_NOW", "BOOK_NOW", "MORE"].includes(c.value)).map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {showUrl && sallaProduct && (
+                <div className="flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={sallaProduct.image} alt="" className="size-8 rounded-md object-cover" crossOrigin="anonymous" />
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate text-xs font-medium text-emerald-800">{sallaProduct.name}</p>
+                    <p className="text-[10px] text-emerald-600">{sallaProduct.price} SAR</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-emerald-700"
+                    onClick={() => onUpdate({ brandName: asset.brandName || sallaProduct.name.slice(0, 32), headline: asset.headline || sallaProduct.name.slice(0, 34) })}
+                  >
+                    Auto-fill
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Media Upload ── */}
+          <div className={cn("px-3 py-3", isSingleFormat && showUrl && !isDeepLink && "border-t border-border")}>
             {isInfluencer ? (
               <div className="flex flex-col gap-2.5">
                 <div className="flex items-center gap-1.5">
@@ -372,8 +528,8 @@ export function CreativeCard({
               <>
                 <UploadZone
                   accept="image/png,image/jpeg,image/gif,video/mp4,video/quicktime"
-                  label="Drop image or video"
-                  sublabel={isStory ? "Full-screen vertical media · 1080×1920px · PNG/JPG/GIF or MP4/MOV" : isCollection ? "Top snap media · 1080×1920px · PNG/JPG/GIF or MP4/MOV" : "Full-screen vertical ad · 1080×1920px · Image (max 5MB) or Video (3–180s, max 32MB)"}
+                  label="Upload Ad Content"
+                  sublabel={isStory ? "Vertical 9:16 (1080×1920) · Video: H.264, 3–30s · Images: PNG or JPEG" : isCollection ? "Top snap · Vertical 9:16 (1080×1920) · Video: H.264, 3–30s" : "Use vertical format (9:16) · 1080×1920px · Video: H.264, 3–180s · PNG or JPEG"}
                   preview={asset.url || undefined}
                   previewMediaType={asset.mediaType}
                   previewFile={asset.file}
@@ -404,80 +560,88 @@ export function CreativeCard({
 
           {/* ── Section 2: Ad Copy ── */}
           <div className="border-t border-border px-3 py-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <Label className="text-xs font-medium text-muted-foreground">Brand Name</Label>
-                    <InfoTip text="Appears at the top-left of your ad. Use your store or brand name — this is how viewers identify you." />
-                  </div>
-                  <CharCounter current={asset.brandName.length} max={32} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <Label className="text-sm font-medium text-foreground">Brand Name</Label>
+                <div className="relative">
+                  <Input placeholder="Your brand" value={asset.brandName} maxLength={34} onChange={(e) => onUpdate({ brandName: e.target.value.slice(0, 34) })} className={cn("h-10 pr-14 text-sm", asset.brandName.length >= 34 && "border-amber-400")} />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{asset.brandName.length}/34</span>
                 </div>
-                <Input placeholder="Your brand" value={asset.brandName} maxLength={32} onChange={(e) => onUpdate({ brandName: e.target.value.slice(0, 32) })} className={cn("h-8 text-xs", asset.brandName.length >= 32 && "border-amber-400")} />
               </div>
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <Label className="text-xs font-medium text-muted-foreground">Headline</Label>
-                    <InfoTip text="Shown on the swipe-up bar at the bottom of the ad. Keep it short and action-oriented — this is what drives the swipe." />
+              <div className="flex flex-col gap-2">
+                <Label className="text-sm font-medium text-foreground">
+                  Ad Headline <span className="text-destructive">*</span>
+                </Label>
+                <div className="relative">
+                  <Input placeholder="Catchy headline" value={asset.headline} maxLength={34} onChange={(e) => onUpdate({ headline: e.target.value.slice(0, 34) })} className={cn("h-10 pr-20 text-sm", asset.headline.length >= 34 && "border-amber-400")} />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                    {asset.headline.trim().length > 0 && (
+                      <button
+                        type="button"
+                        title="AI rephrase — improve this headline"
+                        onClick={() => {
+                          const promos = [
+                            `Shop ${asset.headline.trim().split(" ").slice(0, 3).join(" ")} Now!`,
+                            `${asset.headline.trim()} — Limited Offer`,
+                            `Get ${asset.headline.trim()} Today`,
+                            `Discover ${asset.headline.trim().split(" ").slice(0, 2).join(" ")} ✨`,
+                          ];
+                          const current = asset.headline;
+                          const other = promos.filter(p => p !== current && p.length <= 34);
+                          if (other.length > 0) onUpdate({ headline: other[Math.floor(Math.random() * other.length)] });
+                        }}
+                        className="rounded-full p-0.5 text-amber-400 transition-colors hover:bg-amber-50 hover:text-amber-500"
+                      >
+                        <Sparkles className="size-3" />
+                      </button>
+                    )}
+                    <span className="text-xs tabular-nums text-muted-foreground">{asset.headline.length}/34</span>
                   </div>
-                  <CharCounter current={asset.headline.length} max={34} />
                 </div>
-                <Input placeholder="Catchy headline" value={asset.headline} maxLength={34} onChange={(e) => onUpdate({ headline: e.target.value.slice(0, 34) })} className={cn("h-8 text-xs", asset.headline.length >= 34 && "border-amber-400")} />
               </div>
             </div>
-            {isInfluencer ? (
-              <div className="mt-2 flex items-start gap-1.5 text-[10px] leading-relaxed text-muted-foreground">
-                <Sparkles className="mt-0.5 size-3 shrink-0 text-blue-400" />
-                <span>These fields overlay on the creator&apos;s video — use your brand name and a CTA headline that complements their content</span>
-              </div>
-            ) : (!asset.brandName && !asset.headline) ? (
-              <div className="mt-2 flex items-start gap-1.5 text-[10px] leading-relaxed text-muted-foreground">
-                <Sparkles className="mt-0.5 size-3 shrink-0 text-blue-400" />
-                <span>Tip: Arabic text performs 40% better in Saudi market. Try <span className="font-medium" dir="rtl">تسوق الآن</span> or <span className="font-medium" dir="rtl">متجر الأناقة</span></span>
-              </div>
-            ) : null}
           </div>
 
-          {/* ── Section 3: CTA & Destination ── */}
-          {(showCta || showUrl || isDeepLink) && (
-            <div className="flex flex-col gap-2 border-t border-border px-3 py-3">
+          {/* ── CTA & Destination (non-Single formats) ── */}
+          {(showCta || showUrl || isDeepLink) && (!isSingleFormat || !showUrl || isDeepLink) && (
+            <div className="flex flex-col gap-4 border-t border-border px-3 py-3">
               <div className={cn("grid gap-2", showCta && !isCollection ? "grid-cols-2" : "grid-cols-1")}>
-                {showCta && (
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-1">
-                      <Label className="text-xs font-medium text-muted-foreground">Call to Action</Label>
-                      <InfoTip text="The text shown on the swipe-up button. 'Shop Now' and 'Learn More' typically perform best for e-commerce." />
+                  {showCta && (
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1">
+                        <Label className="text-xs font-medium text-muted-foreground">Call to Action</Label>
+                        <InfoTip text="The text shown on the swipe-up button. 'Shop Now' and 'Learn More' typically perform best for e-commerce." />
+                      </div>
+                      <Select value={asset.cta} onValueChange={(v) => onUpdate({ cta: v as WebViewCTA })}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(isDeepLink ? DEEP_LINK_CTA_OPTIONS : isAppInstall ? APP_INSTALL_CTA_OPTIONS : isLeadGen ? LEAD_CTA_OPTIONS : CTA_OPTIONS).map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <Select value={asset.cta} onValueChange={(v) => onUpdate({ cta: v as WebViewCTA })}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {(isDeepLink ? DEEP_LINK_CTA_OPTIONS : isAppInstall ? APP_INSTALL_CTA_OPTIONS : isLeadGen ? LEAD_CTA_OPTIONS : CTA_OPTIONS).map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                {showUrl && (
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-1">
-                      <Label className="text-xs font-medium text-muted-foreground">
-                        Swipe-Up URL {isStory && <span className="text-destructive">*</span>}
-                      </Label>
-                      <InfoTip text="The landing page users see when they swipe up. Use a direct product or offer page for best conversion — avoid homepages." />
+                  )}
+                  {showUrl && (
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1">
+                        <Label className="text-xs font-medium text-muted-foreground">
+                          Swipe-Up URL {isStory && <span className="text-destructive">*</span>}
+                        </Label>
+                        <InfoTip text="The landing page users see when they swipe up. Use a direct product or offer page for best conversion — avoid homepages." />
+                      </div>
+                      <Input placeholder="https://yourstore.com/product" type="url" value={asset.websiteUrl} onChange={(e) => onUpdate({ websiteUrl: e.target.value })} className={cn("h-8 text-xs", asset.websiteUrl && !asset.websiteUrl.startsWith("https://") && "border-red-400", isStory && !asset.websiteUrl && "border-amber-300")} />
+                      {asset.websiteUrl && !asset.websiteUrl.startsWith("https://") && (
+                        <p className="text-[10px] text-red-600">URL must start with https://</p>
+                      )}
+                      {isStory && !asset.websiteUrl && (
+                        <p className="text-[10px] text-amber-600">Each snap in a Story Ad requires a swipe-up URL</p>
+                      )}
+                      {isInfluencer && !isStory && (
+                        <p className="text-[10px] text-muted-foreground">Where viewers land when they swipe up on the creator&apos;s content — typically your product or landing page</p>
+                      )}
                     </div>
-                    <Input placeholder="https://yourstore.com/product" type="url" value={asset.websiteUrl} onChange={(e) => onUpdate({ websiteUrl: e.target.value })} className={cn("h-8 text-xs", asset.websiteUrl && !asset.websiteUrl.startsWith("https://") && "border-red-400", isStory && !asset.websiteUrl && "border-amber-300")} />
-                    {asset.websiteUrl && !asset.websiteUrl.startsWith("https://") && (
-                      <p className="text-[10px] text-red-600">URL must start with https://</p>
-                    )}
-                    {isStory && !asset.websiteUrl && (
-                      <p className="text-[10px] text-amber-600">Each snap in a Story Ad requires a swipe-up URL</p>
-                    )}
-                    {isInfluencer && !isStory && (
-                      <p className="text-[10px] text-muted-foreground">Where viewers land when they swipe up on the creator&apos;s content — typically your product or landing page</p>
-                    )}
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+
               {showUrl && sallaProduct && (
                 <div className="flex items-center gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -573,15 +737,68 @@ export function CreativeCard({
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex w-full items-center justify-between px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground"
+              className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-foreground hover:text-foreground"
             >
-              <span>Advanced Settings</span>
-              {showAdvanced ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+              <span>Advanced Options</span>
+              {showAdvanced ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
             </button>
-            {showAdvanced && (
-              <div className="flex flex-col gap-0 px-3 pb-3">
 
-                {/* ── General settings row ── */}
+            {showAdvanced && isSingleFormat && showAdvancedWebView && (
+              <div className="flex flex-col gap-4 px-3 pb-4">
+                {/* Toggle options */}
+                <div className="flex flex-col gap-0 rounded-lg border border-border">
+                  <div className="flex items-center justify-between px-3 py-2.5">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-medium text-foreground">Preload Webpage</span>
+                      <span className="text-[11px] leading-tight text-muted-foreground">Loads your page while the ad plays for instant swipe-up</span>
+                    </div>
+                    <Switch
+                      checked={asset.webViewProperties?.preloadEnabled ?? true}
+                      onCheckedChange={(v) => mergeWebView({ preloadEnabled: v })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between border-t border-border px-3 py-2.5">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-medium text-foreground">Open in Snapchat Browser</span>
+                      <span className="text-[11px] leading-tight text-muted-foreground">Keeps users inside Snapchat for a smoother experience</span>
+                    </div>
+                    <Switch
+                      checked={asset.webViewProperties?.useSnapBrowser ?? true}
+                      onCheckedChange={(v) => mergeWebView({ useSnapBrowser: v })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between border-t border-border px-3 py-2.5">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-medium text-foreground">Shareable</span>
+                      <span className="text-[11px] leading-tight text-muted-foreground">Let viewers share this ad with friends via chat</span>
+                    </div>
+                    <Switch
+                      checked={asset.shareable}
+                      onCheckedChange={(v) => onUpdate({ shareable: v })}
+                    />
+                  </div>
+                </div>
+
+                {/* App Deep Link input */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-baseline gap-1.5">
+                    <Label className="text-xs font-medium text-foreground">App Deep Link</Label>
+                    <span className="text-[11px] text-muted-foreground">(Optional)</span>
+                  </div>
+                  <Input
+                    placeholder="myapp://product/123"
+                    value={asset.webViewProperties?.deepLinkUrl || ""}
+                    onChange={(e) => mergeWebView({ deepLinkUrl: e.target.value })}
+                    className="h-9 font-mono text-xs"
+                  />
+                  <p className="text-[11px] text-muted-foreground">If the user has your app installed, this opens the content directly in-app</p>
+                </div>
+              </div>
+            )}
+
+            {/* Fallback: original layout for non-Single formats */}
+            {showAdvanced && (!isSingleFormat || !showAdvancedWebView) && (
+              <div className="flex flex-col gap-0 px-3 pb-3">
                 <div className="flex flex-col gap-0 rounded-lg border border-border">
                   {showCta && (
                     <div className="flex items-center justify-between px-3 py-2.5">
@@ -609,7 +826,6 @@ export function CreativeCard({
                   )}
                 </div>
 
-                {/* ── Web View settings ── */}
                 {showAdvancedWebView && (
                   <div className="mt-3 flex flex-col gap-0 rounded-lg border border-border">
                     <div className="bg-muted/30 px-3 py-2">
@@ -620,21 +836,21 @@ export function CreativeCard({
                         <Label className="text-xs text-foreground">In-App Browser</Label>
                         <InfoTip text="Opens your landing page inside Snapchat instead of the external browser. Keeps users in the app for a faster, smoother experience." />
                       </div>
-                      <Switch checked={asset.webViewProperties?.useSnapBrowser ?? true} onCheckedChange={(v) => onUpdate({ webViewProperties: { ...asset.webViewProperties, url: asset.websiteUrl, useSnapBrowser: v, preloadEnabled: asset.webViewProperties?.preloadEnabled ?? true, blockPreload: asset.webViewProperties?.blockPreload ?? false } })} />
+                      <Switch checked={asset.webViewProperties?.useSnapBrowser ?? true} onCheckedChange={(v) => mergeWebView({ useSnapBrowser: v })} />
                     </div>
                     <div className="flex items-center justify-between border-t border-border px-3 py-2.5">
                       <div className="flex items-center gap-1.5">
                         <Label className="text-xs text-foreground">Preload Page</Label>
                         <InfoTip text="Starts loading the landing page while the ad is showing so it opens instantly on swipe-up. Recommended for faster load times." />
                       </div>
-                      <Switch checked={asset.webViewProperties?.preloadEnabled ?? true} onCheckedChange={(v) => onUpdate({ webViewProperties: { ...asset.webViewProperties, url: asset.websiteUrl, useSnapBrowser: asset.webViewProperties?.useSnapBrowser ?? true, preloadEnabled: v, blockPreload: asset.webViewProperties?.blockPreload ?? false } })} />
+                      <Switch checked={asset.webViewProperties?.preloadEnabled ?? true} onCheckedChange={(v) => mergeWebView({ preloadEnabled: v })} />
                     </div>
                     <div className="flex flex-col gap-1 border-t border-border px-3 py-2.5">
                       <div className="flex items-center gap-1.5">
                         <Label className="text-xs text-foreground">App Deep Link</Label>
                         <InfoTip text="If the user has your app installed, this URI opens the content directly in your app. Otherwise, the web URL is used as fallback." />
                       </div>
-                      <Input placeholder="myapp://product/123" value={asset.webViewProperties?.deepLinkUrl || ""} onChange={(e) => onUpdate({ webViewProperties: { ...asset.webViewProperties, url: asset.websiteUrl, useSnapBrowser: asset.webViewProperties?.useSnapBrowser ?? true, preloadEnabled: asset.webViewProperties?.preloadEnabled ?? true, blockPreload: asset.webViewProperties?.blockPreload ?? false, deepLinkUrl: e.target.value } })} className="mt-1 h-7 text-xs font-mono" />
+                      <Input placeholder="myapp://product/123" value={asset.webViewProperties?.deepLinkUrl || ""} onChange={(e) => mergeWebView({ deepLinkUrl: e.target.value })} className="mt-1 h-7 text-xs font-mono" />
                       <p className="text-[10px] text-muted-foreground">Optional — leave empty if you don&apos;t have a mobile app</p>
                     </div>
                   </div>
@@ -644,6 +860,23 @@ export function CreativeCard({
           </div>
         </div>
       )}
+      <LinkPickerSheet
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        mode={pickerMode}
+        onSelect={(url, label) => {
+          setLinkType(pickerMode);
+          setPickerLabel(label);
+          const updates: Partial<CreativeAsset> = { websiteUrl: url };
+          // Auto-fill headline from selection if empty
+          if (!asset.headline) updates.headline = label.slice(0, 34);
+          // Smart CTA defaults by link type
+          if (pickerMode === "product") updates.cta = (asset.cta === "MORE" || !asset.cta) ? "SHOP_NOW" as WebViewCTA : asset.cta;
+          else if (pickerMode === "category") updates.cta = (asset.cta === "MORE" || !asset.cta) ? "SHOP_NOW" as WebViewCTA : asset.cta;
+          else if (pickerMode === "landing_page") updates.cta = (asset.cta === "MORE" || !asset.cta) ? "MORE" as WebViewCTA : asset.cta;
+          onUpdate(updates);
+        }}
+      />
     </div>
   );
 }

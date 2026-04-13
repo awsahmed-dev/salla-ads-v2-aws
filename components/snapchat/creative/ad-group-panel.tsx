@@ -18,7 +18,6 @@ import {
   Sparkles,
   Upload,
   AlertCircle,
-  CheckCircle2,
   Info,
 } from "lucide-react";
 import type { AdGroup, AdFormat, AdDestination, CreativeAsset, WebViewCTA, CampaignObjective } from "@/lib/snapchat/campaign-types";
@@ -65,7 +64,6 @@ export function AdGroupPanel({
   objective?: CampaignObjective;
 }) {
   const [editingName, setEditingName] = useState(false);
-  const [showTracking, setShowTracking] = useState(false);
   const [expandedCreativeIdx, setExpandedCreativeIdx] = useState(0);
   const maxAssets = getMaxAssets(ad.adFormat);
   const canAddAsset = ad.assets.length < maxAssets;
@@ -351,44 +349,6 @@ export function AdGroupPanel({
               })}
             </div>
 
-            {/* ── Attachment type (SINGLE / INFLUENCER format only) ── */}
-            {(ad.adFormat === "SINGLE" || ad.adFormat === "INFLUENCER") && allowedDestinations.length > 1 && (
-              <div className="mt-6">
-                <p className="mb-1 text-xs font-bold text-foreground">Attachment type</p>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Choose the action for viewers when they interact with your ad.
-                </p>
-                <div className="flex gap-4">
-                  {DESTINATION_OPTIONS.filter((d) => allowedDestinations.includes(d.value)).map((opt) => {
-                    const isSelected = ad.adDestination === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => changeDestination(opt.value)}
-                        className={cn(
-                          "flex flex-1 items-center gap-4 rounded-xl border px-5 py-4 text-left transition-all",
-                          isSelected
-                            ? "border-[#a4ffe5] bg-[#e6fff9]"
-                            : "border-border bg-card hover:border-[#a4ffe5]"
-                        )}
-                      >
-                        <div className={cn(
-                          "flex size-10 shrink-0 items-center justify-center rounded-full",
-                          isSelected ? "bg-[#a4ffe5]" : "bg-muted/60"
-                        )}>
-                          <span className={cn("[&>svg]:size-5", isSelected ? "text-[#004956]" : "text-muted-foreground")}>{opt.icon}</span>
-                        </div>
-                        <div>
-                          <p className={cn("text-sm font-bold", isSelected ? "text-[#004956]" : "text-foreground")}>{opt.label}</p>
-                          <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
           </div>
 
@@ -401,29 +361,31 @@ export function AdGroupPanel({
 
           {/* ── Ad Content ── */}
           {ad.adFormat !== "DYNAMIC" && (
-            <div className="border-t border-border px-6 py-5">
-              <div className="mb-4 flex items-center justify-between">
-                <p className="text-sm font-bold text-foreground">
-                  {ad.adFormat === "INFLUENCER" ? "Ad content" : "Ad Content"}
-                </p>
-                {ad.adFormat === "STORY" && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      {assetCount}/{maxAssets} {assetCount < 3 ? "(min 3)" : ""}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={addAsset}
-                      disabled={!canAddAsset}
-                      className="flex items-center gap-1 text-xs font-medium text-[#004956] hover:underline disabled:opacity-50"
-                    >
-                      <Plus className="size-3" />
-                      Add Story
-                    </button>
-                  </div>
-                )}
-                <ChevronDown className="size-4 text-muted-foreground" />
-              </div>
+            <div className={cn("border-t border-border px-6", ad.adFormat === "SINGLE" ? "py-3" : "py-5")}>
+              {ad.adFormat !== "SINGLE" && (
+                <div className="mb-4 flex items-center justify-between">
+                  <p className="text-sm font-bold text-foreground">
+                    {ad.adFormat === "INFLUENCER" ? "Ad content" : "Ad Content"}
+                  </p>
+                  {ad.adFormat === "STORY" && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {assetCount}/{maxAssets} {assetCount < 3 ? "(min 3)" : ""}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={addAsset}
+                        disabled={!canAddAsset}
+                        className="flex items-center gap-1 text-xs font-medium text-[#004956] hover:underline disabled:opacity-50"
+                      >
+                        <Plus className="size-3" />
+                        Add Story
+                      </button>
+                    </div>
+                  )}
+                  <ChevronDown className="size-4 text-muted-foreground" />
+                </div>
+              )}
 
               {assetCount === 0 ? (
                 influencer ? (
@@ -507,63 +469,12 @@ export function AdGroupPanel({
                   <span className="text-xs text-blue-700 dark:text-blue-400">Snap API: Story snap order is fixed once the campaign goes live and cannot be rearranged after.</span>
                 </div>
               )}
-              {assetCount > 0 && assetCount < maxAssets && maxAssets > 1 && !(ad.adFormat === "STORY" && assetCount < 3) && (
+              {ad.adFormat !== "SINGLE" && assetCount > 0 && assetCount < maxAssets && maxAssets > 1 && !(ad.adFormat === "STORY" && assetCount < 3) && (
                 <p className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground">
                   <Sparkles className="size-3 text-amber-400" />
                   {ad.adFormat === "STORY" ? "Snap recommends 3–5 snaps for a compelling story" : "Snap recommends 3–5 creative variations for best performance"}
                 </p>
               )}
-            </div>
-          )}
-
-          {/* ── Brand Name & Ad Headline ── */}
-          {ad.adFormat !== "DYNAMIC" && ad.assets.length > 0 && (
-            <div className="border-t border-border px-6 py-5">
-              <div className="flex gap-6">
-                <div className="flex-1">
-                  <Label className="mb-2 block text-sm font-medium text-foreground">Brand Name</Label>
-                  <div className="relative">
-                    <Input
-                      value={ad.assets[0]?.brandName ?? ""}
-                      onChange={(e) => {
-                        const val = e.target.value.slice(0, 34);
-                        const updated = ad.assets.map((a, i) => i === 0 ? { ...a, brandName: val } : a);
-                        onUpdate({ ...ad, assets: updated });
-                      }}
-                      placeholder="Your brand"
-                      className="h-10 pr-12 text-sm"
-                      maxLength={34}
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                      {(ad.assets[0]?.brandName ?? "").length}/34
-                    </span>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <Label className="mb-2 block text-sm font-medium text-foreground">
-                    Ad Headline <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      value={ad.assets[0]?.headline ?? ""}
-                      onChange={(e) => {
-                        const val = e.target.value.slice(0, 34);
-                        const updated = ad.assets.map((a, i) => i === 0 ? { ...a, headline: val } : a);
-                        onUpdate({ ...ad, assets: updated });
-                      }}
-                      placeholder="Catchy headline"
-                      className="h-10 pr-16 text-sm"
-                      maxLength={34}
-                    />
-                    <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1">
-                      <Sparkles className="size-3.5 text-amber-400" />
-                      <span className="text-xs text-muted-foreground">
-                        {(ad.assets[0]?.headline ?? "").length}/34
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
@@ -587,8 +498,9 @@ export function AdGroupPanel({
             </div>
           )}
 
-          {/* ── Commercial (only for objectives where non-skippable ads are relevant) ── */}
-          {(!objective || ["SALES", "AWARENESS", "VIDEO_VIEWS", "ENGAGEMENT"].includes(objective)) && (
+          {/* ── Commercial (only for objectives where non-skippable ads are relevant, and only when eligible) ── */}
+          {(!objective || ["SALES", "AWARENESS", "VIDEO_VIEWS", "ENGAGEMENT"].includes(objective)) &&
+           ad.adFormat === "SINGLE" && ad.assets.some((a) => a.mediaType === "VIDEO") && (
             <div className="border-t border-border px-4 py-4">
               <CommercialSection ad={ad} onUpdate={onUpdate} isInfluencer={influencer} />
             </div>
@@ -601,93 +513,6 @@ export function AdGroupPanel({
             />
           </div>
 
-          {/* ── Third-Party Tracking ── */}
-          <div className="border-t border-border">
-            <button
-              type="button"
-              onClick={() => setShowTracking(!showTracking)}
-              className="flex w-full items-center justify-between px-4 py-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <div className="flex items-center gap-2">
-                <span>Third-Party Tracking</span>
-                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">Optional</span>
-              </div>
-              {showTracking ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-            </button>
-            {showTracking && (
-              <div className="flex flex-col gap-4 border-t border-border px-4 py-4">
-                {/* Explainer */}
-                <div className="rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2.5 dark:border-blue-900/40 dark:bg-blue-950/20">
-                  <p className="text-xs font-medium text-blue-800 dark:text-blue-300">What is this?</p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-blue-700/80 dark:text-blue-400/80">
-                    If you use an external analytics tool like <span className="font-medium">Google Analytics, AppsFlyer, Adjust,</span> or <span className="font-medium">Branch</span>, you can paste their tracking URLs here. These URLs get &quot;pinged&quot; automatically when someone sees your ad or swipes up — so your analytics tool can count those events alongside your other marketing data.
-                  </p>
-                  <p className="mt-1.5 text-[11px] leading-relaxed text-blue-700/80 dark:text-blue-400/80">
-                    <span className="font-semibold">Don&apos;t have a tracking tool?</span> Skip this — Salla Ads built-in tracking already handles impressions and swipe-ups for you.
-                  </p>
-                </div>
-
-                {/* Tracking URL fields */}
-                <div className="flex flex-col gap-0 rounded-lg border border-border">
-                  {([
-                    {
-                      key: "impressionUrl" as const,
-                      label: "Impression Tracking",
-                      placeholder: "https://tracker.example.com/impression?campaign={campaign_id}",
-                      icon: "eye",
-                      hint: "Triggered each time your ad appears on someone's screen",
-                    },
-                    {
-                      key: "swipeUpUrl" as const,
-                      label: "Swipe-Up Tracking",
-                      placeholder: "https://tracker.example.com/click?campaign={campaign_id}",
-                      icon: "pointer",
-                      hint: "Triggered when someone swipes up on your ad",
-                    },
-                  ] as const).map(({ key, label, placeholder, icon, hint }, idx) => {
-                    const val = ad.trackingUrls?.[key] || "";
-                    const hasValue = val.trim().length > 0;
-                    const isValid = !hasValue || (() => { try { const u = new URL(val); return u.protocol === "https:"; } catch { return false; } })();
-                    return (
-                      <div key={key} className={cn("flex flex-col gap-1.5 px-3 py-3", idx > 0 && "border-t border-border")}>
-                        <div className="flex items-center gap-2">
-                          {icon === "eye" ? (
-                            <svg className="size-3.5 text-muted-foreground" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><ellipse cx="8" cy="8" rx="6" ry="4"/><circle cx="8" cy="8" r="1.5"/></svg>
-                          ) : (
-                            <svg className="size-3.5 text-muted-foreground" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12l4-8 2 4 3-2"/><path d="M10 8l2 4H8"/></svg>
-                          )}
-                          <Label className="text-xs font-medium text-foreground">{label}</Label>
-                          <InfoTip text={hint} />
-                        </div>
-                        <Input
-                          placeholder={placeholder}
-                          type="url"
-                          value={val}
-                          onChange={(e) => onUpdate({
-                            ...ad,
-                            trackingUrls: {
-                              impressionUrl: ad.trackingUrls?.impressionUrl || "",
-                              swipeUpUrl: ad.trackingUrls?.swipeUpUrl || "",
-                              [key]: e.target.value,
-                            },
-                          })}
-                          className={cn("h-8 text-xs font-mono", hasValue && !isValid ? "border-red-300 focus-visible:ring-red-200" : "", hasValue && isValid ? "border-emerald-300" : "")}
-                        />
-                        {hasValue && !isValid && (
-                          <p className="text-[10px] text-red-600">Must be a valid HTTPS URL (e.g. https://...)</p>
-                        )}
-                        {hasValue && isValid && (
-                          <p className="flex items-center gap-1 text-[10px] text-emerald-600">
-                            <CheckCircle2 className="size-2.5" /> Valid URL
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       )}
     </div>

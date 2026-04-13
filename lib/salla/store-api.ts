@@ -121,6 +121,24 @@ export interface TikTokAdAccountStatus {
   syncedProductCount: number;
 }
 
+export interface SallaCategory {
+  id: string;
+  name: string;
+  nameAr?: string;
+  image: string;
+  productCount: number;
+  url: string;
+}
+
+export interface SallaPage {
+  id: string;
+  title: string;
+  titleAr?: string;
+  slug: string;
+  url: string;
+  type: "landing" | "custom" | "policy";
+}
+
 export interface ProductFetchOptions {
   query?: string;
   category?: string;
@@ -190,6 +208,28 @@ const MOCK_PRODUCTS: SallaProduct[] = [
 
 const MOCK_CATEGORIES = [...new Set(MOCK_PRODUCTS.map((p) => p.category))];
 
+const MOCK_CATEGORY_DETAILS: SallaCategory[] = [
+  { id: "cat-1", name: "Clothing", nameAr: "ملابس", image: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=400&h=400&fit=crop", productCount: 24, url: "https://store.salla.sa/category/clothing" },
+  { id: "cat-2", name: "Accessories", nameAr: "إكسسوارات", image: "https://images.unsplash.com/photo-1611085583191-a3b181a88401?w=400&h=400&fit=crop", productCount: 18, url: "https://store.salla.sa/category/accessories" },
+  { id: "cat-3", name: "Electronics", nameAr: "إلكترونيات", image: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=400&fit=crop", productCount: 12, url: "https://store.salla.sa/category/electronics" },
+  { id: "cat-4", name: "Shoes", nameAr: "أحذية", image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop", productCount: 9, url: "https://store.salla.sa/category/shoes" },
+  { id: "cat-5", name: "Bags", nameAr: "حقائب", image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=400&fit=crop", productCount: 7, url: "https://store.salla.sa/category/bags" },
+  { id: "cat-6", name: "Food", nameAr: "أغذية", image: "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=400&h=400&fit=crop", productCount: 15, url: "https://store.salla.sa/category/food" },
+  { id: "cat-7", name: "Perfume", nameAr: "عطور", image: "https://images.unsplash.com/photo-1541643600914-78b084683601?w=400&h=400&fit=crop", productCount: 11, url: "https://store.salla.sa/category/perfume" },
+  { id: "cat-8", name: "Home", nameAr: "المنزل", image: "https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=400&h=400&fit=crop", productCount: 20, url: "https://store.salla.sa/category/home" },
+  { id: "cat-9", name: "Sports", nameAr: "رياضة", image: "https://images.unsplash.com/photo-1601925260368-ae2f83cf8b7f?w=400&h=400&fit=crop", productCount: 6, url: "https://store.salla.sa/category/sports" },
+];
+
+const MOCK_PAGES: SallaPage[] = [
+  { id: "pg-1", title: "Summer Sale 2026", titleAr: "تخفيضات الصيف 2026", slug: "summer-sale", url: "https://store.salla.sa/page/summer-sale", type: "landing" },
+  { id: "pg-2", title: "Ramadan Collection", titleAr: "مجموعة رمضان", slug: "ramadan-collection", url: "https://store.salla.sa/page/ramadan-collection", type: "landing" },
+  { id: "pg-3", title: "New Arrivals", titleAr: "وصل حديثاً", slug: "new-arrivals", url: "https://store.salla.sa/page/new-arrivals", type: "landing" },
+  { id: "pg-4", title: "About Us", titleAr: "عنا", slug: "about-us", url: "https://store.salla.sa/page/about-us", type: "custom" },
+  { id: "pg-5", title: "Gift Guide", titleAr: "دليل الهدايا", slug: "gift-guide", url: "https://store.salla.sa/page/gift-guide", type: "landing" },
+  { id: "pg-6", title: "White Friday Deals", titleAr: "عروض الجمعة البيضاء", slug: "white-friday", url: "https://store.salla.sa/page/white-friday", type: "landing" },
+  { id: "pg-7", title: "Loyalty Program", titleAr: "برنامج الولاء", slug: "loyalty", url: "https://store.salla.sa/page/loyalty", type: "custom" },
+];
+
 /**
  * Synchronous access to preview products for components that render
  * product imagery in ad previews (no async needed for mock data).
@@ -256,6 +296,17 @@ export async function fetchNewArrivals(limit = 4): Promise<SallaProduct[]> {
 /** Get products on sale */
 export async function fetchOnSale(limit = 4): Promise<SallaProduct[]> {
   return MOCK_PRODUCTS.filter((p) => p.salePrice != null && p.inStock).slice(0, limit);
+}
+
+/** Get category details with images and product counts */
+export async function fetchCategoryDetails(): Promise<SallaCategory[]> {
+  return MOCK_CATEGORY_DETAILS;
+}
+
+/** Get store pages (landing pages, custom pages) */
+export async function fetchPages(type?: SallaPage["type"]): Promise<SallaPage[]> {
+  if (type) return MOCK_PAGES.filter((p) => p.type === type);
+  return MOCK_PAGES;
 }
 
 /** Look up a product by its store URL (for smart auto-fill) */
