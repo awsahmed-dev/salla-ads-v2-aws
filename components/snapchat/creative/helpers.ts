@@ -72,7 +72,7 @@ export function makeAdGroup(format: AdFormat, index: number, destination?: AdDes
       case "DEEP_LINK":
         return {
           cta: "OPEN_APP" as WebViewCTA,
-          deepLinkProperties: { deepLinkUri: "", fallbackUrl: "", fallbackType: "WEB_VIEW_FALLBACK" },
+          deepLinkProperties: { deepLinkUri: "", appName: "", iconMediaId: "", appPlatform: "BOTH", fallbackUrl: "", fallbackType: "WEB_VIEW_FALLBACK" },
         };
       case "APP_INSTALL":
         return { cta: "INSTALL_NOW" as WebViewCTA };

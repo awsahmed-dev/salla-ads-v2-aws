@@ -162,7 +162,14 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
     });
     const currentBid = campaign.budget.bidStrategy;
     const bidStrategyReset = config.allowedBidStrategies.includes(currentBid) ? currentBid : "AUTO_BID";
-    updateNested("budget", { optimizationGoal: config.defaultGoal, bidStrategy: bidStrategyReset });
+    updateNested("budget", {
+      optimizationGoal: config.defaultGoal,
+      bidStrategy: bidStrategyReset,
+      // Frequency cap only supported for IMPRESSIONS goal — auto-disable when switching to non-IMPRESSIONS objective
+      ...(config.defaultGoal !== "IMPRESSIONS" && campaign.budget.frequencyCapEnabled
+        ? { frequencyCapEnabled: false }
+        : {}),
+    });
     if (value === "LEADS" && !campaign.creative.leadForm) {
       updateNested("creative", { leadForm: makeDefaultLeadForm() });
     } else if (value !== "LEADS") {
