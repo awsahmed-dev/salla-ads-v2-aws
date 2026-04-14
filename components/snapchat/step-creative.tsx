@@ -258,6 +258,16 @@ export function StepCreative() {
             }
           }
         }
+        if (ad.adDestination === "DEEP_LINK") {
+          const dlp = a.deepLinkProperties;
+          allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: deep link URI`, ok: !!(dlp?.deepLinkUri?.trim()) });
+          if (dlp?.fallbackType === "WEB_VIEW_FALLBACK") {
+            allChecks.push({
+              label: `Ad ${i + 1} Creative ${j + 1}: fallback URL`,
+              ok: (() => { try { return new URL(dlp?.fallbackUrl ?? "").protocol === "https:"; } catch { return false; } })(),
+            });
+          }
+        }
       });
     }
     if (ad.adFormat === "COLLECTION") {
@@ -265,6 +275,7 @@ export function StepCreative() {
         allChecks.push({ label: `Ad ${i + 1}: product set for dynamic tiles`, ok: !!(ad.dynamicTemplateConfig?.productSetId) });
       } else {
         allChecks.push({ label: `Ad ${i + 1}: min 2 tiles`, ok: ad.collectionTiles.length >= 2 });
+        allChecks.push({ label: `Ad ${i + 1}: max 4 tiles`, ok: ad.collectionTiles.length <= 4 });
         const tilesWithMedia = ad.collectionTiles.filter((t) => t.imageUrl);
         allChecks.push({ label: `Ad ${i + 1}: tiles have image`, ok: tilesWithMedia.length >= 2 });
         const tilesWithUrl = ad.collectionTiles.filter((t) => t.url && t.url.startsWith("https://"));

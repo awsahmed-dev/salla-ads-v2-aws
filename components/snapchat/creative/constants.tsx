@@ -219,7 +219,7 @@ export const SNAP_POSITIONS = [
 
 export const MEDIA_SPECS = {
   IMAGE: { maxSize: 5 * 1024 * 1024, dimLabel: "1080 x 1920 px" },
-  VIDEO: { maxSize: 32 * 1024 * 1024, dimLabel: "1080 x 1920 px" },
+  VIDEO: { maxSize: 100 * 1024 * 1024, dimLabel: "1080 x 1920 px" },
   TILE: { maxSize: 2 * 1024 * 1024, dimLabel: "Min 120 x 120 px" },
 };
 

@@ -121,13 +121,8 @@ export function makeAdGroupLegacy(format: AdFormatKey, index: number): AdGroup {
     case "COLLECTION":    return makeAdGroup("COLLECTION", index, "WEBSITE");
     case "COMPOSITE":     return makeAdGroup("STORY", index, "WEBSITE");
     case "DYNAMIC":       return makeAdGroup("DYNAMIC", index, "WEBSITE");
-    case "INFLUENCER": {
-      const ag = makeAdGroup("SINGLE", index, "WEBSITE");
-      ag.isInfluencer = true;
-      ag.assets = [makeAsset({ mediaSource: "ad_code", name: `Influencer Ad ${index + 1} - Creative 1` })];
-      ag.name = `Influencer Ad ${index + 1}`;
-      return ag;
-    }
+    case "INFLUENCER":
+      return makeAdGroup("INFLUENCER", index, "WEBSITE");
     default: return makeAdGroup("SINGLE", index, "WEBSITE");
   }
 }
