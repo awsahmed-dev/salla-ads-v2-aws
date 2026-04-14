@@ -439,6 +439,157 @@ function AdTrackingSection({ ad, onUpdate }: { ad: TikTokAd; onUpdate: (ad: TikT
 /* ------------------------------------------------------------------ */
 /*  Upload Drop Zone (matches Snap pattern)                            */
 /* ------------------------------------------------------------------ */
+/*  TikTok Campaign Readiness (matches Snapchat pattern)               */
+/* ------------------------------------------------------------------ */
+
+function ReadinessRing({ percent }: { percent: number }) {
+  const color = percent >= 90 ? "#059669" : percent >= 60 ? "#004956" : percent >= 30 ? "#d97706" : "#ef4444";
+  return (
+    <div className="relative flex size-11 items-center justify-center">
+      <svg className="size-11 -rotate-90" viewBox="0 0 44 44">
+        <circle cx="22" cy="22" r="18" fill="none" stroke="#eee" strokeWidth="3.5" />
+        <circle cx="22" cy="22" r="18" fill="none" stroke={color} strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${(percent / 100) * 113} 113`} className="transition-all duration-500" />
+      </svg>
+      <span className="absolute text-[10px] font-bold" style={{ color }}>{percent}%</span>
+    </div>
+  );
+}
+
+function TikTokCampaignReadiness({
+  ads,
+  totalCreatives,
+  allChecks,
+  passingChecks,
+  isCatalogListing,
+  objective,
+}: {
+  ads: TikTokAd[];
+  totalCreatives: number;
+  allChecks: { label: string; ok: boolean }[];
+  passingChecks: number;
+  isCatalogListing: boolean;
+  objective: string;
+}) {
+  const [showAllChecks, setShowAllChecks] = useState(false);
+  const failingChecks = allChecks.filter((c) => !c.ok);
+  const allPassed = passingChecks === allChecks.length && allChecks.length > 0;
+
+  /* ── Best-practice signals ── */
+  const hasMultipleAds = ads.length >= 2;
+  const hasVideoAd = isCatalogListing || ads.some((a) => a.adFormat === "SINGLE_VIDEO" || a.adFormat === "SPARK_AD");
+  const hasImageAd = isCatalogListing || ads.some((a) => a.adFormat === "SINGLE_IMAGE" || a.adFormat === "CAROUSEL");
+  const hasBothMediaTypes = hasVideoAd && hasImageAd;
+
+  const bestPractices: { label: string; met: boolean; tip: string; metTip: string }[] = [];
+
+  if (!isCatalogListing) {
+    bestPractices.push({
+      label: "Multiple ads",
+      met: hasMultipleAds,
+      tip: objective === "PRODUCT_SALES"
+        ? "Each ad supports one creative — add 2+ ads with different visuals or formats to find the best-performing sales driver"
+        : objective === "LEAD_GENERATION"
+          ? "Each ad supports one creative — add multiple ads to test different lead form approaches"
+          : "Each ad supports one creative — add 2+ ads to test different formats and creatives",
+      metTip: `${ads.length} ads — great for A/B testing`,
+    });
+  }
+
+  if (!isCatalogListing) {
+    bestPractices.push({
+      label: "Video + Image ads",
+      met: hasBothMediaTypes,
+      tip: objective === "VIDEO_VIEWS"
+        ? "Create one video ad and one image ad — video gets 3x more engagement, images provide broader reach"
+        : "Create both a video ad and an image ad — video drives engagement while images extend your reach",
+      metTip: "Both video and image ads included",
+    });
+  }
+
+  const bpMet = bestPractices.filter((bp) => bp.met).length;
+  const bpTotal = bestPractices.length;
+
+  const totalWeight = allChecks.length + bpTotal;
+  const totalScore = passingChecks + bpMet;
+  const overallPercent = totalWeight > 0 ? Math.round((totalScore / totalWeight) * 100) : 0;
+
+  return (
+    <div className="rounded-xl bg-card p-6">
+      {/* ── Header with progress ring ── */}
+      <div className="mb-6 flex items-center gap-4">
+        <ReadinessRing percent={overallPercent} />
+        <div className="flex-1">
+          <p className="text-sm font-bold text-foreground">Campaign Readiness</p>
+          <p className="text-xs text-muted-foreground">
+            {allPassed
+              ? "All requirements met"
+              : `${failingChecks.length} required items need attention before launch`
+            }
+          </p>
+        </div>
+      </div>
+
+      {/* ── Required Steps ── */}
+      <div className="mb-6">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">Required Steps</p>
+          <span className="text-xs font-bold text-[#004956]">{passingChecks}/{allChecks.length}</span>
+        </div>
+        <div className="flex flex-col gap-3">
+          {allChecks.slice(0, showAllChecks ? allChecks.length : 6).map((c, i) => (
+            <div key={i} className="flex items-center gap-3 px-3">
+              <div className={cn(
+                "flex size-5 shrink-0 items-center justify-center rounded-full border-2",
+                c.ok ? "border-[#004956] bg-[#004956]" : "border-muted-foreground/30"
+              )}>
+                {c.ok && <Check className="size-3 text-white" strokeWidth={3} />}
+              </div>
+              <p className={cn("text-xs font-medium", c.ok ? "text-muted-foreground line-through" : "text-foreground")}>
+                {c.label}
+              </p>
+            </div>
+          ))}
+          {!showAllChecks && allChecks.length > 6 && (
+            <button type="button" onClick={() => setShowAllChecks(true)} className="text-xs text-[#004956] underline px-3">
+              Show all {allChecks.length} items
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Best Practices ── */}
+      {bpTotal > 0 && (
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">Best Practices</p>
+            <span className="text-xs font-bold text-[#004956]">{bpMet}/{bpTotal}</span>
+          </div>
+          <div className="flex flex-col gap-3">
+            {bestPractices.map((bp, i) => (
+              <div
+                key={i}
+                className={cn("flex items-start gap-3 rounded-lg px-3 py-3", bp.met && "bg-[#e6fff9]")}
+              >
+                <div className={cn(
+                  "flex size-5 shrink-0 items-center justify-center rounded-full border-2 mt-0.5",
+                  bp.met ? "border-[#004956] bg-[#004956]" : "border-muted-foreground/30"
+                )}>
+                  {bp.met && <Check className="size-3 text-white" strokeWidth={3} />}
+                </div>
+                <div>
+                  <p className={cn("text-xs font-bold", bp.met ? "text-[#004956]" : "text-foreground")}>{bp.label}</p>
+                  <p className="text-xs text-muted-foreground">{bp.met ? bp.metTip : bp.tip}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  TikTok Ad Preview (pixel-perfect phone mockup)                     */
 /* ------------------------------------------------------------------ */
 
@@ -3420,101 +3571,15 @@ export function TikTokStepCreative() {
               identityAvatarUrl={identity.avatarPreviewUrl}
             />
 
-            {/* ---- 2. AD SUMMARY ---- */}
-            <SectionCard className="p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Layers className="size-4 text-primary" />
-                <Label className="text-sm font-semibold text-foreground">Ad Summary</Label>
-              </div>
-              <div className="flex flex-col gap-2.5 text-xs">
-                {/* Settings row */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="flex flex-col items-center rounded-lg border border-border bg-muted/20 px-2 py-2">
-                    <User className="mb-1 size-3 text-primary" />
-                    <span className="text-xs text-muted-foreground">Identity</span>
-                    {identity.linkStatus === "confirmed" ? (
-                      <CheckCircle2 className="mt-0.5 size-3 text-emerald-500" />
-                    ) : (
-                      <AlertCircle className="mt-0.5 size-3 text-amber-500" />
-                    )}
-                  </div>
-                  <div className="flex flex-col items-center rounded-lg border border-border bg-muted/20 px-2 py-2">
-                    <LayoutGrid className="mb-1 size-3 text-primary" />
-                    <span className="text-xs text-muted-foreground">Placement</span>
-                    <span className="mt-0.5 text-xs font-medium text-foreground">
-                      {cr.placementType === "PLACEMENT_TYPE_AUTOMATIC" ? "Auto" : "Manual"}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-center rounded-lg border border-border bg-muted/20 px-2 py-2">
-                    <ShieldCheck className="mb-1 size-3 text-primary" />
-                    <span className="text-xs text-muted-foreground">Pixel</span>
-                    <span className="mt-0.5 text-xs font-medium text-foreground">
-                      {objectiveConfig.pixelId ? "Set" : "None"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Counts */}
-                {isCatalogListing ? (
-                  <div className="flex flex-col gap-1.5 rounded-lg bg-primary/[0.03] px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <Zap className="size-3.5 text-primary" />
-                      <span className="text-xs font-medium text-foreground">Catalog Listing</span>
-                    </div>
-                    <span className="text-[11px] text-muted-foreground">Creatives auto-generated from your product catalog</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className="text-lg font-bold text-foreground">{ads.length}</span>
-                      <span className="text-xs text-muted-foreground">Ad{ads.length !== 1 ? "s" : ""}</span>
-                    </div>
-                    <div className="h-6 w-px bg-border" />
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className="text-lg font-bold text-foreground">{totalCreatives}</span>
-                      <span className="text-xs text-muted-foreground">Creative{totalCreatives !== 1 ? "s" : ""}</span>
-                    </div>
-                    <div className="h-6 w-px bg-border" />
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className="text-lg font-bold text-foreground">{ads.filter((a) => a.adFormat === "SPARK_AD").length || "--"}</span>
-                      <span className="text-xs text-muted-foreground">Spark</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Per-ad breakdown */}
-                {ads.length > 0 && (
-                  <div className="flex flex-col gap-1.5">
-                    {ads.map((ad, i) => (
-                      <button
-                        key={ad.id}
-                        type="button"
-                        onClick={() => setActiveAdIdx(i)}
-                        className={cn(
-                          "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors",
-                          i === activeAdIdx ? "border-primary/40 bg-primary/5" : "border-border hover:border-primary/20"
-                        )}
-                      >
-                        <span className="flex size-5 shrink-0 items-center justify-center rounded bg-primary/10 text-xs font-bold text-primary">
-                          {i + 1}
-                        </span>
-                        <div className="flex-1 truncate">
-                          <span className="text-xs font-medium text-foreground">{ad.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Badge variant="secondary" className={cn("rounded-full px-1.5 py-0 text-[8px]", ad.adFormat === "SPARK_AD" && "bg-primary/10 text-primary")}>
-                            {ad.adFormat === "SPARK_AD" ? "Spark" : getFormatLabel(ad.adFormat).split(" ")[0]}
-                          </Badge>
-                          <span className="text-xs tabular-nums text-muted-foreground">
-                            {ad.adFormat === "CAROUSEL" ? `${ad.carouselCards.length}c` : `${ad.assets.length}cr`}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </SectionCard>
+            {/* ---- 2. CAMPAIGN READINESS ---- */}
+            <TikTokCampaignReadiness
+              ads={ads}
+              totalCreatives={totalCreatives}
+              allChecks={allChecks}
+              passingChecks={passingChecks}
+              isCatalogListing={isCatalogListing}
+              objective={campaign.objective.objective}
+            />
 
             {/* ---- 2.5 LEAD GEN FORM SUMMARY ---- */}
             {isLeadGen && (
@@ -3610,121 +3675,6 @@ export function TikTokStepCreative() {
               </SectionCard>
             )}
 
-            {/* ---- 3. MEDIA SPECS ---- */}
-            <SectionCard className="p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Info className="size-4 text-primary" />
-                <Label className="text-sm font-semibold text-foreground">Media Requirements</Label>
-              </div>
-              <div className="flex flex-col gap-2">
-                {/* Video specs */}
-                <div className="rounded-lg border border-border p-2.5">
-                  <p className="mb-1.5 text-xs font-semibold text-foreground">Video Creative</p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <Film className="size-2.5 text-primary" />
-                      <span className="text-xs text-muted-foreground">MP4 / MOV</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">Max 500MB</span>
-                  </div>
-                  <div className="mt-1.5 flex flex-col gap-0.5 border-t border-border pt-1.5">
-                    <span className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Resolution:</span> 540x960+ (1080x1920 best)</span>
-                    <span className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Duration:</span> 5-60s (9-15s best)</span>
-                    <span className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Codec:</span> H.264</span>
-                  </div>
-                </div>
-                {/* Image specs */}
-                <div className="rounded-lg border border-border p-2.5">
-                  <p className="mb-1 text-xs font-semibold text-foreground">Image Creative</p>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs text-muted-foreground">PNG / JPG, max 100MB</span>
-                    <span className="text-xs text-muted-foreground">9:16 (1080x1920), 1:1 (1080x1080), 16:9 (1200x628)</span>
-                  </div>
-                </div>
-                {/* Carousel specs */}
-                {ads.some((a) => a.adFormat === "CAROUSEL") && (
-                  <div className="rounded-lg border border-border p-2.5">
-                    <p className="mb-1 text-xs font-semibold text-foreground">Carousel Cards</p>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-xs text-muted-foreground">2-35 images, JPG/PNG, {"<"} 100KB each suggested</span>
-                      <span className="text-xs text-muted-foreground">1200x628 / 640x640 / 720x1280</span>
-                      <span className="text-xs text-muted-foreground">One caption + one URL for all cards</span>
-                    </div>
-                    <div className="mt-1.5 flex items-center gap-1.5 border-t border-border pt-1.5">
-                      <Music className="size-2.5 text-primary" />
-                      <span className="text-xs text-muted-foreground">Music required: MP3/WAV, min 2s, max 10MB</span>
-                    </div>
-                  </div>
-                )}
-                {/* Format tip */}
-                <div className="rounded-lg bg-muted/30 px-2.5 py-2">
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    <span className="font-medium text-foreground">Tip:</span>{" "}
-                    {activeAdFormat === "CAROUSEL"
-                      ? "Use high-quality product images for carousel cards. The first card is shown as the hero in the feed."
-                      : activeAdFormat === "SPARK_AD"
-                        ? "Spark Ads leverage your existing organic content. Posts with high engagement tend to convert better as ads."
-                        : activeAdFormat === "SINGLE_IMAGE"
-                          ? "Use bold, eye-catching imagery with minimal text. TikTok recommends vertical 9:16 for best performance."
-                          : "Use vertical 9:16 video for best performance. Videos under 15 seconds have higher completion rates on TikTok."}
-                  </p>
-                </div>
-              </div>
-            </SectionCard>
-
-            {/* ---- 4. CHECKLIST ---- */}
-            <SectionCard className="p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-primary" />
-                  <Label className="text-sm font-semibold text-foreground">Checklist</Label>
-                </div>
-                <span className={cn(
-                  "text-xs font-semibold tabular-nums",
-                  passingChecks === allChecks.length ? "text-emerald-600" : "text-muted-foreground"
-                )}>
-                  {passingChecks}/{allChecks.length}
-                </span>
-              </div>
-              {/* Progress bar */}
-              <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-all",
-                    passingChecks === allChecks.length ? "bg-emerald-500" : passingChecks > 0 ? "bg-primary" : "bg-muted-foreground/30"
-                  )}
-                  style={{ width: allChecks.length > 0 ? `${(passingChecks / allChecks.length) * 100}%` : "0%" }}
-                />
-              </div>
-              {/* Checks list */}
-              <div className="flex flex-col gap-1">
-                {allChecks
-                  .slice()
-                  .sort((a, b) => (a.ok === b.ok ? 0 : a.ok ? 1 : -1))
-                  .slice(0, 10)
-                  .map((c, i) => (
-                  <div key={i} className="flex items-center gap-2 py-0.5">
-                    {c.ok ? (
-                      <CheckCircle2 className="size-3 shrink-0 text-emerald-500" />
-                    ) : (
-                      <div className="flex size-3 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30">
-                        <div className="size-1.5 rounded-full" />
-                      </div>
-                    )}
-                    <span className={cn("text-xs", c.ok ? "text-muted-foreground line-through" : "font-medium text-foreground")}>{c.label}</span>
-                  </div>
-                ))}
-                {allChecks.length > 10 && (
-                  <p className="mt-1 text-xs text-muted-foreground">+{allChecks.length - 10} more checks</p>
-                )}
-              </div>
-              {passingChecks === allChecks.length && allChecks.length > 0 && (
-                <div className="mt-2.5 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                  <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
-                  <p className="text-xs font-medium text-emerald-700">All checks passed. Ready to proceed.</p>
-                </div>
-              )}
-            </SectionCard>
 
           </div>
         </div>
