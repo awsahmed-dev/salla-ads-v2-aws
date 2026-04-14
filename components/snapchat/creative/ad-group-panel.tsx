@@ -192,7 +192,7 @@ export function AdGroupPanel({
   const changeFormat = (newFormat: AdFormat) => {
     if (newFormat === ad.adFormat) return;
     const isNewInfluencer = newFormat === "INFLUENCER";
-    const dest = (newFormat === "SINGLE" || isNewInfluencer) ? (allowedDestinations[0] ?? "WEBSITE") : ad.adDestination;
+    const dest = (newFormat === "SINGLE" || isNewInfluencer) ? (allowedDestinations[0] ?? "WEBSITE") : (newFormat === "STORY" || newFormat === "COLLECTION") ? "WEBSITE" : ad.adDestination;
     const adType = deriveCreativeType(newFormat, dest);
     const defaultAssets =
       newFormat === "DYNAMIC" ? [] :
@@ -315,7 +315,7 @@ export function AdGroupPanel({
               Choose a format for this ad. You can add more ads in different formats.
             </p>
 
-            <div className="flex gap-6">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {FORMAT_OPTIONS.filter((f) => allowedFormats.includes(f.value)).map((opt) => {
                 const isSelected = ad.adFormat === opt.value;
                 const lockedOut = freqCapLockedFormat !== null && opt.value !== freqCapLockedFormat && !isSelected;
@@ -326,7 +326,7 @@ export function AdGroupPanel({
                     disabled={lockedOut}
                     onClick={() => changeFormat(opt.value)}
                     className={cn(
-                      "flex flex-1 flex-col items-center gap-2 rounded-xl border px-5 py-4 text-center transition-all",
+                      "flex flex-col items-center gap-2 rounded-xl border px-3 py-4 text-center transition-all",
                       lockedOut
                         ? "cursor-not-allowed opacity-40 border-border"
                         : isSelected
@@ -343,7 +343,7 @@ export function AdGroupPanel({
                       </span>
                     </div>
                     <p className={cn("text-xs font-bold", isSelected ? "text-[#004956]" : "text-foreground")}>{opt.label}</p>
-                    <p className="text-[10px] leading-snug text-muted-foreground">{opt.desc}</p>
+                    <p className="hidden text-[10px] leading-snug text-muted-foreground sm:block">{opt.desc}</p>
                   </button>
                 );
               })}
