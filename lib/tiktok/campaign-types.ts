@@ -608,11 +608,15 @@ export interface IdentitySettings {
   linkStatus: TikTokAccountLinkStatus;
 }
 
+export type TikTokPlacement = "PLACEMENT_TIKTOK" | "PLACEMENT_PANGLE" | "PLACEMENT_GLOBALAPP_BUNDLE";
+
 export interface CreativeSettings {
   /** All ads in this campaign */
   ads: TikTokAd[];
   /** Placement type (shared across all ads). Maps to API placement_type. */
   placementType: PlacementType;
+  /** Selected placements when placementType is PLACEMENT_TYPE_NORMAL. Maps to API placement array. */
+  placements: TikTokPlacement[];
   /** Identity settings shared across all ads */
   identity: IdentitySettings;
   /** Brand safety inventory filter. Maps to API brand_safety_type on ad group. */
@@ -723,6 +727,7 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
   creative: {
     ads: [],
     placementType: "PLACEMENT_TYPE_AUTOMATIC",
+    placements: ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBALAPP_BUNDLE"],
     identity: {
       identityType: "BC_AUTH_TT",
       identityId: "",

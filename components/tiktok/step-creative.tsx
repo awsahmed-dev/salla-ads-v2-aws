@@ -12,10 +12,13 @@ import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -75,9 +78,14 @@ import {
   FileText,
   Radio,
   Info,
+  Eye,
+  Shield,
+  Settings2,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
+import { UploadZone } from "@/components/shared/upload-zone";
+import { LinkPickerSheet } from "@/components/snapchat/creative/link-picker-sheet";
 import type {
   TikTokAdFormat,
   TikTokCTA,
@@ -149,6 +157,13 @@ const CTA_OPTIONS: { value: TikTokCTA; label: string }[] = [
   { value: "GET_QUOTE", label: "Get Quote" },
 ];
 
+const RECOMMENDED_CTAS = CTA_OPTIONS.filter((c) =>
+  ["SHOP_NOW", "BUY_NOW", "ORDER_NOW", "LEARN_MORE", "SIGN_UP"].includes(c.value)
+);
+const OTHER_CTAS = CTA_OPTIONS.filter((c) =>
+  !["SHOP_NOW", "BUY_NOW", "ORDER_NOW", "LEARN_MORE", "SIGN_UP"].includes(c.value)
+);
+
 const MEDIA_SPECS = {
   IMAGE: { maxSize: 100 * 1024 * 1024, dimLabel: "1080 x 1920 px (9:16)" },
   VIDEO: { maxSize: 500 * 1024 * 1024, dimLabel: "1080 x 1920 px (9:16)" },
@@ -192,6 +207,160 @@ function makeCarouselCard(): CarouselCard {
 
 function getFormatLabel(format: TikTokAdFormat): string {
   return AD_FORMAT_OPTIONS.find((o) => o.value === format)?.label ?? format;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Link Type Pills — product-first URL selection                     */
+/* ------------------------------------------------------------------ */
+
+type LinkType = "store" | "product" | "category" | "landing" | "custom";
+
+const LINK_PILL_OPTIONS: { value: LinkType; label: string; icon: React.ElementType }[] = [
+  { value: "store", label: "Store", icon: Store },
+  { value: "product", label: "Product", icon: Package },
+  { value: "category", label: "Category", icon: Tag },
+  { value: "landing", label: "Landing Page", icon: Globe },
+  { value: "custom", label: "Custom URL", icon: Link2 },
+];
+
+const MOCK_STORE_URL = "https://yourstore.salla.sa";
+
+function TikTokLinkPills({
+  ad,
+  onUpdate,
+  optional = false,
+}: {
+  ad: TikTokAd;
+  onUpdate: (ad: TikTokAd) => void;
+  optional?: boolean;
+}) {
+  const [linkType, setLinkType] = useState<LinkType>(() => {
+    if (!ad.landingPageUrl) return "store";
+    if (ad.landingPageUrl === MOCK_STORE_URL) return "store";
+    return "custom";
+  });
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerMode, setPickerMode] = useState<"product" | "category" | "landing_page">("product");
+
+  const openPicker = (mode: "product" | "category" | "landing_page") => {
+    setPickerMode(mode);
+    setPickerOpen(true);
+  };
+
+  const handlePillClick = (type: LinkType) => {
+    setLinkType(type);
+    if (type === "store") {
+      onUpdate({ ...ad, landingPageUrl: MOCK_STORE_URL });
+    } else if (type === "product") {
+      openPicker("product");
+    } else if (type === "category") {
+      openPicker("category");
+    } else if (type === "landing") {
+      openPicker("landing_page");
+    }
+  };
+
+  const handlePickerSelect = (url: string, label: string) => {
+    onUpdate({
+      ...ad,
+      landingPageUrl: url,
+      ...(label && !ad.adText ? { adText: label.slice(0, 100) } : {}),
+      ...(linkType === "product" ? { callToAction: "SHOP_NOW" as TikTokCTA } : {}),
+    });
+    setPickerOpen(false);
+  };
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap gap-2">
+        {LINK_PILL_OPTIONS.map((pill) => {
+          const active = linkType === pill.value;
+          return (
+            <button
+              key={pill.value}
+              type="button"
+              onClick={() => handlePillClick(pill.value)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg border px-4 py-2 text-xs font-medium transition-colors",
+                active
+                  ? "border-primary/60 bg-primary/[0.06] text-primary"
+                  : "border-border bg-white text-foreground hover:border-primary/30"
+              )}
+            >
+              <pill.icon className="size-3" />
+              {pill.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Store URL — read-only with Auto UTM badge */}
+      {linkType === "store" && (
+        <div className="flex h-10 items-center justify-between rounded-lg border border-border bg-muted/40 px-3">
+          <span className="truncate text-sm text-muted-foreground">{MOCK_STORE_URL}</span>
+          <button
+            type="button"
+            title="UTM parameters are auto-appended for tracking"
+            className="group/utm flex shrink-0 items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-200"
+          >
+            Auto UTM
+            <Info className="size-2.5 text-emerald-500 transition-colors group-hover/utm:text-emerald-700" />
+          </button>
+        </div>
+      )}
+
+      {/* Product/Category/Landing — clickable selector */}
+      {(linkType === "product" || linkType === "category" || linkType === "landing") && (
+        <div
+          onClick={() => openPicker(linkType === "landing" ? "landing_page" : linkType as "product" | "category" | "landing_page")}
+          className={cn(
+            "flex h-10 cursor-pointer items-center justify-between rounded-lg border px-3 transition-colors hover:border-primary/40",
+            ad.landingPageUrl && ad.landingPageUrl !== MOCK_STORE_URL ? "border-primary/40 bg-primary/5" : "border-border bg-muted/40"
+          )}
+        >
+          {ad.landingPageUrl && ad.landingPageUrl !== MOCK_STORE_URL ? (
+            <>
+              <span className="truncate text-sm text-foreground">{ad.landingPageUrl}</span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onUpdate({ ...ad, landingPageUrl: "" }); }}
+                className="shrink-0 ml-2 rounded p-0.5 text-muted-foreground hover:text-destructive"
+              >
+                <X className="size-3" />
+              </button>
+            </>
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              {linkType === "product" ? "Select a product..." : linkType === "category" ? "Select a category..." : "Select a page..."}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Custom URL — editable input */}
+      {linkType === "custom" && (
+        <div className="flex flex-col gap-1">
+          <Input
+            placeholder={optional ? "https://yourstore.salla.sa (optional)" : "https://yourstore.salla.sa/product"}
+            type="url"
+            value={ad.landingPageUrl}
+            onChange={(e) => onUpdate({ ...ad, landingPageUrl: e.target.value })}
+            className={cn("h-10 text-sm", ad.landingPageUrl && !ad.landingPageUrl.startsWith("https://") && "border-red-400")}
+          />
+          {ad.landingPageUrl && !ad.landingPageUrl.startsWith("https://") && (
+            <p className="text-[10px] text-red-600">URL must start with https://</p>
+          )}
+        </div>
+      )}
+
+      <LinkPickerSheet
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        mode={pickerMode}
+        onSelect={handlePickerSelect}
+      />
+    </div>
+  );
 }
 
 /**
@@ -269,122 +438,6 @@ function AdTrackingSection({ ad, onUpdate }: { ad: TikTokAd; onUpdate: (ad: TikT
 
 /* ------------------------------------------------------------------ */
 /*  Upload Drop Zone (matches Snap pattern)                            */
-/* ------------------------------------------------------------------ */
-
-function UploadZone({
-  accept,
-  label,
-  sublabel,
-  preview,
-  previewMediaType,
-  previewFile,
-  onFile,
-  onClear,
-  compact,
-}: {
-  accept: string;
-  label: string;
-  sublabel: string;
-  preview?: string;
-  previewMediaType?: "VIDEO" | "IMAGE";
-  previewFile?: File;
-  onFile: (file: File) => void;
-  onClear?: () => void;
-  compact?: boolean;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
-
-  const handleFiles = useCallback(
-    (files: FileList | null) => {
-      if (files?.[0]) onFile(files[0]);
-    },
-    [onFile]
-  );
-
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  };
-
-  if (preview) {
-    if (compact) {
-      return (
-        <div className="relative h-20 overflow-hidden rounded-lg border border-border bg-muted/20">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview} alt="Preview" className="size-full object-cover" crossOrigin="anonymous" />
-          <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/40 opacity-0 transition-opacity hover:opacity-100">
-            <Button size="sm" variant="secondary" className="h-6 px-2 text-xs" onClick={() => inputRef.current?.click()}>Replace</Button>
-            {onClear && <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" onClick={onClear}>Remove</Button>}
-          </div>
-          <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-        </div>
-      );
-    }
-
-    const fileName = previewFile?.name || (previewMediaType === "VIDEO" ? "video.mp4" : "image.jpg");
-    const fileSize = previewFile?.size ? formatSize(previewFile.size) : "";
-    const isVideo = previewMediaType === "VIDEO";
-
-    return (
-      <div className="flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2.5">
-        <div className="size-11 shrink-0 overflow-hidden rounded-lg bg-black">
-          {isVideo ? (
-            <video src={preview} muted className="size-full object-cover" />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={preview} alt="Preview" className="size-full object-cover" crossOrigin="anonymous" />
-          )}
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-xs font-medium text-foreground">{fileName}</span>
-          {fileSize && <span className="text-sm text-muted-foreground">{fileSize}</span>}
-        </div>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          title="Replace media"
-        >
-          <Upload className="size-3.5" />
-        </button>
-        {onClear && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="shrink-0 rounded-md p-1.5 text-destructive/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
-            title="Remove media"
-          >
-            <Trash2 className="size-4" />
-          </button>
-        )}
-        <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-      </div>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => inputRef.current?.click()}
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-      className={cn(
-        "flex w-full flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors",
-        dragOver ? "border-primary bg-primary/5" : "border-border bg-muted/10 hover:border-primary/40 hover:bg-muted/20",
-        compact ? "gap-1 py-3" : "gap-1.5 py-6"
-      )}
-    >
-      <Upload className={cn("text-muted-foreground", compact ? "size-4" : "size-5")} />
-      <span className={cn("font-medium text-foreground", compact ? "text-xs" : "text-xs")}>{label}</span>
-      <span className={cn("text-center text-muted-foreground", compact ? "text-[8px]" : "text-xs")}>{sublabel}</span>
-      <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-    </button>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /*  TikTok Ad Preview (pixel-perfect phone mockup)                     */
 /* ------------------------------------------------------------------ */
@@ -684,6 +737,7 @@ function AdPanel({
   isAppPromo: boolean;
 }) {
   const [editingName, setEditingName] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const isSpark = ad.adFormat === "SPARK_AD";
   const isCarousel = ad.adFormat === "CAROUSEL";
   const assetCount = ad.assets.length;
@@ -1211,28 +1265,61 @@ function AdPanel({
 
           {/* ---- SINGLE VIDEO ---- */}
           {ad.adFormat === "SINGLE_VIDEO" && !isSpark && (
-            <div className="flex flex-col gap-4">
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <Label className="text-xs font-semibold text-foreground">Video Creative</Label>
-                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">Best Format</Badge>
-                </div>
+            <div className="flex flex-col gap-0">
 
-                {/* Video specs */}
-                <div className="mb-2 grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-muted/30 px-3 py-2 sm:grid-cols-3">
-                  {[
-                    { label: "Format", value: "MP4 / MOV" },
-                    { label: "Aspect Ratio", value: "9:16 recommended" },
-                    { label: "Resolution", value: "540x960+ (1080x1920 best)" },
-                    { label: "Duration", value: "5-60s (9-15s best)" },
-                    { label: "Max Size", value: "500 MB" },
-                    { label: "Codec", value: "H.264" },
-                  ].map((s) => (
-                    <div key={s.label} className="flex items-baseline gap-1">
-                      <span className="text-[10px] text-muted-foreground">{s.label}:</span>
-                      <span className="text-[10px] font-medium text-foreground">{s.value}</span>
+              {/* ── Section 1: Link Type + CTA (product-first) ── */}
+              {!isAppPromo ? (
+                <div className="flex flex-col gap-4 px-3 py-3">
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium text-foreground">Link type</Label>
+                    <TikTokLinkPills ad={ad} onUpdate={onUpdate} optional={isVideoViews || isLeadGen} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <Label className="text-sm font-medium text-foreground">Link</Label>
+                      <div className="flex h-10 items-center rounded-lg border border-border bg-muted/40 px-3">
+                        <span className="truncate text-sm text-muted-foreground">{ad.landingPageUrl || "Select a link type above"}</span>
+                      </div>
                     </div>
-                  ))}
+                    <div className="flex flex-col gap-2">
+                      <Label className="text-sm font-medium text-foreground">
+                        CTA button <span className="text-destructive">*</span>
+                      </Label>
+                      <Select value={ad.callToAction} onValueChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}>
+                        <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select call to action" /></SelectTrigger>
+                        <SelectContent>
+                          <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Recommended</div>
+                          {RECOMMENDED_CTAS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                          <div className="my-1 border-t border-border" />
+                          <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">More Options</div>
+                          {OTHER_CTAS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4 px-3 py-3">
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium text-foreground">App Download URL</Label>
+                    <div className="flex h-10 items-center justify-between rounded-lg border border-border bg-muted/40 px-3">
+                      <span className="truncate text-sm text-muted-foreground">{ad.landingPageUrl || "Set in Objective step"}</span>
+                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {ad.landingPageUrl?.includes("apple.com") ? "App Store" : "Google Play"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Section 2: Media Upload ── */}
+              <div className="border-t border-border px-3 py-3">
+                <div className="mb-2 flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2">
+                  <Film className="size-3.5 shrink-0 text-muted-foreground" />
+                  <p className="text-[11px] text-muted-foreground">
+                    MP4/MOV · 9:16 recommended · 5-60s · max 500MB · H.264
+                  </p>
+                  <span className="ml-auto shrink-0 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">Best Format</span>
                 </div>
 
                 <UploadZone
@@ -1247,152 +1334,164 @@ function AdPanel({
                   libraryContext="VIDEO"
                 />
 
-                <div className="mt-2 flex items-start gap-1.5">
-                  <Info className="mt-0.5 size-2.5 shrink-0 text-muted-foreground/60" />
-                  <p className="text-[10px] text-muted-foreground">
-                    Videos under 15 seconds have higher completion rates. Use vertical 9:16 for best performance.
-                  </p>
+                {/* Background Music — toggle+description row */}
+                <div className="mt-3 flex flex-col gap-0 rounded-lg border border-border">
+                  <div className="flex items-center justify-between px-3 py-2.5">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-medium text-foreground">Background Music</span>
+                      <span className="text-[11px] leading-tight text-muted-foreground">Add background music to enhance your video ad</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Optional</span>
+                      <Switch
+                        checked={!ad.promotionalMusicDisabled}
+                        onCheckedChange={(checked) => {
+                          onUpdate({ ...ad, promotionalMusicDisabled: !checked, ...(!checked ? { musicFile: undefined, musicUrl: "" } : {}) });
+                        }}
+                      />
+                    </div>
+                  </div>
+                  {!ad.promotionalMusicDisabled && (
+                    <div className="border-t border-border px-3 py-2.5">
+                      {ad.musicFile ? (
+                        <div className="flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
+                          <Music className="size-4 text-primary" />
+                          <div className="flex-1">
+                            <p className="text-xs font-medium text-foreground">{ad.musicFile.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{(ad.musicFile.size / 1024).toFixed(0)} KB</p>
+                          </div>
+                          <button type="button" onClick={() => onUpdate({ ...ad, musicFile: undefined, musicUrl: "" })} className="text-destructive/60 hover:text-destructive"><Trash2 className="size-3.5" /></button>
+                        </div>
+                      ) : (
+                        <UploadZone
+                          accept="audio/mpeg,audio/wav,audio/x-m4a,audio/flac"
+                          label="Upload music"
+                          sublabel="MP3/WAV/M4A/FLAC, max 10MB"
+                          onFile={(file) => {
+                            if (file.size > 10 * 1024 * 1024) { alert("Music file must be under 10MB."); return; }
+                            onUpdate({ ...ad, musicFile: file, musicUrl: URL.createObjectURL(file) });
+                          }}
+                          enableLibrary={false}
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Optional music for video ads */}
-              <div className="rounded-lg border border-border bg-muted/10 p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Music className="size-3.5 text-muted-foreground" />
-                    <Label className="text-xs font-medium text-foreground">Background Music</Label>
-                    <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">Optional</Badge>
-                  </div>
-                  <Switch
-                    checked={!ad.promotionalMusicDisabled}
-                    onCheckedChange={(checked) => {
-                      onUpdate({ ...ad, promotionalMusicDisabled: !checked, ...(!checked ? { musicFile: undefined, musicUrl: "" } : {}) });
-                    }}
-                  />
-                </div>
-                {!ad.promotionalMusicDisabled && (
-                  <div className="mt-2">
-                    <p className="mb-2 text-[10px] text-muted-foreground">
-                      Upload your own music or leave empty to use the video&apos;s original audio. Maps to API <code className="rounded bg-muted px-1 text-[10px]">promotional_music_disabled</code>.
-                    </p>
-                    {ad.musicFile ? (
-                      <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/[0.03] px-3 py-2">
-                        <Music className="size-4 text-primary" />
-                        <div className="flex-1">
-                          <p className="text-xs font-medium text-foreground">{ad.musicFile.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{(ad.musicFile.size / 1024).toFixed(0)} KB</p>
-                        </div>
-                        <button type="button" onClick={() => onUpdate({ ...ad, musicFile: undefined, musicUrl: "" })} className="text-destructive/60 hover:text-destructive"><Trash2 className="size-3.5" /></button>
-                      </div>
-                    ) : (
-                      <UploadZone
-                        accept="audio/mpeg,audio/wav,audio/x-m4a,audio/flac"
-                        label="Upload music"
-                        sublabel="MP3/WAV/M4A/FLAC, max 10MB"
-                        onFile={(file) => {
-                          if (file.size > 10 * 1024 * 1024) { alert("Music file must be under 10MB."); return; }
-                          onUpdate({ ...ad, musicFile: file, musicUrl: URL.createObjectURL(file) });
-                        }}
-                        enableLibrary={false}
+              {/* ── Section 3: Ad Copy ── */}
+              <div className="border-t border-border px-3 py-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium text-foreground">Display Name</Label>
+                    <div className="relative">
+                      <Input
+                        placeholder="Your brand"
+                        value={ad.displayName}
+                        maxLength={20}
+                        onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })}
+                        className={cn("h-10 pr-14 text-sm", ad.displayName.length >= 20 && "border-amber-400")}
                       />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.displayName.length}/20</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium text-foreground">
+                      Ad Caption <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        placeholder="Write a short caption..."
+                        value={ad.adText}
+                        maxLength={100}
+                        onChange={(e) => onUpdate({ ...ad, adText: e.target.value.slice(0, 100) })}
+                        className={cn("h-10 pr-14 text-sm", ad.adText.length >= 100 && "border-amber-400")}
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.adText.length}/100</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Advanced Options ── */}
+              <div className="border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setAdvancedOpen(!advancedOpen)}
+                  className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-foreground hover:text-foreground"
+                >
+                  <span>Advanced Options</span>
+                  {advancedOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                </button>
+
+                {advancedOpen && (
+                  <div className="flex flex-col gap-4 px-3 pb-4">
+                    <div className="flex flex-col gap-0 rounded-lg border border-border">
+                      {/* Instant Product Page */}
+                      <div className="flex items-center justify-between px-3 py-2.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-medium text-foreground">Instant Product Page</span>
+                          <span className="text-[11px] leading-tight text-muted-foreground">In-app landing page optimized for speed and conversions</span>
+                        </div>
+                        <Switch
+                          checked={ad.instantProductPageUsed ?? false}
+                          onCheckedChange={(checked) => onUpdate({ ...ad, instantProductPageUsed: checked })}
+                        />
+                      </div>
+                      <div className="border-t border-border" />
+                      {/* AI Content Disclosure */}
+                      <div className="flex items-center justify-between px-3 py-2.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-medium text-foreground">AI Content Disclosure</span>
+                          <span className="text-[11px] leading-tight text-muted-foreground">Declare this ad contains AI-generated content</span>
+                        </div>
+                        <Switch
+                          checked={ad.aigcDisclosureType === "DECLARED"}
+                          onCheckedChange={(checked) => onUpdate({ ...ad, aigcDisclosureType: checked ? "DECLARED" : "NOT_DECLARED" })}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Click Tracking URL */}
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-xs font-medium text-muted-foreground">Click Tracking URL</Label>
+                      <Input
+                        placeholder="https://tracking.example.com/click"
+                        type="url"
+                        value={ad.clickTrackingUrl || ""}
+                        onChange={(e) => onUpdate({ ...ad, clickTrackingUrl: e.target.value })}
+                        className="h-10 text-sm"
+                      />
+                    </div>
+
+                    {/* Impression Tracking URL */}
+                    <div className="flex flex-col gap-1">
+                      <Label className="text-xs font-medium text-muted-foreground">Impression Tracking URL</Label>
+                      <Input
+                        placeholder="https://tracking.example.com/impression"
+                        type="url"
+                        value={ad.impressionTrackingUrl || ""}
+                        onChange={(e) => onUpdate({ ...ad, impressionTrackingUrl: e.target.value })}
+                        className="h-10 text-sm"
+                      />
+                    </div>
+
+                    {/* App Deep Link */}
+                    {isAppPromo && (
+                      <div className="flex flex-col gap-1">
+                        <Label className="text-xs font-medium text-muted-foreground">App Deep Link</Label>
+                        <Input
+                          placeholder="myapp://product/123"
+                          value={ad.deeplink || ""}
+                          onChange={(e) => onUpdate({ ...ad, deeplink: e.target.value })}
+                          className="h-10 font-mono text-sm"
+                        />
+                        <p className="text-[10px] text-muted-foreground">Opens content directly in your app if installed</p>
+                      </div>
                     )}
                   </div>
                 )}
               </div>
-
-              {/* Video ad fields */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-muted-foreground">Display Name</Label>
-                    <CharCounter current={ad.displayName.length} max={20} />
-                  </div>
-                  <Input
-                    placeholder="Your brand"
-                    value={ad.displayName}
-                    maxLength={20}
-                    onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })}
-                    className={cn("h-8 text-xs", ad.displayName.length >= 20 && "border-amber-400")}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-medium text-muted-foreground">Call to Action</Label>
-                  <Select value={ad.callToAction} onValueChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {CTA_OPTIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium text-muted-foreground">Ad Text / Caption</Label>
-                  <CharCounter current={ad.adText.length} max={100} />
-                </div>
-                <Textarea
-                  placeholder="Write an engaging caption for your TikTok ad..."
-                  value={ad.adText}
-                  maxLength={100}
-                  rows={2}
-                  onChange={(e) => onUpdate({ ...ad, adText: e.target.value.slice(0, 100) })}
-                  className="resize-none text-xs"
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Maps to API <code className="rounded bg-muted px-1 text-[10px]">ad_text</code>. Keep it short and punchy -- best captions are under 80 chars.
-                </p>
-              </div>
-
-              {isAppPromo ? (
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground">App Download URL</Label>
-                    <Download className="size-2.5 text-muted-foreground" />
-                  </div>
-                  <div className="flex h-8 items-center rounded-md border border-border bg-muted/30 px-3 text-xs text-muted-foreground">
-                    {ad.landingPageUrl || "Set in Objective step"}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Auto-filled from your app download URL. Users will be directed to the {" "}
-                    {ad.landingPageUrl?.includes("apple.com") ? "App Store" : "Google Play Store"} to install your app.
-                  </p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground">Landing Page URL{(isVideoViews || isLeadGen) ? " (optional)" : ""}</Label>
-                    <Link2 className="size-2.5 text-muted-foreground" />
-                  </div>
-                  <Input
-                    placeholder={(isVideoViews || isLeadGen) ? "https://yourstore.salla.sa (optional)" : "https://yourstore.salla.sa/product"}
-                    type="url"
-                    value={ad.landingPageUrl}
-                    onChange={(e) => onUpdate({ ...ad, landingPageUrl: e.target.value })}
-                    className={cn("h-8 text-xs", ad.landingPageUrl && !ad.landingPageUrl.startsWith("https://") && "border-red-400")}
-                  />
-                  {ad.landingPageUrl && !ad.landingPageUrl.startsWith("https://") && (
-                    <p className="text-[10px] text-red-600">URL must start with https://</p>
-                  )}
-                </div>
-              )}
-
-              {/* Instant product page toggle (for catalog ads) */}
-              <div className="flex items-center justify-between rounded-lg border border-border bg-muted/10 px-3 py-2.5">
-                <div>
-                  <p className="text-xs font-medium text-foreground">Instant Product Page</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    In-app landing page optimized for speed. Maps to <code className="rounded bg-muted px-1 text-[10px]">instant_product_page_used</code>.
-                  </p>
-                </div>
-                <Switch
-                  checked={ad.instantProductPageUsed ?? false}
-                  onCheckedChange={(checked) => onUpdate({ ...ad, instantProductPageUsed: checked })}
-                />
-              </div>
-
-              {/* Tracking URLs */}
-              <AdTrackingSection ad={ad} onUpdate={onUpdate} />
             </div>
           )}
 
@@ -2591,6 +2690,7 @@ export function TikTokStepCreative() {
   const isAppPromo = campaign.objective.objective === "APP_PROMOTION";
   const allowedFormats = apiConfig.allowedAdFormats;
   const [activeAdIdx, setActiveAdIdx] = useState(0);
+  const [placementExpanded, setPlacementExpanded] = useState(false);
 
   const ads = cr.ads ?? [];
   const activeAd = ads[activeAdIdx] ?? ads[0] ?? null;
@@ -2720,31 +2820,48 @@ export function TikTokStepCreative() {
         {/* ============ LEFT COLUMN ============ */}
         <div className="flex flex-1 flex-col gap-5">
 
-          {/* ---- Connected Identity (configured in Step 0) ---- */}
-          <SectionCard>
-            <div className="mb-1 flex items-center gap-2">
-              <User className="size-4 text-primary" />
-              <Label className="text-sm font-semibold text-foreground">TikTok Identity</Label>
-              {identity.linkStatus === "confirmed" && identity.identityId ? (
-                <Badge variant="outline" className="gap-1 rounded-full border-emerald-300 bg-emerald-50 px-2 text-[10px] text-emerald-700">
-                  <CheckCircle2 className="size-2.5" />
-                  Connected
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="gap-1 rounded-full border-amber-300 bg-amber-50 px-2 text-[10px] text-amber-700">
-                  <AlertCircle className="size-2.5" />
-                  Not Connected
-                </Badge>
+          {/* ---- TikTok Identity ---- */}
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border px-5 py-3">
+              <div className="flex items-center gap-2.5">
+                <div className={cn(
+                  "flex size-8 items-center justify-center rounded-xl",
+                  identity.linkStatus === "confirmed" && identity.identityId ? "bg-[#e6fff9]" : "bg-amber-100"
+                )}>
+                  {identity.linkStatus === "confirmed" && identity.identityId
+                    ? <User className="size-4 text-[#004956]" />
+                    : <AlertCircle className="size-4 text-amber-500" />
+                  }
+                </div>
+                <span className="text-sm font-semibold text-foreground">TikTok Identity</span>
+                {identity.linkStatus === "confirmed" && identity.identityId ? (
+                  <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">Connected</span>
+                ) : (
+                  <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">Not Connected</span>
+                )}
+              </div>
+              {identity.linkStatus === "confirmed" && identity.identityId && (
+                <button
+                  type="button"
+                  onClick={() => setStep(0)}
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                >
+                  <Pencil className="size-3" />
+                  Edit
+                </button>
               )}
             </div>
 
-            {identity.linkStatus === "confirmed" && identity.identityId ? (
-              /* ======== Connected: show account card ======== */
-              <div className="mt-3 flex flex-col gap-3">
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-4 py-3">
-                  <div className="flex size-10 items-center justify-center rounded-full bg-foreground">
+            {/* Body */}
+            <div className="px-5 py-4">
+              {identity.linkStatus === "confirmed" && identity.identityId ? (
+                /* ======== Connected: account card ======== */
+                <div className="flex items-center gap-3.5">
+                  <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-foreground">
                     {identity.avatarPreviewUrl ? (
-                      <img src={identity.avatarPreviewUrl} alt="" className="size-10 rounded-full object-cover" />
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={identity.avatarPreviewUrl} alt="" className="size-12 rounded-xl object-cover" />
                     ) : (
                       <svg viewBox="0 0 24 24" className="size-5 text-background" fill="currentColor">
                         <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.75a8.18 8.18 0 0 0 4.76 1.52V6.84a4.83 4.83 0 0 1-1-.15z"/>
@@ -2752,56 +2869,45 @@ export function TikTokStepCreative() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-foreground truncate">{identity.tiktokUsername || identity.displayName}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {identity.identityType === "BC_AUTH_TT" ? "Linked via Business Center" : identity.identityType === "AUTH_CODE" ? "Creator Auth Code" : "Custom Identity"}
+                    <p className="text-sm font-bold text-foreground truncate">{identity.tiktokUsername || identity.displayName || "TikTok Account"}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {identity.identityType === "BC_AUTH_TT" ? "Linked via Salla Business Center" : identity.identityType === "AUTH_CODE" ? "Creator Authorization Code" : "Custom Identity"}
                     </p>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      {identity.identityId && (
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                          ID: {identity.identityId.length > 12 ? `...${identity.identityId.slice(-8)}` : identity.identityId}
+                        </span>
+                      )}
+                      <span className="rounded bg-[#e6fff9] px-1.5 py-0.5 text-[10px] font-semibold text-[#004956]">
+                        {identity.identityType === "BC_AUTH_TT" ? "Business Center" : identity.identityType === "AUTH_CODE" ? "Auth Code" : "Custom"}
+                      </span>
+                    </div>
                   </div>
-                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px] font-medium">
-                    {identity.identityType === "BC_AUTH_TT" ? "BC Auth" : identity.identityType === "AUTH_CODE" ? "Auth Code" : "Custom"}
-                  </Badge>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                    {identity.identityId && (
-                      <span>ID: <span className="font-mono">{identity.identityId}</span></span>
-                    )}
-                    {identity.businessCenterId && (
-                      <span>BC: <span className="font-mono">{identity.businessCenterId}</span></span>
-                    )}
+              ) : (
+                /* ======== Not connected: prompt ======== */
+                <div className="flex items-center gap-3.5 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3.5">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100">
+                    <User className="size-4.5 text-amber-600" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setStep(0)}
-                    className="flex items-center gap-1 text-[10px] font-medium text-primary hover:underline"
-                  >
-                    <Pencil className="size-2.5" />
-                    Change
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* ======== Not connected: prompt to go back ======== */
-              <div className="mt-3 flex flex-col gap-3">
-                <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3">
-                  <AlertCircle className="size-4 shrink-0 text-amber-600" />
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-amber-900">TikTok account not connected</p>
-                    <p className="mt-0.5 text-[10px] text-amber-700">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-amber-900">TikTok account not connected</p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700">
                       Go back to Campaign Setup to link your TikTok account via QR code. This is required for ad delivery.
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setStep(0)}
-                    className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-[10px] font-medium text-amber-800 transition-colors hover:bg-amber-50"
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#004956] px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-[#003a44]"
                   >
                     Connect Now
                   </button>
                 </div>
-              </div>
-            )}
-          </SectionCard>
+              )}
+            </div>
+          </div>
 
           {/* ---- Catalog Active Banner (when catalog enabled in step 0) ---- */}
           {catalogEnabled && (
@@ -2888,139 +2994,217 @@ export function TikTokStepCreative() {
             </div>
           )}
 
-          {/* ---- Placement & Brand Safety ---- */}
-          <SectionCard>
-            <div className="mb-4 flex items-center gap-2">
-              <LayoutGrid className="size-4 text-primary" />
-              <Label className="text-sm font-semibold text-foreground">Placement</Label>
-              <InfoTip text="Maps to TikTok API placement_type. Automatic lets TikTok optimize across all placements including TikTok, Pangle, and Global App Bundle." />
-            </div>
-
-            <div className="flex gap-3">
-              {([
-                { value: "PLACEMENT_TYPE_AUTOMATIC" as const, label: "Automatic Placement", desc: "TikTok optimizes across all placements for best results." },
-                { value: "PLACEMENT_TYPE_NORMAL" as const, label: "Manual Placement", desc: "You choose specific placements (TikTok, Pangle, etc.)." },
-              ]).map((opt) => {
-                const active = cr.placementType === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => updateNested("creative", { placementType: opt.value })}
-                    className={cn(
-                      "flex flex-1 flex-col items-start rounded-lg border px-3 py-2.5 text-left transition-colors",
-                      active ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/40"
-                    )}
-                  >
-                    <span className={cn("text-xs font-medium", active ? "text-primary" : "text-foreground")}>{opt.label}</span>
-                    <span className="mt-0.5 text-xs text-muted-foreground">{opt.desc}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {cr.placementType === "PLACEMENT_TYPE_NORMAL" && (
-              <div className="mt-3 flex flex-col gap-2">
-                <Label className="mb-1 text-xs font-semibold text-foreground">Select Placements</Label>
-                {[
-                  { id: "TIKTOK", label: "TikTok", desc: "Main TikTok feed (For You page)" },
-                  { id: "PANGLE", label: "Pangle", desc: "TikTok Audience Network (third-party apps)" },
-                  { id: "GLOBAL_APP_BUNDLE", label: "Global App Bundle", desc: "Ads across TikTok-owned apps (CapCut, Fizzo, etc.)" },
-                ].map((pos) => (
-                  <label
-                    key={pos.id}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2 transition-colors hover:border-primary/20"
-                  >
-                    <input type="checkbox" defaultChecked className="accent-primary" />
-                    <div className="flex-1">
-                      <span className="text-xs font-medium text-foreground">{pos.label}</span>
-                      <p className="text-xs text-muted-foreground">{pos.desc}</p>
-                    </div>
-                  </label>
-                ))}
+          {/* ---- Ad Placement & Brand Safety (merged, collapsible) ---- */}
+          <div className={cn("rounded-2xl transition-colors", placementExpanded ? "bg-muted/50 p-2" : "")}>
+            <button
+              type="button"
+              onClick={() => setPlacementExpanded(!placementExpanded)}
+              className={cn(
+                "flex w-full items-center justify-between px-6 pb-3 pt-5 text-left transition-colors rounded-2xl",
+                !placementExpanded && "border border-border bg-card"
+              )}
+            >
+              <div>
+                <span className="text-base font-bold text-foreground">Ad Placement & Brand Safety</span>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Choose your ad placements and surrounding content to ensure your brand identity remains protected.
+                </p>
               </div>
-            )}
-          </SectionCard>
+              <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", placementExpanded && "rotate-180")} />
+            </button>
 
-          {/* ---- Brand Safety & Content Controls ---- */}
-          <SectionCard>
-            <div className="mb-4 flex items-center gap-2">
-              <ShieldCheck className="size-4 text-primary" />
-              <Label className="text-sm font-semibold text-foreground">Brand Safety & Content Controls</Label>
-              <InfoTip text="Control where your ads appear and how users interact with them. Maps to TikTok API brand_safety_type, comment_disabled, share_disabled, and video_download_disabled." />
-            </div>
+            {placementExpanded && (
+              <div className="mt-2 flex flex-col gap-4">
 
-            {/* Inventory Filter */}
-            <Label className="mb-2 block text-xs font-medium text-muted-foreground">Inventory Filter</Label>
-            <div className="mb-4 grid gap-2 sm:grid-cols-2">
-              {([
-                { value: "NO_BRAND_SAFETY" as const, label: "Full Inventory", desc: "No content filtering. Maximum reach." },
-                { value: "STANDARD_INVENTORY" as const, label: "Standard Inventory", desc: "Appropriate for most brands. Recommended." },
-                { value: "LIMITED_INVENTORY" as const, label: "Limited Inventory", desc: "Most restrictive. No mature themes." },
-                { value: "EXPANDED_INVENTORY" as const, label: "Expanded Inventory", desc: "Exclude only explicitly inappropriate content." },
-              ]).map((opt) => {
-                const active = cr.brandSafetyType === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => updateNested("creative", { brandSafetyType: opt.value })}
-                    className={cn(
-                      "flex flex-col items-start rounded-lg border px-3 py-2.5 text-left transition-colors",
-                      active ? "border-primary bg-primary/5" : "border-border bg-background hover:border-primary/40"
-                    )}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className={cn("text-xs font-medium", active ? "text-primary" : "text-foreground")}>{opt.label}</span>
-                      {opt.value === "STANDARD_INVENTORY" && (
-                        <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">Recommended</Badge>
-                      )}
-                    </div>
-                    <span className="mt-0.5 text-[11px] text-muted-foreground">{opt.desc}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Content Interaction Controls */}
-            <Label className="mb-2 block text-xs font-medium text-muted-foreground">Content Interaction Controls</Label>
-            <div className="flex flex-col gap-2">
-              {([
-                { key: "commentDisabled" as const, label: "Disable comments", desc: "Prevent users from commenting on your ads." },
-                { key: "shareDisabled" as const, label: "Disable sharing", desc: "Prevent users from sharing your ads." },
-                { key: "videoDownloadDisabled" as const, label: "Disable video download", desc: "Prevent users from downloading your ad videos." },
-              ]).map((ctrl) => (
-                <div key={ctrl.key} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-                  <div>
-                    <p className="text-xs font-medium text-foreground">{ctrl.label}</p>
-                    <p className="text-[11px] text-muted-foreground">{ctrl.desc}</p>
-                  </div>
-                  <Switch
-                    checked={cr.contentControls[ctrl.key]}
-                    onCheckedChange={(checked) =>
-                      updateNested("creative", {
-                        contentControls: { ...cr.contentControls, [ctrl.key]: checked },
-                      })
-                    }
-                  />
+              {/* ── Content Safety (Inventory Filter) ── */}
+              <div className="rounded-xl bg-card px-6 py-5">
+                <h3 className="text-sm font-bold text-foreground">Content Safety</h3>
+                <p className="mt-1 mb-4 text-xs text-muted-foreground">
+                  Defines the type of content your ads appear next to. This doesn&apos;t change your ad—it controls its environment.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {([
+                    { value: "NO_BRAND_SAFETY" as const, label: "Full Inventory", desc: "Ads can appear next to all TikTok content for maximum reach.", tradeoff: "Lower brand safety, larger audience" },
+                    { value: "STANDARD_INVENTORY" as const, label: "Standard Inventory", desc: "Appropriate for most brands. Recommended.", tradeoff: "Balanced safety and reach", recommended: true },
+                    { value: "LIMITED_INVENTORY" as const, label: "Limited Inventory", desc: "Most restrictive. No mature themes.", tradeoff: "Greater safety, smaller audience" },
+                    { value: "EXPANDED_INVENTORY" as const, label: "Expanded Inventory", desc: "Exclude only explicitly inappropriate content.", tradeoff: "Broad reach, minimal filtering" },
+                  ]).map((opt) => {
+                    const selected = cr.brandSafetyType === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => updateNested("creative", { brandSafetyType: opt.value })}
+                        className={cn(
+                          "flex flex-1 flex-col gap-2 rounded-xl border px-5 py-4 text-left transition-all",
+                          selected
+                            ? "border-[#a4ffe5] bg-[#e6fff9]"
+                            : "border-border bg-card hover:border-[#a4ffe5]"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={cn("text-sm font-bold", selected ? "text-[#004956]" : "text-foreground")}>{opt.label}</span>
+                          {opt.recommended && (
+                            <span className="rounded-full bg-[#a4ffe5] px-2 py-0.5 text-xs font-medium text-[#004956]">Recommended</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                        <span className="text-xs text-muted-foreground">{opt.tradeoff}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
+
+              {/* ── Ad Placement ── */}
+              <div className="rounded-xl bg-card px-6 py-5">
+                <h3 className="text-sm font-bold text-foreground">Ad Placement</h3>
+                <p className="mt-1 mb-4 text-xs text-muted-foreground">
+                  Where your ads appear on TikTok. Auto-placement finds the best locations for performance, while manual lets you choose.
+                </p>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
+                  {([
+                    { value: "PLACEMENT_TYPE_AUTOMATIC" as const, label: "Automatic", desc: "TikTok optimizes placements for top results across TikTok, Pangle, and partner apps.", recommended: true },
+                    { value: "PLACEMENT_TYPE_NORMAL" as const, label: "Manual", desc: "Select exactly where your ads appear. Useful if you know your audience is in a specific spot.", recommended: false },
+                  ]).map((opt) => {
+                    const selected = cr.placementType === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => updateNested("creative", { placementType: opt.value })}
+                        className={cn(
+                          "flex flex-1 flex-col gap-2 rounded-xl border px-5 py-4 text-left transition-all",
+                          selected
+                            ? "border-[#a4ffe5] bg-[#e6fff9]"
+                            : "border-border bg-card hover:border-[#a4ffe5]"
+                        )}
+                      >
+                        <div className="flex w-full items-center justify-between">
+                          <span className={cn("text-sm font-bold", selected ? "text-[#004956]" : "text-foreground")}>{opt.label}</span>
+                          {opt.recommended && (
+                            <span className="rounded-full bg-[#a4ffe5] px-2 py-0.5 text-xs font-medium text-[#004956]">Recommended</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {cr.placementType === "PLACEMENT_TYPE_AUTOMATIC" && (
+                  <div className="mt-4 flex items-center gap-2 rounded-lg bg-[#e6fff9] px-4 py-3">
+                    <Sparkles className="size-4 shrink-0 text-[#004956]" />
+                    <p className="text-xs font-medium text-[#004956]">
+                      Automatic placement typically delivers 20-40% more impressions than manual placement.
+                    </p>
+                  </div>
+                )}
+
+                {cr.placementType === "PLACEMENT_TYPE_NORMAL" && (
+                  <div className="mt-4">
+                    <div className="rounded-lg bg-blue-50 px-4 py-3 mb-3">
+                      <p className="text-xs text-blue-700">
+                        Select your placements. TikTok is always required. Toggle Pangle and Global App Bundle on or off.
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border divide-y divide-border">
+                      {([
+                        { id: "PLACEMENT_TIKTOK" as const, label: "TikTok", desc: "Main TikTok feed (For You page)", required: true },
+                        { id: "PLACEMENT_PANGLE" as const, label: "Pangle", desc: "TikTok Audience Network (third-party apps)", required: false },
+                        { id: "PLACEMENT_GLOBALAPP_BUNDLE" as const, label: "Global App Bundle", desc: "Ads across TikTok-owned apps (CapCut, Fizzo, etc.)", required: false },
+                      ]).map((pos) => {
+                        const isOn = cr.placements?.includes(pos.id) ?? true;
+                        return (
+                          <div key={pos.id} className="flex items-center justify-between px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                "flex size-6 shrink-0 items-center justify-center rounded-full",
+                                isOn ? "bg-emerald-100" : "bg-muted"
+                              )}>
+                                {isOn
+                                  ? <CheckCircle2 className="size-3.5 text-emerald-600" />
+                                  : <X className="size-3 text-muted-foreground" />
+                                }
+                              </div>
+                              <div>
+                                <p className={cn("text-xs font-medium", isOn ? "text-foreground" : "text-muted-foreground")}>{pos.label}</p>
+                                <p className="text-[11px] text-muted-foreground">{pos.desc}</p>
+                              </div>
+                            </div>
+                            {pos.required ? (
+                              <span className="text-[10px] font-medium text-muted-foreground">Required</span>
+                            ) : (
+                              <Switch
+                                checked={isOn}
+                                onCheckedChange={(checked) => {
+                                  const current = cr.placements ?? ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBALAPP_BUNDLE"];
+                                  const next = checked
+                                    ? [...current, pos.id]
+                                    : current.filter((p) => p !== pos.id);
+                                  updateNested("creative", { placements: next });
+                                }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Content Interaction Controls ── */}
+              <div className="rounded-xl bg-card px-6 py-5">
+                <h3 className="text-sm font-bold text-foreground">Content Interaction Controls</h3>
+                <p className="mt-1 mb-4 text-xs text-muted-foreground">
+                  Control how users can interact with your ads. Disabling features may reduce organic reach but gives you more control.
+                </p>
+                <div className="rounded-xl border border-border divide-y divide-border">
+                  {([
+                    { key: "commentDisabled" as const, label: "Disable comments", desc: "Prevent users from commenting on your ads." },
+                    { key: "shareDisabled" as const, label: "Disable sharing", desc: "Prevent users from sharing your ads." },
+                    { key: "videoDownloadDisabled" as const, label: "Disable video download", desc: "Prevent users from downloading your ad videos." },
+                  ]).map((ctrl) => (
+                    <div key={ctrl.key} className="flex items-center justify-between px-4 py-3">
+                      <div>
+                        <p className="text-xs font-medium text-foreground">{ctrl.label}</p>
+                        <p className="text-[11px] text-muted-foreground">{ctrl.desc}</p>
+                      </div>
+                      <Switch
+                        checked={cr.contentControls[ctrl.key]}
+                        onCheckedChange={(checked) =>
+                          updateNested("creative", {
+                            contentControls: { ...cr.contentControls, [ctrl.key]: checked },
+                          })
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </div>
-          </SectionCard>
+            )}
+          </div>
 
           {/* ---- Lead Gen: location picker + instant form builder ---- */}
           {isLeadGen && <InstantFormBuilder />}
 
           {/* ---- Ads List ---- */}
-          <SectionCard>
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Layers className="size-4 text-primary" />
-                <Label className="text-sm font-semibold text-foreground">Your Ads</Label>
-                <Badge variant="secondary" className="text-xs">{ads.length} ad{ads.length !== 1 ? "s" : ""}</Badge>
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border px-5 py-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-xl bg-[#e6fff9]">
+                  <Layers className="size-4 text-[#004956]" />
+                </div>
+                <span className="text-sm font-semibold text-foreground">Your Ads</span>
+                <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{ads.length} ad{ads.length !== 1 ? "s" : ""}</span>
                 <InfoTip text="Create multiple ads with different formats to test what works best. TikTok recommends 3-5 ad variations per ad group." />
               </div>
             </div>
+            <div className="px-5 py-4">
 
             {/* Catalog Listing: auto-generated creatives */}
             {catalogEnabled && objectiveConfig.shoppingAdsType === "CATALOG_LISTING_ADS" ? (
@@ -3111,31 +3295,41 @@ export function TikTokStepCreative() {
               /* Standard ads: manual upload (Video Shopping or non-catalog) */
               <>
                 {ads.length === 0 ? (
-                  <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-border py-12">
-                    <ImagePlus className="size-10 text-muted-foreground" />
+                  <div className="flex flex-col gap-4">
                     <div className="text-center">
-                      <p className="text-sm font-medium text-foreground">No ads yet</p>
+                      <p className="text-sm font-semibold text-foreground">Choose an ad format to get started</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {catalogEnabled
                           ? "Add videos to showcase with your catalog products. Products will be attached as interactive cards."
-                          : "Add your first ad to get started. You can mix different formats."}
+                          : "Pick a format below. You can mix different formats and add more ads later."}
                       </p>
                     </div>
-                    <div className="flex flex-wrap justify-center gap-2">
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                       {AD_FORMAT_OPTIONS.filter((opt) => allowedFormats.includes(opt.value)).map((opt) => (
-                        <Button
+                        <button
                           key={opt.value}
-                          variant="outline"
-                          size="sm"
-                          className={cn(
-                            "gap-1.5 text-xs",
-                            opt.value === "SPARK_AD" && "border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
-                          )}
+                          type="button"
                           onClick={() => addAd(opt.value)}
+                          className={cn(
+                            "flex flex-col items-center gap-2 rounded-xl border px-3 py-4 text-center transition-all",
+                            "border-border bg-card hover:border-[#a4ffe5] hover:bg-[#e6fff9]",
+                            opt.value === "SPARK_AD" && "border-[#a4ffe5]/60 bg-[#e6fff9]/30"
+                          )}
                         >
-                          {opt.icon}
-                          {opt.label}
-                        </Button>
+                          <div className={cn(
+                            "flex size-10 items-center justify-center rounded-full",
+                            opt.value === "SPARK_AD" ? "bg-[#a4ffe5]" : "bg-muted/60"
+                          )}>
+                            <span className={cn("[&>svg]:size-5", opt.value === "SPARK_AD" ? "text-[#004956]" : "text-muted-foreground")}>
+                              {opt.icon}
+                            </span>
+                          </div>
+                          <p className={cn("text-xs font-bold", opt.value === "SPARK_AD" ? "text-[#004956]" : "text-foreground")}>{opt.label}</p>
+                          <p className="hidden text-[10px] leading-snug text-muted-foreground sm:block">{opt.desc}</p>
+                          {opt.recommended && (
+                            <span className="rounded-full bg-[#a4ffe5] px-2 py-0.5 text-[10px] font-medium text-[#004956]">Best</span>
+                          )}
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -3169,24 +3363,37 @@ export function TikTokStepCreative() {
   />
                     ))}
 
-                    {/* Add more ads */}
-                    <div className="rounded-lg border border-dashed border-border p-3">
-                      <span className="mb-2 block text-xs text-muted-foreground">Add another ad:</span>
-                      <div className="flex flex-wrap gap-2">
+                    {/* Add Another Ad */}
+                    <div className="rounded-xl border-2 border-dashed border-border py-6">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex size-10 items-center justify-center rounded-full bg-[#e6fff9]">
+                          <Plus className="size-5 text-[#004956]" />
+                        </div>
+                        <p className="text-sm font-bold text-[#004956]">Add Another Ad</p>
+                        <p className="text-xs text-muted-foreground">A/B test different creatives or formats to find what works best</p>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-2 px-6 sm:grid-cols-4">
                         {AD_FORMAT_OPTIONS.filter((opt) => allowedFormats.includes(opt.value)).map((opt) => (
-                          <Button
+                          <button
                             key={opt.value}
-                            variant={opt.value === "SPARK_AD" ? "outline" : "ghost"}
-                            size="sm"
-                            className={cn(
-                              "h-7 gap-1.5 text-sm",
-                              opt.value === "SPARK_AD" && "border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
-                            )}
+                            type="button"
                             onClick={() => addAd(opt.value)}
+                            className={cn(
+                              "flex flex-col items-center gap-1.5 rounded-xl border px-3 py-3 text-center transition-all",
+                              "border-border bg-card hover:border-[#a4ffe5] hover:bg-[#e6fff9]",
+                              opt.value === "SPARK_AD" && "border-[#a4ffe5]/60 bg-[#e6fff9]/30"
+                            )}
                           >
-                            {opt.icon ? <span className="[&>svg]:size-3">{opt.icon}</span> : <Plus className="size-3" />}
-                            {opt.label}
-                          </Button>
+                            <div className={cn(
+                              "flex size-8 items-center justify-center rounded-full",
+                              opt.value === "SPARK_AD" ? "bg-[#a4ffe5]" : "bg-muted/60"
+                            )}>
+                              <span className={cn("[&>svg]:size-4", opt.value === "SPARK_AD" ? "text-[#004956]" : "text-muted-foreground")}>
+                                {opt.icon}
+                              </span>
+                            </div>
+                            <span className={cn("text-[11px] font-bold", opt.value === "SPARK_AD" ? "text-[#004956]" : "text-foreground")}>{opt.label}</span>
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -3194,7 +3401,8 @@ export function TikTokStepCreative() {
                 )}
               </>
             )}
-          </SectionCard>
+            </div>
+          </div>
 
         </div>
 
