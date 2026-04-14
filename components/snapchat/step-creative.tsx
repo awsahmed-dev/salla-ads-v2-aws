@@ -260,10 +260,20 @@ export function StepCreative() {
         }
         if (ad.adDestination === "DEEP_LINK") {
           const dlp = a.deepLinkProperties;
-          allChecks.push({ label: `Ad ${i + 1} Creative ${j + 1}: deep link URI`, ok: !!(dlp?.deepLinkUri?.trim()) });
+          const pre = `Ad ${i + 1} Creative ${j + 1}`;
+          allChecks.push({ label: `${pre}: deep link URI`, ok: !!(dlp?.deepLinkUri?.trim()) });
+          allChecks.push({ label: `${pre}: app name`, ok: !!(dlp?.appName?.trim()) });
+          allChecks.push({ label: `${pre}: app icon`, ok: !!(dlp?.iconMediaId?.trim()) });
+          const plat = dlp?.appPlatform ?? "BOTH";
+          if (plat === "BOTH" || plat === "IOS") {
+            allChecks.push({ label: `${pre}: iOS App ID`, ok: !!(dlp?.iosAppId?.trim()) });
+          }
+          if (plat === "BOTH" || plat === "ANDROID") {
+            allChecks.push({ label: `${pre}: Android package`, ok: !!(dlp?.androidAppUrl?.trim()) });
+          }
           if (dlp?.fallbackType === "WEB_VIEW_FALLBACK") {
             allChecks.push({
-              label: `Ad ${i + 1} Creative ${j + 1}: fallback URL`,
+              label: `${pre}: fallback URL`,
               ok: (() => { try { return new URL(dlp?.fallbackUrl ?? "").protocol === "https:"; } catch { return false; } })(),
             });
           }
@@ -898,33 +908,24 @@ export function StepCreative() {
                       Add Dynamic Ad
                     </button>
                   ) : (
-                  <>
-                  <button
-                    type="button"
-                    onClick={() => setShowNewAdPicker((v) => !v)}
-                    className="flex w-full flex-col items-center gap-1 px-4 py-4 transition-colors hover:bg-primary/[0.03]"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="flex size-6 items-center justify-center rounded-full bg-primary/10">
-                        <Plus className="size-3.5 text-primary" />
+                  <div className="px-4 py-6">
+                    <div className="rounded-xl border-2 border-dashed border-border py-6">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex size-10 items-center justify-center rounded-full bg-[#e6fff9]">
+                          <Plus className="size-5 text-[#004956]" />
+                        </div>
+                        <p className="text-sm font-bold text-[#004956]">Add Another Ad</p>
+                        <p className="text-xs text-muted-foreground">A/B test different creatives or formats to find what works best</p>
                       </div>
-                      <span className="text-sm font-semibold text-primary">Add Another Ad</span>
-                      {showNewAdPicker ? <ChevronUp className="size-3.5 text-primary" /> : <ChevronDown className="size-3.5 text-primary" />}
-                    </div>
-                    <span className="text-[11px] text-muted-foreground">A/B test different creatives or formats to find what works best</span>
-                  </button>
-                  {showNewAdPicker && (
-                    <div className="border-t border-border px-4 pb-4 pt-3">
-                      <p className="mb-3 text-xs text-muted-foreground">Choose a format for your new ad:</p>
                       {freqCapLockedFormat && (
-                        <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                        <div className="mx-6 mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                           <Info className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
                           <p className="text-[11px] leading-relaxed text-amber-700">
-                            Frequency cap requires all ads to use the same format (<span className="font-semibold">{FILTERED_AD_FORMATS.find((f) => f.value === freqCapLockedFormat)?.label ?? freqCapLockedFormat}</span>). Disable frequency cap in Budget settings to use multiple formats.
+                            Frequency cap requires all ads to use the same format (<span className="font-semibold">{FILTERED_AD_FORMATS.find((f) => f.value === freqCapLockedFormat)?.label ?? freqCapLockedFormat}</span>). Disable frequency cap to use multiple formats.
                           </p>
                         </div>
                       )}
-                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="mt-4 grid grid-cols-2 gap-2 px-6 sm:grid-cols-3 lg:grid-cols-5">
                         {FILTERED_AD_FORMATS.map((opt) => {
                           const lockedOut = freqCapLockedFormat !== null && opt.value !== freqCapLockedFormat;
                           return (
@@ -932,24 +933,24 @@ export function StepCreative() {
                               key={opt.value}
                               type="button"
                               disabled={lockedOut}
-                              onClick={() => { addAd(opt.value); setShowNewAdPicker(false); }}
+                              onClick={() => addAd(opt.value)}
                               className={cn(
-                                "flex flex-col items-center gap-2 rounded-lg border bg-background px-3 py-3 text-center transition-all",
+                                "flex flex-col items-center gap-1.5 rounded-xl border px-3 py-3 text-center transition-all",
                                 lockedOut
                                   ? "cursor-not-allowed border-border/50 opacity-40"
-                                  : "border-border hover:border-primary/40 hover:bg-primary/[0.02]"
+                                  : "border-border bg-card hover:border-[#a4ffe5] hover:bg-[#e6fff9]"
                               )}
                             >
-                              <span className="shrink-0 text-muted-foreground [&>svg]:size-5">{opt.icon}</span>
-                              <p className="text-xs font-medium text-foreground">{opt.label}</p>
-                              <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">{opt.desc}</p>
+                              <div className={cn("flex size-8 items-center justify-center rounded-full", "bg-muted/60")}>
+                                <span className="text-muted-foreground [&>svg]:size-4">{opt.icon}</span>
+                              </div>
+                              <span className="text-[11px] font-bold text-foreground">{opt.label}</span>
                             </button>
                           );
                         })}
                       </div>
                     </div>
-                  )}
-                  </>
+                  </div>
                   )}
                 </div>
               </div>

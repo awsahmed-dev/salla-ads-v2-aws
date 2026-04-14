@@ -502,6 +502,12 @@ export interface AppSettings {
 export interface DeepLinkProperties {
   /** Deep link URI scheme (e.g. "myapp://product/123") */
   deepLinkUri: string;
+  /** Snap API: app_name — required, max 30 chars */
+  appName: string;
+  /** Snap API: icon_media_id — required, the uploaded app icon media ID */
+  iconMediaId: string;
+  /** Which platforms to target: determines which of ios_app_id / android_app_url are required */
+  appPlatform: "BOTH" | "IOS" | "ANDROID";
   /** iOS App ID for Universal Links fallback */
   iosAppId?: string;
   /** Android package name for App Links fallback */

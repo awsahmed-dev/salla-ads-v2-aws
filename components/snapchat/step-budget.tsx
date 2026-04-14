@@ -575,6 +575,10 @@ export function StepBudget() {
                 ...(!isNewGoalAcceleratedCompatible && budget.pacingType === "ACCELERATED"
                   ? { pacingType: "STANDARD" }
                   : {}),
+                // Frequency cap only supported for IMPRESSIONS goal — auto-disable when switching away
+                ...(newGoal !== "IMPRESSIONS" && budget.frequencyCapEnabled
+                  ? { frequencyCapEnabled: false }
+                  : {}),
               });
             }}
             layout="grid"
@@ -791,7 +795,8 @@ export function StepBudget() {
               )}
 
               {/* -- Frequency Capping (Snapchat API: ad_squad.cap_and_exclusion_config.frequency_cap_config) -- */}
-              {(() => {
+              {/* Snap API only supports frequency cap when optimization_goal = IMPRESSIONS */}
+              {budget.optimizationGoal === "IMPRESSIONS" && (() => {
                 const FREQ_PRESETS = [
                   { id: "conservative", label: "Conservative", count: 2, interval: 168, window: "7 days", hint: "Less fatigue" },
                   { id: "balanced", label: "Balanced", count: 4, interval: 168, window: "7 days", hint: "Recommended", recommended: true },

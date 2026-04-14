@@ -664,47 +664,182 @@ export function CreativeCard({
                 </div>
               )}
 
-              {isDeepLink && (
-                <div className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/[0.02] p-3">
-                  <div className="flex items-center gap-1.5">
-                    <Link2 className="size-3 text-primary" />
-                    <Label className="text-xs font-semibold text-foreground">Deep Link Configuration</Label>
-                    <InfoTip text="Deep links open content directly inside your mobile app. Users who don't have the app will see the fallback page instead." />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-[10px] font-medium text-muted-foreground">Deep Link URI</Label>
-                    <Input placeholder="myapp://product/123" value={asset.deepLinkProperties?.deepLinkUri ?? ""} onChange={(e) => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: e.target.value, fallbackUrl: asset.deepLinkProperties?.fallbackUrl ?? "", fallbackType: asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK" } })} className="h-8 text-xs font-mono" />
-                    <p className="text-[9px] text-muted-foreground">Your app&apos;s custom URL scheme (e.g. myapp://path)</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-[10px] font-medium text-muted-foreground">iOS App ID</Label>
-                      <Input placeholder="123456789" value={asset.deepLinkProperties?.iosAppId ?? ""} onChange={(e) => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: asset.deepLinkProperties?.deepLinkUri ?? "", iosAppId: e.target.value || undefined, fallbackUrl: asset.deepLinkProperties?.fallbackUrl ?? "", fallbackType: asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK" } })} className="h-8 text-xs" />
+              {isDeepLink && (() => {
+                const dlp = asset.deepLinkProperties;
+                const updateDlp = (patch: Record<string, unknown>) => onUpdate({
+                  deepLinkProperties: {
+                    deepLinkUri: dlp?.deepLinkUri ?? "",
+                    appName: dlp?.appName ?? "",
+                    iconMediaId: dlp?.iconMediaId ?? "",
+                    appPlatform: dlp?.appPlatform ?? "BOTH",
+                    fallbackUrl: dlp?.fallbackUrl ?? "",
+                    fallbackType: dlp?.fallbackType ?? "WEB_VIEW_FALLBACK",
+                    iosAppId: dlp?.iosAppId,
+                    androidAppUrl: dlp?.androidAppUrl,
+                    ...patch,
+                  },
+                });
+                const platform = dlp?.appPlatform ?? "BOTH";
+                const showIos = platform === "BOTH" || platform === "IOS";
+                const showAndroid = platform === "BOTH" || platform === "ANDROID";
+
+                return (
+                  <div className="flex flex-col gap-4 rounded-lg border border-primary/30 bg-primary/[0.02] p-3">
+                    {/* Header */}
+                    <div className="flex items-center gap-1.5">
+                      <Link2 className="size-3 text-primary" />
+                      <Label className="text-xs font-semibold text-foreground">Deep Link Configuration</Label>
+                      <InfoTip text="Deep links open content directly inside your mobile app. Users who don't have the app will see the fallback page instead." />
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-[10px] font-medium text-muted-foreground">Android Package</Label>
-                      <Input placeholder="com.example.app" value={asset.deepLinkProperties?.androidAppUrl ?? ""} onChange={(e) => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: asset.deepLinkProperties?.deepLinkUri ?? "", androidAppUrl: e.target.value || undefined, fallbackUrl: asset.deepLinkProperties?.fallbackUrl ?? "", fallbackType: asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK" } })} className="h-8 text-xs font-mono" />
+
+                    {/* ── Section 1: App Details ── */}
+                    <div className="flex flex-col gap-3 rounded-md border border-border bg-background p-3">
+                      <p className="text-xs font-semibold text-foreground">App Details</p>
+
+                      {/* App Name */}
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-medium text-muted-foreground">App Name <span className="text-destructive">*</span></Label>
+                          <span className="text-xs text-muted-foreground">{(dlp?.appName ?? "").length}/30</span>
+                        </div>
+                        <Input
+                          placeholder="My Store App"
+                          maxLength={30}
+                          value={dlp?.appName ?? ""}
+                          onChange={(e) => updateDlp({ appName: e.target.value })}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+
+                      {/* App Icon */}
+                      <div className="flex flex-col gap-1">
+                        <Label className="text-xs font-medium text-muted-foreground">App Icon <span className="text-destructive">*</span></Label>
+                        {dlp?.iconMediaId ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex size-10 items-center justify-center rounded-lg border border-border bg-muted">
+                              <CheckCircle2 className="size-4 text-emerald-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="truncate text-xs text-foreground">Icon uploaded</p>
+                              <p className="text-xs text-muted-foreground">{dlp.iconMediaId.slice(0, 16)}…</p>
+                            </div>
+                            <button type="button" onClick={() => updateDlp({ iconMediaId: "" })} className="text-muted-foreground hover:text-destructive"><X className="size-3.5" /></button>
+                          </div>
+                        ) : (
+                          <Input
+                            placeholder="Paste icon media ID from Snap"
+                            value=""
+                            onChange={(e) => updateDlp({ iconMediaId: e.target.value })}
+                            className="h-8 text-xs font-mono"
+                          />
+                        )}
+                        <p className="text-xs text-muted-foreground">Upload your icon via Snapchat Media Library, then paste the media ID here.</p>
+                      </div>
+
+                      {/* Platform Selector */}
+                      <div className="flex flex-col gap-1.5">
+                        <Label className="text-xs font-medium text-muted-foreground">App Platform <span className="text-destructive">*</span></Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(["BOTH", "IOS", "ANDROID"] as const).map((p) => (
+                            <button
+                              key={p}
+                              type="button"
+                              onClick={() => updateDlp({
+                                appPlatform: p,
+                                ...(p === "IOS" ? { androidAppUrl: undefined } : {}),
+                                ...(p === "ANDROID" ? { iosAppId: undefined } : {}),
+                              })}
+                              className={cn(
+                                "flex items-center justify-center rounded-lg border py-2 text-xs font-medium transition-colors",
+                                platform === p
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                              )}
+                            >
+                              {p === "BOTH" ? "Both" : p === "IOS" ? "iOS" : "Android"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* iOS / Android inputs */}
+                      <div className={cn("grid gap-2", showIos && showAndroid ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
+                        {showIos && (
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs font-medium text-muted-foreground">iOS App ID <span className="text-destructive">*</span></Label>
+                            <Input
+                              placeholder="123456789"
+                              value={dlp?.iosAppId ?? ""}
+                              onChange={(e) => updateDlp({ iosAppId: e.target.value || undefined })}
+                              className="h-8 text-xs"
+                            />
+                            <p className="text-xs text-muted-foreground">From your App Store listing URL</p>
+                          </div>
+                        )}
+                        {showAndroid && (
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs font-medium text-muted-foreground">Android Package <span className="text-destructive">*</span></Label>
+                            <Input
+                              placeholder="com.example.app"
+                              value={dlp?.androidAppUrl ?? ""}
+                              onChange={(e) => updateDlp({ androidAppUrl: e.target.value || undefined })}
+                              className="h-8 text-xs font-mono"
+                            />
+                            <p className="text-xs text-muted-foreground">Package name from Google Play listing</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ── Section 2: Deep Link & Fallback ── */}
+                    <div className="flex flex-col gap-3 rounded-md border border-border bg-background p-3">
+                      <p className="text-xs font-semibold text-foreground">Deep Link &amp; Fallback</p>
+
+                      {/* Deep Link URI */}
+                      <div className="flex flex-col gap-1">
+                        <Label className="text-xs font-medium text-muted-foreground">Deep Link URI <span className="text-destructive">*</span></Label>
+                        <Input
+                          placeholder="myapp://product/123"
+                          value={dlp?.deepLinkUri ?? ""}
+                          onChange={(e) => updateDlp({ deepLinkUri: e.target.value })}
+                          className="h-8 text-xs font-mono"
+                        />
+                        <p className="text-xs text-muted-foreground">Your app&apos;s custom URL scheme (e.g. myapp://path)</p>
+                      </div>
+
+                      {/* Fallback Type + URL */}
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="flex flex-col gap-1">
+                          <Label className="text-xs font-medium text-muted-foreground">Fallback Type</Label>
+                          <Select
+                            value={dlp?.fallbackType ?? "WEB_VIEW_FALLBACK"}
+                            onValueChange={(v: "WEB_VIEW_FALLBACK" | "APP_STORE_FALLBACK") => updateDlp({ fallbackType: v })}
+                          >
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="WEB_VIEW_FALLBACK">Open web page</SelectItem>
+                              <SelectItem value="APP_STORE_FALLBACK">Open app store</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {(dlp?.fallbackType ?? "WEB_VIEW_FALLBACK") === "WEB_VIEW_FALLBACK" && (
+                          <div className="flex flex-col gap-1">
+                            <Label className="text-xs font-medium text-muted-foreground">Fallback URL <span className="text-destructive">*</span></Label>
+                            <Input
+                              placeholder="https://yoursite.com/product"
+                              type="url"
+                              value={dlp?.fallbackUrl ?? ""}
+                              onChange={(e) => updateDlp({ fallbackUrl: e.target.value })}
+                              className="h-8 text-xs"
+                            />
+                            <p className="text-xs text-muted-foreground">Where users go if the app isn&apos;t installed</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-[10px] font-medium text-muted-foreground">Fallback URL</Label>
-                      <Input placeholder="https://yoursite.com/product" type="url" value={asset.deepLinkProperties?.fallbackUrl ?? ""} onChange={(e) => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: asset.deepLinkProperties?.deepLinkUri ?? "", fallbackUrl: e.target.value, fallbackType: asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK" } })} className="h-8 text-xs" />
-                      <p className="text-[9px] text-muted-foreground">Where users go if the app isn&apos;t installed</p>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-[10px] font-medium text-muted-foreground">Fallback Type</Label>
-                      <Select value={asset.deepLinkProperties?.fallbackType ?? "WEB_VIEW_FALLBACK"} onValueChange={(v: "WEB_VIEW_FALLBACK" | "APP_STORE_FALLBACK") => onUpdate({ deepLinkProperties: { ...asset.deepLinkProperties, deepLinkUri: asset.deepLinkProperties?.deepLinkUri ?? "", fallbackUrl: asset.deepLinkProperties?.fallbackUrl ?? "", fallbackType: v } })}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="WEB_VIEW_FALLBACK">Open web page</SelectItem>
-                          <SelectItem value="APP_STORE_FALLBACK">Open app store</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {isLeadGen && (
                 <p className="flex items-center gap-1.5 text-[10px] text-blue-600"><Info className="size-3 shrink-0" />Swipe-up opens the Lead Generation Form. No URL needed.</p>
