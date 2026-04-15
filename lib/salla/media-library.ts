@@ -402,6 +402,66 @@ export async function searchMedia(query: string, filter: MediaFilter = "ALL"): P
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Music Library                                                      */
+/* ------------------------------------------------------------------ */
+
+export type MusicGenre =
+  | "Pop"
+  | "Electronic"
+  | "Ambient"
+  | "Corporate"
+  | "Upbeat"
+  | "Hip Hop"
+  | "Acoustic"
+  | "Cinematic";
+
+export interface MusicTrack {
+  id: string;
+  name: string;
+  artist: string;
+  genre: MusicGenre;
+  /** Duration in seconds */
+  duration: number;
+  /** Preview URL (optional — CML stubs may not have one) */
+  url: string;
+  /** TikTok Commercial Music Library music_id */
+  musicId?: string;
+}
+
+export const MOCK_MUSIC_TRACKS: MusicTrack[] = [
+  { id: "t1", name: "Upbeat Shopping", artist: "TikTok CML", genre: "Pop", duration: 15, url: "", musicId: "cml_001" },
+  { id: "t2", name: "Summer Vibes", artist: "TikTok CML", genre: "Electronic", duration: 30, url: "", musicId: "cml_002" },
+  { id: "t3", name: "Clean Corporate", artist: "TikTok CML", genre: "Corporate", duration: 20, url: "", musicId: "cml_003" },
+  { id: "t4", name: "Sunrise Ambience", artist: "TikTok CML", genre: "Ambient", duration: 45, url: "", musicId: "cml_004" },
+  { id: "t5", name: "Energy Boost", artist: "TikTok CML", genre: "Upbeat", duration: 18, url: "", musicId: "cml_005" },
+  { id: "t6", name: "Street Beat", artist: "TikTok CML", genre: "Hip Hop", duration: 22, url: "", musicId: "cml_006" },
+  { id: "t7", name: "Morning Coffee", artist: "TikTok CML", genre: "Acoustic", duration: 28, url: "", musicId: "cml_007" },
+  { id: "t8", name: "Epic Launch", artist: "TikTok CML", genre: "Cinematic", duration: 35, url: "", musicId: "cml_008" },
+  { id: "t9", name: "Festive Friday", artist: "TikTok CML", genre: "Pop", duration: 24, url: "", musicId: "cml_009" },
+  { id: "t10", name: "Neon Nights", artist: "TikTok CML", genre: "Electronic", duration: 40, url: "", musicId: "cml_010" },
+  { id: "t11", name: "Workspace Flow", artist: "TikTok CML", genre: "Corporate", duration: 26, url: "", musicId: "cml_011" },
+  { id: "t12", name: "Trending Hook", artist: "TikTok CML", genre: "Upbeat", duration: 15, url: "", musicId: "cml_012" },
+];
+
+export async function fetchMusicLibrary(): Promise<MusicTrack[]> {
+  await new Promise((r) => setTimeout(r, 150));
+  return [...MOCK_MUSIC_TRACKS];
+}
+
+export async function searchMusic(query: string, genre?: MusicGenre | "ALL"): Promise<MusicTrack[]> {
+  const q = query.toLowerCase().trim();
+  let items = [...MOCK_MUSIC_TRACKS];
+  if (genre && genre !== "ALL") items = items.filter((t) => t.genre === genre);
+  if (!q) return items;
+  return items.filter(
+    (t) =>
+      t.name.toLowerCase().includes(q) ||
+      t.artist.toLowerCase().includes(q) ||
+      t.genre.toLowerCase().includes(q)
+  );
+}
+
 export async function addMediaToLibrary(
   file: File,
   meta?: { usage?: MediaUsage; aspect?: MediaAspect }
