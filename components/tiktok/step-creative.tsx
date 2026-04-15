@@ -43,7 +43,6 @@ import {
   AlertCircle,
   User,
   LayoutGrid,
-  ShieldCheck,
   Layers,
   Copy,
   Video,
@@ -85,7 +84,8 @@ import {
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
 import { UploadZone } from "@/components/shared/upload-zone";
-import { LinkPickerSheet } from "@/components/snapchat/creative/link-picker-sheet";
+import { LinkTypeSection } from "@/components/shared/link-type-section";
+import { MusicLibrarySheet } from "@/components/shared/music-library-sheet";
 import type {
   TikTokAdFormat,
   TikTokCTA,
@@ -209,235 +209,6 @@ function getFormatLabel(format: TikTokAdFormat): string {
   return AD_FORMAT_OPTIONS.find((o) => o.value === format)?.label ?? format;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Link Type Pills — product-first URL selection                     */
-/* ------------------------------------------------------------------ */
-
-type LinkType = "store" | "product" | "category" | "landing" | "custom";
-
-const LINK_PILL_OPTIONS: { value: LinkType; label: string; icon: React.ElementType }[] = [
-  { value: "store", label: "Store", icon: Store },
-  { value: "product", label: "Product", icon: Package },
-  { value: "category", label: "Category", icon: Tag },
-  { value: "landing", label: "Landing Page", icon: Globe },
-  { value: "custom", label: "Custom URL", icon: Link2 },
-];
-
-const MOCK_STORE_URL = "https://yourstore.salla.sa";
-
-function TikTokLinkPills({
-  ad,
-  onUpdate,
-  optional = false,
-}: {
-  ad: TikTokAd;
-  onUpdate: (ad: TikTokAd) => void;
-  optional?: boolean;
-}) {
-  const [linkType, setLinkType] = useState<LinkType>(() => {
-    if (!ad.landingPageUrl) return "store";
-    if (ad.landingPageUrl === MOCK_STORE_URL) return "store";
-    return "custom";
-  });
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerMode, setPickerMode] = useState<"product" | "category" | "landing_page">("product");
-
-  const openPicker = (mode: "product" | "category" | "landing_page") => {
-    setPickerMode(mode);
-    setPickerOpen(true);
-  };
-
-  const handlePillClick = (type: LinkType) => {
-    setLinkType(type);
-    if (type === "store") {
-      onUpdate({ ...ad, landingPageUrl: MOCK_STORE_URL });
-    } else if (type === "product") {
-      openPicker("product");
-    } else if (type === "category") {
-      openPicker("category");
-    } else if (type === "landing") {
-      openPicker("landing_page");
-    }
-  };
-
-  const handlePickerSelect = (url: string, label: string) => {
-    onUpdate({
-      ...ad,
-      landingPageUrl: url,
-      ...(label && !ad.adText ? { adText: label.slice(0, 100) } : {}),
-      ...(linkType === "product" ? { callToAction: "SHOP_NOW" as TikTokCTA } : {}),
-    });
-    setPickerOpen(false);
-  };
-
-  return (
-    <div className="flex flex-col gap-2.5">
-      <div className="flex flex-wrap gap-2">
-        {LINK_PILL_OPTIONS.map((pill) => {
-          const active = linkType === pill.value;
-          return (
-            <button
-              key={pill.value}
-              type="button"
-              onClick={() => handlePillClick(pill.value)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg border px-4 py-2 text-xs font-medium transition-colors",
-                active
-                  ? "border-primary/60 bg-primary/[0.06] text-primary"
-                  : "border-border bg-white text-foreground hover:border-primary/30"
-              )}
-            >
-              <pill.icon className="size-3" />
-              {pill.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Store URL — read-only with Auto UTM badge */}
-      {linkType === "store" && (
-        <div className="flex h-10 items-center justify-between rounded-lg border border-border bg-muted/40 px-3">
-          <span className="truncate text-sm text-muted-foreground">{MOCK_STORE_URL}</span>
-          <button
-            type="button"
-            title="UTM parameters are auto-appended for tracking"
-            className="group/utm flex shrink-0 items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-200"
-          >
-            Auto UTM
-            <Info className="size-2.5 text-emerald-500 transition-colors group-hover/utm:text-emerald-700" />
-          </button>
-        </div>
-      )}
-
-      {/* Product/Category/Landing — clickable selector */}
-      {(linkType === "product" || linkType === "category" || linkType === "landing") && (
-        <div
-          onClick={() => openPicker(linkType === "landing" ? "landing_page" : linkType as "product" | "category" | "landing_page")}
-          className={cn(
-            "flex h-10 cursor-pointer items-center justify-between rounded-lg border px-3 transition-colors hover:border-primary/40",
-            ad.landingPageUrl && ad.landingPageUrl !== MOCK_STORE_URL ? "border-primary/40 bg-primary/5" : "border-border bg-muted/40"
-          )}
-        >
-          {ad.landingPageUrl && ad.landingPageUrl !== MOCK_STORE_URL ? (
-            <>
-              <span className="truncate text-sm text-foreground">{ad.landingPageUrl}</span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onUpdate({ ...ad, landingPageUrl: "" }); }}
-                className="shrink-0 ml-2 rounded p-0.5 text-muted-foreground hover:text-destructive"
-              >
-                <X className="size-3" />
-              </button>
-            </>
-          ) : (
-            <span className="text-sm text-muted-foreground">
-              {linkType === "product" ? "Select a product..." : linkType === "category" ? "Select a category..." : "Select a page..."}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Custom URL — editable input */}
-      {linkType === "custom" && (
-        <div className="flex flex-col gap-1">
-          <Input
-            placeholder={optional ? "https://yourstore.salla.sa (optional)" : "https://yourstore.salla.sa/product"}
-            type="url"
-            value={ad.landingPageUrl}
-            onChange={(e) => onUpdate({ ...ad, landingPageUrl: e.target.value })}
-            className={cn("h-10 text-sm", ad.landingPageUrl && !ad.landingPageUrl.startsWith("https://") && "border-red-400")}
-          />
-          {ad.landingPageUrl && !ad.landingPageUrl.startsWith("https://") && (
-            <p className="text-[10px] text-red-600">URL must start with https://</p>
-          )}
-        </div>
-      )}
-
-      <LinkPickerSheet
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        mode={pickerMode}
-        onSelect={handlePickerSelect}
-      />
-    </div>
-  );
-}
-
-/**
- * Shared tracking URL section -- click_tracking_url, impression_tracking_url, AIGC disclosure.
- * Used by Single Video, Single Image, and Carousel formats.
- */
-function AdTrackingSection({ ad, onUpdate }: { ad: TikTokAd; onUpdate: (ad: TikTokAd) => void }) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <div className="rounded-lg border border-border bg-muted/10">
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between px-3 py-2.5"
-      >
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="size-3.5 text-muted-foreground" />
-          <span className="text-xs font-medium text-foreground">Tracking & Advanced</span>
-        </div>
-        {expanded ? <ChevronUp className="size-3.5 text-muted-foreground" /> : <ChevronDown className="size-3.5 text-muted-foreground" />}
-      </button>
-      {expanded && (
-        <div className="flex flex-col gap-3 border-t border-border px-3 pb-3 pt-2.5">
-          {/* Click tracking URL */}
-          <div className="flex flex-col gap-1">
-            <Label className="text-[11px] font-medium text-muted-foreground">Click Tracking URL</Label>
-            <Input
-              placeholder="https://tracking.example.com/click?..."
-              type="url"
-              value={ad.clickTrackingUrl || ""}
-              onChange={(e) => onUpdate({ ...ad, clickTrackingUrl: e.target.value })}
-              className="h-7 text-[11px]"
-            />
-            <p className="text-[10px] text-muted-foreground">Third-party click tracker. Maps to <code className="rounded bg-muted px-1 text-[10px]">click_tracking_url</code>.</p>
-          </div>
-          {/* Impression tracking URL */}
-          <div className="flex flex-col gap-1">
-            <Label className="text-[11px] font-medium text-muted-foreground">Impression Tracking URL</Label>
-            <Input
-              placeholder="https://tracking.example.com/impression?..."
-              type="url"
-              value={ad.impressionTrackingUrl || ""}
-              onChange={(e) => onUpdate({ ...ad, impressionTrackingUrl: e.target.value })}
-              className="h-7 text-[11px]"
-            />
-            <p className="text-[10px] text-muted-foreground">Third-party impression tracker. Maps to <code className="rounded bg-muted px-1 text-[10px]">impression_tracking_url</code>.</p>
-          </div>
-          {/* AIGC Disclosure */}
-          <div className="flex items-center justify-between">
-            <div>
-              <Label className="text-[11px] font-medium text-foreground">AI-Generated Content Disclosure</Label>
-              <p className="text-[10px] text-muted-foreground">Declare if this ad uses AI-generated content. Maps to <code className="rounded bg-muted px-1 text-[10px]">aigc_disclosure_type</code>.</p>
-            </div>
-            <Switch
-              checked={ad.aigcDisclosureType === "DECLARED"}
-              onCheckedChange={(checked) => onUpdate({ ...ad, aigcDisclosureType: checked ? "DECLARED" : "NOT_DECLARED" })}
-            />
-          </div>
-          {/* Deep link (app) */}
-          <div className="flex flex-col gap-1">
-            <Label className="text-[11px] font-medium text-muted-foreground">App Deep Link (optional)</Label>
-            <Input
-              placeholder="myapp://product/123"
-              value={ad.deeplink || ""}
-              onChange={(e) => onUpdate({ ...ad, deeplink: e.target.value })}
-              className="h-7 font-mono text-[11px]"
-            />
-            <p className="text-[10px] text-muted-foreground">Deep link for users who have your app. Maps to <code className="rounded bg-muted px-1 text-[10px]">deeplink</code>.</p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Upload Drop Zone (matches Snap pattern)                            */
 /* ------------------------------------------------------------------ */
 /*  TikTok Campaign Readiness (matches Snapchat pattern)               */
 /* ------------------------------------------------------------------ */
@@ -889,6 +660,37 @@ function AdPanel({
 }) {
   const [editingName, setEditingName] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [musicSheetOpen, setMusicSheetOpen] = useState(false);
+  const handleMusicSelect = useCallback(
+    (music: { url: string; file?: File; name: string; musicId?: string }) => {
+      onUpdate({
+        ...ad,
+        musicFile: music.file,
+        musicUrl: music.url,
+        musicId: music.musicId || "",
+        musicName: music.name,
+        promotionalMusicDisabled: false,
+      });
+    },
+    [ad, onUpdate]
+  );
+  const handleMusicClear = useCallback(() => {
+    onUpdate({
+      ...ad,
+      musicFile: undefined,
+      musicUrl: "",
+      musicId: "",
+      musicName: "",
+    });
+  }, [ad, onUpdate]);
+  const musicDisplayName =
+    ad.musicFile?.name || ad.musicName || (ad.musicId ? "Library track" : "");
+  const musicSizeLabel = ad.musicFile
+    ? `${(ad.musicFile.size / 1024).toFixed(0)} KB`
+    : ad.musicId
+      ? "TikTok CML"
+      : "";
+  const hasMusic = Boolean(ad.musicFile || ad.musicUrl || ad.musicId);
   const isSpark = ad.adFormat === "SPARK_AD";
   const isCarousel = ad.adFormat === "CAROUSEL";
   const assetCount = ad.assets.length;
@@ -947,6 +749,7 @@ function AdPanel({
   );
 
   const changeFormat = (val: TikTokAdFormat) => {
+    const keepMusic = val === "CAROUSEL";
     onUpdate({
       ...ad,
       adFormat: val,
@@ -954,8 +757,12 @@ function AdPanel({
       assets: val !== ad.adFormat ? [] : ad.assets,
       carouselCards: val === "CAROUSEL" ? ad.carouselCards : [],
       sparkAdAuthCode: val === "SPARK_AD" ? ad.sparkAdAuthCode : "",
-      musicFile: val === "CAROUSEL" ? ad.musicFile : undefined,
-      musicUrl: val === "CAROUSEL" ? ad.musicUrl : "",
+      // Reset all music fields together when leaving Carousel so no stale
+      // musicId/musicName leaks into the payload on a follow-up format switch.
+      musicFile: keepMusic ? ad.musicFile : undefined,
+      musicUrl: keepMusic ? ad.musicUrl : "",
+      musicId: keepMusic ? ad.musicId : "",
+      musicName: keepMusic ? ad.musicName : "",
       // Carousel: music enabled by default (required). Others: disabled by default (optional).
       promotionalMusicDisabled: val !== "CAROUSEL",
     });
@@ -1076,134 +883,115 @@ function AdPanel({
 
           {/* ---- SPARK AD ---- */}
           {isSpark && (
-            <div className="flex flex-col gap-4">
-              <div className="rounded-lg border border-primary/30 bg-primary/[0.03] p-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <Sparkles className="size-4 text-primary" />
-                  <p className="text-xs font-semibold text-foreground">Spark Ad Authorization</p>
-                </div>
-                <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
-                  Spark Ads promote an existing organic TikTok post. The display name, caption, video, and profile image all come from the original post. Enter the per-video authorization code below.
-                </p>
+            <div className="flex flex-col gap-0">
 
-                {/* Authorization method */}
-                <div className="mb-3 flex flex-col gap-1.5">
-                  <Label className="text-xs font-medium text-foreground">How to get the code</Label>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <div className="rounded-lg border border-border bg-card p-2.5">
-                      <p className="text-[11px] font-medium text-foreground">From your own post</p>
-                      <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
-                        Open post in TikTok app &gt; Tap &quot;...&quot; &gt; Ad settings &gt; Authorize
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-border bg-card p-2.5">
-                      <p className="text-[11px] font-medium text-foreground">From a creator</p>
-                      <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
-                        Creator generates code in TikTok app, shares it with you (valid 7-365 days)
-                      </p>
-                    </div>
+              {/* ── Section 1: Authorization Code ── */}
+              <div className="flex flex-col gap-4 px-3 py-3">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="size-3 text-primary" />
+                    <Label className="text-sm font-medium text-foreground">Spark Ad Code</Label>
                   </div>
-                </div>
-
-                {/* Auth code input */}
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">Authorization Code / Post URL</Label>
-                  <Input
-                    placeholder="e.g. abc123def456 or https://www.tiktok.com/@user/video/..."
-                    value={ad.sparkAdAuthCode}
-                    onChange={(e) => onUpdate({ ...ad, sparkAdAuthCode: e.target.value })}
-                    className="h-9 font-mono text-xs"
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    Maps to API <code className="rounded bg-muted px-1 text-[10px]">tiktok_item_id</code>. Private posts become public during promotion.
+                  <p className="text-xs text-muted-foreground">
+                    Promote an existing TikTok post. Paste the authorization code from the post owner below.
                   </p>
                 </div>
 
+                <div className="flex flex-col gap-1">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Paste authorization code or post URL..."
+                      value={ad.sparkAdAuthCode}
+                      onChange={(e) => onUpdate({ ...ad, sparkAdAuthCode: e.target.value })}
+                      className="h-10 flex-1 font-mono text-sm"
+                    />
+                  </div>
+                  {!ad.sparkAdAuthCode && (
+                    <p className="text-[10px] text-muted-foreground">The creator shares this code from their TikTok app. Private posts become public during promotion.</p>
+                  )}
+                </div>
+
+                {/* Warning: not yet entered */}
+                {!ad.sparkAdAuthCode && (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5">
+                    <AlertCircle className="size-3 shrink-0 text-amber-600" />
+                    <span className="text-xs text-amber-700">Enter the authorization code to link this Spark Ad to a TikTok post</span>
+                  </div>
+                )}
+
+                {/* Success: code entered */}
                 {ad.sparkAdAuthCode && (
-                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2">
-                    <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
-                    <div>
-                      <p className="text-xs font-medium text-emerald-700">Auth code received</p>
-                      <p className="text-[10px] text-emerald-600">Post will be verified on submission. Caption cannot be edited on Spark Ads.</p>
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
+                      <p className="text-xs font-medium text-emerald-800">Authorization code linked</p>
                     </div>
+                    <p className="mt-1 pl-5.5 text-[10px] text-emerald-600">
+                      The post&apos;s video, caption, profile, and music will be used in your ad.
+                    </p>
                   </div>
                 )}
               </div>
 
-              {/* What Spark Ads include automatically */}
-              <div className="rounded-lg border border-border bg-muted/20 p-3">
-                <p className="mb-2 text-[11px] font-medium text-muted-foreground">Inherited from original post</p>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                  {["Video/Image creative", "Caption text", "Profile name & avatar", "Likes & comments", "Music/audio", "Hashtags"].map((item) => (
-                    <div key={item} className="flex items-center gap-1.5">
-                      <CheckCircle2 className="size-2.5 text-primary" />
-                      <span className="text-[10px] text-muted-foreground">{item}</span>
-                    </div>
-                  ))}
-                </div>
+              {/* ── Section 2: Link Type + CTA ── */}
+              <div className="border-t border-border px-3 py-3">
+                <LinkTypeSection
+                  url={ad.landingPageUrl}
+                  onUrlChange={(url) => onUpdate({ ...ad, landingPageUrl: url })}
+                  cta={ad.callToAction}
+                  onCtaChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}
+                  recommendedCtas={RECOMMENDED_CTAS}
+                  otherCtas={OTHER_CTAS}
+                />
               </div>
 
-              {/* CTA + Landing (optional overrides for Spark) */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-medium text-muted-foreground">Call to Action (optional)</Label>
-                  <Select value={ad.callToAction} onValueChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {CTA_OPTIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground">Landing URL (optional)</Label>
-                    <Link2 className="size-2.5 text-muted-foreground" />
-                  </div>
-                  <Input
-                    placeholder="https://yourstore.salla.sa"
-                    type="url"
-                    value={ad.landingPageUrl}
-                    onChange={(e) => onUpdate({ ...ad, landingPageUrl: e.target.value })}
-                    className="h-8 text-xs"
-                  />
-                </div>
-              </div>
+              {/* ── Advanced Options ── */}
+              <div className="border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setAdvancedOpen(!advancedOpen)}
+                  className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-foreground hover:text-foreground"
+                >
+                  <span>Advanced Options</span>
+                  {advancedOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                </button>
 
-              {/* Spark Ad interaction settings */}
-              <div className="rounded-lg border border-border bg-muted/10 p-3">
-                <p className="mb-2 text-[11px] font-medium text-muted-foreground">Post Interaction Settings</p>
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-xs font-medium text-foreground">Allow Duet</Label>
-                      <p className="text-[10px] text-muted-foreground">Maps to <code className="rounded bg-muted px-1 text-[10px]">item_duet_status</code></p>
+                {advancedOpen && (
+                  <div className="flex flex-col gap-4 px-3 pb-4">
+                    <div className="flex flex-col gap-0 rounded-lg border border-border">
+                      {/* Allow Duet */}
+                      <div className="flex items-center justify-between px-3 py-2.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-medium text-foreground">Allow Duet</span>
+                          <span className="text-[11px] leading-tight text-muted-foreground">Let other users create Duet videos with your ad</span>
+                        </div>
+                        <Switch
+                          checked={ad.sparkDuetStatus !== "DISABLE"}
+                          onCheckedChange={(checked) => onUpdate({ ...ad, sparkDuetStatus: checked ? "ENABLE" : "DISABLE" })}
+                        />
+                      </div>
+                      <div className="border-t border-border" />
+                      {/* Allow Stitch */}
+                      <div className="flex items-center justify-between px-3 py-2.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-medium text-foreground">Allow Stitch</span>
+                          <span className="text-[11px] leading-tight text-muted-foreground">Let other users clip and remix parts of your ad</span>
+                        </div>
+                        <Switch
+                          checked={ad.sparkStitchStatus !== "DISABLE"}
+                          onCheckedChange={(checked) => onUpdate({ ...ad, sparkStitchStatus: checked ? "ENABLE" : "DISABLE" })}
+                        />
+                      </div>
                     </div>
-                    <Switch
-                      checked={ad.sparkDuetStatus !== "DISABLE"}
-                      onCheckedChange={(checked) => onUpdate({ ...ad, sparkDuetStatus: checked ? "ENABLE" : "DISABLE" })}
-                    />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-xs font-medium text-foreground">Allow Stitch</Label>
-                      <p className="text-[10px] text-muted-foreground">Maps to <code className="rounded bg-muted px-1 text-[10px]">item_stitch_status</code></p>
-                    </div>
-                    <Switch
-                      checked={ad.sparkStitchStatus !== "DISABLE"}
-                      onCheckedChange={(checked) => onUpdate({ ...ad, sparkStitchStatus: checked ? "ENABLE" : "DISABLE" })}
-                    />
-                  </div>
-                </div>
+                )}
               </div>
-
-              {/* Tracking URLs for Spark */}
-              <AdTrackingSection ad={ad} onUpdate={onUpdate} />
             </div>
           )}
 
           {/* ---- CAROUSEL ---- */}
           {isCarousel && !isSpark && (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-0">
               {/* Carousel image cards */}
               <div>
                 <div className="mb-2 flex items-center justify-between">
@@ -1283,134 +1071,97 @@ function AdPanel({
                 )}
               </div>
 
-              {/* Music upload (REQUIRED for Carousel) */}
-              <div className="rounded-lg border border-border bg-card p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Music className="size-3.5 text-primary" />
-                    <Label className="text-xs font-semibold text-foreground">Background Music</Label>
-                    <Badge variant="default" className="rounded-full px-1.5 py-0 text-[9px]">Required</Badge>
+              {/* Background Music — REQUIRED for Carousel */}
+              <div className="flex flex-col gap-0 rounded-lg border border-border">
+                <div className="flex items-center justify-between px-3 py-2.5">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-medium text-foreground">Background Music</span>
+                    <span className="text-[11px] leading-tight text-muted-foreground">
+                      Music is mandatory for carousel ads and plays on loop across cards
+                    </span>
                   </div>
+                  <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">Required</span>
                 </div>
-                <p className="mb-2 text-[11px] text-muted-foreground">
-                  Music is mandatory for carousel ads. Upload MP3, WAV, M4A, or FLAC. Min 2 seconds, max 10MB. Plays on loop.
-                </p>
-                {ad.musicFile ? (
-                  <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/[0.03] px-3 py-2">
-                    <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
-                      <Music className="size-4 text-primary" />
+                <div className="border-t border-border px-3 py-2.5">
+                  {hasMusic ? (
+                    <div className="flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/25 to-primary/5">
+                        <Music className="size-4 text-primary" />
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-xs font-medium text-foreground">{musicDisplayName}</span>
+                        {musicSizeLabel && (
+                          <span className="text-[10px] text-muted-foreground">{musicSizeLabel}</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMusicSheetOpen(true)}
+                        className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        title="Replace music"
+                      >
+                        <Upload className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleMusicClear}
+                        className="shrink-0 rounded-md p-1.5 text-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+                        title="Remove music"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-xs font-medium text-foreground">{ad.musicFile.name}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {(ad.musicFile.size / 1024).toFixed(0)} KB
-                      </p>
-                    </div>
+                  ) : (
                     <button
                       type="button"
-                      onClick={() => onUpdate({ ...ad, musicFile: undefined, musicUrl: "" })}
-                      className="shrink-0 rounded-md p-1 text-destructive/60 hover:text-destructive"
+                      onClick={() => setMusicSheetOpen(true)}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-white py-4 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
                     >
-                      <Trash2 className="size-3.5" />
+                      <Music className="size-4" />
+                      Browse or upload music
                     </button>
-                  </div>
-                ) : (
-                  <UploadZone
-                    accept="audio/mpeg,audio/wav,audio/x-m4a,audio/flac"
-                    label="Upload music"
-                    sublabel="MP3, WAV, M4A, FLAC -- min 2s, max 10MB"
-                    onFile={(file) => {
-                      if (file.size > 10 * 1024 * 1024) {
-                        alert("Music file must be under 10MB.");
-                        return;
-                      }
-                      onUpdate({ ...ad, musicFile: file, musicUrl: URL.createObjectURL(file) });
-                    }}
-                    enableLibrary={false}
-                  />
-                )}
-                <div className="mt-2 flex flex-col gap-1.5">
-                  <div className="flex items-start gap-1.5">
+                  )}
+                  <div className="mt-2 flex items-start gap-1.5">
                     <Info className="mt-0.5 size-2.5 shrink-0 text-muted-foreground/60" />
-                    <p className="text-[10px] text-muted-foreground">
-                      CML (Commercial Music Library) is available for TikTok placement only. For Pangle placement, you must upload your own music.
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-1.5">
-                    <AlertCircle className="mt-0.5 size-2.5 shrink-0 text-amber-500" />
-                    <p className="text-[10px] text-muted-foreground">
-                      If placement includes Pangle: upload music here to avoid silent ads. CML music will not play on Pangle.
+                    <p className="text-[10px] leading-tight text-muted-foreground">
+                      CML tracks play on TikTok placements only. For Pangle, upload your own audio.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Carousel shares: one caption, one CTA, one URL for all cards */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-muted-foreground">Display Name</Label>
-                    <CharCounter current={ad.displayName.length} max={20} />
+              {/* ── Link Type + CTA ── */}
+              <div className="border-t border-border px-3 py-3">
+                <LinkTypeSection
+                  url={ad.landingPageUrl}
+                  onUrlChange={(url) => onUpdate({ ...ad, landingPageUrl: url })}
+                  cta={ad.callToAction}
+                  onCtaChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}
+                  recommendedCtas={RECOMMENDED_CTAS}
+                  otherCtas={OTHER_CTAS}
+                />
+              </div>
+
+              {/* ── Ad Copy ── */}
+              <div className="border-t border-border px-3 py-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium text-foreground">Display Name</Label>
+                    <div className="relative">
+                      <Input placeholder="Your brand" value={ad.displayName} maxLength={20} onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })} className={cn("h-10 pr-14 text-sm", ad.displayName.length >= 20 && "border-amber-400")} />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.displayName.length}/20</span>
+                    </div>
                   </div>
-                  <Input
-                    placeholder="Your brand"
-                    value={ad.displayName}
-                    maxLength={20}
-                    onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })}
-                    className={cn("h-8 text-xs", ad.displayName.length >= 20 && "border-amber-400")}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-medium text-muted-foreground">Call to Action</Label>
-                  <Select value={ad.callToAction} onValueChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {CTA_OPTIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium text-foreground">Ad Caption <span className="text-destructive">*</span></Label>
+                    <div className="relative">
+                      <Input placeholder="Write a short caption..." value={ad.adText} maxLength={100} onChange={(e) => onUpdate({ ...ad, adText: e.target.value.slice(0, 100) })} className={cn("h-10 pr-14 text-sm", ad.adText.length >= 100 && "border-amber-400")} />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.adText.length}/100</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium text-muted-foreground">Ad Text / Caption</Label>
-                  <CharCounter current={ad.adText.length} max={100} />
-                </div>
-                <Textarea
-                  placeholder="Write a caption for all carousel cards..."
-                  value={ad.adText}
-                  maxLength={100}
-                  rows={2}
-                  onChange={(e) => onUpdate({ ...ad, adText: e.target.value.slice(0, 100) })}
-                  className="resize-none text-xs"
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  One caption and CTA shared across all carousel cards.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">Landing Page URL</Label>
-                  <Link2 className="size-2.5 text-muted-foreground" />
-                </div>
-                <Input
-                  placeholder="https://yourstore.salla.sa/collection"
-                  type="url"
-                  value={ad.landingPageUrl}
-                  onChange={(e) => onUpdate({ ...ad, landingPageUrl: e.target.value })}
-                  className={cn("h-8 text-xs", ad.landingPageUrl && !ad.landingPageUrl.startsWith("https://") && "border-red-400")}
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Single URL for all cards. For product-specific links, use Video Shopping Ads with catalog.
-                </p>
-                {ad.landingPageUrl && !ad.landingPageUrl.startsWith("https://") && (
-                  <p className="text-[10px] text-red-600">URL must start with https://</p>
-                )}
-              </div>
-
-              {/* Tracking URLs */}
-              <AdTrackingSection ad={ad} onUpdate={onUpdate} />
             </div>
           )}
 
@@ -1420,34 +1171,16 @@ function AdPanel({
 
               {/* ── Section 1: Link Type + CTA (product-first) ── */}
               {!isAppPromo ? (
-                <div className="flex flex-col gap-4 px-3 py-3">
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-sm font-medium text-foreground">Link type</Label>
-                    <TikTokLinkPills ad={ad} onUpdate={onUpdate} optional={isVideoViews || isLeadGen} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-2">
-                      <Label className="text-sm font-medium text-foreground">Link</Label>
-                      <div className="flex h-10 items-center rounded-lg border border-border bg-muted/40 px-3">
-                        <span className="truncate text-sm text-muted-foreground">{ad.landingPageUrl || "Select a link type above"}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label className="text-sm font-medium text-foreground">
-                        CTA button <span className="text-destructive">*</span>
-                      </Label>
-                      <Select value={ad.callToAction} onValueChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}>
-                        <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select call to action" /></SelectTrigger>
-                        <SelectContent>
-                          <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Recommended</div>
-                          {RECOMMENDED_CTAS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                          <div className="my-1 border-t border-border" />
-                          <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">More Options</div>
-                          {OTHER_CTAS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                <div className="px-3 py-3">
+                  <LinkTypeSection
+                    url={ad.landingPageUrl}
+                    onUrlChange={(url) => onUpdate({ ...ad, landingPageUrl: url })}
+                    cta={ad.callToAction}
+                    onCtaChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}
+                    recommendedCtas={RECOMMENDED_CTAS}
+                    otherCtas={OTHER_CTAS}
+                    optional={isVideoViews || isLeadGen}
+                  />
                 </div>
               ) : (
                 <div className="flex flex-col gap-4 px-3 py-3">
@@ -1497,33 +1230,50 @@ function AdPanel({
                       <Switch
                         checked={!ad.promotionalMusicDisabled}
                         onCheckedChange={(checked) => {
-                          onUpdate({ ...ad, promotionalMusicDisabled: !checked, ...(!checked ? { musicFile: undefined, musicUrl: "" } : {}) });
+                          onUpdate({ ...ad, promotionalMusicDisabled: !checked, ...(!checked ? { musicFile: undefined, musicUrl: "", musicId: "", musicName: "" } : {}) });
                         }}
                       />
                     </div>
                   </div>
                   {!ad.promotionalMusicDisabled && (
                     <div className="border-t border-border px-3 py-2.5">
-                      {ad.musicFile ? (
+                      {hasMusic ? (
                         <div className="flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
-                          <Music className="size-4 text-primary" />
-                          <div className="flex-1">
-                            <p className="text-xs font-medium text-foreground">{ad.musicFile.name}</p>
-                            <p className="text-[10px] text-muted-foreground">{(ad.musicFile.size / 1024).toFixed(0)} KB</p>
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/25 to-primary/5">
+                            <Music className="size-4 text-primary" />
                           </div>
-                          <button type="button" onClick={() => onUpdate({ ...ad, musicFile: undefined, musicUrl: "" })} className="text-destructive/60 hover:text-destructive"><Trash2 className="size-3.5" /></button>
+                          <div className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate text-xs font-medium text-foreground">{musicDisplayName}</span>
+                            {musicSizeLabel && (
+                              <span className="text-[10px] text-muted-foreground">{musicSizeLabel}</span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setMusicSheetOpen(true)}
+                            className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            title="Replace music"
+                          >
+                            <Upload className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleMusicClear}
+                            className="shrink-0 rounded-md p-1.5 text-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+                            title="Remove music"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
                         </div>
                       ) : (
-                        <UploadZone
-                          accept="audio/mpeg,audio/wav,audio/x-m4a,audio/flac"
-                          label="Upload music"
-                          sublabel="MP3/WAV/M4A/FLAC, max 10MB"
-                          onFile={(file) => {
-                            if (file.size > 10 * 1024 * 1024) { alert("Music file must be under 10MB."); return; }
-                            onUpdate({ ...ad, musicFile: file, musicUrl: URL.createObjectURL(file) });
-                          }}
-                          enableLibrary={false}
-                        />
+                        <button
+                          type="button"
+                          onClick={() => setMusicSheetOpen(true)}
+                          className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-white py-4 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                        >
+                          <Music className="size-4" />
+                          Browse or upload music
+                        </button>
                       )}
                     </div>
                   )}
@@ -1603,30 +1353,6 @@ function AdPanel({
                       </div>
                     </div>
 
-                    {/* Click Tracking URL */}
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-xs font-medium text-muted-foreground">Click Tracking URL</Label>
-                      <Input
-                        placeholder="https://tracking.example.com/click"
-                        type="url"
-                        value={ad.clickTrackingUrl || ""}
-                        onChange={(e) => onUpdate({ ...ad, clickTrackingUrl: e.target.value })}
-                        className="h-10 text-sm"
-                      />
-                    </div>
-
-                    {/* Impression Tracking URL */}
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-xs font-medium text-muted-foreground">Impression Tracking URL</Label>
-                      <Input
-                        placeholder="https://tracking.example.com/impression"
-                        type="url"
-                        value={ad.impressionTrackingUrl || ""}
-                        onChange={(e) => onUpdate({ ...ad, impressionTrackingUrl: e.target.value })}
-                        className="h-10 text-sm"
-                      />
-                    </div>
-
                     {/* App Deep Link */}
                     {isAppPromo && (
                       <div className="flex flex-col gap-1">
@@ -1648,35 +1374,27 @@ function AdPanel({
 
           {/* ---- SINGLE IMAGE ---- */}
           {ad.adFormat === "SINGLE_IMAGE" && !isSpark && (
-            <div className="flex flex-col gap-4">
-              <div>
-                <Label className="mb-2 text-xs font-semibold text-foreground">Image Creative</Label>
+            <div className="flex flex-col gap-0">
 
-                {/* Image specs with aspect ratio options */}
-                <div className="mb-2 rounded-lg bg-muted/30 px-3 py-2">
-                  <div className="mb-1.5 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
-                    {[
-                      { label: "Format", value: "PNG / JPG" },
-                      { label: "Max Size", value: "100 MB" },
-                    ].map((s) => (
-                      <div key={s.label} className="flex items-baseline gap-1">
-                        <span className="text-[10px] text-muted-foreground">{s.label}:</span>
-                        <span className="text-[10px] font-medium text-foreground">{s.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="text-[10px] text-muted-foreground">Supported ratios:</span>
-                    {[
-                      { ratio: "9:16", res: "1080x1920", label: "Vertical" },
-                      { ratio: "1:1", res: "1080x1080", label: "Square" },
-                      { ratio: "16:9", res: "1200x628", label: "Horizontal" },
-                    ].map((r) => (
-                      <span key={r.ratio} className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[10px] text-foreground">
-                        {r.ratio} <span className="text-muted-foreground">({r.res})</span>
-                      </span>
-                    ))}
-                  </div>
+              {/* ── Section 1: Link Type + CTA ── */}
+              <div className="px-3 py-3">
+                <LinkTypeSection
+                  url={ad.landingPageUrl}
+                  onUrlChange={(url) => onUpdate({ ...ad, landingPageUrl: url })}
+                  cta={ad.callToAction}
+                  onCtaChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}
+                  recommendedCtas={RECOMMENDED_CTAS}
+                  otherCtas={OTHER_CTAS}
+                />
+              </div>
+
+              {/* ── Section 2: Media Upload ── */}
+              <div className="border-t border-border px-3 py-3">
+                <div className="mb-2 flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2">
+                  <ImageIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                  <p className="text-[11px] text-muted-foreground">
+                    PNG/JPG · 9:16, 1:1, or 16:9 · max 100MB
+                  </p>
                 </div>
 
                 <UploadZone
@@ -1691,126 +1409,100 @@ function AdPanel({
                   libraryContext="IMAGE"
                 />
 
-                <div className="mt-2 flex items-start gap-1.5">
-                  <Info className="mt-0.5 size-2.5 shrink-0 text-muted-foreground/60" />
-                  <p className="text-[10px] text-muted-foreground">
-                    9:16 vertical images perform best on TikTok. Images are displayed with an auto-generated animation effect.
-                  </p>
-                </div>
-              </div>
-
-              {/* Optional music for image ads */}
-              <div className="rounded-lg border border-border bg-muted/10 p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Music className="size-3.5 text-muted-foreground" />
-                    <Label className="text-xs font-medium text-foreground">Background Music</Label>
-                    <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">Optional</Badge>
-                  </div>
-                  <Switch
-                    checked={!ad.promotionalMusicDisabled}
-                    onCheckedChange={(checked) => {
-                      onUpdate({ ...ad, promotionalMusicDisabled: !checked, ...(!checked ? { musicFile: undefined, musicUrl: "" } : {}) });
-                    }}
-                  />
-                </div>
-                {!ad.promotionalMusicDisabled && (
-                  <div className="mt-2">
-                    <p className="mb-2 text-[10px] text-muted-foreground">
-                      TikTok will animate your image with this music. Upload your own or leave empty for system-generated audio.
-                    </p>
-                    {ad.musicFile ? (
-                      <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/[0.03] px-3 py-2">
-                        <Music className="size-4 text-primary" />
-                        <div className="flex-1">
-                          <p className="text-xs font-medium text-foreground">{ad.musicFile.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{(ad.musicFile.size / 1024).toFixed(0)} KB</p>
-                        </div>
-                        <button type="button" onClick={() => onUpdate({ ...ad, musicFile: undefined, musicUrl: "" })} className="text-destructive/60 hover:text-destructive"><Trash2 className="size-3.5" /></button>
-                      </div>
-                    ) : (
-                      <UploadZone
-                        accept="audio/mpeg,audio/wav,audio/x-m4a,audio/flac"
-                        label="Upload music"
-                        sublabel="MP3/WAV/M4A/FLAC, max 10MB"
-                        onFile={(file) => {
-                          if (file.size > 10 * 1024 * 1024) { alert("Music file must be under 10MB."); return; }
-                          onUpdate({ ...ad, musicFile: file, musicUrl: URL.createObjectURL(file) });
+                {/* Background Music */}
+                <div className="mt-3 flex flex-col gap-0 rounded-lg border border-border">
+                  <div className="flex items-center justify-between px-3 py-2.5">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-medium text-foreground">Background Music</span>
+                      <span className="text-[11px] leading-tight text-muted-foreground">TikTok will animate your image with this music</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Optional</span>
+                      <Switch
+                        checked={!ad.promotionalMusicDisabled}
+                        onCheckedChange={(checked) => {
+                          onUpdate({ ...ad, promotionalMusicDisabled: !checked, ...(!checked ? { musicFile: undefined, musicUrl: "", musicId: "", musicName: "" } : {}) });
                         }}
-                        enableLibrary={false}
                       />
-                    )}
+                    </div>
                   </div>
-                )}
+                  {!ad.promotionalMusicDisabled && (
+                    <div className="border-t border-border px-3 py-2.5">
+                      {hasMusic ? (
+                        <div className="flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/25 to-primary/5">
+                            <Music className="size-4 text-primary" />
+                          </div>
+                          <div className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate text-xs font-medium text-foreground">{musicDisplayName}</span>
+                            {musicSizeLabel && (
+                              <span className="text-[10px] text-muted-foreground">{musicSizeLabel}</span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setMusicSheetOpen(true)}
+                            className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            title="Replace music"
+                          >
+                            <Upload className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleMusicClear}
+                            className="shrink-0 rounded-md p-1.5 text-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+                            title="Remove music"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setMusicSheetOpen(true)}
+                          className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-white py-4 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                        >
+                          <Music className="size-4" />
+                          Browse or upload music
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Image ad fields */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium text-muted-foreground">Display Name</Label>
-                    <CharCounter current={ad.displayName.length} max={20} />
+              {/* ── Section 3: Ad Copy ── */}
+              <div className="border-t border-border px-3 py-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium text-foreground">Display Name</Label>
+                    <div className="relative">
+                      <Input placeholder="Your brand" value={ad.displayName} maxLength={20} onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })} className={cn("h-10 pr-14 text-sm", ad.displayName.length >= 20 && "border-amber-400")} />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.displayName.length}/20</span>
+                    </div>
                   </div>
-                  <Input
-                    placeholder="Your brand"
-                    value={ad.displayName}
-                    maxLength={20}
-                    onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })}
-                    className={cn("h-8 text-xs", ad.displayName.length >= 20 && "border-amber-400")}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-medium text-muted-foreground">Call to Action</Label>
-                  <Select value={ad.callToAction} onValueChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {CTA_OPTIONS.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium text-foreground">Ad Caption <span className="text-destructive">*</span></Label>
+                    <div className="relative">
+                      <Input placeholder="Write a short caption..." value={ad.adText} maxLength={100} onChange={(e) => onUpdate({ ...ad, adText: e.target.value.slice(0, 100) })} className={cn("h-10 pr-14 text-sm", ad.adText.length >= 100 && "border-amber-400")} />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.adText.length}/100</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium text-muted-foreground">Ad Text / Caption</Label>
-                  <CharCounter current={ad.adText.length} max={100} />
-                </div>
-                <Textarea
-                  placeholder="Write an engaging caption for your image ad..."
-                  value={ad.adText}
-                  maxLength={100}
-                  rows={2}
-                  onChange={(e) => onUpdate({ ...ad, adText: e.target.value.slice(0, 100) })}
-                  className="resize-none text-xs"
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Maps to API <code className="rounded bg-muted px-1 text-[10px]">ad_text</code>.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">Landing Page URL</Label>
-                  <Link2 className="size-2.5 text-muted-foreground" />
-                </div>
-                <Input
-                  placeholder="https://yourstore.salla.sa/product"
-                  type="url"
-                  value={ad.landingPageUrl}
-                  onChange={(e) => onUpdate({ ...ad, landingPageUrl: e.target.value })}
-                  className={cn("h-8 text-xs", ad.landingPageUrl && !ad.landingPageUrl.startsWith("https://") && "border-red-400")}
-                />
-                {ad.landingPageUrl && !ad.landingPageUrl.startsWith("https://") && (
-                  <p className="text-[10px] text-red-600">URL must start with https://</p>
-                )}
-              </div>
-
-              {/* Tracking URLs */}
-              <AdTrackingSection ad={ad} onUpdate={onUpdate} />
             </div>
           )}
         </div>
       )}
+
+      {/* Shared Music Library Sheet (opens from any ad format's Background Music section) */}
+      <MusicLibrarySheet
+        open={musicSheetOpen}
+        onOpenChange={setMusicSheetOpen}
+        onSelect={handleMusicSelect}
+        required={isCarousel}
+      />
     </div>
   );
 }

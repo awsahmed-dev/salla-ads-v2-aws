@@ -300,9 +300,10 @@ export function TikTokStepReview() {
       });
     }
 
-    // Carousel music validation (music is mandatory for carousel ads)
+    // Carousel music validation (music is mandatory for carousel ads).
+    // Honor both upload and TikTok Commercial Music Library selections.
     const carouselAdsMissingMusic = creative.ads.filter(
-      (a) => a.adFormat === "CAROUSEL" && !a.musicFile
+      (a) => a.adFormat === "CAROUSEL" && !(a.musicFile || a.musicId || a.musicUrl)
     );
     if (!catalogListingMode && carouselAdsMissingMusic.length > 0) {
       list.push({
@@ -480,7 +481,13 @@ export function TikTokStepReview() {
           adgroup_id: "<ADGROUP_ID>",
           creatives: [{
             ad_name: ad.name,
-            ad_format: ad.sparkAdEnabled ? "SINGLE_VIDEO" : ad.adFormat,
+            // Map wizard adFormat to TikTok Marketing API v1.3 ad_format enum.
+            // Spark Ads use CUSTOMIZED_USER; multi-image carousels use CAROUSEL_ADS.
+            ad_format: ad.sparkAdEnabled
+              ? "CUSTOMIZED_USER"
+              : ad.adFormat === "CAROUSEL"
+                ? "CAROUSEL_ADS"
+                : ad.adFormat,
             identity_type: creative.identity?.identityType ?? "BC_AUTH_TT",
             identity_id: creative.identity?.identityId || "<IDENTITY_ID>",
             ...(creative.identity?.identityType === "BC_AUTH_TT" && {
@@ -491,7 +498,8 @@ export function TikTokStepReview() {
               ? { tiktok_item_id: `<RESOLVED_ITEM_ID:${ad.sparkAdAuthCode || "pending"}>` }
               : {
                   ad_text: (ad.adText || "").slice(0, 100),
-                  display_name: ad.displayName || creative.identity?.displayName || "",
+                  // TikTok display_name is capped at 20 chars.
+                  display_name: (ad.displayName || creative.identity?.displayName || "").slice(0, 20),
                   call_to_action: ad.callToAction,
                   ...(ad.landingPageUrl && { landing_page_url: ad.landingPageUrl }),
                 }),
@@ -500,12 +508,16 @@ export function TikTokStepReview() {
             ...(ad.adFormat === "CAROUSEL" && ad.carouselCards.length > 0 && {
               image_ids: ad.carouselCards.map((_, i) => `<IMAGE_ID_${i + 1}>`),
             }),
-            ...(ad.musicFile && { music_id: "<UPLOADED_MUSIC_ID>" }),
-            promotional_music_disabled: ad.promotionalMusicDisabled ?? (ad.adFormat !== "CAROUSEL"),
+            // Honor both library (musicId) and upload (musicFile) selections.
+            ...((ad.musicId || ad.musicFile) && {
+              music_id: ad.musicId || "<UPLOADED_MUSIC_ID>",
+            }),
+            promotional_music_disabled:
+              ad.adFormat === "CAROUSEL"
+                ? false
+                : ad.promotionalMusicDisabled === true,
             ...(ad.sparkAdEnabled && ad.sparkDuetStatus && { item_duet_status: ad.sparkDuetStatus }),
             ...(ad.sparkAdEnabled && ad.sparkStitchStatus && { item_stitch_status: ad.sparkStitchStatus }),
-            ...(ad.clickTrackingUrl && { click_tracking_url: ad.clickTrackingUrl }),
-            ...(ad.impressionTrackingUrl && { impression_tracking_url: ad.impressionTrackingUrl }),
             ...(ad.deeplink && { deeplink: ad.deeplink, deeplink_type: ad.deeplinkType || "NORMAL" }),
             ...(ad.aigcDisclosureType && ad.aigcDisclosureType !== "NOT_DECLARED" && { aigc_disclosure_type: ad.aigcDisclosureType }),
             ...(ad.instantProductPageUsed && { instant_product_page_used: true }),
@@ -839,15 +851,25 @@ export function TikTokStepReview() {
                         </>
                       )}
                       {/* Music status */}
-                      {ad.adFormat === "CAROUSEL" && (
-                        <span className={ad.musicFile ? "text-primary" : "text-destructive"}>{ad.musicFile ? "Music: Uploaded" : "Music: Missing (required)"}</span>
-                      )}
-                      {(ad.adFormat === "SINGLE_VIDEO" || ad.adFormat === "SINGLE_IMAGE") && !ad.promotionalMusicDisabled && (
-                        <span className="text-primary">{ad.musicFile ? "Music: Custom" : "Music: Enabled"}</span>
-                      )}
-                      {/* Tracking */}
-                      {ad.clickTrackingUrl && <span>Click tracking</span>}
-                      {ad.impressionTrackingUrl && <span>Impression tracking</span>}
+                      {(() => {
+                        const hasMusic = Boolean(ad.musicFile || ad.musicId || ad.musicUrl);
+                        const musicLabel = ad.musicFile ? "Uploaded" : ad.musicId ? "Library" : ad.musicUrl ? "Custom" : null;
+                        if (ad.adFormat === "CAROUSEL") {
+                          return (
+                            <span className={hasMusic ? "text-primary" : "text-destructive"}>
+                              {hasMusic ? `Music: ${musicLabel}` : "Music: Missing (required)"}
+                            </span>
+                          );
+                        }
+                        if ((ad.adFormat === "SINGLE_VIDEO" || ad.adFormat === "SINGLE_IMAGE") && !ad.promotionalMusicDisabled) {
+                          return (
+                            <span className="text-primary">
+                              {hasMusic ? `Music: ${musicLabel}` : "Music: Enabled"}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                       {ad.aigcDisclosureType === "DECLARED" && <span>AIGC disclosed</span>}
                     </div>
                   </div>

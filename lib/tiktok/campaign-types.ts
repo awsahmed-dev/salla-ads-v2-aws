@@ -534,14 +534,12 @@ export interface TikTokAd {
   musicUrl?: string;
   /** CML music_id from TikTok's Commercial Music Library. Maps to API music_id. */
   musicId?: string;
+  /** Display name for the selected track (for UI only — not sent to API). */
+  musicName?: string;
   /** Whether promotional music is disabled. Maps to API promotional_music_disabled. Default true. */
   promotionalMusicDisabled: boolean;
 
-  /* --- Tracking & Deep Links --- */
-  /** Third-party click tracking URL. Maps to API click_tracking_url. */
-  clickTrackingUrl?: string;
-  /** Third-party impression tracking URL. Maps to API impression_tracking_url. */
-  impressionTrackingUrl?: string;
+  /* --- Deep Links --- */
   /** Deep link URL for app. Maps to API deeplink. */
   deeplink?: string;
   /** Deep link type. Maps to API deeplink_type. */
