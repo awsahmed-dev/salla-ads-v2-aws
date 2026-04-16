@@ -275,7 +275,7 @@ const BID_STRATEGIES: {
     desc: "Set a target cost per result. TikTok averages your cost around this amount but may exceed per-auction.",
     bestFor: "Best when you know your target CPA and want to scale while maintaining average profitability.",
     icon: <Target className="size-4" />,
-    supportedGoals: ["CONVERSION", "VIDEO_VIEW", "FOCUSED_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
+    supportedGoals: ["CONVERSION", "VALUE", "VIDEO_VIEW", "FOCUSED_VIEW", "LANDING_PAGE_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
   },
   {
     value: "BID_CAP",
@@ -286,7 +286,7 @@ const BID_STRATEGIES: {
     desc: "Set a hard maximum bid per auction. TikTok will never exceed your bid amount in any single auction.",
     bestFor: "Best for strict cost control. Use when profitability per-action matters more than volume.",
     icon: <Target className="size-4" />,
-    supportedGoals: ["CONVERSION", "CLICK", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
+    supportedGoals: ["CONVERSION", "CLICK", "LANDING_PAGE_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
   },
 ];
 
@@ -619,6 +619,53 @@ export function TikTokStepBudget() {
 
 
           {/* ======================================================= */}
+          {/* SECTION 2b: ROAS Target (APP_PROMOTION + VALUE only)    */}
+          {/* ConversionEventCard is hidden for App Promo, so we need */}
+          {/* a standalone ROAS input for the VO_MIN_ROAS deep bid.   */}
+          {/* ======================================================= */}
+          {isAppPromo && budget.optimizationGoal === "VALUE" && (
+            <SectionCard>
+              <div className="mb-3 flex items-center gap-2">
+                <TrendingUp className="size-4 text-primary" />
+                <Label className="text-sm font-semibold text-foreground">Minimum ROAS Target</Label>
+                <InfoTip text="Set the minimum Return on Ad Spend you want to achieve. TikTok will optimize delivery to meet this target. Maps to the roas_bid API field with deep_bid_type = VO_MIN_ROAS." />
+              </div>
+              <p className="mb-3 text-xs text-muted-foreground">
+                How much revenue do you expect for every SAR 1 spent? TikTok will prioritize users most likely to generate this return.
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground">×</span>
+                  <Input
+                    type="number"
+                    min={0.01}
+                    max={1000}
+                    step={0.1}
+                    value={budget.roasBid ?? 1}
+                    onChange={(e) => updateNested("budget", { roasBid: Math.max(0.01, parseFloat(e.target.value) || 1) })}
+                    className="h-9 pl-8 text-sm"
+                  />
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  SAR 1 spent → SAR {(budget.roasBid ?? 1).toFixed(1)} returned
+                </span>
+              </div>
+              {(budget.roasBid ?? 1) >= 2.0 && (budget.roasBid ?? 1) <= 5.0 && (
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5">
+                  <Sparkles className="size-3 shrink-0 text-emerald-600" />
+                  <p className="text-xs text-emerald-700">ROAS target is in the recommended range (2×–5×).</p>
+                </div>
+              )}
+              {(budget.roasBid ?? 1) > 5.0 && (
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5">
+                  <AlertCircle className="size-3 shrink-0 text-amber-600" />
+                  <p className="text-xs text-amber-700">High ROAS target — delivery may be limited. Consider lowering to 2×–5× for better volume.</p>
+                </div>
+              )}
+            </SectionCard>
+          )}
+
+          {/* ======================================================= */}
           {/* SECTION 3: Conversion Event (only for CONVERSION/VALUE) */}
           {/* ======================================================= */}
           {!isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo && budget.optimizationGoal !== "CLICK" && (
@@ -662,37 +709,44 @@ export function TikTokStepBudget() {
             layout="buttons"
             infoTipText="Choose how TikTok spends your daily budget. Auto Bid is recommended for most advertisers."
             contextNote={
-              budget.bidType !== "BID_TYPE_NO_BID" && budget.bidAmount > 0 && budget.bidAmount > budget.amount
+              budget.optimizationGoal === "VALUE" && budget.bidType === "BID_TYPE_CUSTOM"
                 ? (
-                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                      <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-                      <p className="text-xs leading-relaxed text-amber-700">
-                        Your bid of <span className="font-semibold">SAR {budget.bidAmount.toFixed(2)}</span> exceeds your daily budget of <span className="font-semibold">SAR {budget.amount}</span>. You may get very few results per day — consider increasing your budget or lowering your bid.
+                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-3 py-2">
+                      <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                      <p className="text-xs leading-relaxed text-[#004956]">
+                        Your <span className="font-semibold">minimum ROAS target</span> ({budget.roasBid ?? 1}×) controls the cost cap. TikTok will aim to maintain at least this return on ad spend. Adjust your target in the ROAS section above.
                       </p>
                     </div>
                   )
-                : undefined
+                : budget.bidType !== "BID_TYPE_NO_BID" && budget.bidAmount > 0 && budget.bidAmount > budget.amount
+                  ? (
+                      <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                        <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+                        <p className="text-xs leading-relaxed text-amber-700">
+                          Your bid of <span className="font-semibold">SAR {budget.bidAmount.toFixed(2)}</span> exceeds your daily budget of <span className="font-semibold">SAR {budget.amount}</span>. You may get very few results per day — consider increasing your budget or lowering your bid.
+                        </p>
+                      </div>
+                    )
+                  : undefined
             }
             bidInputs={
-              budget.bidType === "BID_TYPE_CUSTOM"
+              budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal !== "VALUE"
                 ? [{
                     label: budget.bidStrategy === "BID_CAP" ? "Maximum Bid per Action" : "Target Cost per Action",
                     desc: budget.bidStrategy === "BID_CAP"
                       ? "TikTok will never bid above this amount. Set it too low and you may not win any auctions."
                       : "TikTok will try to keep your average cost per result close to this amount.",
-                    value: budget.optimizationGoal === "VALUE" ? (budget.roasBid ?? 1) : (budget.bidAmount || undefined),
-                    onChange: budget.optimizationGoal === "VALUE"
-                      ? (v) => updateNested("budget", { roasBid: Math.max(0.01, v || 1) })
-                      : (v) => updateNested("budget", { bidAmount: v }),
-                    prefix: budget.optimizationGoal === "VALUE" ? "×" : "SAR",
+                    value: budget.bidAmount || undefined,
+                    onChange: (v) => updateNested("budget", { bidAmount: v }),
+                    prefix: "SAR",
                     suffix: `per ${goalLabel.replace(/s$/, "")}`,
                     min: 0.01,
-                    step: budget.optimizationGoal === "VALUE" ? 0.1 : 0.5,
-                    suggestedRange: budget.optimizationGoal === "VALUE" ? { min: 2.0, max: 5.0 } : suggestedBid,
-                    warning: budget.bidAmount > 0 && budget.bidAmount < suggestedBid.min && budget.optimizationGoal !== "VALUE"
+                    step: 0.5,
+                    suggestedRange: suggestedBid,
+                    warning: budget.bidAmount > 0 && budget.bidAmount < suggestedBid.min
                       ? `Your bid of SAR ${budget.bidAmount.toFixed(2)} is below the suggested minimum of SAR ${suggestedBid.min.toFixed(2)}. You may get very few or no results.`
                       : undefined,
-                    tip: budget.bidAmount >= suggestedBid.min && budget.bidAmount <= suggestedBid.max && budget.optimizationGoal !== "VALUE"
+                    tip: budget.bidAmount >= suggestedBid.min && budget.bidAmount <= suggestedBid.max
                       ? "Your bid is within the suggested range — good balance between cost and delivery."
                       : undefined,
                   }]
@@ -993,7 +1047,7 @@ export function TikTokStepBudget() {
                 { label: "End date", value: budget.endDateOptional ? "Continuous" : budget.endDate || "Not set" },
                 { label: "Goal", value: goalLabel },
                 { label: "Budget mode", value: budget.budgetMode === "BUDGET_MODE_TOTAL" ? "Lifetime" : "Daily" },
-                { label: "Bid", value: budget.bidType === "BID_TYPE_NO_BID" ? "Maximum Delivery" : `${budget.bidStrategy === "BID_CAP" ? "Bid Cap" : "Cost Cap"}: SAR ${budget.bidAmount}` },
+                { label: "Bid", value: budget.bidType === "BID_TYPE_NO_BID" ? "Maximum Delivery" : budget.optimizationGoal === "VALUE" ? `Cost Cap: ${budget.roasBid ?? 1}× ROAS` : `${budget.bidStrategy === "BID_CAP" ? "Bid Cap" : "Cost Cap"}: SAR ${budget.bidAmount}` },
                 { label: "Schedule", value: budget.schedule === "custom" ? "Custom hours" : "24/7" },
                 ...(budget.searchResultEnabled ? [{ label: "Search ads", value: "Enabled" }] : []),
                 ...(autoIncrease.enabled ? [{ label: "Auto-increase", value: `+${autoIncrease.pct}% / ${autoIncrease.intervalDays}d` }] : []),
@@ -1001,7 +1055,7 @@ export function TikTokStepBudget() {
               checkItems={[
                 { label: "Budget", status: dailyAmount >= 50 ? "ok" as const : "warning" as const, text: dailyAmount >= 50 ? "Budget is healthy" : "Below recommended minimum" },
                 { label: "Duration", status: (durationDays >= 7 || (budget.endDateOptional ?? false)) ? "ok" as const : "warning" as const, text: (durationDays >= 7 || (budget.endDateOptional ?? false)) ? "Sufficient learning time" : "Too short for optimization" },
-                { label: "Bid strategy", status: "ok" as const, text: budget.bidType === "BID_TYPE_NO_BID" ? "Maximum Delivery" : `${budget.bidStrategy === "BID_CAP" ? "Bid Cap" : "Cost Cap"}: SAR ${budget.bidAmount}` },
+                { label: "Bid strategy", status: "ok" as const, text: budget.bidType === "BID_TYPE_NO_BID" ? "Maximum Delivery" : budget.optimizationGoal === "VALUE" ? `Cost Cap: ${budget.roasBid ?? 1}× ROAS` : `${budget.bidStrategy === "BID_CAP" ? "Bid Cap" : "Cost Cap"}: SAR ${budget.bidAmount}` },
                 { label: "Billing event", status: "ok" as const, text: budget.billingEvent === "OCPM" ? "oCPM (optimized)" : budget.billingEvent === "CPV" ? "CPV (per view)" : budget.billingEvent },
                 ...(isTraffic && budget.optimizationGoal === "LANDING_PAGE_VIEW" && !hasPixel ? [{ label: "Pixel", status: "error" as const, text: "Required for Landing Page View" }] : []),
               ]}
