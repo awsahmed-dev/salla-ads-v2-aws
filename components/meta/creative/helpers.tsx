@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import type { MetaAdFormat, MetaAd, MetaCarouselCard } from "@/lib/meta/campaign-types";
 import { Image as ImageIcon, Video, Film, Layers, Wand2 } from "lucide-react";
 
@@ -34,16 +33,6 @@ export function CharCounter({
   );
 }
 
-export function ApiBadge({ field }: { field: string }) {
-  return (
-    <Badge
-      variant="secondary"
-      className="rounded-full px-1 py-0 font-mono text-[8px]"
-    >
-      {field}
-    </Badge>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /*  Data factories                                                     */

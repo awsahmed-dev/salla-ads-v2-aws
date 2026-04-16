@@ -175,12 +175,6 @@ export function CarouselCardEditor({
         ))}
       </div>
 
-      <p className="text-[10px] text-muted-foreground">
-        Maps to{" "}
-        <code className="rounded bg-muted px-1">child_attachments[]</code> in
-        object_story_spec.link_data. Min 2, max 5 cards.
-      </p>
-
       <ProductPickerDialog
         open={pickerOpen}
         onOpenChange={setPickerOpen}
