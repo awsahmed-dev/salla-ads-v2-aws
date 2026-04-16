@@ -33,6 +33,7 @@ interface OptimizationGoalCardProps {
   infoTipText?: string;
   pixelReadiness?: PixelReadiness;
   children?: React.ReactNode;
+  learnMoreTrigger?: React.ReactNode;
 }
 
 export function OptimizationGoalCard({
@@ -45,6 +46,7 @@ export function OptimizationGoalCard({
   infoTipText = "Choose the action you want to optimize. This determines how your budget is spent.",
   pixelReadiness,
   children,
+  learnMoreTrigger,
 }: OptimizationGoalCardProps) {
   const isNewPixel = pixelReadiness === "new";
   const selectedGoalObj = goals.find((g) => g.value === selectedGoal);
@@ -53,13 +55,16 @@ export function OptimizationGoalCard({
   return (
     <SectionCard>
       {/* Header */}
-      <div className="mb-5">
-        <h3 className="text-base font-bold text-foreground">
-          Optimization Strategy
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {infoTipText}
-        </p>
+      <div className="mb-5 flex items-start justify-between">
+        <div>
+          <h3 className="text-base font-bold text-foreground">
+            Optimization Strategy
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {infoTipText}
+          </p>
+        </div>
+        {learnMoreTrigger}
       </div>
 
       {subtitle && (

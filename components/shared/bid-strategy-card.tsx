@@ -41,6 +41,7 @@ interface BidStrategyCardProps {
   layout?: "buttons" | "cards";
   infoTipText?: string;
   children?: React.ReactNode;
+  learnMoreTrigger?: React.ReactNode;
 }
 
 export function BidStrategyCard({
@@ -53,6 +54,7 @@ export function BidStrategyCard({
   layout = "cards",
   infoTipText = "Choose how your budget competes for ad placements.",
   children,
+  learnMoreTrigger,
 }: BidStrategyCardProps) {
   const activeStrategy = strategies.find((s) => s.value === selectedStrategy);
   const isAuto = selectedStrategy === "AUTO_BID";
@@ -60,13 +62,16 @@ export function BidStrategyCard({
   return (
     <SectionCard>
       {/* Header */}
-      <div className="mb-4">
-        <h3 className="text-base font-bold text-foreground">
-          Bidding Strategy
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {infoTipText}
-        </p>
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <h3 className="text-base font-bold text-foreground">
+            Bidding Strategy
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {infoTipText}
+          </p>
+        </div>
+        {learnMoreTrigger}
       </div>
 
       {billingContext && billingContext.length > 0 && (

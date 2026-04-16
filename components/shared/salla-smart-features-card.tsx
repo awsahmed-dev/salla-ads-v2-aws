@@ -30,6 +30,7 @@ export interface SallaSmartFeaturesCardProps {
   accent?: SallaSmartFeaturesAccent;
   showExcludePurchasers?: boolean;
   showLookalike?: boolean;
+  learnMoreTrigger?: React.ReactNode;
 }
 
 function NewBadge() {
@@ -62,6 +63,7 @@ export function SallaSmartFeaturesCard({
   smartTargetingDisabled = false,
   showExcludePurchasers = true,
   showLookalike = true,
+  learnMoreTrigger,
 }: SallaSmartFeaturesCardProps) {
   const validDays = PURCHASER_PRESETS.map((x) => x.days);
   const defaultDays = 30;
@@ -72,10 +74,11 @@ export function SallaSmartFeaturesCard({
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       {/* Header */}
-      <div className="px-6 py-5">
+      <div className="flex items-start justify-between px-6 py-5">
         <h3 className="text-base font-bold text-foreground">
           Salla Smart Features ✨
         </h3>
+        {learnMoreTrigger}
       </div>
 
       {/* Exclude Recent Buyers */}
