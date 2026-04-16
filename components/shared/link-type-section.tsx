@@ -172,6 +172,7 @@ export function LinkTypeSection({
               type="url"
               value={url}
               onChange={(e) => onUrlChange(e.target.value)}
+              maxLength={1000}
               className={cn("h-10 text-sm", url && !url.startsWith("https://") && "border-red-400")}
             />
           )}

@@ -89,7 +89,15 @@ const GOAL_LABELS: Record<string, string> = {
   OFFSITE_CONVERSIONS: "Maximum Conversions",
   VALUE: "Maximum Value (ROAS)",
   LINK_CLICKS: "Link Clicks",
+  LANDING_PAGE_VIEWS: "Landing Page Views",
   CONVERSATIONS: "Conversations",
+};
+
+const BRAND_SAFETY_LABELS: Record<string, string> = {
+  FACEBOOK_STANDARD: "Standard Inventory",
+  FULL_INVENTORY: "Full Inventory",
+  LIMITED_INVENTORY: "Limited Inventory",
+  AN_STANDARD: "Audience Network Standard",
 };
 
 const EVENT_LABELS: Record<string, string> = {
@@ -279,6 +287,18 @@ export function MetaStepReview() {
           { event_type: "CLICK_THROUGH", window_days: clickDays },
           ...(viewDays > 0 ? [{ event_type: "VIEW_THROUGH", window_days: viewDays }] : []),
         ],
+        // Frequency cap
+        ...(budget.frequencyCap.enabled && {
+          frequency_control_specs: [{
+            event: "IMPRESSIONS",
+            interval_days: budget.frequencyCap.intervalDays,
+            max_frequency: budget.frequencyCap.maxFrequency,
+          }],
+        }),
+        // Brand safety
+        ...(creative.brandSafetyLevel !== "FULL_INVENTORY" && {
+          brand_safety_content_filter_levels: [creative.brandSafetyLevel],
+        }),
         status: "PAUSED",
       },
       // POST /act_{ad_account_id}/ads (one per ad creative)
@@ -407,11 +427,15 @@ export function MetaStepReview() {
               <ReviewRow label="Min ROAS" value={`${budget.roasTarget}x`} />
             )}
             <ReviewRow label="Attribution" value={`${budget.clickAttributionWindow === "7d_click" ? "7d" : budget.clickAttributionWindow === "1d_click" ? "1d" : "28d"} click + ${budget.viewAttributionWindow === "1d_view" ? "1d" : budget.viewAttributionWindow === "7d_view" ? "7d" : "no"} view`} />
+            {budget.frequencyCap.enabled && (
+              <ReviewRow label="Frequency Cap" value={`${budget.frequencyCap.maxFrequency}x per ${budget.frequencyCap.intervalDays === 1 ? "day" : `${budget.frequencyCap.intervalDays} days`}`} />
+            )}
           </SectionCard>
 
           {/* ---- Creative ---- */}
           <SectionCard>
             <SectionHeader icon={ImagePlus} title="Ad Creative" step={3} setStep={setStep} />
+            <ReviewRow label="Brand Safety" value={BRAND_SAFETY_LABELS[creative.brandSafetyLevel] || creative.brandSafetyLevel} />
             {creative.ads.length === 0 ? (
               <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                 <AlertCircle className="size-3.5 text-amber-600" />

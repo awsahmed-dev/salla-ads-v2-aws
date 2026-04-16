@@ -57,6 +57,7 @@ import {
   ArrowUpRight,
   Settings2,
   MessageSquare,
+  Globe,
 } from "lucide-react";
 import { BudgetDurationCard } from "@/components/shared/budget-duration-card";
 import { BidStrategyCard } from "@/components/shared/bid-strategy-card";
@@ -65,6 +66,7 @@ import { CostSummaryCard } from "@/components/shared/cost-summary-card";
 import { EstimatedResultsCard } from "@/components/shared/estimated-results-card";
 import { ConfigCheckCard } from "@/components/shared/config-check-card";
 import { DeliveryPacingCard } from "@/components/shared/delivery-pacing-card";
+import { FrequencyCapCard } from "@/components/shared/frequency-cap-card";
 import { ConversionEventCard } from "@/components/shared/conversion-event-card";
 import { OptimizationGoalCard } from "@/components/shared/optimization-goal-card";
 import { AttributionWindowCard } from "@/components/shared/attribution-window-card";
@@ -106,6 +108,14 @@ const OPTIMIZATION_GOALS: {
     desc: "Drive clicks to your website. No conversion optimization applied.",
     bestFor: "Best for new stores that need traffic, or when testing creatives before optimizing for purchases.",
     icon: <MousePointerClick className="size-4" />,
+    billingLabel: "CPM",
+  },
+  {
+    value: "LANDING_PAGE_VIEWS",
+    label: "Landing Page Views",
+    desc: "Optimize for quality clicks that actually load your landing page.",
+    bestFor: "Best when you want to ensure visitors reach your store, not just click the ad.",
+    icon: <Globe className="size-4" />,
     billingLabel: "CPM",
   },
   {
@@ -152,7 +162,7 @@ const BID_STRATEGIES: {
     bestFor: "Best for most Salla merchants, especially when starting a new campaign or testing new products.",
     icon: <Zap className="size-4" />,
     recommended: true,
-    supportedGoals: ["OFFSITE_CONVERSIONS", "VALUE", "LINK_CLICKS", "CONVERSATIONS"],
+    supportedGoals: ["OFFSITE_CONVERSIONS", "VALUE", "LINK_CLICKS", "LANDING_PAGE_VIEWS", "CONVERSATIONS"],
   },
   {
     value: "COST_CAP",
@@ -161,7 +171,7 @@ const BID_STRATEGIES: {
     desc: "Set a target cost per result. Meta keeps your average cost per result around this amount.",
     bestFor: "Best when you know your target CPA and want to maintain profitability at scale.",
     icon: <Target className="size-4" />,
-    supportedGoals: ["OFFSITE_CONVERSIONS", "LINK_CLICKS", "CONVERSATIONS"],
+    supportedGoals: ["OFFSITE_CONVERSIONS", "LINK_CLICKS", "LANDING_PAGE_VIEWS", "CONVERSATIONS"],
   },
   {
     value: "LOWEST_COST_WITH_BID_CAP",
@@ -170,7 +180,7 @@ const BID_STRATEGIES: {
     desc: "Set a maximum bid. Meta won't bid above this in any auction.",
     bestFor: "Best for advertisers who want strict cost control and understand their auction dynamics.",
     icon: <BarChart3 className="size-4" />,
-    supportedGoals: ["OFFSITE_CONVERSIONS", "VALUE", "LINK_CLICKS", "CONVERSATIONS"],
+    supportedGoals: ["OFFSITE_CONVERSIONS", "VALUE", "LINK_CLICKS", "LANDING_PAGE_VIEWS", "CONVERSATIONS"],
   },
   {
     value: "LOWEST_COST_WITH_MIN_ROAS",
@@ -482,7 +492,7 @@ export function MetaStepBudget() {
               >
                 <div>
                   <span className="text-base font-bold text-foreground">Advanced Settings</span>
-                  <p className="mt-1 text-xs text-muted-foreground">Pacing and delivery type</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Pacing, frequency cap, and delivery type</p>
                 </div>
                 <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", showAdvanced && "rotate-180")} />
               </button>
@@ -501,6 +511,39 @@ export function MetaStepBudget() {
                 selectedPacing={budget.pacing}
                 onPacingChange={(v) => updateBudget({ pacing: v as MetaPacing })}
                 infoTipText="Controls how fast Meta spends your daily budget. Maps to pacing_type: STANDARD or NO_PACING."
+              />
+
+              {/* Frequency Capping */}
+              <FrequencyCapCard
+                enabled={budget.frequencyCap.enabled}
+                onEnabledChange={(v) =>
+                  updateBudget({ frequencyCap: { ...budget.frequencyCap, enabled: v } })
+                }
+                maxImpressions={budget.frequencyCap.maxFrequency}
+                onMaxImpressionsChange={(v) =>
+                  updateBudget({ frequencyCap: { ...budget.frequencyCap, maxFrequency: v } })
+                }
+                minImpressions={1}
+                maxImpressionsMax={20}
+                timeWindowValue={String(budget.frequencyCap.intervalDays)}
+                timeWindowOptions={[
+                  { value: "1", label: "1 day" },
+                  { value: "7", label: "7 days" },
+                  { value: "14", label: "14 days" },
+                  { value: "30", label: "30 days" },
+                ]}
+                onTimeWindowChange={(v) =>
+                  updateBudget({ frequencyCap: { ...budget.frequencyCap, intervalDays: Number(v) } })
+                }
+                timeWindowSummaryLabel={
+                  budget.frequencyCap.intervalDays === 1
+                    ? "day"
+                    : `${budget.frequencyCap.intervalDays} days`
+                }
+                summaryMode={budget.frequencyCap.intervalDays === 1 ? "per" : "every"}
+                accent="meta"
+                apiBadge="frequency_control_specs"
+                infoTipText="Limit how often one person sees your ad. Maps to API frequency_control_specs on the Ad Set. Helps prevent ad fatigue and improve cost efficiency."
               />
 
             </CollapsibleContent>
