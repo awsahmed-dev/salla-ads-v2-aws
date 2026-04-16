@@ -793,7 +793,7 @@ export function StepCreative() {
               <Label className="text-base font-bold text-foreground">Campaign Content</Label>
             </div>
             <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
-              Create multiple ads with different video and text options. The system will automatically shift budget toward your top-performing ads.
+              Create multiple ads with different video and image options. The system will automatically shift budget toward your top-performing ads.
             </p>
 
             {ads.length === 0 && !catalogEnabled && (

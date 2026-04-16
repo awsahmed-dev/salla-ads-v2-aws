@@ -190,7 +190,7 @@ export const OBJECTIVE_CONFIGS: Record<string, ObjectiveConfig> = {
     defaultGoal: "INSTALL",
     pixelRequirement: "none",  // Uses TikTok SDK, not pixel
     catalogAvailable: false,
-    allowedAdFormats: ["SINGLE_VIDEO", "SINGLE_IMAGE", "SPARK_AD"],
+    allowedAdFormats: ["SINGLE_VIDEO", "SINGLE_IMAGE", "CAROUSEL", "SPARK_AD"],
     defaultCTA: "INSTALL_NOW",
   },
 };

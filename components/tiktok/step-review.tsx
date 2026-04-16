@@ -138,6 +138,33 @@ const GOAL_LABELS: Record<string, string> = {
   IN_APP_EVENT: "In-App Events (AEO)",
 };
 
+/** Maps our internal optimization_goal enum to TikTok Marketing API v1.3 values.
+ *  Key difference: API uses "CONVERT" not "CONVERSION". */
+const GOAL_TO_API: Record<string, string> = {
+  CONVERSION: "CONVERT",        // API enum is CONVERT, not CONVERSION
+  VALUE: "VALUE",
+  CLICK: "CLICK",
+  LANDING_PAGE_VIEW: "LANDING_PAGE_VIEW",
+  REACH: "REACH",
+  SHOW: "SHOW",
+  VIDEO_VIEW: "VIDEO_VIEW",
+  FOCUSED_VIEW: "FOCUSED_VIEW",
+  LEAD_GENERATION: "LEAD_GENERATION",
+  INSTALL: "INSTALL",
+  IN_APP_EVENT: "IN_APP_EVENT",
+};
+
+/** Maps our internal optimization_event enum to TikTok API v1.3 PascalCase format.
+ *  API uses PascalCase event names, not SCREAMING_SNAKE_CASE. */
+const EVENT_TO_API: Record<string, string> = {
+  COMPLETE_PAYMENT: "CompletePayment",
+  INITIATE_CHECKOUT: "InitiateCheckout",
+  ADD_TO_CART: "AddToCart",
+  VIEW_CONTENT: "ViewContent",
+  ADD_BILLING: "AddPaymentInfo",       // API name is AddPaymentInfo, not AddBilling
+  SUBMIT_FORM: "SubmitForm",           // Lead Gen website form submission
+};
+
 const EVENT_LABELS: Record<string, string> = {
   COMPLETE_PAYMENT: "Purchase",
   INITIATE_CHECKOUT: "Initiate Checkout",
@@ -218,10 +245,13 @@ export function TikTokStepReview() {
       detail: audience.locationIds.map((c) => COUNTRY_MAP[c] || c).join(", ") || "None",
     });
 
-    if (!isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo) {
+    // Pixel is required for: PRODUCT_SALES always, LEAD_GENERATION with WEBSITE form
+    const isSalesObj = !isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo;
+    const pixelRequired = isSalesObj || (isLeadGen && objective.leadOptimizationLocation === "WEBSITE");
+    if (pixelRequired) {
       list.push({
         id: "pixel",
-        label: "TikTok Pixel configured",
+        label: isLeadGen ? "TikTok Pixel (required for Website form)" : "TikTok Pixel configured",
         ok: objective.pixelMode !== "none" && (objective.pixelMode === "salla_managed" || !!objective.pixelId),
         detail: objective.pixelMode === "salla_managed" ? "Salla Managed" : objective.pixelId ? "Connected" : "Missing",
       });
@@ -384,11 +414,14 @@ export function TikTokStepReview() {
         campaign_id: "<CAMPAIGN_ID>",
         adgroup_name: `${objective.campaignName} - Ad Group`,
         ...(isSales && { promotion_type: "WEBSITE" }),
-        placement_type: creative.placementType,
+        // PRODUCT_SALES only supports PLACEMENT_TIKTOK (Pangle/GlobalApp not available for sales).
+        placement_type: isSales ? "PLACEMENT_TYPE_NORMAL" : creative.placementType,
+        ...(isSales && { placements: ["PLACEMENT_TIKTOK"] }),
+        ...(!isSales && creative.placementType === "PLACEMENT_TYPE_NORMAL" && { placements: creative.placements }),
         budget_mode: budget.budgetMode,
         budget: budget.budgetMode === "BUDGET_MODE_TOTAL" ? budget.lifetimeAmount : budget.amount,
-        optimization_goal: budget.optimizationGoal,
-        ...(isSales && { optimization_event: budget.optimizationEvent }),
+        optimization_goal: GOAL_TO_API[budget.optimizationGoal] || budget.optimizationGoal,
+        ...(isSales && { optimization_event: EVENT_TO_API[budget.optimizationEvent] || budget.optimizationEvent }),
         ...(isAppPromo && {
           app_id: objective.appSettings.appId || "<APP_ID>",
           app_type: objective.appSettings.appPlatform,
@@ -402,11 +435,15 @@ export function TikTokStepReview() {
         ...(budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "LEAD_GENERATION" && { conversion_bid_price: budget.bidAmount }),
         ...(budget.bidType === "BID_TYPE_CUSTOM" && (budget.optimizationGoal === "INSTALL" || budget.optimizationGoal === "IN_APP_EVENT") && { conversion_bid_price: budget.bidAmount }),
         ...(isLeadGen && { optimization_location: objective.leadOptimizationLocation }),
+        // Lead Gen website form requires SubmitForm as the optimization event
+        ...(isLeadGen && objective.leadOptimizationLocation === "WEBSITE" && { optimization_event: "SubmitForm" }),
         ...(budget.optimizationGoal === "VALUE" && { deep_bid_type: budget.deepBidType, roas_bid: Number(budget.roasBid) || 1 }),
         ...(isSales && {
           click_attribution_window: Number(budget.clickAttributionWindow),
           view_attribution_window: Number(budget.viewAttributionWindow),
         }),
+        // Video Views: engaged view attribution (how long after a video view a conversion counts)
+        ...(isVideoViews && { engaged_view_attribution_window: 7 }),
         ...(isReach && budget.frequencyCap && {
           frequency: budget.frequencyCap.frequency,
           frequency_schedule: budget.frequencyCap.schedule,
@@ -420,7 +457,11 @@ export function TikTokStepReview() {
         }),
         schedule_start_time: toApiDateTime(budget.startDate),
         ...(budget.endDate && !budget.endDateOptional && { schedule_end_time: toApiDateTime(budget.endDate, true) }),
-        ...(!isReach && !isVideoViews && !isLeadGen && !isAppPromo && !(isTraffic && objective.pixelMode === "none") && {
+        // Pixel: required for PRODUCT_SALES, optional for TRAFFIC (enables LPV), required for LEAD_GEN website form
+        ...(!isReach && !isVideoViews && !isAppPromo
+          && !(isTraffic && objective.pixelMode === "none")
+          && !(isLeadGen && objective.leadOptimizationLocation === "INSTANT_FORM")
+          && {
           pixel_id: resolvedPixelId || "<PIXEL_ID>",
         }),
         ...(objective.catalogEnabled && {
@@ -434,8 +475,13 @@ export function TikTokStepReview() {
         gender: audience.gender,
         languages: audience.languages,
         ...(hasNonMockInterests && { interest_category_ids: audience.interests }),
-        ...(audience.interestKeywordIds?.length > 0 && { interest_keyword_ids: audience.interestKeywordIds }),
-        ...(audience.purchaseIntentKeywordIds?.length > 0 && { purchase_intention_keyword_ids: audience.purchaseIntentKeywordIds }),
+        // API: interest_keyword_ids and purchase_intention_keyword_ids CANNOT coexist (keyword conflict).
+        // Purchase intent takes priority when both are somehow present.
+        ...(audience.purchaseIntentKeywordIds?.length > 0
+          ? { purchase_intention_keyword_ids: audience.purchaseIntentKeywordIds }
+          : audience.interestKeywordIds?.length > 0
+            ? { interest_keyword_ids: audience.interestKeywordIds }
+            : {}),
         ...(audience.operatingSystems.length > 0 && { operating_systems: audience.operatingSystems }),
         // Search Placement
         ...(budget.searchResultEnabled && { search_result_enabled: true }),
@@ -664,8 +710,20 @@ export function TikTokStepReview() {
                         : "Not configured"
                   } warn={objective.pixelMode === "none"} />
                 )}
-                {(isReach || isVideoViews || isLeadGen || isAppPromo) && (
-                  <ReviewRow label="Pixel" value={isAppPromo ? "Not required (SDK tracking)" : isLeadGen ? "Not required (Instant Form)" : isVideoViews ? "Not required for Video Views" : "Not required for Reach"} />
+                {(isReach || isVideoViews || isAppPromo) && (
+                  <ReviewRow label="Pixel" value={isAppPromo ? "Not required (SDK tracking)" : isVideoViews ? "Not required for Video Views" : "Not required for Reach"} />
+                )}
+                {isLeadGen && objective.leadOptimizationLocation === "INSTANT_FORM" && (
+                  <ReviewRow label="Pixel" value="Not required (Instant Form)" />
+                )}
+                {isLeadGen && objective.leadOptimizationLocation === "WEBSITE" && (
+                  <ReviewRow label="TikTok Pixel" value={
+                    objective.pixelMode === "salla_managed"
+                      ? "Salla Managed"
+                      : objective.pixelId
+                        ? objective.pixelName || objective.pixelId
+                        : "Not configured"
+                  } warn={objective.pixelMode === "none"} />
                 )}
                 {isTraffic && (
                   <ReviewRow label="TikTok Pixel" value={
