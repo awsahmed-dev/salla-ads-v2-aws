@@ -54,6 +54,7 @@ import {
   Download,
   Smartphone,
   Activity,
+  Repeat,
 } from "lucide-react";
 import { FrequencyCapCard } from "@/components/shared/frequency-cap-card";
 import { BudgetDurationCard } from "@/components/shared/budget-duration-card";
@@ -136,6 +137,14 @@ const ALL_OPTIMIZATION_GOALS: {
     icon: <Eye className="size-4" />,
     billingLabel: "CPM",
     recommended: true,
+  },
+  {
+    value: "SHOW",
+    label: "Impressions (Frequency)",
+    desc: "Maximize total impressions. Users may see your ad multiple times to reinforce your message.",
+    bestFor: "Best for retargeting, limited-time offers, or when repetition drives conversions.",
+    icon: <Repeat className="size-4" />,
+    billingLabel: "CPM",
   },
   {
     value: "VIDEO_VIEW",
@@ -255,7 +264,7 @@ const BID_STRATEGIES: {
     bestFor: "Best for most Salla merchants, especially when starting a new campaign or testing new products.",
     icon: <Zap className="size-4" />,
     recommended: true,
-    supportedGoals: ["CONVERSION", "VALUE", "CLICK", "LANDING_PAGE_VIEW", "REACH", "VIDEO_VIEW", "FOCUSED_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
+    supportedGoals: ["CONVERSION", "VALUE", "CLICK", "LANDING_PAGE_VIEW", "REACH", "SHOW", "VIDEO_VIEW", "FOCUSED_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
   },
   {
     value: "COST_CAP",
@@ -359,6 +368,7 @@ export function TikTokStepBudget() {
     CLICK: { min: 0.8, max: 2.5 },
     LANDING_PAGE_VIEW: { min: 1.5, max: 4.0 },
     REACH: { min: 3.0, max: 12.0 },  // CPM range in SAR
+    SHOW: { min: 3.0, max: 12.0 },   // CPM range in SAR (same as REACH)
     VIDEO_VIEW: { min: 0.02, max: 0.08 },  // CPV range in SAR (2-second views)
     FOCUSED_VIEW: { min: 0.04, max: 0.15 },  // CPV range in SAR (6-second focused views)
     LEAD_GENERATION: { min: 5.0, max: 20.0 },  // CPL range in SAR
@@ -451,44 +461,7 @@ export function TikTokStepBudget() {
         <div className="flex flex-1 flex-col gap-5">
 
           {/* ======================================================= */}
-          {/* SECTION 1: Budget, Duration & Payment (shared card)      */}
-          {/* ======================================================= */}
-          <BudgetDurationCard
-            budgetTypes={BUDGET_TYPES}
-            paymentMethod={budget.paymentMethod}
-            onPaymentMethodChange={(v) => updateNested("budget", { paymentMethod: v })}
-            showLifetimeToggle={true}
-            budgetMode={budget.budgetMode === "BUDGET_MODE_TOTAL" ? "lifetime" : "daily"}
-            onBudgetModeChange={(mode) =>
-              updateNested("budget", {
-                budgetMode: mode === "lifetime" ? "BUDGET_MODE_TOTAL" : "BUDGET_MODE_DAY",
-              })
-            }
-            amount={budget.budgetMode === "BUDGET_MODE_TOTAL" ? budget.lifetimeAmount : budget.amount}
-            onAmountChange={(v) =>
-              updateNested("budget", budget.budgetMode === "BUDGET_MODE_TOTAL" ? { lifetimeAmount: v } : { amount: v })
-            }
-            suggestedDaily={suggestedDaily}
-            goalLabel={goalLabel}
-            platformName="TikTok"
-            strengthTiers={strengthTiers}
-            startDate={budget.startDate}
-            endDate={budget.endDate}
-            endDateOptional={budget.endDateOptional}
-            onStartDateChange={(d) => updateNested("budget", { startDate: d })}
-            onEndDateChange={(d) => updateNested("budget", { endDate: d })}
-            showRunContinuously={true}
-            endDateRequired={endDateRequired}
-            showAutoIncrease={true}
-            autoIncrease={autoIncrease}
-            onAutoIncreaseChange={(ai) => updateNested("budget", { autoIncrease: ai })}
-            onBulkUpdate={(updates) => updateNested("budget", updates)}
-            showSmartStart={true}
-          />
-
-
-          {/* ======================================================= */}
-          {/* SECTION 2: Optimization Goal                             */}
+          {/* SECTION 1: Optimization Goal                             */}
           {/* ======================================================= */}
           <OptimizationGoalCard
             goals={ALL_OPTIMIZATION_GOALS.filter((g) =>
@@ -498,7 +471,7 @@ export function TikTokStepBudget() {
             onGoalChange={(value) => {
               const billingEvent: BillingEvent =
                 value === "CLICK" ? "CPC"
-                : value === "REACH" ? "CPM"
+                : value === "REACH" || value === "SHOW" ? "CPM"
                 : value === "VIDEO_VIEW" || value === "FOCUSED_VIEW" ? "CPV"
                 : "OCPM";
               const deepBidType = value === "VALUE" ? ("VO_MIN_ROAS" as const) : ("DEFAULT" as const);
@@ -509,7 +482,7 @@ export function TikTokStepBudget() {
                 bidType: "BID_TYPE_NO_BID" as BidType,
               });
             }}
-            layout="list"
+            layout="grid"
             subtitle={
               isReach
                 ? "Your campaign is optimized for Reach. TikTok will maximize the number of unique users who see your ad."
@@ -685,7 +658,7 @@ export function TikTokStepBudget() {
                 });
               }
             }}
-            layout="cards"
+            layout="buttons"
             infoTipText="Choose how TikTok spends your daily budget. Maximum Delivery gets the most results; Cost Cap averages around your target; Bid Cap is a hard max per auction."
             billingContext={[
               {
@@ -708,7 +681,9 @@ export function TikTokStepBudget() {
                 <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
                   <Info className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
                   <p className="text-xs leading-relaxed text-amber-700">
-                    {isReach
+                    {budget.optimizationGoal === "SHOW"
+                      ? "Impressions optimization uses Maximum Delivery with CPM billing. TikTok will maximize total impressions — users may see your ad multiple times to reinforce your message."
+                      : isReach
                       ? "Reach campaigns use Maximum Delivery with CPM billing. TikTok will auto-bid to show your ad to as many unique people as possible within your budget."
                       : budget.optimizationGoal === "VALUE"
                         ? "Value optimization always uses Maximum Delivery combined with your ROAS target. TikTok auto-bids to maximize total revenue while meeting your minimum ROAS."
@@ -795,23 +770,48 @@ export function TikTokStepBudget() {
           />
 
           {/* ======================================================= */}
-          {/* SECTION 5: Attribution Window                           */}
+          {/* SECTION 4: Budget, Duration & Payment                    */}
           {/* ======================================================= */}
-          {!isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo && budget.optimizationGoal !== "CLICK" && (
-            <AttributionWindowCard
-              mode="separate"
-              clickOptions={CLICK_ATTRIBUTION_WINDOWS}
-              viewOptions={VIEW_ATTRIBUTION_WINDOWS}
-              clickValue={budget.clickAttributionWindow}
-              viewValue={budget.viewAttributionWindow}
-              onClickChange={(v) => updateNested("budget", { clickAttributionWindow: v })}
-              onViewChange={(v) => updateNested("budget", { viewAttributionWindow: v })}
-              icon={<Link className="size-4 text-primary" />}
-              subtitle="How long after someone interacts with your ad should a purchase still count as a result? This affects both reporting and how TikTok optimizes delivery."
-              infoTipText="Defines the time window in which a conversion is credited to your ad after a user clicks or views it. Maps to API fields click_attribution_window and view_attribution_window."
-              tip="Use 7-day click + 1-day view for your online store. Most customers take 1-3 days to decide on a purchase after clicking an ad, and this window gives TikTok enough signal to optimize your campaign effectively."
-            />
-          )}
+          <BudgetDurationCard
+            budgetTypes={BUDGET_TYPES}
+            paymentMethod={budget.paymentMethod}
+            onPaymentMethodChange={(v) => updateNested("budget", { paymentMethod: v })}
+            showLifetimeToggle={true}
+            budgetMode={budget.budgetMode === "BUDGET_MODE_TOTAL" ? "lifetime" : "daily"}
+            onBudgetModeChange={(mode) =>
+              updateNested("budget", {
+                budgetMode: mode === "lifetime" ? "BUDGET_MODE_TOTAL" : "BUDGET_MODE_DAY",
+              })
+            }
+            amount={budget.budgetMode === "BUDGET_MODE_TOTAL" ? budget.lifetimeAmount : budget.amount}
+            onAmountChange={(v) =>
+              updateNested("budget", budget.budgetMode === "BUDGET_MODE_TOTAL" ? { lifetimeAmount: v } : { amount: v })
+            }
+            suggestedDaily={suggestedDaily}
+            goalLabel={goalLabel}
+            platformName="TikTok"
+            strengthTiers={strengthTiers}
+            startDate={budget.startDate}
+            endDate={budget.endDate}
+            endDateOptional={budget.endDateOptional}
+            onStartDateChange={(d) => updateNested("budget", { startDate: d })}
+            onEndDateChange={(d) => updateNested("budget", { endDate: d })}
+            showRunContinuously={true}
+            endDateRequired={endDateRequired}
+            showAutoIncrease={true}
+            autoIncrease={autoIncrease}
+            onAutoIncreaseChange={(ai) => updateNested("budget", { autoIncrease: ai })}
+            onBulkUpdate={(updates) => updateNested("budget", updates)}
+            showSmartStart={true}
+          />
+
+          {/* ======================================================= */}
+          {/* SECTION 5: Performance Boost (Salla Upsell)              */}
+          {/* ======================================================= */}
+          <PerformanceBoostCard
+            enabled={budget.performanceBoost}
+            onToggle={(checked) => updateNested("budget", { performanceBoost: checked })}
+          />
 
           {/* ======================================================= */}
           {/* ADVANCED SETTINGS (Collapsible)                          */}
@@ -827,7 +827,7 @@ export function TikTokStepBudget() {
               >
                 <div>
                   <span className="text-base font-bold text-foreground">Advanced Settings</span>
-                  <p className="mt-1 text-xs text-muted-foreground">Frequency Cap, Delivery Pacing</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Attribution Window, Frequency Cap, Delivery Pacing</p>
                 </div>
                 <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", showAdvanced && "rotate-180")} />
               </button>
@@ -897,9 +897,42 @@ export function TikTokStepBudget() {
             />
           )}
 
+              {/* -- Attribution Window -- */}
+              {!isReach && budget.optimizationGoal !== "CLICK" && budget.optimizationGoal !== "SHOW" && (
+                <AttributionWindowCard
+                  mode="separate"
+                  clickOptions={CLICK_ATTRIBUTION_WINDOWS}
+                  viewOptions={VIEW_ATTRIBUTION_WINDOWS}
+                  clickValue={budget.clickAttributionWindow}
+                  viewValue={budget.viewAttributionWindow}
+                  onClickChange={(v) => updateNested("budget", { clickAttributionWindow: v })}
+                  onViewChange={(v) => updateNested("budget", { viewAttributionWindow: v })}
+                  icon={<Link className="size-4 text-primary" />}
+                  subtitle={
+                    isAppPromo
+                      ? "How long after someone interacts with your ad should an install or in-app event count as a result?"
+                      : isLeadGen
+                        ? "How long after someone interacts with your ad should a lead submission count as a result?"
+                        : isTraffic
+                          ? "How long after someone clicks your ad should a landing page view count as a result?"
+                          : "How long after someone interacts with your ad should a purchase still count as a result? This affects both reporting and how TikTok optimizes delivery."
+                  }
+                  infoTipText="Defines the time window in which a conversion is credited to your ad after a user clicks or views it. Maps to API fields click_attribution_window and view_attribution_window."
+                  tip={
+                    isAppPromo
+                      ? "Use 7-day click + 1-day view for app campaigns. Most users install within a few days of seeing an ad."
+                      : isLeadGen
+                        ? "Use 7-day click + 1-day view. Lead form submissions typically happen quickly, but a wider click window captures follow-up conversions."
+                        : isVideoViews
+                          ? "Use 7-day click + 1-day view to track conversions driven by your video ad engagement."
+                          : "Use 7-day click + 1-day view for your online store. Most customers take 1-3 days to decide on a purchase after clicking an ad, and this window gives TikTok enough signal to optimize your campaign effectively."
+                  }
+                />
+              )}
+
               {/* -- Delivery pacing -- */}
               <DeliveryPacingCard
-                layout="cards"
+                layout="buttons"
                 options={[
                   { value: "PACING_MODE_SMOOTH", label: "Standard", desc: "Spend budget evenly throughout the day. Recommended for most campaigns.", icon: <Gauge className="size-4" />, recommended: true },
                   { value: "PACING_MODE_FAST", label: "Accelerated", desc: "Spend budget as fast as possible. Use for time-sensitive campaigns.", icon: <Zap className="size-4" /> },
@@ -968,14 +1001,6 @@ export function TikTokStepBudget() {
 
             </CollapsibleContent>
           </Collapsible>
-
-          {/* ======================================================= */}
-          {/* PERFORMANCE BOOST (Salla Upsell)                         */}
-          {/* ======================================================= */}
-          <PerformanceBoostCard
-            enabled={budget.performanceBoost}
-            onToggle={(checked) => updateNested("budget", { performanceBoost: checked })}
-          />
 
         </div>
 
