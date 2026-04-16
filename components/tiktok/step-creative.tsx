@@ -135,7 +135,7 @@ const AD_FORMAT_OPTIONS: {
   {
     value: "SPARK_AD",
     label: "Spark Ad",
-    desc: "Promote an existing organic TikTok post via authorization code (tiktok_item_id).",
+    desc: "Promote an existing organic TikTok post via authorization code.",
     icon: <Sparkles className="size-5" />,
   },
 ];
@@ -250,6 +250,7 @@ function TikTokCampaignReadiness({
   const hasVideoAd = isCatalogListing || ads.some((a) => a.adFormat === "SINGLE_VIDEO" || a.adFormat === "SPARK_AD");
   const hasImageAd = isCatalogListing || ads.some((a) => a.adFormat === "SINGLE_IMAGE" || a.adFormat === "CAROUSEL");
   const hasBothMediaTypes = hasVideoAd && hasImageAd;
+  const hasMultipleFormats = new Set(ads.map((a) => a.adFormat)).size >= 2;
 
   const bestPractices: { label: string; met: boolean; tip: string; metTip: string }[] = [];
 
@@ -274,6 +275,27 @@ function TikTokCampaignReadiness({
         ? "Create one video ad and one image ad — video gets 3x more engagement, images provide broader reach"
         : "Create both a video ad and an image ad — video drives engagement while images extend your reach",
       metTip: "Both video and image ads included",
+    });
+  }
+
+  if (ads.length >= 2 && !isCatalogListing) {
+    bestPractices.push({
+      label: "Multiple formats",
+      met: hasMultipleFormats,
+      tip: "Mix formats (Single Video, Single Image, Carousel) to reach users in different placements",
+      metTip: `${new Set(ads.map((a) => a.adFormat)).size} formats in use`,
+    });
+  }
+
+  if (ads.length >= 2 && !isCatalogListing) {
+    const hasDifferentCreatives = ads.some((a, i) =>
+      i > 0 && (a.adText !== ads[0].adText || a.callToAction !== ads[0].callToAction)
+    );
+    bestPractices.push({
+      label: "A/B testing",
+      met: hasDifferentCreatives,
+      tip: "Vary captions, CTAs, or visuals across ads to find what resonates best with your audience",
+      metTip: "Different creatives across ads",
     });
   }
 
@@ -810,6 +832,12 @@ function AdPanel({
             </div>
           )}
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {(() => {
+              const hasMedia = isSpark ? !!ad.sparkAdAuthCode : isCarousel ? cardCount >= 2 : assetCount > 0;
+              return (
+                <span className={cn("inline-block size-1.5 rounded-full", hasMedia ? "bg-emerald-500" : "bg-amber-400")} />
+              );
+            })()}
             {isSpark ? (
               <>
                 <Badge variant="secondary" className="rounded-full bg-primary/10 px-1.5 py-0 text-xs font-semibold text-primary">Spark Ad</Badge>
@@ -818,8 +846,8 @@ function AdPanel({
             ) : (
               <>
                 <span>{getFormatLabel(ad.adFormat)}</span>
-                <span>{"--"}</span>
-                <span>{isCarousel ? `${cardCount} card${cardCount !== 1 ? "s" : ""}${ad.musicFile ? " + music" : ""}` : `${assetCount} creative${assetCount !== 1 ? "s" : ""}`}</span>
+                <span>{"·"}</span>
+                <span>{isCarousel ? `${cardCount} card${cardCount !== 1 ? "s" : ""}${hasMusic ? " + music" : ""}` : `${assetCount} creative${assetCount !== 1 ? "s" : ""}`}</span>
               </>
             )}
           </div>
@@ -838,44 +866,55 @@ function AdPanel({
 
       {/* ---- Expanded Content ---- */}
       {isActive && (
-        <div className="flex flex-col gap-4 p-4">
-          {/* Format picker */}
-          <div>
-            <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-              Ad Format
-              <InfoTip text="TikTok API ad_format field. SINGLE_VIDEO is recommended for best results. Spark Ads promote existing posts via tiktok_item_id." />
-            </Label>
-  <div className="grid gap-2 sm:grid-cols-2">
-  {AD_FORMAT_OPTIONS.filter((opt) => allowedFormats.includes(opt.value)).map((opt) => (
-  <button
-  key={opt.value}
-  type="button"
-  onClick={() => changeFormat(opt.value)}
-  className={cn(
-                    "flex flex-col items-start gap-1.5 rounded-lg border px-3 py-2.5 text-left transition-all",
-                    ad.adFormat === opt.value
-                      ? "border-primary bg-primary/5"
-                      : "border-border bg-background hover:border-primary/40"
-                  )}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className={cn(ad.adFormat === opt.value ? "text-primary" : "text-muted-foreground")}>{opt.icon}</span>
-                    <span className={cn("text-xs font-medium", ad.adFormat === opt.value ? "text-primary" : "text-foreground")}>{opt.label}</span>
-                    {opt.recommended && <Badge variant="secondary" className="ml-auto rounded-full px-1 py-0 text-[7px]">Best</Badge>}
-                  </div>
-                  <p className="text-xs leading-snug text-muted-foreground">{opt.desc}</p>
-                </button>
-              ))}
+        <div className="flex flex-col gap-0 border-t border-border">
+
+          {/* ── Ad Format (format picker) ── */}
+          <div className="px-6 py-5">
+            <p className="mb-1 text-xs font-bold text-foreground">Ad Format</p>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Choose a format for this ad. You can add more ads in different formats.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {AD_FORMAT_OPTIONS.filter((opt) => allowedFormats.includes(opt.value)).map((opt) => {
+                const isSelected = ad.adFormat === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => changeFormat(opt.value)}
+                    className={cn(
+                      "flex flex-col items-center gap-2 rounded-xl border px-3 py-4 text-center transition-all",
+                      isSelected
+                        ? "border-[#a4ffe5] bg-[#e6fff9]"
+                        : "border-border bg-card hover:border-[#a4ffe5] hover:bg-[#e6fff9]"
+                    )}
+                  >
+                    <div className={cn(
+                      "flex size-10 items-center justify-center rounded-full",
+                      isSelected ? "bg-[#a4ffe5]" : "bg-muted/60"
+                    )}>
+                      <span className={cn("[&>svg]:size-5", isSelected ? "text-[#004956]" : "text-muted-foreground")}>
+                        {opt.icon}
+                      </span>
+                    </div>
+                    <p className={cn("text-xs font-bold", isSelected ? "text-[#004956]" : "text-foreground")}>{opt.label}</p>
+                    <p className="hidden text-[10px] leading-snug text-muted-foreground sm:block">{opt.desc}</p>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Video Views: video-only notice */}
           {isVideoViews && (
-            <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
-              <Info className="mt-0.5 size-3.5 shrink-0 text-primary" />
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                <span className="font-medium text-foreground">Video Views campaigns</span> only support video formats (Single Video and Spark Ads). Upload engaging vertical videos (9:16) to maximize view completion rates.
-              </p>
+            <div className="border-t border-border px-6 py-4">
+              <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
+                <Info className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  <span className="font-medium text-foreground">Video Views campaigns</span> only support video formats (Single Video and Spark Ads). Upload engaging vertical videos (9:16) to maximize view completion rates.
+                </p>
+              </div>
             </div>
           )}
 
@@ -883,10 +922,22 @@ function AdPanel({
 
           {/* ---- SPARK AD ---- */}
           {isSpark && (
-            <div className="flex flex-col gap-0">
+            <div className="flex flex-col gap-0 border-t border-border">
 
-              {/* ── Section 1: Authorization Code ── */}
-              <div className="flex flex-col gap-4 px-3 py-3">
+              {/* ── Section 1: Link Type + CTA ── */}
+              <div className="px-6 py-5">
+                <LinkTypeSection
+                  url={ad.landingPageUrl}
+                  onUrlChange={(url) => onUpdate({ ...ad, landingPageUrl: url })}
+                  cta={ad.callToAction}
+                  onCtaChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}
+                  recommendedCtas={RECOMMENDED_CTAS}
+                  otherCtas={OTHER_CTAS}
+                />
+              </div>
+
+              {/* ── Section 2: Authorization Code ── */}
+              <div className="flex flex-col gap-4 border-t border-border px-6 py-5">
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-1.5">
                     <Sparkles className="size-3 text-primary" />
@@ -933,31 +984,19 @@ function AdPanel({
                 )}
               </div>
 
-              {/* ── Section 2: Link Type + CTA ── */}
-              <div className="border-t border-border px-3 py-3">
-                <LinkTypeSection
-                  url={ad.landingPageUrl}
-                  onUrlChange={(url) => onUpdate({ ...ad, landingPageUrl: url })}
-                  cta={ad.callToAction}
-                  onCtaChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}
-                  recommendedCtas={RECOMMENDED_CTAS}
-                  otherCtas={OTHER_CTAS}
-                />
-              </div>
-
               {/* ── Advanced Options ── */}
               <div className="border-t border-border">
                 <button
                   type="button"
                   onClick={() => setAdvancedOpen(!advancedOpen)}
-                  className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-foreground hover:text-foreground"
+                  className="flex w-full items-center justify-between px-6 py-2.5 text-sm font-medium text-foreground hover:text-foreground"
                 >
                   <span>Advanced Options</span>
                   {advancedOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
                 </button>
 
                 {advancedOpen && (
-                  <div className="flex flex-col gap-4 px-3 pb-4">
+                  <div className="flex flex-col gap-4 px-6 pb-4">
                     <div className="flex flex-col gap-0 rounded-lg border border-border">
                       {/* Allow Duet */}
                       <div className="flex items-center justify-between px-3 py-2.5">
@@ -991,9 +1030,22 @@ function AdPanel({
 
           {/* ---- CAROUSEL ---- */}
           {isCarousel && !isSpark && (
-            <div className="flex flex-col gap-0">
+            <div className="flex flex-col gap-0 border-t border-border">
+
+              {/* ── Link Type + CTA ── */}
+              <div className="px-6 py-5">
+                <LinkTypeSection
+                  url={ad.landingPageUrl}
+                  onUrlChange={(url) => onUpdate({ ...ad, landingPageUrl: url })}
+                  cta={ad.callToAction}
+                  onCtaChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}
+                  recommendedCtas={RECOMMENDED_CTAS}
+                  otherCtas={OTHER_CTAS}
+                />
+              </div>
+
               {/* Carousel image cards */}
-              <div>
+              <div className="border-t border-border px-6 py-5">
                 <div className="mb-2 flex items-center justify-between">
                   <Label className="text-xs font-semibold text-foreground">
                     Carousel Cards
@@ -1130,20 +1182,8 @@ function AdPanel({
                 </div>
               </div>
 
-              {/* ── Link Type + CTA ── */}
-              <div className="border-t border-border px-3 py-3">
-                <LinkTypeSection
-                  url={ad.landingPageUrl}
-                  onUrlChange={(url) => onUpdate({ ...ad, landingPageUrl: url })}
-                  cta={ad.callToAction}
-                  onCtaChange={(v) => onUpdate({ ...ad, callToAction: v as TikTokCTA })}
-                  recommendedCtas={RECOMMENDED_CTAS}
-                  otherCtas={OTHER_CTAS}
-                />
-              </div>
-
               {/* ── Ad Copy ── */}
-              <div className="border-t border-border px-3 py-3">
+              <div className="border-t border-border px-6 py-5">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
                     <Label className="text-sm font-medium text-foreground">Display Name</Label>
@@ -1162,16 +1202,46 @@ function AdPanel({
                 </div>
               </div>
 
+              {/* ── Advanced Options ── */}
+              <div className="border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setAdvancedOpen(!advancedOpen)}
+                  className="flex w-full items-center justify-between px-6 py-2.5 text-sm font-medium text-foreground hover:text-foreground"
+                >
+                  <span>Advanced Options</span>
+                  {advancedOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                </button>
+
+                {advancedOpen && (
+                  <div className="flex flex-col gap-4 px-6 pb-4">
+                    <div className="flex flex-col gap-0 rounded-lg border border-border">
+                      {/* AI Content Disclosure */}
+                      <div className="flex items-center justify-between px-3 py-2.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-medium text-foreground">AI Content Disclosure</span>
+                          <span className="text-[11px] leading-tight text-muted-foreground">Declare this ad contains AI-generated content</span>
+                        </div>
+                        <Switch
+                          checked={ad.aigcDisclosureType === "DECLARED"}
+                          onCheckedChange={(checked) => onUpdate({ ...ad, aigcDisclosureType: checked ? "DECLARED" : "NOT_DECLARED" })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
 
           {/* ---- SINGLE VIDEO ---- */}
           {ad.adFormat === "SINGLE_VIDEO" && !isSpark && (
-            <div className="flex flex-col gap-0">
+            <div className="flex flex-col gap-0 border-t border-border">
 
-              {/* ── Section 1: Link Type + CTA (product-first) ── */}
+              {/* ── Section 1: Link Type + CTA ── */}
               {!isAppPromo ? (
-                <div className="px-3 py-3">
+                <div className="px-6 py-5">
                   <LinkTypeSection
                     url={ad.landingPageUrl}
                     onUrlChange={(url) => onUpdate({ ...ad, landingPageUrl: url })}
@@ -1183,7 +1253,7 @@ function AdPanel({
                   />
                 </div>
               ) : (
-                <div className="flex flex-col gap-4 px-3 py-3">
+                <div className="flex flex-col gap-4 px-6 py-5">
                   <div className="flex flex-col gap-2">
                     <Label className="text-sm font-medium text-foreground">App Download URL</Label>
                     <div className="flex h-10 items-center justify-between rounded-lg border border-border bg-muted/40 px-3">
@@ -1197,7 +1267,7 @@ function AdPanel({
               )}
 
               {/* ── Section 2: Media Upload ── */}
-              <div className="border-t border-border px-3 py-3">
+              <div className="border-t border-border px-6 py-5">
                 <div className="mb-2 flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2">
                   <Film className="size-3.5 shrink-0 text-muted-foreground" />
                   <p className="text-[11px] text-muted-foreground">
@@ -1217,9 +1287,11 @@ function AdPanel({
                   onClear={() => onUpdate({ ...ad, assets: [] })}
                   libraryContext="VIDEO"
                 />
+              </div>
 
-                {/* Background Music — toggle+description row */}
-                <div className="mt-3 flex flex-col gap-0 rounded-lg border border-border">
+              {/* ── Section 2b: Background Music ── */}
+              <div className="border-t border-border px-6 py-5">
+                <div className="flex flex-col gap-0 rounded-lg border border-border">
                   <div className="flex items-center justify-between px-3 py-2.5">
                     <div className="flex flex-col gap-0.5">
                       <span className="text-xs font-medium text-foreground">Background Music</span>
@@ -1281,7 +1353,7 @@ function AdPanel({
               </div>
 
               {/* ── Section 3: Ad Copy ── */}
-              <div className="border-t border-border px-3 py-3">
+              <div className="border-t border-border px-6 py-5">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
                     <Label className="text-sm font-medium text-foreground">Display Name</Label>
@@ -1319,14 +1391,14 @@ function AdPanel({
                 <button
                   type="button"
                   onClick={() => setAdvancedOpen(!advancedOpen)}
-                  className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-foreground hover:text-foreground"
+                  className="flex w-full items-center justify-between px-6 py-2.5 text-sm font-medium text-foreground hover:text-foreground"
                 >
                   <span>Advanced Options</span>
                   {advancedOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
                 </button>
 
                 {advancedOpen && (
-                  <div className="flex flex-col gap-4 px-3 pb-4">
+                  <div className="flex flex-col gap-4 px-6 pb-4">
                     <div className="flex flex-col gap-0 rounded-lg border border-border">
                       {/* Instant Product Page */}
                       <div className="flex items-center justify-between px-3 py-2.5">
@@ -1374,10 +1446,10 @@ function AdPanel({
 
           {/* ---- SINGLE IMAGE ---- */}
           {ad.adFormat === "SINGLE_IMAGE" && !isSpark && (
-            <div className="flex flex-col gap-0">
+            <div className="flex flex-col gap-0 border-t border-border">
 
               {/* ── Section 1: Link Type + CTA ── */}
-              <div className="px-3 py-3">
+              <div className="px-6 py-5">
                 <LinkTypeSection
                   url={ad.landingPageUrl}
                   onUrlChange={(url) => onUpdate({ ...ad, landingPageUrl: url })}
@@ -1389,7 +1461,7 @@ function AdPanel({
               </div>
 
               {/* ── Section 2: Media Upload ── */}
-              <div className="border-t border-border px-3 py-3">
+              <div className="border-t border-border px-6 py-5">
                 <div className="mb-2 flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2">
                   <ImageIcon className="size-3.5 shrink-0 text-muted-foreground" />
                   <p className="text-[11px] text-muted-foreground">
@@ -1408,9 +1480,11 @@ function AdPanel({
                   onClear={() => onUpdate({ ...ad, assets: [] })}
                   libraryContext="IMAGE"
                 />
+              </div>
 
-                {/* Background Music */}
-                <div className="mt-3 flex flex-col gap-0 rounded-lg border border-border">
+              {/* ── Section 2b: Background Music ── */}
+              <div className="border-t border-border px-6 py-5">
+                <div className="flex flex-col gap-0 rounded-lg border border-border">
                   <div className="flex items-center justify-between px-3 py-2.5">
                     <div className="flex flex-col gap-0.5">
                       <span className="text-xs font-medium text-foreground">Background Music</span>
@@ -1472,7 +1546,7 @@ function AdPanel({
               </div>
 
               {/* ── Section 3: Ad Copy ── */}
-              <div className="border-t border-border px-3 py-3">
+              <div className="border-t border-border px-6 py-5">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
                     <Label className="text-sm font-medium text-foreground">Display Name</Label>
@@ -1489,6 +1563,36 @@ function AdPanel({
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* ── Advanced Options ── */}
+              <div className="border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setAdvancedOpen(!advancedOpen)}
+                  className="flex w-full items-center justify-between px-6 py-2.5 text-sm font-medium text-foreground hover:text-foreground"
+                >
+                  <span>Advanced Options</span>
+                  {advancedOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                </button>
+
+                {advancedOpen && (
+                  <div className="flex flex-col gap-4 px-6 pb-4">
+                    <div className="flex flex-col gap-0 rounded-lg border border-border">
+                      {/* AI Content Disclosure */}
+                      <div className="flex items-center justify-between px-3 py-2.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-medium text-foreground">AI Content Disclosure</span>
+                          <span className="text-[11px] leading-tight text-muted-foreground">Declare this ad contains AI-generated content</span>
+                        </div>
+                        <Switch
+                          checked={ad.aigcDisclosureType === "DECLARED"}
+                          onCheckedChange={(checked) => onUpdate({ ...ad, aigcDisclosureType: checked ? "DECLARED" : "NOT_DECLARED" })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
             </div>
@@ -1565,7 +1669,7 @@ function CatalogProductSelection({
         <div className="mb-1 flex items-center gap-2">
           <Store className="size-4 text-primary" />
           <Label className="text-sm font-semibold text-foreground">Product Selection</Label>
-          <InfoTip text="Choose which products from your catalog to feature. 'All products' uses all in-stock items. 'Product Set' maps to API product_set_id. 'Specific' lets you pick up to 20 products." />
+          <InfoTip text="Choose which products from your catalog to feature. 'All products' uses all in-stock items. 'Product Set' lets you group products by shared characteristics. 'Specific' lets you pick up to 20 products." />
         </div>
         <p className="mb-4 text-xs text-muted-foreground">
           Select which products from your Salla catalog to include in this campaign.
@@ -1707,7 +1811,7 @@ function CatalogProductSelection({
                   </DialogTitle>
                 </DialogHeader>
                 <p className="text-xs text-muted-foreground">
-                  Choose a product set from your synced catalog. Product sets group products by shared characteristics. Maps to TikTok API <code className="rounded bg-muted px-1 text-[10px]">product_set_id</code>.
+                  Choose a product set from your synced catalog. Product sets group products by shared characteristics.
                 </p>
                 <div className="mt-3 flex flex-col gap-2">
                   {TIKTOK_MOCK_PRODUCT_SETS.map((set) => (
@@ -2579,6 +2683,17 @@ export function TikTokStepCreative() {
     setActiveAdIdx(idx + 1);
   };
 
+  /** Copy Display Name, Caption, CTA, and Landing Page URL from the active ad to all others */
+  const applyToAll = () => {
+    if (!activeAd || ads.length < 2) return;
+    const { displayName, adText, callToAction, landingPageUrl } = activeAd;
+    updateNested("creative", {
+      ads: ads.map((a) =>
+        a.id === activeAd.id ? a : { ...a, displayName, adText, callToAction, landingPageUrl }
+      ),
+    });
+  };
+
   const totalCreatives = ads.reduce((sum, a) => sum + (a.adFormat === "CAROUSEL" ? a.carouselCards.length : a.assets.length), 0);
   const activeAdFormat = activeAd?.adFormat ?? "SINGLE_VIDEO";
   const isCatalogListing = catalogEnabled && objectiveConfig.shoppingAdsType === "CATALOG_LISTING_ADS";
@@ -2664,92 +2779,50 @@ export function TikTokStepCreative() {
         <div className="flex flex-1 flex-col gap-5">
 
           {/* ---- TikTok Identity ---- */}
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-border px-5 py-3">
-              <div className="flex items-center gap-2.5">
-                <div className={cn(
-                  "flex size-8 items-center justify-center rounded-xl",
-                  identity.linkStatus === "confirmed" && identity.identityId ? "bg-[#e6fff9]" : "bg-amber-100"
-                )}>
-                  {identity.linkStatus === "confirmed" && identity.identityId
-                    ? <User className="size-4 text-[#004956]" />
-                    : <AlertCircle className="size-4 text-amber-500" />
-                  }
-                </div>
-                <span className="text-sm font-semibold text-foreground">TikTok Identity</span>
-                {identity.linkStatus === "confirmed" && identity.identityId ? (
-                  <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">Connected</span>
-                ) : (
-                  <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">Not Connected</span>
-                )}
+          <div className="rounded-xl border border-border bg-card">
+            <div className="flex items-center justify-between px-6 py-5">
+              <div>
+                <p className="text-sm font-bold text-foreground">Your TikTok account</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Your TikTok profile will appear in the advertisement, and it is advisable to match it with your store name.
+                </p>
               </div>
-              {identity.linkStatus === "confirmed" && identity.identityId && (
-                <button
-                  type="button"
-                  onClick={() => setStep(0)}
-                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
-                >
-                  <Pencil className="size-3" />
-                  Edit
-                </button>
-              )}
+              <Switch checked={identity.linkStatus === "confirmed" && !!identity.identityId} disabled />
             </div>
 
-            {/* Body */}
-            <div className="px-5 py-4">
-              {identity.linkStatus === "confirmed" && identity.identityId ? (
-                /* ======== Connected: account card ======== */
-                <div className="flex items-center gap-3.5">
-                  <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-foreground">
+            {identity.linkStatus === "confirmed" && identity.identityId ? (
+              <div className="border-t border-border px-6 py-4">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-lg border border-border px-4 py-3 text-left"
+                >
+                  <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-foreground">
                     {identity.avatarPreviewUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={identity.avatarPreviewUrl} alt="" className="size-12 rounded-xl object-cover" />
+                      <img src={identity.avatarPreviewUrl} alt="" className="size-8 rounded-lg object-cover" />
                     ) : (
-                      <svg viewBox="0 0 24 24" className="size-5 text-background" fill="currentColor">
+                      <svg viewBox="0 0 24 24" className="size-4 text-background" fill="currentColor">
                         <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V8.75a8.18 8.18 0 0 0 4.76 1.52V6.84a4.83 4.83 0 0 1-1-.15z"/>
                       </svg>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-foreground truncate">{identity.tiktokUsername || identity.displayName || "TikTok Account"}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {identity.identityType === "BC_AUTH_TT" ? "Linked via Salla Business Center" : identity.identityType === "AUTH_CODE" ? "Creator Authorization Code" : "Custom Identity"}
-                    </p>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      {identity.identityId && (
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
-                          ID: {identity.identityId.length > 12 ? `...${identity.identityId.slice(-8)}` : identity.identityId}
-                        </span>
-                      )}
-                      <span className="rounded bg-[#e6fff9] px-1.5 py-0.5 text-[10px] font-semibold text-[#004956]">
-                        {identity.identityType === "BC_AUTH_TT" ? "Business Center" : identity.identityType === "AUTH_CODE" ? "Auth Code" : "Custom"}
-                      </span>
-                    </div>
-                  </div>
+                  <span className="flex-1 text-sm font-medium text-foreground">
+                    {identity.tiktokUsername || identity.displayName || "TikTok Account"}
+                  </span>
+                  <ChevronDown className="size-4 text-muted-foreground" />
+                </button>
+              </div>
+            ) : (
+              <div className="border-t border-border px-6 py-4">
+                <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-4 py-3">
+                  <AlertCircle className="size-4 shrink-0 text-amber-500" />
+                  <p className="text-xs text-amber-700">
+                    No TikTok account connected.{" "}
+                    <button type="button" onClick={() => setStep(0)} className="font-medium underline">Set it up in Campaign Setup</button>
+                  </p>
                 </div>
-              ) : (
-                /* ======== Not connected: prompt ======== */
-                <div className="flex items-center gap-3.5 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3.5">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100">
-                    <User className="size-4.5 text-amber-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-amber-900">TikTok account not connected</p>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700">
-                      Go back to Campaign Setup to link your TikTok account via QR code. This is required for ad delivery.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setStep(0)}
-                    className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#004956] px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-[#003a44]"
-                  >
-                    Connect Now
-                  </button>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* ---- Catalog Active Banner (when catalog enabled in step 0) ---- */}
@@ -2778,7 +2851,7 @@ export function TikTokStepCreative() {
                 <div className="mb-1 flex items-center gap-2">
                   <Tag className="size-4 text-primary" />
                   <Label className="text-sm font-semibold text-foreground">Shopping Ad Type</Label>
-                  <InfoTip text="Maps to TikTok API shopping_ads_type on the ad group. Determines how your catalog products appear in ads." />
+                  <InfoTip text="Determines how your catalog products appear in ads. Choose the format that best showcases your products." />
                 </div>
                 <p className="mb-4 text-xs text-muted-foreground">
                   Choose how your catalog products are displayed in your TikTok ads.
@@ -3037,17 +3110,37 @@ export function TikTokStepCreative() {
 
           {/* ---- Ads List ---- */}
           <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border px-5 py-3">
-              <div className="flex items-center gap-2.5">
-                <div className="flex size-8 items-center justify-center rounded-xl bg-[#e6fff9]">
-                  <Layers className="size-4 text-[#004956]" />
-                </div>
-                <span className="text-sm font-semibold text-foreground">Your Ads</span>
-                <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{ads.length} ad{ads.length !== 1 ? "s" : ""}</span>
-                <InfoTip text="Create multiple ads with different formats to test what works best. TikTok recommends 3-5 ad variations per ad group." />
+            <div className="px-5 pt-5 pb-1">
+              <div className="mb-1">
+                <Label className="text-base font-bold text-foreground">Campaign Content</Label>
               </div>
+              <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
+                Create multiple ads with different video and image options. The system will automatically shift budget toward your top-performing ads.
+              </p>
+
+              {ads.length === 0 && !isCatalogListing && (
+                <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
+                  <Zap className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Recommended Format</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {campaign.objective.objective === "PRODUCT_SALES"
+                        ? "For Sales campaigns, Single Video ads with product demos perform 2.3x better on TikTok."
+                        : campaign.objective.objective === "TRAFFIC"
+                          ? "Single Video ads drive the most website traffic. Use vertical 9:16 video with a clear CTA."
+                          : campaign.objective.objective === "VIDEO_VIEWS"
+                            ? "Spark Ads get 2x more engagement than standard ads. Use an organic post that already resonates."
+                            : campaign.objective.objective === "LEAD_GENERATION"
+                              ? "Lead Generation ads with short video (under 15s) have 40% higher form completion rates."
+                              : campaign.objective.objective === "APP_PROMOTION"
+                                ? "App Install ads with gameplay or demo videos have 25% higher install rates."
+                                : "Start with a Single Video ad for best results across all objectives."}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="px-5 py-4">
+            <div className="px-5 pb-5">
 
             {/* Catalog Listing: auto-generated creatives */}
             {catalogEnabled && objectiveConfig.shoppingAdsType === "CATALOG_LISTING_ADS" ? (
@@ -3139,12 +3232,12 @@ export function TikTokStepCreative() {
               <>
                 {ads.length === 0 ? (
                   <div className="flex flex-col gap-4">
-                    <div className="text-center">
-                      <p className="text-sm font-semibold text-foreground">Choose an ad format to get started</p>
+                    <div>
+                      <h3 className="text-xs font-bold text-foreground">Ad Type</h3>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {catalogEnabled
                           ? "Add videos to showcase with your catalog products. Products will be attached as interactive cards."
-                          : "Pick a format below. You can mix different formats and add more ads later."}
+                          : "Choose a format for this ad. You can add more ads in different formats."}
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
@@ -3205,6 +3298,25 @@ export function TikTokStepCreative() {
   isAppPromo={isAppPromo}
   />
                     ))}
+
+                    {/* Apply to All */}
+                    {ads.length >= 2 && (
+                      <div className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-4 py-2.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-medium text-foreground">Apply to All Ads</span>
+                          <span className="text-[11px] text-muted-foreground">Copy display name, caption, CTA, and URL from the active ad to all others</span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 gap-1.5 text-xs"
+                          onClick={applyToAll}
+                        >
+                          <Copy className="size-3" />
+                          Apply
+                        </Button>
+                      </div>
+                    )}
 
                     {/* Add Another Ad */}
                     <div className="rounded-xl border-2 border-dashed border-border py-6">

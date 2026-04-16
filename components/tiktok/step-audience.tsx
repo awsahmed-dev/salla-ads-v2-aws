@@ -21,6 +21,7 @@ import {
   ShoppingCart,
   X,
   Plus,
+  AlertCircle,
 } from "lucide-react";
 import { getCountryByCode, getCityById } from "@/lib/locations";
 import { LocationSelector } from "@/components/shared/location-selector";
@@ -185,11 +186,18 @@ export function TikTokStepAudience() {
             <Label className="mb-1 flex items-center gap-2 text-sm font-semibold text-foreground">
               <Search className="size-4 text-primary" />
               Interest Keywords
-              <InfoTip text="Target users interested in specific topics or products. More granular than interest categories -- maps to TikTok's interest_keyword_ids for precise audience matching." />
+              <Badge variant="outline" className="rounded-full px-2 text-[10px] font-medium text-muted-foreground">Optional</Badge>
+              <InfoTip text="Target users interested in specific topics or products. More granular than interest categories. Cannot be combined with Purchase Intent Keywords." />
             </Label>
             <p className="mb-3 text-xs text-muted-foreground">
               Add specific keywords to target users with precise interests. These are more granular than category-level interest targeting.
             </p>
+            {aud.purchaseIntentKeywordIds.length > 0 && (
+              <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
+                <AlertCircle className="size-3.5 shrink-0 text-amber-500" />
+                <p className="text-[11px] text-amber-700">Cannot be used together with Purchase Intent Keywords. Adding interest keywords will clear purchase intent keywords.</p>
+              </div>
+            )}
             <div className="flex gap-2">
               <Input
                 placeholder="e.g. skincare routine, running shoes, home decor..."
@@ -202,6 +210,7 @@ export function TikTokStepAudience() {
                     if (!aud.interestKeywordIds.includes(kw)) {
                       updateNested("audience", {
                         interestKeywordIds: [...aud.interestKeywordIds, kw],
+                        purchaseIntentKeywordIds: [], // API conflict: cannot combine both
                       });
                     }
                     setInterestKeywordInput("");
@@ -216,6 +225,7 @@ export function TikTokStepAudience() {
                   if (kw && !aud.interestKeywordIds.includes(kw)) {
                     updateNested("audience", {
                       interestKeywordIds: [...aud.interestKeywordIds, kw],
+                      purchaseIntentKeywordIds: [], // API conflict: cannot combine both
                     });
                   }
                   setInterestKeywordInput("");
@@ -248,12 +258,13 @@ export function TikTokStepAudience() {
               </div>
             )}
             <p className="mt-2 text-[10px] text-muted-foreground">
-              In production, keywords are resolved to TikTok interest_keyword_ids via the Interest Keyword API.
+              In production, keywords are resolved to TikTok interest keyword IDs via the Interest Keyword API.
             </p>
           </SectionCard>
 
           {/* ---- 5. Purchase Intent Keywords (e-commerce specific) ---- */}
-          {(isSales || isTraffic) && (
+          {/* API only supports purchase_intention_keyword_ids for PRODUCT_SALES and APP_PROMOTION */}
+          {(isSales || isAppPromo) && (
             <SectionCard>
               <Label className="mb-1 flex items-center gap-2 text-sm font-semibold text-foreground">
                 <ShoppingCart className="size-4 text-primary" />
@@ -261,11 +272,17 @@ export function TikTokStepAudience() {
                 <Badge variant="outline" className="rounded-full px-2 text-[10px] font-medium text-primary">
                   E-commerce
                 </Badge>
-                <InfoTip text="Target users actively searching for or engaging with specific product categories on TikTok. Maps to purchase_intention_keyword_ids -- highly effective for driving sales." />
+                <InfoTip text="Target users actively searching for or engaging with specific product categories on TikTok. Highly effective for driving sales. Cannot be combined with Interest Keywords." />
               </Label>
               <p className="mb-3 text-xs text-muted-foreground">
                 Reach users who are actively looking to buy. These keywords target shopping intent signals, not just interest.
               </p>
+              {aud.interestKeywordIds.length > 0 && (
+                <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
+                  <AlertCircle className="size-3.5 shrink-0 text-amber-500" />
+                  <p className="text-[11px] text-amber-700">Cannot be used together with Interest Keywords. Adding purchase intent keywords will clear interest keywords.</p>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Input
                   placeholder="e.g. buy perfume, abaya online, gaming laptop..."
@@ -278,6 +295,7 @@ export function TikTokStepAudience() {
                       if (!aud.purchaseIntentKeywordIds.includes(kw)) {
                         updateNested("audience", {
                           purchaseIntentKeywordIds: [...aud.purchaseIntentKeywordIds, kw],
+                          interestKeywordIds: [], // API conflict: cannot combine both
                         });
                       }
                       setPurchaseIntentInput("");
@@ -292,6 +310,7 @@ export function TikTokStepAudience() {
                     if (kw && !aud.purchaseIntentKeywordIds.includes(kw)) {
                       updateNested("audience", {
                         purchaseIntentKeywordIds: [...aud.purchaseIntentKeywordIds, kw],
+                        interestKeywordIds: [], // API conflict: cannot combine both
                       });
                     }
                     setPurchaseIntentInput("");
@@ -324,7 +343,7 @@ export function TikTokStepAudience() {
                 </div>
               )}
               <p className="mt-2 text-[10px] text-muted-foreground">
-                In production, keywords are resolved to TikTok purchase_intention_keyword_ids via the Keyword API.
+                In production, keywords are resolved to TikTok purchase intent keyword IDs via the Keyword API.
               </p>
             </SectionCard>
           )}
