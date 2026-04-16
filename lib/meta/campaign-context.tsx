@@ -13,7 +13,7 @@ import { defaultMetaCampaign, type MetaCampaignData } from "@/lib/meta/campaign-
 
 const DRAFT_KEY = "salla_meta_campaign_draft";
 const DRAFT_STEP_KEY = "salla_meta_campaign_step";
-const DRAFT_VERSION = 1;
+const DRAFT_VERSION = 2;
 const DRAFT_VERSION_KEY = "salla_meta_draft_version";
 
 function getClientDates() {

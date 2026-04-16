@@ -92,6 +92,23 @@ export type MetaConversionLocation = "WEBSITE" | "APP" | "MESSAGING" | "INSTANT_
 /** Pacing type */
 export type MetaPacing = "standard" | "no_pacing";
 
+/** Brand safety inventory filter level. Maps to API brand_safety_content_filter_levels. */
+export type MetaBrandSafetyLevel =
+  | "FACEBOOK_STANDARD"    // Standard inventory (recommended)
+  | "AN_STANDARD"          // Audience Network standard
+  | "FULL_INVENTORY"       // No restrictions -- maximum reach
+  | "LIMITED_INVENTORY";   // Most restrictive -- no mature themes
+
+/** Frequency cap configuration. Maps to API frequency_control_specs at Ad Set level. */
+export interface MetaFrequencyCap {
+  /** Whether frequency cap is enabled */
+  enabled: boolean;
+  /** Max impressions per user (1-20). Maps to max_frequency. */
+  maxFrequency: number;
+  /** Time window in days (1-30). Maps to interval_days. */
+  intervalDays: number;
+}
+
 /** Click attribution window */
 export type MetaClickAttributionWindow = "1d_click" | "7d_click" | "28d_click";
 /** View attribution window */
@@ -169,7 +186,7 @@ export const META_OBJECTIVE_CONFIGS: Record<string, MetaObjectiveConfig> = {
     apiObjective: "OUTCOME_SALES",
     label: "Sales",
     description: "Drive purchases on your website or from your product catalog",
-    allowedGoals: ["OFFSITE_CONVERSIONS", "VALUE", "LINK_CLICKS", "CONVERSATIONS"],
+    allowedGoals: ["OFFSITE_CONVERSIONS", "VALUE", "LINK_CLICKS", "LANDING_PAGE_VIEWS", "CONVERSATIONS"],
     defaultGoal: "OFFSITE_CONVERSIONS",
     pixelRequirement: "required",
     catalogAvailable: true,
@@ -418,6 +435,8 @@ export interface MetaBudgetSettings {
     intervalDays: number;
     maxDailyBudget: number;
   };
+  /** Frequency cap. Maps to API frequency_control_specs. */
+  frequencyCap: MetaFrequencyCap;
 }
 
 /* ---- Step: Creative ---- */
@@ -481,6 +500,10 @@ export interface MetaAd {
 export interface MetaCreativeSettings {
   /** All ads in this campaign */
   ads: MetaAd[];
+  /** Brand safety inventory filter. Maps to API brand_safety_content_filter_levels. */
+  brandSafetyLevel: MetaBrandSafetyLevel;
+  /** Advantage+ Creative enhancements (brightness, crop, text). Maps to degrees_of_freedom_spec. */
+  advantagePlusCreative?: boolean;
 }
 
 /* ---- Full Campaign ---- */
@@ -559,9 +582,15 @@ export const defaultMetaCampaign: MetaCampaignData = {
       intervalDays: 7,
       maxDailyBudget: 600,
     },
+    frequencyCap: {
+      enabled: false,
+      maxFrequency: 3,
+      intervalDays: 7,
+    },
   },
   creative: {
     ads: [],
+    brandSafetyLevel: "FACEBOOK_STANDARD",
   },
 };
 

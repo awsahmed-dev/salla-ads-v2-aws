@@ -204,7 +204,7 @@ export const AD_FORMAT_OPTIONS: AdFormatOption[] = [
   {
     value: "CAROUSEL",
     label: "Carousel",
-    desc: "2--10 scrollable image/video cards. Each card can have its own link.",
+    desc: "2--5 scrollable image/video cards. Each card can have its own link.",
     apiNote: "object_story_spec.link_data with child_attachments[]",
     supportedPlacements: [
       "FACEBOOK_FEED",
