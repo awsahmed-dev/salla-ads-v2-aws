@@ -853,6 +853,13 @@ export interface DiscoverTile {
   /** Optional brand logo on the tile. Spec: 993x284 px, PNG only, max 2MB */
   logoImageUrl: string;
   logoImageFile?: File;
+  /**
+   * Tile media source for catalog Story Ads.
+   * "DYNAMIC" — tile background auto-generated from catalog product images (no upload needed).
+   * "STATIC"  — merchant uploads a custom background image (default for non-catalog).
+   * Maps to Snap API PREVIEW creative `render_type`.
+   */
+  renderType?: "DYNAMIC" | "STATIC";
 }
 
 /**
@@ -882,6 +889,13 @@ export interface AdGroup {
   dynamicTemplateConfig?: DynamicTemplateConfig;
   /** When true, COLLECTION tiles are auto-populated from catalog product set */
   dynamicCollectionEnabled?: boolean;
+  /**
+   * Snap API: render_type on Creative.
+   * "DYNAMIC" = hero + tiles fully auto-generated from catalog (no upload needed).
+   * "STATIC"  = merchant uploads hero media (top_snap_media_id), tiles still from catalog.
+   * Only relevant when catalogEnabled + COLLECTION or STORY format.
+   */
+  catalogRenderType?: "DYNAMIC" | "STATIC";
   /**
    * Commercial config -- non-skippable video ads in premium content.
    * Only for WEB_VIEW with VIDEO media. Maps to Snap API forced_view_eligibility + forced_view_setting.

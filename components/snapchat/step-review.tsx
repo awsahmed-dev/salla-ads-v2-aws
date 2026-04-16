@@ -239,11 +239,27 @@ export function StepReview() {
       list.push({ id: "app_name", label: "App name", ok: !!app?.appName?.trim(), step: 0 });
     }
     list.push({ id: "ads", label: "At least one ad", ok: creative.ads.length > 0, step: 3 });
-    const missingMedia = creative.ads.filter((a) => (a.adFormat ?? "SINGLE") !== "DYNAMIC" && !((a.adFormat ?? "SINGLE") === "COLLECTION" && a.dynamicCollectionEnabled) && a.assets.length === 0);
+    /** Media not needed for: DYNAMIC, catalog COLLECTION with dynamic hero, catalog STORY */
+    const needsNoMedia = (a: typeof creative.ads[0]) => {
+      const fmt = a.adFormat ?? "SINGLE";
+      if (fmt === "DYNAMIC") return true;
+      if (fmt === "COLLECTION" && a.dynamicCollectionEnabled && a.catalogRenderType === "DYNAMIC") return true;
+      if (fmt === "STORY" && a.catalogRenderType === "DYNAMIC") return true;
+      return false;
+    };
+    const missingMedia = creative.ads.filter((a) => !needsNoMedia(a) && a.assets.length === 0);
     if (missingMedia.length > 0) list.push({ id: "ad_creative", label: "All ads have creatives", ok: false, step: 3 });
     else if (creative.ads.length > 0) list.push({ id: "ad_creative", label: "All ads have creatives", ok: true });
-    const missingPS = creative.ads.filter((a) => (a.adFormat ?? "SINGLE") === "DYNAMIC" && !a.dynamicTemplateConfig?.productSetId);
-    if (missingPS.length > 0) list.push({ id: "dynamic_ps", label: "Dynamic ads product set", ok: false, step: 3 });
+    /** Product set required for: DYNAMIC, catalog COLLECTION, catalog STORY */
+    const needsProductSet = (a: typeof creative.ads[0]) => {
+      const fmt = a.adFormat ?? "SINGLE";
+      if (fmt === "DYNAMIC") return true;
+      if (fmt === "COLLECTION" && a.dynamicCollectionEnabled) return true;
+      if (fmt === "STORY" && a.catalogRenderType) return true;
+      return false;
+    };
+    const missingPS = creative.ads.filter((a) => needsProductSet(a) && !a.dynamicTemplateConfig?.productSetId);
+    if (missingPS.length > 0) list.push({ id: "dynamic_ps", label: "Catalog ads: product set selected", ok: false, step: 3 });
     const budgetMinOk = budget.type === "daily" ? dailyAmount >= 20 : budget.amount >= 100;
     const budgetLabel = budget.type === "daily" ? "Budget ≥ 20 SAR/day" : "Budget ≥ 100 SAR (lifetime)";
     list.push({ id: "budget", label: budgetLabel, ok: budgetMinOk, step: 2 });
@@ -262,17 +278,19 @@ export function StepReview() {
       if (hasCommercial && hasNonCommercial) {
         list.push({ id: "mix_commercial", label: "Commercials cannot mix with non-commercial ads", ok: false, step: 3 });
       }
-      const hasDynamic = creative.ads.some((a) => (a.adFormat ?? "SINGLE") === "DYNAMIC");
-      const hasNonDynamic = creative.ads.some((a) => (a.adFormat ?? "SINGLE") !== "DYNAMIC");
-      if (hasDynamic && hasNonDynamic) {
-        list.push({ id: "mix_dynamic", label: "Dynamic ads cannot mix with standard ads", ok: false, step: 3 });
+      const CATALOG_FORMATS = ["DYNAMIC", "COLLECTION", "STORY"];
+      const hasCatalogAd = creative.ads.some((a) => (a.adFormat ?? "SINGLE") === "DYNAMIC" || a.catalogRenderType);
+      const hasNonCatalogAd = creative.ads.some((a) => (a.adFormat ?? "SINGLE") !== "DYNAMIC" && !a.catalogRenderType);
+      if (hasCatalogAd && hasNonCatalogAd) {
+        list.push({ id: "mix_dynamic", label: "Catalog ads cannot mix with standard ads", ok: false, step: 3 });
       }
     }
     if (objective.catalogEnabled) {
+      const ALLOWED_CATALOG_FORMATS: string[] = ["DYNAMIC", "COLLECTION", "STORY"];
       list.push({
-        id: "catalog_dynamic",
-        label: "Catalog: all ads are Dynamic",
-        ok: creative.ads.length === 0 || creative.ads.every((a) => (a.adFormat ?? "SINGLE") === "DYNAMIC"),
+        id: "catalog_format",
+        label: "Catalog: all ads use a catalog format",
+        ok: creative.ads.length === 0 || creative.ads.every((a) => ALLOWED_CATALOG_FORMATS.includes(a.adFormat ?? "SINGLE")),
         step: 3,
       });
     }
@@ -616,7 +634,9 @@ export function StepReview() {
                       {" · "}
                       {(ad.adFormat ?? "SINGLE") === "DYNAMIC"
                         ? (ad.dynamicTemplateConfig?.productSetName || "No product set")
-                        : `${ad.assets.length} creative${ad.assets.length !== 1 ? "s" : ""}`}
+                        : ad.catalogRenderType
+                          ? `${ad.catalogRenderType === "STATIC" ? "Custom Hero" : "Auto Hero"} · ${ad.dynamicTemplateConfig?.productSetName || "No product set"}`
+                          : `${ad.assets.length} creative${ad.assets.length !== 1 ? "s" : ""}`}
                       {ad.isInfluencer ? " · Influencer" : ""}
                     </p>
                   </div>

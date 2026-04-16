@@ -189,13 +189,18 @@ export function AdGroupPanel({
     }
   };
 
+  const isCatalogCollection = catalogEnabled && ad.adFormat === "COLLECTION";
+  const isCatalogStory = catalogEnabled && ad.adFormat === "STORY";
+
   const changeFormat = (newFormat: AdFormat) => {
     if (newFormat === ad.adFormat) return;
     const isNewInfluencer = newFormat === "INFLUENCER";
     const dest = (newFormat === "SINGLE" || isNewInfluencer) ? (allowedDestinations[0] ?? "WEBSITE") : (newFormat === "STORY" || newFormat === "COLLECTION") ? "WEBSITE" : ad.adDestination;
     const adType = deriveCreativeType(newFormat, dest);
+    const newCatalogCollection = catalogEnabled && newFormat === "COLLECTION";
+    const newCatalogStory = catalogEnabled && newFormat === "STORY";
     const defaultAssets =
-      newFormat === "DYNAMIC" ? [] :
+      newFormat === "DYNAMIC" || newCatalogStory ? [] :
       isNewInfluencer ? [makeAsset({ mediaSource: "ad_code" })] :
       [makeAsset(defaultAssetForDest(dest))];
     onUpdate({
@@ -206,9 +211,10 @@ export function AdGroupPanel({
       isInfluencer: isNewInfluencer,
       assets: defaultAssets,
       collectionTiles: [],
-      dynamicTemplateConfig: newFormat === "DYNAMIC" ? makeDefaultDynamicTemplate() : undefined,
-      dynamicCollectionEnabled: newFormat === "COLLECTION" ? (ad.dynamicCollectionEnabled ?? false) : false,
-      discoverTile: newFormat === "STORY" ? { enabled: true, headline: "", backgroundImageUrl: "", logoImageUrl: "" } : undefined,
+      dynamicTemplateConfig: (newFormat === "DYNAMIC" || newCatalogCollection || newCatalogStory) ? makeDefaultDynamicTemplate() : undefined,
+      dynamicCollectionEnabled: newCatalogCollection ? true : newFormat === "COLLECTION" ? (ad.dynamicCollectionEnabled ?? false) : false,
+      catalogRenderType: newCatalogCollection ? "STATIC" : newCatalogStory ? "DYNAMIC" : undefined,
+      discoverTile: newFormat === "STORY" ? { enabled: true, headline: "", backgroundImageUrl: "", logoImageUrl: "", ...(newCatalogStory ? { renderType: "DYNAMIC" as const } : {}) } : undefined,
     });
   };
 
@@ -284,6 +290,10 @@ export function AdGroupPanel({
             <span className="text-border">·</span>
             {ad.adFormat === "DYNAMIC" ? (
               <span>Catalog Product Ad</span>
+            ) : isCatalogCollection ? (
+              <span>{ad.catalogRenderType === "STATIC" ? "Custom Hero" : "Auto Hero"} + Catalog Tiles</span>
+            ) : isCatalogStory ? (
+              <span>Catalog Story</span>
             ) : (
               <span>{assetCount} creative{assetCount !== 1 ? "s" : ""}{ad.adFormat === "COLLECTION" ? `, ${tileCount} tile${tileCount !== 1 ? "s" : ""}` : ""}</span>
             )}
@@ -352,15 +362,19 @@ export function AdGroupPanel({
 
           </div>
 
-          {/* ── Dynamic Ad Config ── */}
-          {ad.adFormat === "DYNAMIC" && (
+          {/* ── Dynamic Ad Config (pure DYNAMIC or catalog STORY) ── */}
+          {(ad.adFormat === "DYNAMIC" || isCatalogStory) && (
             <div className="border-t border-border px-4 py-4">
-              <DynamicAdConfig ad={ad} onUpdate={onUpdate} />
+              <DynamicAdConfig
+                ad={ad}
+                onUpdate={onUpdate}
+                catalogStory={isCatalogStory}
+              />
             </div>
           )}
 
           {/* ── Ad Content ── */}
-          {ad.adFormat !== "DYNAMIC" && (
+          {ad.adFormat !== "DYNAMIC" && !isCatalogStory && !(isCatalogCollection && ad.catalogRenderType === "DYNAMIC") && (
             <div className={cn("border-t border-border px-6", (ad.adFormat === "SINGLE" || ad.adFormat === "COLLECTION" || ad.adFormat === "STORY" || ad.adFormat === "INFLUENCER") ? "py-3" : "py-5")}>
               {ad.adFormat !== "SINGLE" && ad.adFormat !== "COLLECTION" && ad.adFormat !== "INFLUENCER" && (
                 <div className="mb-4 flex items-center justify-between">
@@ -488,10 +502,10 @@ export function AdGroupPanel({
             </div>
           )}
 
-          {/* ── Discover Tile (Story Ads) ── */}
+          {/* ── Discover Tile (all Story Ads including catalog) ── */}
           {ad.adFormat === "STORY" && (
             <div className="border-t border-border px-6 py-4">
-              <DiscoverTileSection ad={ad} onUpdate={onUpdate} />
+              <DiscoverTileSection ad={ad} onUpdate={onUpdate} catalogEnabled={isCatalogStory} />
             </div>
           )}
 

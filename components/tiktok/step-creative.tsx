@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useTikTokCampaign } from "@/lib/tiktok/campaign-context";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
@@ -25,15 +25,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+// Dialog removed — product set picker now uses Sheet pattern
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { ProductPickerDialog, type SallaProduct } from "@/components/shared/product-picker";
 import { PREVIEW_PRODUCTS } from "@/lib/salla/store-api";
+import { fetchProductSets, type ProductSetCategory } from "@/lib/salla/product-sets";
+import type { SallaProductSet } from "@/lib/salla/store-api";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   ImagePlus,
   Plus,
@@ -80,6 +82,11 @@ import {
   Eye,
   Shield,
   Settings2,
+  Search,
+  TrendingUp,
+  CalendarDays,
+  RefreshCw,
+  ArrowRight,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
@@ -1612,29 +1619,20 @@ function AdPanel({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Mock Product Sets (in production from TikTok Catalog API)          */
+/*  Catalog Product Selection — Sheet-based unified pattern             */
+/*  Matches Snapchat DynamicAdConfig product set picker design system.  */
 /* ------------------------------------------------------------------ */
 
-interface CatalogProductSet {
-  id: string;
-  name: string;
-  productCount: number;
-  description: string;
-}
-
-const TIKTOK_MOCK_PRODUCT_SETS: CatalogProductSet[] = [
-  { id: "ps_all", name: "All Products", productCount: 156, description: "All products synced from your Salla store" },
-  { id: "ps_best", name: "Best Sellers", productCount: 24, description: "Top performing products by sales volume" },
-  { id: "ps_new", name: "New Arrivals", productCount: 18, description: "Products added in the last 30 days" },
-  { id: "ps_sale", name: "On Sale", productCount: 32, description: "Products with active discounts" },
-  { id: "ps_high", name: "High Margin", productCount: 15, description: "Products with highest profit margin" },
-  { id: "ps_electronics", name: "Electronics", productCount: 28, description: "Electronics category products" },
-  { id: "ps_clothing", name: "Clothing & Fashion", productCount: 45, description: "Clothing and fashion items" },
-];
-
-/* ------------------------------------------------------------------ */
-/*  Catalog Product Selection Section                                  */
-/* ------------------------------------------------------------------ */
+/** Seasonal tag color map — matches Snapchat's dynamic-ad-config.tsx */
+const SEASONAL_COLORS: Record<string, string> = {
+  ramadan: "border-purple-200 bg-purple-50 text-purple-700",
+  eid_fitr: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  eid_adha: "border-amber-200 bg-amber-50 text-amber-700",
+  national_day: "border-green-200 bg-green-50 text-green-700",
+  white_friday: "border-red-200 bg-red-50 text-red-700",
+  year_end: "border-blue-200 bg-blue-50 text-blue-700",
+  back_to_school: "border-orange-200 bg-orange-50 text-orange-700",
+};
 
 function CatalogProductSelection({
   objectiveConfig,
@@ -1646,22 +1644,74 @@ function CatalogProductSelection({
   updateNested: any;
   isCatalogListing: boolean;
 }) {
-  const [showSetPicker, setShowSetPicker] = useState(false);
+  const [showSheet, setShowSheet] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
+  const [productSets, setProductSets] = useState<SallaProductSet[]>([]);
+  const [search, setSearch] = useState("");
+  const [filterTab, setFilterTab] = useState<ProductSetCategory | "all">("all");
 
-  // Get the selected product set info
-  const selectedSet = TIKTOK_MOCK_PRODUCT_SETS.find((s) => s.id === objectiveConfig.productSetId);
-  // Get selected specific products
+  // Fetch product sets on mount
+  useEffect(() => {
+    fetchProductSets("all").then(setProductSets);
+  }, []);
+
+  // Selected set from shared data
+  const selectedSet = productSets.find((s) => s.id === objectiveConfig.productSetId);
+  // Selected specific products
   const selectedProducts = PREVIEW_PRODUCTS.filter((p) => objectiveConfig.specificProductIds.includes(p.id));
+
+  // Filter product sets based on tab + search
+  const filteredSets = useMemo(() => {
+    let sets = productSets;
+    if (filterTab === "standard") sets = sets.filter((s) => !s.seasonalTag && !s.id.startsWith("ps_cat_"));
+    else if (filterTab === "category") sets = sets.filter((s) => s.id.startsWith("ps_cat_"));
+    else if (filterTab === "seasonal") sets = sets.filter((s) => !!s.seasonalTag);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      sets = sets.filter((s) =>
+        s.name.toLowerCase().includes(q) ||
+        (s.nameAr && s.nameAr.includes(q)) ||
+        s.description.toLowerCase().includes(q)
+      );
+    }
+    return sets;
+  }, [productSets, filterTab, search]);
+
+  const maxProductCount = Math.max(...productSets.map((s) => s.productCount), 1);
 
   const handleAddProducts = (products: SallaProduct[]) => {
     const ids = [...objectiveConfig.specificProductIds, ...products.map((p) => p.id)].slice(0, 20);
-    updateNested("objective", { specificProductIds: ids });
+    updateNested("objective", { specificProductIds: ids, productSelectionMode: "SPECIFIC" });
   };
 
   const removeProduct = (id: string) => {
-    updateNested("objective", { specificProductIds: objectiveConfig.specificProductIds.filter((pid: string) => pid !== id) });
+    const next = objectiveConfig.specificProductIds.filter((pid: string) => pid !== id);
+    updateNested("objective", {
+      specificProductIds: next,
+      ...(next.length === 0 && { productSelectionMode: "ALL" }),
+    });
   };
+
+  const selectProductSet = (set: SallaProductSet) => {
+    updateNested("objective", {
+      productSelectionMode: "PRODUCT_SET",
+      productSetId: set.id,
+      specificProductIds: [],
+    });
+    setShowSheet(false);
+  };
+
+  const clearSelection = () => {
+    updateNested("objective", {
+      productSelectionMode: "ALL",
+      productSetId: "",
+      specificProductIds: [],
+    });
+  };
+
+  const isAllProducts = objectiveConfig.productSelectionMode === "ALL";
+  const isProductSet = objectiveConfig.productSelectionMode === "PRODUCT_SET" && !!selectedSet;
+  const isSpecific = objectiveConfig.productSelectionMode === "SPECIFIC" && selectedProducts.length > 0;
 
   return (
     <>
@@ -1669,288 +1719,151 @@ function CatalogProductSelection({
         <div className="mb-1 flex items-center gap-2">
           <Store className="size-4 text-primary" />
           <Label className="text-sm font-semibold text-foreground">Product Selection</Label>
-          <InfoTip text="Choose which products from your catalog to feature. 'All products' uses all in-stock items. 'Product Set' lets you group products by shared characteristics. 'Specific' lets you pick up to 20 products." />
+          <InfoTip text="Choose which products to feature. By default, all products are included. You can narrow down to a product set or pick up to 20 individual products." />
         </div>
         <p className="mb-4 text-xs text-muted-foreground">
           Select which products from your Salla catalog to include in this campaign.
         </p>
 
-        {/* Mode selector tabs */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          {([
-            { value: "ALL" as const, label: "All Products", icon: <ShoppingBag className="size-3" /> },
-            { value: "PRODUCT_SET" as const, label: "Product Set", icon: <Package className="size-3" /> },
-            { value: "SPECIFIC" as const, label: "Specific Products", icon: <Tag className="size-3" /> },
-          ]).map((ps) => {
-            const sel = objectiveConfig.productSelectionMode === ps.value;
-            return (
-              <button
-                key={ps.value}
-                type="button"
-                onClick={() => updateNested("objective", { productSelectionMode: ps.value })}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-lg border-2 px-3 py-2 text-xs font-medium transition-all",
-                  sel
-                    ? "border-primary bg-primary/[0.04] text-primary"
-                    : "border-border bg-card text-foreground hover:border-primary/40"
-                )}
-              >
-                {ps.icon}
-                {ps.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* --- ALL PRODUCTS --- */}
-        {objectiveConfig.productSelectionMode === "ALL" && (
+        {/* ── Current selection display ── */}
+        {isAllProducts && !isSpecific && (
           <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-2.5 rounded-lg border border-primary/20 bg-primary/[0.02] px-3 py-2.5">
-              <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-primary" />
+            {/* All products confirmation */}
+            <div className="flex items-start gap-2.5 rounded-xl border border-[#a4ffe5] bg-[#e6fff9] px-3 py-2.5">
+              <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
               <div>
-                <p className="text-xs font-medium text-foreground">All 156 products will be included</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  TikTok will dynamically select the best products to show based on user behavior and your optimization goals.
+                <p className="text-xs font-bold text-[#004956]">All 156 products included</p>
+                <p className="mt-0.5 text-[11px] text-[#004956]/70">
+                  TikTok will dynamically select the best products to show based on user behavior.
                 </p>
               </div>
             </div>
-            {/* Product preview grid */}
-            <div>
-              <Label className="mb-2 text-xs text-muted-foreground">Product Preview</Label>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {PREVIEW_PRODUCTS.slice(0, 8).map((p) => (
-                  <div key={p.id} className="group overflow-hidden rounded-lg border border-border bg-card">
-                    <div className="relative aspect-square overflow-hidden bg-muted">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={p.image} alt={p.name} className="size-full object-cover" crossOrigin="anonymous" />
-                    </div>
-                    <div className="px-2 py-1.5">
-                      <p className="truncate text-[10px] font-medium text-foreground">{p.name}</p>
-                      <p className="text-[10px] font-semibold text-primary">{p.price} {p.currency}</p>
-                    </div>
-                  </div>
-                ))}
+            {/* Customize button */}
+            <button
+              type="button"
+              onClick={() => setShowSheet(true)}
+              className="group flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border py-5 text-muted-foreground transition-all hover:border-[#a4ffe5] hover:bg-[#e6fff9]/30 hover:text-foreground"
+            >
+              <div className="flex size-10 items-center justify-center rounded-full bg-muted/60 transition-colors group-hover:bg-[#a4ffe5]/40">
+                <Package className="size-5 transition-colors group-hover:text-[#004956]" />
               </div>
-              <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
-                Showing 8 of 156 products
-              </p>
-            </div>
+              <span className="text-xs font-medium">Customize Product Selection</span>
+              <span className="text-[10px] text-muted-foreground">
+                Choose a product set or pick specific products
+              </span>
+            </button>
           </div>
         )}
 
-        {/* --- PRODUCT SET --- */}
-        {objectiveConfig.productSelectionMode === "PRODUCT_SET" && (
+        {/* ── Selected Product Set display ── */}
+        {isProductSet && selectedSet && (
           <div className="flex flex-col gap-3">
-            {selectedSet ? (
-              <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <Package className="size-4 text-primary" />
+            <div className="overflow-hidden rounded-xl border border-border bg-card">
+              {/* Preview images — 4 equal columns */}
+              {selectedSet.previewImages && selectedSet.previewImages.length > 0 && (
+                <div className="grid grid-cols-4 gap-px bg-border">
+                  {selectedSet.previewImages.slice(0, 4).map((img, i) => (
+                    <div key={i} className="aspect-[4/3] overflow-hidden bg-muted">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img} alt="" className="size-full object-cover" crossOrigin="anonymous" />
+                    </div>
+                  ))}
+                  {selectedSet.previewImages.length < 4 &&
+                    Array.from({ length: 4 - selectedSet.previewImages.length }).map((_, i) => (
+                      <div key={`ph-${i}`} className="flex aspect-[4/3] items-center justify-center bg-muted/40">
+                        <ImageIcon className="size-4 text-muted-foreground/20" />
+                      </div>
+                    ))}
+                </div>
+              )}
+              {/* Info row */}
+              <div className="flex items-center gap-3 rounded-b-xl border-t border-[#a4ffe5]/50 bg-[#e6fff9]/60 px-4 py-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#004956] text-white">
+                  <Package className="size-4.5" />
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-xs font-medium text-foreground">{selectedSet.name}</span>
-                  <span className="text-[11px] text-muted-foreground">{selectedSet.productCount} products</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-bold text-[#004956]">{selectedSet.nameAr || selectedSet.name}</span>
+                    {selectedSet.autoRefresh && <RefreshCw className="size-3 text-emerald-500" />}
+                    {selectedSet.seasonalTag && (
+                      <Badge variant="outline" className={cn("shrink-0 rounded-full px-1.5 py-0 text-[9px] font-medium capitalize", SEASONAL_COLORS[selectedSet.seasonalTag] ?? "bg-muted text-muted-foreground")}>
+                        {selectedSet.seasonalTag.replace(/_/g, " ")}
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-xs text-[#004956]/60">
+                    {selectedSet.productCount} products{selectedSet.autoRefresh ? " · Auto-refreshing" : ""}
+                  </span>
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setShowSetPicker(true)}
-                  className="h-7 text-xs"
-                >
+                <Button size="sm" variant="outline" onClick={() => setShowSheet(true)} className="h-8 gap-1.5 rounded-full border-[#004956]/20 bg-white px-4 text-xs font-medium text-[#004956] hover:bg-[#004956]/5">
                   Change
                 </Button>
-                <button
-                  type="button"
-                  onClick={() => updateNested("objective", { productSetId: "" })}
-                  className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-destructive"
-                >
-                  <X className="size-3.5" />
+                <button type="button" onClick={clearSelection} className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
+                  <X className="size-4" />
                 </button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowSetPicker(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-6 text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-              >
-                <Package className="size-5" />
-                <span className="text-xs font-medium">Select a Product Set</span>
-              </button>
-            )}
-
-            {/* Show product preview if set is selected */}
-            {selectedSet && (
-              <div>
-                <Label className="mb-2 text-xs text-muted-foreground">Products in this set</Label>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {PREVIEW_PRODUCTS.slice(0, 4).map((p) => (
-                    <div key={p.id} className="overflow-hidden rounded-lg border border-border bg-card">
-                      <div className="relative aspect-square overflow-hidden bg-muted">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={p.image} alt={p.name} className="size-full object-cover" crossOrigin="anonymous" />
-                      </div>
-                      <div className="px-2 py-1.5">
-                        <p className="truncate text-[10px] font-medium text-foreground">{p.name}</p>
-                        <p className="text-[10px] font-semibold text-primary">{p.price} {p.currency}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <p className="mt-1.5 text-center text-[10px] text-muted-foreground">
-                  Showing 4 of {selectedSet.productCount} products
-                </p>
-              </div>
-            )}
-
-            {/* Product Set Picker Dialog */}
-            <Dialog open={showSetPicker} onOpenChange={setShowSetPicker}>
-              <DialogContent className="max-h-[80vh] max-w-lg overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <ShoppingBag className="size-5 text-primary" />
-                    Select Product Set
-                  </DialogTitle>
-                </DialogHeader>
-                <p className="text-xs text-muted-foreground">
-                  Choose a product set from your synced catalog. Product sets group products by shared characteristics.
-                </p>
-                <div className="mt-3 flex flex-col gap-2">
-                  {TIKTOK_MOCK_PRODUCT_SETS.map((set) => (
-                    <button
-                      key={set.id}
-                      type="button"
-                      onClick={() => {
-                        updateNested("objective", { productSetId: set.id });
-                        setShowSetPicker(false);
-                      }}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-all",
-                        objectiveConfig.productSetId === set.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/30 hover:bg-muted/30"
-                      )}
-                    >
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <Package className="size-4 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-xs font-medium text-foreground">{set.name}</p>
-                        <p className="text-[11px] text-muted-foreground">{set.description}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-foreground">{set.productCount}</p>
-                        <p className="text-[10px] text-muted-foreground">products</p>
-                      </div>
-                      {objectiveConfig.productSetId === set.id && (
-                        <Check className="size-4 shrink-0 text-primary" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </DialogContent>
-            </Dialog>
+            </div>
           </div>
         )}
 
-        {/* --- SPECIFIC PRODUCTS --- */}
-        {objectiveConfig.productSelectionMode === "SPECIFIC" && (
+        {/* ── Selected Specific Products display ── */}
+        {isSpecific && (
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {selectedProducts.length} of 20 products selected
-              </p>
-              {selectedProducts.length < 20 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowProductPicker(true)}
-                  className="h-7 gap-1 text-xs"
-                >
-                  <Plus className="size-3" />
-                  Add Products
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="rounded-full bg-[#e6fff9] px-2 py-0.5 text-[10px] font-bold text-[#004956]">
+                  {selectedProducts.length} of 20
+                </Badge>
+                <span className="text-xs text-muted-foreground">products selected</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {selectedProducts.length < 20 && (
+                  <Button size="sm" variant="outline" onClick={() => setShowProductPicker(true)} className="h-7 gap-1 text-xs">
+                    <Plus className="size-3" />
+                    Add
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 text-xs text-muted-foreground hover:text-destructive">
+                  Clear
                 </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {selectedProducts.map((p) => (
+                <div key={p.id} className="group relative overflow-hidden rounded-lg border border-border bg-card">
+                  <div className="relative aspect-square overflow-hidden bg-muted">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.image} alt={p.name} className="size-full object-cover" crossOrigin="anonymous" />
+                    <button
+                      type="button"
+                      onClick={() => removeProduct(p.id)}
+                      className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                  <div className="px-2 py-1.5">
+                    <p className="truncate text-[10px] font-medium text-foreground">{p.name}</p>
+                    <p className="text-[10px] font-semibold text-primary">{p.price} {p.currency}</p>
+                  </div>
+                </div>
+              ))}
+              {selectedProducts.length < 20 && (
+                <button
+                  type="button"
+                  onClick={() => setShowProductPicker(true)}
+                  className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-[#a4ffe5] hover:text-[#004956]"
+                >
+                  <Plus className="size-5" />
+                  <span className="text-[10px] font-medium">Add More</span>
+                </button>
               )}
             </div>
-
-            {selectedProducts.length === 0 ? (
-              <button
-                type="button"
-                onClick={() => setShowProductPicker(true)}
-                className="flex w-full flex-col items-center gap-3 rounded-lg border-2 border-dashed border-border py-8 text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-              >
-                <Store className="size-8" />
-                <div className="text-center">
-                  <p className="text-xs font-medium">Select Products from Catalog</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">Choose up to 20 specific products to feature in your ads</p>
-                </div>
-              </button>
-            ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {selectedProducts.map((p) => (
-                  <div key={p.id} className="group relative overflow-hidden rounded-lg border border-border bg-card">
-                    <div className="relative aspect-square overflow-hidden bg-muted">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={p.image} alt={p.name} className="size-full object-cover" crossOrigin="anonymous" />
-                      {/* Remove button */}
-                      <button
-                        type="button"
-                        onClick={() => removeProduct(p.id)}
-                        className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    </div>
-                    <div className="px-2 py-1.5">
-                      <p className="truncate text-[10px] font-medium text-foreground">{p.name}</p>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-semibold text-primary">{p.price} {p.currency}</p>
-                        <p className="text-[9px] text-muted-foreground">{p.sku}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {/* Add more button */}
-                {selectedProducts.length < 20 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowProductPicker(true)}
-                    className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-                  >
-                    <Plus className="size-5" />
-                    <span className="text-[10px] font-medium">Add More</span>
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Product Picker Dialog */}
-            <ProductPickerDialog
-              open={showProductPicker}
-              onOpenChange={setShowProductPicker}
-              existingProductNames={selectedProducts.map((p) => p.name)}
-              maxProducts={20 - selectedProducts.length}
-              onAddProducts={handleAddProducts}
-            />
           </div>
         )}
       </SectionCard>
 
-      {/* Dynamic Format toggle */}
-      <div className="flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-foreground">Dynamic Creative Format</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {isCatalogListing
-              ? "Auto-assemble Catalog Video, Single Video, and Carousel formats using TikTok AI."
-              : "Let TikTok AI auto-generate ad creatives from your catalog products."}
-          </p>
-        </div>
-        <Switch
-          checked={objectiveConfig.dynamicFormat}
-          onCheckedChange={(checked) => updateNested("objective", { dynamicFormat: checked })}
-        />
-      </div>
-
-      {/* Template Options (like Snap's Template Options) */}
+      {/* Template Options (Catalog Listing only) */}
       {isCatalogListing && (
         <SectionCard>
           <div className="mb-1 flex items-center gap-2">
@@ -1964,29 +1877,23 @@ function CatalogProductSelection({
 
           <div className="rounded-lg border border-border bg-muted/10 p-3">
             <div className="flex flex-col gap-3">
-              {/* Show Price */}
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-foreground">Show product price</Label>
                 <Switch defaultChecked />
               </div>
-              {/* Show Sale Badge */}
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-foreground">Show sale/discount badge</Label>
                 <Switch defaultChecked />
               </div>
-              {/* Show Free Shipping */}
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-foreground">Show free shipping tag</Label>
                 <Switch />
               </div>
               <div className="h-px bg-border" />
-              {/* Caption text */}
               <div>
                 <Label className="mb-1.5 text-xs text-foreground">Caption text</Label>
                 <Select defaultValue="product_name_price">
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="product_name">Product name only</SelectItem>
                     <SelectItem value="product_name_price">Product name + price</SelectItem>
@@ -1994,13 +1901,10 @@ function CatalogProductSelection({
                   </SelectContent>
                 </Select>
               </div>
-              {/* Product landing */}
               <div>
                 <Label className="mb-1.5 text-xs text-foreground">Product landing page</Label>
                 <Select defaultValue="product_page">
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="product_page">Individual product page</SelectItem>
                     <SelectItem value="store_home">Store homepage</SelectItem>
@@ -2012,6 +1916,265 @@ function CatalogProductSelection({
           </div>
         </SectionCard>
       )}
+
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      {/*  Product Selection Sheet (matches Snapchat DynamicAdConfig)      */}
+      {/* ══════════════════════════════════════════════════════════════════ */}
+      <Sheet open={showSheet} onOpenChange={setShowSheet}>
+        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[420px]">
+
+          {/* ── Branded header ── */}
+          <div className="bg-[#004956] px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+                <ShoppingBag className="size-5 text-white" />
+              </div>
+              <div>
+                <SheetTitle className="text-base font-bold text-white">Product Selection</SheetTitle>
+                <p className="mt-0.5 text-xs text-white/70">
+                  Choose a product set or pick individual products for your campaign.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Search + Filter bar ── */}
+          <div className="flex flex-col gap-3 border-b border-border bg-white px-4 py-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search product sets..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 rounded-full border-border bg-muted/40 pl-9 text-xs focus-visible:ring-[#a4ffe5]"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
+            {/* Filter tabs */}
+            <div className="flex gap-1.5 overflow-x-auto">
+              {([
+                { key: "all" as const, label: "All", icon: <Layers className="size-3" /> },
+                { key: "standard" as const, label: "Smart", icon: <TrendingUp className="size-3" /> },
+                { key: "category" as const, label: "Category", icon: <Tag className="size-3" /> },
+                { key: "seasonal" as const, label: "Seasonal", icon: <CalendarDays className="size-3" /> },
+              ]).map((tab) => {
+                const count = tab.key === "all"
+                  ? productSets.length
+                  : tab.key === "standard"
+                    ? productSets.filter((s) => !s.seasonalTag && !s.id.startsWith("ps_cat_")).length
+                    : tab.key === "category"
+                      ? productSets.filter((s) => s.id.startsWith("ps_cat_")).length
+                      : productSets.filter((s) => !!s.seasonalTag).length;
+                const active = filterTab === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setFilterTab(tab.key)}
+                    className={cn(
+                      "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors",
+                      active
+                        ? "bg-[#a4ffe5] text-[#004956] shadow-sm"
+                        : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                    <span className={cn("tabular-nums", active ? "text-[#004956]/70" : "text-muted-foreground/60")}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Scrollable product set list ── */}
+          <div className="flex-1 overflow-y-auto bg-[#f8f8f8] px-4 py-3">
+            <div className="flex flex-col gap-2">
+              {/* Tip banner */}
+              {!objectiveConfig.productSetId && filterTab === "all" && !search && (
+                <div className="mb-1 flex items-start gap-2.5 rounded-xl border border-[#a4ffe5] bg-[#e6fff9] px-3 py-2.5">
+                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                  <p className="text-[11px] font-medium leading-relaxed text-[#004956]">
+                    Start with &ldquo;Best Sellers&rdquo; or &ldquo;On Sale&rdquo; — they typically have the highest conversion rates for catalog ads.
+                  </p>
+                </div>
+              )}
+
+              {/* "Pick Individual Products" option — always at top */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSheet(false);
+                  setTimeout(() => setShowProductPicker(true), 200);
+                }}
+                className="group flex items-center gap-3 rounded-2xl border border-white bg-white px-3 py-3 text-left shadow-sm transition-all hover:border-[#a4ffe5] hover:shadow-md"
+              >
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#f4f4f4] text-muted-foreground transition-colors group-hover:bg-[#e6fff9] group-hover:text-[#004956]">
+                  <Tag className="size-4" />
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <p className="text-xs font-bold text-foreground">Pick Individual Products</p>
+                  <p className="text-[11px] text-muted-foreground">Choose up to 20 specific products from your catalog</p>
+                </div>
+                <ArrowRight className="size-4 shrink-0 text-muted-foreground/30 transition-all group-hover:translate-x-0.5 group-hover:text-[#004956]" />
+              </button>
+
+              {/* Divider */}
+              <div className="flex items-center gap-2 py-1">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-[10px] font-medium text-muted-foreground">Product Sets</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              {/* Product set cards */}
+              {filteredSets.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-10 text-center">
+                  <Package className="size-8 text-muted-foreground/30" />
+                  <p className="text-xs font-medium text-muted-foreground">No product sets found</p>
+                  <p className="text-[10px] text-muted-foreground/70">Try a different search or filter</p>
+                </div>
+              ) : (
+                filteredSets.map((set) => {
+                  const isSelected = objectiveConfig.productSetId === set.id;
+                  const isEmpty = set.productCount === 0;
+                  const barWidth = Math.max((set.productCount / maxProductCount) * 100, 2);
+                  const isRecommended = !objectiveConfig.productSetId && (set.id === "ps_best" || set.id === "ps_sale");
+
+                  return (
+                    <button
+                      key={set.id}
+                      type="button"
+                      onClick={() => !isEmpty && selectProductSet(set)}
+                      disabled={isEmpty}
+                      className={cn(
+                        "group flex flex-col overflow-hidden rounded-2xl border text-left shadow-sm transition-all",
+                        isEmpty
+                          ? "cursor-not-allowed border-border bg-white opacity-50"
+                          : isSelected
+                            ? "border-[#a4ffe5] bg-[#e6fff9] shadow-md"
+                            : "border-white bg-white hover:border-[#a4ffe5] hover:shadow-md"
+                      )}
+                    >
+                      {/* Preview images */}
+                      {set.previewImages && set.previewImages.length > 0 ? (
+                        <div className="flex h-[72px] gap-px overflow-hidden rounded-t-2xl">
+                          {set.previewImages.slice(0, 4).map((img, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={i} src={img} alt="" className="h-full flex-1 object-cover transition-transform duration-300 group-hover:scale-105" crossOrigin="anonymous" />
+                          ))}
+                          {set.previewImages.length < 4 &&
+                            Array.from({ length: 4 - set.previewImages.length }).map((_, i) => (
+                              <div key={`ph-${i}`} className="flex h-full flex-1 items-center justify-center bg-muted/30">
+                                <ImageIcon className="size-3 text-muted-foreground/20" />
+                              </div>
+                            ))}
+                        </div>
+                      ) : (
+                        <div className="flex h-12 items-center justify-center gap-3 rounded-t-2xl bg-muted/20">
+                          {[1, 2, 3, 4].map((n) => (
+                            <div key={n} className="flex size-7 items-center justify-center rounded-lg bg-muted/50">
+                              <ImageIcon className="size-3 text-muted-foreground/25" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Card body */}
+                      <div className="flex items-center gap-3 px-3 py-3">
+                        {/* Left icon */}
+                        <div className={cn(
+                          "flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors",
+                          isSelected
+                            ? "bg-[#004956] text-white"
+                            : "bg-[#f4f4f4] text-muted-foreground group-hover:bg-[#e6fff9] group-hover:text-[#004956]"
+                        )}>
+                          {set.seasonalTag ? <Sparkles className="size-4" /> : set.autoRefresh ? <TrendingUp className="size-4" /> : <Package className="size-4" />}
+                        </div>
+
+                        {/* Center */}
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <p className={cn("truncate text-xs font-bold", isSelected ? "text-[#004956]" : "text-foreground")}>
+                              {set.nameAr || set.name}
+                            </p>
+                            {isRecommended && (
+                              <span className="shrink-0 rounded-full bg-[#004956] px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+                                Recommended
+                              </span>
+                            )}
+                            {set.seasonalTag && (
+                              <Badge variant="outline" className={cn("shrink-0 rounded-full px-1.5 py-0 text-[9px] font-medium capitalize", SEASONAL_COLORS[set.seasonalTag] ?? "bg-muted text-muted-foreground")}>
+                                {set.seasonalTag.replace(/_/g, " ")}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="line-clamp-1 text-[11px] text-muted-foreground">
+                            {set.descriptionAr || set.description}
+                          </p>
+                          {/* Product count bar */}
+                          <div className="mt-1 flex items-center gap-2">
+                            <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted/40">
+                              <div
+                                className={cn("h-full rounded-full transition-all", isSelected ? "bg-[#004956]" : isEmpty ? "bg-red-300" : "bg-[#a4ffe5]")}
+                                style={{ width: `${barWidth}%` }}
+                              />
+                            </div>
+                            <span className={cn("shrink-0 text-[11px] font-bold tabular-nums", isSelected ? "text-[#004956]" : isEmpty ? "text-red-400" : "text-muted-foreground")}>
+                              {set.productCount}
+                            </span>
+                            {set.autoRefresh && (
+                              <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-600">
+                                <RefreshCw className="size-2.5" /> Auto
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right indicator */}
+                        {isSelected ? (
+                          <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#004956]">
+                            <Check className="size-3.5 text-white" />
+                          </div>
+                        ) : (
+                          <ArrowRight className="size-4 shrink-0 text-muted-foreground/30 transition-all group-hover:translate-x-0.5 group-hover:text-[#004956]" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* ── Footer ── */}
+          <div className="flex items-center justify-between border-t border-border bg-white px-5 py-3">
+            <p className="text-[11px] text-muted-foreground">
+              {filteredSets.length} of {productSets.length} sets shown
+            </p>
+            <p className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600">
+              <RefreshCw className="size-3" />
+              Synced from Salla store
+            </p>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Specific Products Picker (shared component) ── */}
+      <ProductPickerDialog
+        open={showProductPicker}
+        onOpenChange={setShowProductPicker}
+        existingProductNames={selectedProducts.map((p) => p.name)}
+        maxProducts={20 - selectedProducts.length}
+        onAddProducts={handleAddProducts}
+      />
     </>
   );
 }
@@ -2698,30 +2861,34 @@ export function TikTokStepCreative() {
   const activeAdFormat = activeAd?.adFormat ?? "SINGLE_VIDEO";
   const isCatalogListing = catalogEnabled && objectiveConfig.shoppingAdsType === "CATALOG_LISTING_ADS";
 
-  /* Auto-create a placeholder ad for Catalog Listing; remove it when leaving catalog listing mode */
-  const prevCatalogListing = useRef(isCatalogListing);
+  /* Auto-create a placeholder ad for auto-generated modes; remove empty placeholders when leaving */
+  const needsAutoAd = isCatalogListing || (catalogEnabled && objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING" && objectiveConfig.dynamicFormat);
+  const prevNeedsAutoAd = useRef(needsAutoAd);
   useEffect(() => {
-    if (isCatalogListing && ads.length === 0) {
+    if (needsAutoAd && ads.length === 0) {
       const catalogAd = makeDefaultAd("SINGLE_VIDEO", 0);
-      catalogAd.name = "Catalog Listing Ad";
+      catalogAd.name = isCatalogListing ? "Catalog Listing Ad" : "Dynamic Ad";
       updateNested("creative", { ads: [catalogAd] });
     }
-    if (!isCatalogListing && prevCatalogListing.current) {
-      const cleaned = ads.filter((a) => a.name !== "Catalog Listing Ad" || a.assets.length > 0);
+    if (!needsAutoAd && prevNeedsAutoAd.current) {
+      // Remove ads that are empty placeholders (no assets, no ad text, no auth code)
+      const cleaned = ads.filter((a) => a.assets.length > 0 || a.adText.trim().length > 0 || a.sparkAdAuthCode.trim().length > 0 || a.carouselCards.length > 0);
       if (cleaned.length !== ads.length) {
         updateNested("creative", { ads: cleaned });
       }
     }
-    prevCatalogListing.current = isCatalogListing;
-  }, [isCatalogListing]); // eslint-disable-line react-hooks/exhaustive-deps
+    prevNeedsAutoAd.current = needsAutoAd;
+  }, [needsAutoAd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Validation */
   const allChecks: { label: string; ok: boolean }[] = [];
   allChecks.push({ label: "Identity: TikTok account linked", ok: identity.linkStatus === "confirmed" && !!identity.identityId });
 
-  if (isCatalogListing) {
-    // Catalog Listing: creatives are auto-generated, only need basic settings
-    allChecks.push({ label: "Catalog connected", ok: true });
+  const isAutoGenerated = isCatalogListing || (catalogEnabled && objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING" && objectiveConfig.dynamicFormat);
+
+  if (isAutoGenerated) {
+    // Auto-generated creatives (Catalog Listing or Video Shopping + Dynamic Format): no manual uploads needed
+    allChecks.push({ label: "Catalog connected", ok: !!campaign.objective.catalogId });
   } else {
     // Video Shopping or non-catalog: need manual ad uploads
     allChecks.push({ label: "At least 1 ad created", ok: ads.length > 0 });
@@ -2825,51 +2992,27 @@ export function TikTokStepCreative() {
             )}
           </div>
 
-          {/* ---- Catalog Active Banner (when catalog enabled in step 0) ---- */}
+          {/* ---- Catalog Settings (when catalog enabled in step 0) ---- */}
           {catalogEnabled && (
             <div className="flex flex-col gap-4">
-              {/* Catalog info banner */}
-              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3.5">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-100">
-                  <Zap className="size-4 text-amber-600" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs font-semibold text-amber-900">Product Catalog Active</p>
-                    <Badge variant="secondary" className="rounded-full bg-amber-200 px-1.5 py-0 text-xs font-medium text-amber-800">
-                      Salla Store
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-xs leading-relaxed text-amber-700">
-                    Your product catalog is connected. Configure how your products appear in ads below.
-                  </p>
-                </div>
-              </div>
-
               {/* Shopping Ad Type */}
               <SectionCard>
-                <div className="mb-1 flex items-center gap-2">
-                  <Tag className="size-4 text-primary" />
+                <div className="mb-3 flex items-center gap-2">
+                  <Tag className="size-4 text-[#004956]" />
                   <Label className="text-sm font-semibold text-foreground">Shopping Ad Type</Label>
-                  <InfoTip text="Determines how your catalog products appear in ads. Choose the format that best showcases your products." />
                 </div>
-                <p className="mb-4 text-xs text-muted-foreground">
-                  Choose how your catalog products are displayed in your TikTok ads.
-                </p>
 
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {([
                     {
                       value: "VIDEO_SHOPPING" as const,
                       label: "Video Shopping",
-                      desc: "Upload videos and attach catalog products as interactive cards. Users browse & buy from the video.",
-                      details: ["You upload video/image creatives", "Products displayed as interactive add-ons", "Best for brand storytelling + product discovery"],
+                      desc: "You upload creatives — products attach as interactive cards",
                     },
                     {
                       value: "CATALOG_LISTING_ADS" as const,
                       label: "Catalog Listing",
-                      desc: "TikTok auto-generates product ads from your catalog images, titles and prices. No manual creative needed.",
-                      details: ["Creatives auto-generated from catalog", "Dynamic formats (video + carousel)", "Best for large catalogs with 50+ products"],
+                      desc: "TikTok auto-generates ads from your catalog products",
                     },
                   ]).map((sat) => {
                     const sel = objectiveConfig.shoppingAdsType === sat.value;
@@ -2879,27 +3022,62 @@ export function TikTokStepCreative() {
                         type="button"
                         onClick={() => updateNested("objective", { shoppingAdsType: sat.value })}
                         className={cn(
-                          "flex flex-col items-start rounded-lg border-2 p-4 text-left transition-all",
+                          "flex items-center gap-3 rounded-xl border-2 px-4 py-3.5 text-left transition-all",
                           sel
-                            ? "border-primary bg-primary/[0.04]"
-                            : "border-border bg-card hover:border-primary/40"
+                            ? "border-[#a4ffe5] bg-[#e6fff9]"
+                            : "border-border bg-card hover:border-[#a4ffe5] hover:bg-[#e6fff9]/40"
                         )}
                       >
-                        <p className={cn("text-xs font-semibold", sel ? "text-primary" : "text-foreground")}>{sat.label}</p>
-                        <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{sat.desc}</p>
-                        <ul className="mt-2 flex flex-col gap-0.5">
-                          {sat.details.map((d) => (
-                            <li key={d} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                              <CheckCircle2 className={cn("size-2.5 shrink-0", sel ? "text-primary" : "text-muted-foreground/50")} />
-                              {d}
-                            </li>
-                          ))}
-                        </ul>
+                        <div className={cn(
+                          "flex size-5 items-center justify-center rounded-full border-2 transition-colors",
+                          sel ? "border-[#004956] bg-[#004956]" : "border-muted-foreground/30"
+                        )}>
+                          {sel && <div className="size-2 rounded-full bg-white" />}
+                        </div>
+                        <div className="flex-1">
+                          <p className={cn("text-xs font-bold", sel ? "text-[#004956]" : "text-foreground")}>{sat.label}</p>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">{sat.desc}</p>
+                        </div>
                       </button>
                     );
                   })}
                 </div>
               </SectionCard>
+
+              {/* Dynamic Creative Format — only for Video Shopping (Catalog Listing is always dynamic) */}
+              {objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING" && (
+                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                  <div className="flex items-center justify-between px-5 py-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">Dynamic Creative Format</p>
+                        <Badge variant="secondary" className="rounded-full bg-[#e6fff9] px-1.5 py-0 text-[9px] font-semibold text-[#004956]">
+                          Optional
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {objectiveConfig.dynamicFormat
+                          ? "TikTok AI will auto-generate and test Catalog Video, Single Video, and Carousel formats from your products. No manual ad upload needed."
+                          : "You upload your own video/image creatives. Products from your catalog are attached as interactive cards below your ad."}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={objectiveConfig.dynamicFormat}
+                      onCheckedChange={(checked) => updateNested("objective", { dynamicFormat: checked })}
+                    />
+                  </div>
+                  {objectiveConfig.dynamicFormat && (
+                    <div className="border-t border-border bg-[#e6fff9]/40 px-5 py-3">
+                      <div className="flex items-start gap-2">
+                        <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                        <p className="text-[11px] leading-relaxed text-[#004956]/80">
+                          TikTok will automatically create and A/B test multiple ad formats using your catalog products. You only need to select products below — no creative upload required.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Product Selection */}
               <CatalogProductSelection
@@ -3119,22 +3297,24 @@ export function TikTokStepCreative() {
               </p>
 
               {ads.length === 0 && !isCatalogListing && (
-                <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
-                  <Zap className="mt-0.5 size-4 shrink-0 text-primary" />
+                <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2.5">
+                  <Zap className="mt-0.5 size-4 shrink-0 text-[#004956]" />
                   <div>
-                    <p className="text-xs font-semibold text-foreground">Recommended Format</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {campaign.objective.objective === "PRODUCT_SALES"
-                        ? "For Sales campaigns, Single Video ads with product demos perform 2.3x better on TikTok."
-                        : campaign.objective.objective === "TRAFFIC"
-                          ? "Single Video ads drive the most website traffic. Use vertical 9:16 video with a clear CTA."
-                          : campaign.objective.objective === "VIDEO_VIEWS"
-                            ? "Spark Ads get 2x more engagement than standard ads. Use an organic post that already resonates."
-                            : campaign.objective.objective === "LEAD_GENERATION"
-                              ? "Lead Generation ads with short video (under 15s) have 40% higher form completion rates."
-                              : campaign.objective.objective === "APP_PROMOTION"
-                                ? "App Install ads with gameplay or demo videos have 25% higher install rates."
-                                : "Start with a Single Video ad for best results across all objectives."}
+                    <p className="text-xs font-semibold text-[#004956]">Recommended Format</p>
+                    <p className="mt-0.5 text-xs text-[#004956]/70">
+                      {catalogEnabled && objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING"
+                        ? "For Video Shopping, Single Video ads with product demos let users browse and buy directly from the video."
+                        : campaign.objective.objective === "PRODUCT_SALES"
+                          ? "For Sales campaigns, Single Video ads with product demos perform 2.3x better on TikTok."
+                          : campaign.objective.objective === "TRAFFIC"
+                            ? "Single Video ads drive the most website traffic. Use vertical 9:16 video with a clear CTA."
+                            : campaign.objective.objective === "VIDEO_VIEWS"
+                              ? "Spark Ads get 2x more engagement than standard ads. Use an organic post that already resonates."
+                              : campaign.objective.objective === "LEAD_GENERATION"
+                                ? "Lead Generation ads with short video (under 15s) have 40% higher form completion rates."
+                                : campaign.objective.objective === "APP_PROMOTION"
+                                  ? "App Install ads with gameplay or demo videos have 25% higher install rates."
+                                  : "Start with a Single Video ad for best results across all objectives."}
                     </p>
                   </div>
                 </div>
@@ -3142,90 +3322,41 @@ export function TikTokStepCreative() {
             </div>
             <div className="px-5 pb-5">
 
-            {/* Catalog Listing: auto-generated creatives */}
-            {catalogEnabled && objectiveConfig.shoppingAdsType === "CATALOG_LISTING_ADS" ? (
-              <div className="flex flex-col gap-4">
-                <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/[0.02] py-10">
-                  <div className="flex flex-col items-center gap-3 text-center">
-                    <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10">
-                      <Zap className="size-6 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Auto-Generated Catalog Creatives</p>
-                      <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-                        TikTok will automatically generate ad creatives using product images, titles, and prices from your catalog. No manual upload needed.
-                      </p>
-                    </div>
+            {/* Auto-generated creatives: Catalog Listing OR Video Shopping with Dynamic Format ON */}
+            {catalogEnabled && (isCatalogListing || (objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING" && objectiveConfig.dynamicFormat)) ? (
+              <div className="flex flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card">
+                {/* Header */}
+                <div className="flex items-center gap-3 border-b border-border bg-[#e6fff9]/40 px-5 py-3.5">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#004956]/10">
+                    <Zap className="size-4 text-[#004956]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#004956]">Auto-Generated Catalog Creatives</p>
+                    <p className="mt-0.5 text-[11px] text-[#004956]/60">
+                      TikTok generates Catalog Video, Carousel &amp; Single Product ads from your catalog.
+                    </p>
                   </div>
                 </div>
 
-                {/* What TikTok generates */}
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  {[
-                    { label: "Catalog Video", desc: "Product images assembled into video format with auto transitions" },
-                    { label: "Product Carousel", desc: "Swipeable product cards generated from catalog images and data" },
-                    { label: "Single Product", desc: "Individual product highlight ads with image, price, and CTA" },
-                  ].map((f) => (
-                    <div key={f.label} className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-                      <p className="text-xs font-medium text-foreground">{f.label}</p>
-                      <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">{f.desc}</p>
-                    </div>
-                  ))}
+                {/* Link Type + CTA */}
+                <div className="px-5 py-4">
+                  <LinkTypeSection
+                    url={ads[0]?.landingPageUrl || ""}
+                    onUrlChange={(url) => {
+                      if (ads[0]) {
+                        updateAd(ads[0].id, { ...ads[0], landingPageUrl: url });
+                      }
+                    }}
+                    cta={ads[0]?.callToAction || "SHOP_NOW"}
+                    onCtaChange={(v) => {
+                      if (ads[0]) {
+                        updateAd(ads[0].id, { ...ads[0], callToAction: v as TikTokCTA });
+                      }
+                    }}
+                    recommendedCtas={RECOMMENDED_CTAS}
+                    otherCtas={OTHER_CTAS}
+                  />
                 </div>
-
-                {/* Catalog Listing basic settings */}
-                <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
-                  <p className="text-xs font-semibold text-foreground">Ad Settings</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-xs font-medium text-muted-foreground">Display Name</Label>
-                      <Input
-                        placeholder="Your brand"
-                        value={ads[0]?.displayName || identity.displayName || ""}
-                        maxLength={20}
-                        onChange={(e) => {
-                          if (ads[0]) {
-                            updateAd(ads[0].id, { ...ads[0], displayName: e.target.value.slice(0, 20) });
-                          }
-                        }}
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <Label className="text-xs font-medium text-muted-foreground">Call to Action</Label>
-                      <select
-                        className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground"
-                        value={ads[0]?.callToAction || "SHOP_NOW"}
-                        onChange={(e) => {
-                          if (ads[0]) {
-                            updateAd(ads[0].id, { ...ads[0], callToAction: e.target.value as TikTokCTA });
-                          }
-                        }}
-                      >
-                        {CTA_OPTIONS.map((c) => (
-                          <option key={c.value} value={c.value}>{c.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label className="text-xs font-medium text-muted-foreground">Landing Page URL</Label>
-                    <Input
-                      placeholder="https://yourstore.salla.sa"
-                      value={ads[0]?.landingPageUrl || ""}
-                      onChange={(e) => {
-                        if (ads[0]) {
-                          updateAd(ads[0].id, { ...ads[0], landingPageUrl: e.target.value });
-                        }
-                      }}
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                </div>
-
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Dynamic formats automatically assemble Catalog Video, Single Video, and Carousel ad formats based on your optimization goals and audience behavior.
-                </p>
               </div>
             ) : (
               /* Standard ads: manual upload (Video Shopping or non-catalog) */
@@ -3282,21 +3413,21 @@ export function TikTokStepCreative() {
                     )}
 
                     {ads.map((ad, i) => (
-  <AdPanel
-  key={ad.id}
-  ad={ad}
-  adIndex={i}
-  totalAds={ads.length}
-  isActive={i === activeAdIdx}
-  onSelect={() => setActiveAdIdx(i)}
-  onUpdate={(next) => updateAd(ad.id, next)}
-  onRemove={() => removeAd(ad.id)}
-  onDuplicate={() => duplicateAd(ad.id)}
-  allowedFormats={allowedFormats}
-  isLeadGen={isLeadGen}
-  isVideoViews={isVideoViews}
-  isAppPromo={isAppPromo}
-  />
+                      <AdPanel
+                        key={ad.id}
+                        ad={ad}
+                        adIndex={i}
+                        totalAds={ads.length}
+                        isActive={i === activeAdIdx}
+                        onSelect={() => setActiveAdIdx(i)}
+                        onUpdate={(next) => updateAd(ad.id, next)}
+                        onRemove={() => removeAd(ad.id)}
+                        onDuplicate={() => duplicateAd(ad.id)}
+                        allowedFormats={allowedFormats}
+                        isLeadGen={isLeadGen}
+                        isVideoViews={isVideoViews}
+                        isAppPromo={isAppPromo}
+                      />
                     ))}
 
                     {/* Apply to All */}
@@ -3315,6 +3446,38 @@ export function TikTokStepCreative() {
                           <Copy className="size-3" />
                           Apply
                         </Button>
+                      </div>
+                    )}
+
+                    {/* ── Ad count guidance ── */}
+                    {ads.length >= 5 && ads.length < 10 && (
+                      <div className="flex items-start gap-2.5 rounded-xl border border-[#a4ffe5]/50 bg-[#e6fff9]/60 px-4 py-3">
+                        <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-[#004956]/10">
+                          <Sparkles className="size-3.5 text-[#004956]" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-[#004956]">
+                            {ads.length} ads created — that&apos;s a solid set
+                          </p>
+                          <p className="mt-0.5 text-[11px] leading-relaxed text-[#004956]/70">
+                            TikTok recommends 3–5 ads per ad group for optimal budget distribution and faster optimization. You can still add more if needed.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {ads.length >= 10 && (
+                      <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                        <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-100">
+                          <AlertCircle className="size-3.5 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-amber-800">
+                            {ads.length} ads — budget will be spread thin
+                          </p>
+                          <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700">
+                            With {ads.length} ads, each creative gets less budget for TikTok to optimize. Consider removing underperformers or consolidating similar ads for better results.
+                          </p>
+                        </div>
                       </div>
                     )}
 

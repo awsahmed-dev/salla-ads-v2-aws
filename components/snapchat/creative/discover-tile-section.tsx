@@ -4,17 +4,16 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import {
   Compass,
-  ChevronUp,
   ChevronDown,
   AlertCircle,
   CheckCircle2,
   ImageIcon,
   Type,
-  Sparkles,
   Eye,
+  Upload,
+  Sparkles,
 } from "lucide-react";
 import { type AdGroup, type DiscoverTile } from "@/lib/snapchat/campaign-types";
 import { UploadZone } from "@/components/shared/upload-zone";
@@ -22,9 +21,11 @@ import { UploadZone } from "@/components/shared/upload-zone";
 export function DiscoverTileSection({
   ad,
   onUpdate,
+  catalogEnabled = false,
 }: {
   ad: AdGroup;
   onUpdate: (next: AdGroup) => void;
+  catalogEnabled?: boolean;
 }) {
   const tile = ad.discoverTile ?? {
     enabled: false,
@@ -32,7 +33,12 @@ export function DiscoverTileSection({
     backgroundImageUrl: "",
     logoImageUrl: "",
   };
-  const isComplete = !!(tile.headline && tile.backgroundImageUrl);
+
+  const tileRenderType = tile.renderType ?? "STATIC";
+  const isDynamicTile = catalogEnabled && tileRenderType === "DYNAMIC";
+  const isComplete = isDynamicTile
+    ? !!tile.headline
+    : !!(tile.headline && tile.backgroundImageUrl);
 
   const updateTile = (patch: Partial<DiscoverTile>) => {
     onUpdate({
@@ -106,8 +112,111 @@ export function DiscoverTileSection({
       {/* ── Expanded Content ── */}
       {expanded && (
         <div className="border-t border-border">
+          {/* ── Catalog Tile Options (only for catalog Story Ads) ── */}
+          {catalogEnabled && (
+            <div className="px-5 py-4">
+              <Label className="mb-2 block text-xs font-bold text-foreground">
+                Discover Tile Options
+              </Label>
+              <div className="flex flex-col gap-2">
+                {/* Use images from Catalog */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateTile({
+                      renderType: "DYNAMIC",
+                      backgroundImageUrl: "",
+                      backgroundImageFile: undefined,
+                    })
+                  }
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl border-2 px-4 py-3.5 text-left transition-all",
+                    tileRenderType === "DYNAMIC"
+                      ? "border-[#a4ffe5] bg-[#e6fff9]"
+                      : "border-border bg-card hover:border-[#a4ffe5] hover:bg-[#e6fff9]/40"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex size-5 items-center justify-center rounded-full border-2 transition-colors",
+                      tileRenderType === "DYNAMIC"
+                        ? "border-[#004956] bg-[#004956]"
+                        : "border-muted-foreground/30"
+                    )}
+                  >
+                    {tileRenderType === "DYNAMIC" && (
+                      <div className="size-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p
+                      className={cn(
+                        "text-xs font-bold",
+                        tileRenderType === "DYNAMIC"
+                          ? "text-[#004956]"
+                          : "text-foreground"
+                      )}
+                    >
+                      Use images from the Catalog
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      The Discover tile media will be automatically generated
+                      from products in your Catalog.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Upload a single image */}
+                <button
+                  type="button"
+                  onClick={() => updateTile({ renderType: "STATIC" })}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl border-2 px-4 py-3.5 text-left transition-all",
+                    tileRenderType === "STATIC"
+                      ? "border-[#a4ffe5] bg-[#e6fff9]"
+                      : "border-border bg-card hover:border-[#a4ffe5] hover:bg-[#e6fff9]/40"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex size-5 items-center justify-center rounded-full border-2 transition-colors",
+                      tileRenderType === "STATIC"
+                        ? "border-[#004956] bg-[#004956]"
+                        : "border-muted-foreground/30"
+                    )}
+                  >
+                    {tileRenderType === "STATIC" && (
+                      <div className="size-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p
+                      className={cn(
+                        "text-xs font-bold",
+                        tileRenderType === "STATIC"
+                          ? "text-[#004956]"
+                          : "text-foreground"
+                      )}
+                    >
+                      Upload a single image
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      The Discover tile media will be the same for all of your
+                      ads.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* ── Headline Section ── */}
-          <div className="px-5 py-4">
+          <div
+            className={cn(
+              "px-5 py-4",
+              catalogEnabled && "border-t border-border"
+            )}
+          >
             <div className="mb-1.5 flex items-center justify-between">
               <Label className="flex items-center gap-1.5 text-xs font-medium text-foreground">
                 <Type className="size-3 text-muted-foreground" />
@@ -137,79 +246,94 @@ export function DiscoverTileSection({
             </p>
           </div>
 
-          {/* ── Media Uploads ── */}
-          <div className="border-t border-border px-5 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              {/* Background Image */}
-              <div className="flex flex-col gap-1.5">
-                <Label className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-                  <ImageIcon className="size-3 text-muted-foreground" />
-                  Background{" "}
-                  <span className="text-destructive">*</span>
-                </Label>
-                <UploadZone
-                  accept="image/png,image/jpeg"
-                  label="Add background"
-                  sublabel="360×600, PNG or JPEG"
-                  preview={tile.backgroundImageUrl || undefined}
-                  onFile={handleBackgroundFile}
-                  onClear={() =>
-                    updateTile({
-                      backgroundImageUrl: "",
-                      backgroundImageFile: undefined,
-                    })
-                  }
-                  enableLibrary={true}
-                  libraryContext="IMAGE_PORTRAIT"
-                />
-                <div className="flex flex-wrap gap-1">
-                  <span className="rounded border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">
-                    3:5 ratio
-                  </span>
-                  <span className="rounded border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">
-                    Max 2MB
-                  </span>
+          {/* ── Media Uploads (hidden when catalog DYNAMIC tile) ── */}
+          {!isDynamicTile && (
+            <div className="border-t border-border px-5 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                {/* Background Image */}
+                <div className="flex flex-col gap-1.5">
+                  <Label className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                    <ImageIcon className="size-3 text-muted-foreground" />
+                    Background{" "}
+                    <span className="text-destructive">*</span>
+                  </Label>
+                  <UploadZone
+                    accept="image/png,image/jpeg"
+                    label="Add background"
+                    sublabel="360×600, PNG or JPEG"
+                    preview={tile.backgroundImageUrl || undefined}
+                    onFile={handleBackgroundFile}
+                    onClear={() =>
+                      updateTile({
+                        backgroundImageUrl: "",
+                        backgroundImageFile: undefined,
+                      })
+                    }
+                    enableLibrary={true}
+                    libraryContext="IMAGE_PORTRAIT"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    <span className="rounded border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">
+                      3:5 ratio
+                    </span>
+                    <span className="rounded border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">
+                      Max 2MB
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Logo Image */}
-              <div className="flex flex-col gap-1.5">
-                <Label className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-                  <ImageIcon className="size-3 text-muted-foreground" />
-                  Logo{" "}
-                  <span className="text-[10px] font-normal text-muted-foreground">
-                    (Optional)
-                  </span>
-                </Label>
-                <UploadZone
-                  accept="image/png,image/jpeg"
-                  label="Add logo"
-                  sublabel="993×284, PNG or JPEG"
-                  preview={tile.logoImageUrl || undefined}
-                  onFile={handleLogoFile}
-                  onClear={() =>
-                    updateTile({
-                      logoImageUrl: "",
-                      logoImageFile: undefined,
-                    })
-                  }
-                  enableLibrary={true}
-                  libraryContext="LOGO_LANDSCAPE"
-                />
-                <div className="flex flex-wrap gap-1">
-                  <span className="rounded border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">
-                    Wide format
-                  </span>
-                  <span className="rounded border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">
-                    Max 2MB
-                  </span>
+                {/* Logo Image */}
+                <div className="flex flex-col gap-1.5">
+                  <Label className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                    <ImageIcon className="size-3 text-muted-foreground" />
+                    Logo{" "}
+                    <span className="text-[10px] font-normal text-muted-foreground">
+                      (Optional)
+                    </span>
+                  </Label>
+                  <UploadZone
+                    accept="image/png,image/jpeg"
+                    label="Add logo"
+                    sublabel="993×284, PNG or JPEG"
+                    preview={tile.logoImageUrl || undefined}
+                    onFile={handleLogoFile}
+                    onClear={() =>
+                      updateTile({
+                        logoImageUrl: "",
+                        logoImageFile: undefined,
+                      })
+                    }
+                    enableLibrary={true}
+                    libraryContext="LOGO_LANDSCAPE"
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    <span className="rounded border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">
+                      Wide format
+                    </span>
+                    <span className="rounded border border-border px-1.5 py-0.5 text-[9px] text-muted-foreground">
+                      Max 2MB
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* ── Catalog DYNAMIC info ── */}
+          {isDynamicTile && (
+            <div className="border-t border-border px-5 py-4">
+              <div className="flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+                <Sparkles className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
+                <p className="text-[11px] leading-relaxed text-emerald-700">
+                  The tile background will be auto-generated from your catalog
+                  product images. No upload needed — just add a headline above.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* ── Mini Preview ── */}
-          {(tile.backgroundImageUrl || tile.headline) && (
+          {(tile.backgroundImageUrl || tile.headline || isDynamicTile) && (
             <div className="border-t border-border px-5 py-4">
               <div className="mb-2.5 flex items-center gap-1.5">
                 <Eye className="size-3 text-muted-foreground" />
@@ -221,7 +345,14 @@ export function DiscoverTileSection({
                 <div className="relative overflow-hidden rounded-xl bg-zinc-900 shadow-lg">
                   {/* Background */}
                   <div className="aspect-[3/5]">
-                    {tile.backgroundImageUrl ? (
+                    {isDynamicTile ? (
+                      <div className="flex size-full flex-col items-center justify-center gap-1.5 bg-gradient-to-br from-[#004956] to-[#006b7a]">
+                        <Sparkles className="size-5 text-[#a4ffe5]/60" />
+                        <span className="text-[7px] font-medium text-[#a4ffe5]/70">
+                          From Catalog
+                        </span>
+                      </div>
+                    ) : tile.backgroundImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={tile.backgroundImageUrl}
@@ -285,11 +416,13 @@ export function DiscoverTileSection({
               <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
                 <AlertCircle className="size-3.5 shrink-0 text-amber-600" />
                 <p className="text-xs text-amber-700">
-                  {!tile.headline && !tile.backgroundImageUrl
-                    ? "Add a headline and background image to complete the Discover Tile."
-                    : !tile.headline
-                      ? "Add a headline to complete the Discover Tile."
-                      : "Upload a background image to complete the Discover Tile."}
+                  {isDynamicTile
+                    ? "Add a headline to complete the Discover Tile."
+                    : !tile.headline && !tile.backgroundImageUrl
+                      ? "Add a headline and background image to complete the Discover Tile."
+                      : !tile.headline
+                        ? "Add a headline to complete the Discover Tile."
+                        : "Upload a background image to complete the Discover Tile."}
                 </p>
               </div>
             )}

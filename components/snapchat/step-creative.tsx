@@ -116,7 +116,7 @@ export function StepCreative() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const allowedFormats: AdFormat[] = catalogEnabled
-    ? ["DYNAMIC"]
+    ? ["DYNAMIC", "COLLECTION", "STORY"]
     : (objectiveConfig.allowedFormats ?? ["SINGLE", "COLLECTION", "STORY", "INFLUENCER"]).filter((f) => f !== "DYNAMIC");
 
   const allowedDestinations: AdDestination[] = objectiveConfig.allowedDestinations ?? ["WEBSITE"];
@@ -130,7 +130,7 @@ export function StepCreative() {
   /* ---- Ad CRUD ---- */
   const addAd = (format: AdFormat = "SINGLE", destination?: AdDestination) => {
     const dest = destination ?? allowedDestinations[0] ?? "WEBSITE";
-    const newAd = makeAdGroup(format, ads.length, dest);
+    const newAd = makeAdGroup(format, ads.length, dest, catalogEnabled);
     newAd.assets = newAd.assets.map((a) => ({ ...a, cta: defaultCTA }));
     const next = [...ads, newAd];
     updateNested("creative", { ads: next });
@@ -205,7 +205,10 @@ export function StepCreative() {
 
   const destNeedsUrl = (dest: AdDestination) => dest === "WEBSITE" || dest === "DEEP_LINK";
   ads.forEach((ad, i) => {
-    if (ad.adFormat === "DYNAMIC") {
+    const isCatalogNoMedia =
+      (ad.adFormat === "COLLECTION" && ad.dynamicCollectionEnabled && ad.catalogRenderType === "DYNAMIC") ||
+      (ad.adFormat === "STORY" && ad.catalogRenderType === "DYNAMIC");
+    if (ad.adFormat === "DYNAMIC" || isCatalogNoMedia) {
       allChecks.push({ label: `Ad ${i + 1}: product set selected`, ok: !!(ad.dynamicTemplateConfig?.productSetId) });
     } else {
       allChecks.push({ label: `Ad ${i + 1}: has creative`, ok: ad.assets.length > 0 });
@@ -295,12 +298,18 @@ export function StepCreative() {
       }
     }
     if (ad.adFormat === "STORY") {
-      allChecks.push({ label: `Ad ${i + 1}: min 3 snaps`, ok: ad.assets.length >= 3 });
+      const isCatStory = ad.catalogRenderType === "DYNAMIC";
+      if (!isCatStory) {
+        allChecks.push({ label: `Ad ${i + 1}: min 3 snaps`, ok: ad.assets.length >= 3 });
+      }
       const tile = ad.discoverTile;
       allChecks.push({ label: `Ad ${i + 1}: Discover Tile enabled`, ok: !!tile?.enabled });
       if (tile?.enabled) {
         allChecks.push({ label: `Ad ${i + 1}: Discover Tile headline`, ok: (tile.headline ?? "").trim().length > 0 });
-        allChecks.push({ label: `Ad ${i + 1}: Discover Tile background`, ok: !!tile.backgroundImageUrl });
+        const tileNeedsBg = tile.renderType !== "DYNAMIC";
+        if (tileNeedsBg) {
+          allChecks.push({ label: `Ad ${i + 1}: Discover Tile background`, ok: !!tile.backgroundImageUrl });
+        }
       }
       ad.assets.forEach((a, j) => {
         const hasUrl = (() => { try { const u = new URL(a.websiteUrl); return u.protocol === "https:" && u.hostname.includes("."); } catch { return false; } })();
@@ -363,7 +372,7 @@ export function StepCreative() {
               <div className="flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5">
                 <Info className="mt-0.5 size-3.5 shrink-0 text-blue-600" />
                 <p className="text-xs leading-relaxed text-blue-700">
-                  Catalog campaigns use <span className="font-semibold">Dynamic Product Ads</span> only. Ads are auto-generated from your product catalog. To create manual image/video ads, turn off the catalog toggle in Campaign settings.
+                  Catalog campaigns support <span className="font-semibold">Dynamic Product Ads</span>, <span className="font-semibold">Collection Ads</span> (hero image/video + catalog tiles), and <span className="font-semibold">Story Ads</span> (product story from catalog). Choose the format that best fits your campaign.
                 </p>
               </div>
             </div>
@@ -896,6 +905,38 @@ export function StepCreative() {
                     objective={campaign.objective.objective}
                   />
                 ))}
+
+                {/* ── Ad count guidance ── */}
+                {ads.length >= 5 && ads.length < 10 && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-[#a4ffe5]/50 bg-[#e6fff9]/60 px-4 py-3">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[#004956]/10 mt-0.5">
+                      <Sparkles className="size-3.5 text-[#004956]" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-[#004956]">
+                        {ads.length} ads created — that&apos;s a solid set
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-[#004956]/70">
+                        Snapchat recommends 3–5 ads per campaign for optimal budget distribution and faster optimization. You can still add more if needed.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {ads.length >= 10 && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 mt-0.5">
+                      <AlertCircle className="size-3.5 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-amber-800">
+                        {ads.length} ads — budget will be spread thin
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-amber-700">
+                        With {ads.length} ads, each creative gets less budget for Snapchat to optimize. Consider removing underperformers or consolidating similar ads for better results.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="rounded-xl border-2 border-dashed border-border transition-all hover:border-primary/30">
                   {catalogEnabled ? (

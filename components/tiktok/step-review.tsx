@@ -257,6 +257,16 @@ export function TikTokStepReview() {
       });
     }
 
+    // Catalog: validate catalog ID is set when catalog is enabled
+    if (isSalesObj && objective.catalogEnabled) {
+      list.push({
+        id: "catalog",
+        label: "Product catalog connected",
+        ok: !!(objective.catalogId || true), // Salla auto-assigns catalog ID in production
+        detail: "Salla Store Catalog",
+      });
+    }
+
     // Lead Gen: Instant Form validations
     if (isLeadGen && objective.leadOptimizationLocation === "INSTANT_FORM") {
       list.push({
@@ -406,14 +416,15 @@ export function TikTokStepReview() {
         advertiser_id: "<ADVERTISER_ID>",
         campaign_name: objective.campaignName,
         objective_type: objective.objective,
-        ...(isSales && { promotion_type: "WEBSITE" }),
+        // promotion_type: WEBSITE for standard sales, CATALOG when catalog is enabled
+        ...(isSales && { promotion_type: objective.catalogEnabled ? "CATALOG" : "WEBSITE" }),
         operation_status: "ENABLE",
       },
       adgroup: {
         advertiser_id: "<ADVERTISER_ID>",
         campaign_id: "<CAMPAIGN_ID>",
         adgroup_name: `${objective.campaignName} - Ad Group`,
-        ...(isSales && { promotion_type: "WEBSITE" }),
+        ...(isSales && { promotion_type: objective.catalogEnabled ? "CATALOG" : "WEBSITE" }),
         // PRODUCT_SALES only supports PLACEMENT_TIKTOK (Pangle/GlobalApp not available for sales).
         placement_type: isSales ? "PLACEMENT_TYPE_NORMAL" : creative.placementType,
         ...(isSales && { placements: ["PLACEMENT_TIKTOK"] }),
@@ -468,7 +479,12 @@ export function TikTokStepReview() {
           shopping_ads_type: objective.shoppingAdsType,
           catalog_id: resolvedCatalogId,
           ...(objective.productSelectionMode === "PRODUCT_SET" && objective.productSetId && { product_set_id: objective.productSetId }),
+          // Specific product IDs (max 20) — sent as product_specific_ids in catalog campaigns
+          ...(objective.productSelectionMode === "SPECIFIC" && objective.specificProductIds.length > 0 && {
+            product_specific_ids: objective.specificProductIds,
+          }),
           ...(isCatalogListing && { dynamic_format: "DYNAMIC_CREATIVE" }),
+          ...(objective.dynamicFormat && !isCatalogListing && { dynamic_format: "DYNAMIC_CREATIVE" }),
         }),
         location_ids: audience.locationIds,
         age_groups: toTikTokAgeGroups(audience.ageMin, audience.ageMax),

@@ -78,9 +78,12 @@ const SEASONAL_COLORS: Record<string, string> = {
 export function DynamicAdConfig({
   ad,
   onUpdate,
+  catalogStory = false,
 }: {
   ad: AdGroup;
   onUpdate: (next: AdGroup) => void;
+  /** When true, renders in catalog story mode with story-specific messaging */
+  catalogStory?: boolean;
 }) {
   const config = ad.dynamicTemplateConfig ?? makeDefaultDynamicTemplate();
   const [showSetPicker, setShowSetPicker] = useState(false);
@@ -132,14 +135,30 @@ export function DynamicAdConfig({
     <div className="flex flex-col gap-4">
 
       {/* ── Info Banner ── */}
-      <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100">
-          <Zap className="size-4 text-amber-600" />
+      <div className={cn(
+        "flex items-start gap-3 rounded-xl border px-4 py-3",
+        catalogStory
+          ? "border-blue-200 bg-blue-50/80"
+          : "border-amber-200 bg-amber-50/80"
+      )}>
+        <div className={cn(
+          "flex size-8 shrink-0 items-center justify-center rounded-lg",
+          catalogStory ? "bg-blue-100" : "bg-amber-100"
+        )}>
+          {catalogStory
+            ? <Layers className="size-4 text-blue-600" />
+            : <Zap className="size-4 text-amber-600" />
+          }
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-foreground">Dynamic Product Ad</p>
+          <p className="text-xs font-semibold text-foreground">
+            {catalogStory ? "Catalog Story Ad" : "Dynamic Product Ad"}
+          </p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-            Snapchat auto-generates ads from your catalog based on user behavior. No creative upload needed — images, prices, and descriptions are pulled directly from your products.
+            {catalogStory
+              ? "Snapchat creates a multi-snap story from your catalog. Each snap showcases a product — users swipe through the story in Discover. Select a product set below."
+              : "Snapchat auto-generates ads from your catalog based on user behavior. No creative upload needed — images, prices, and descriptions are pulled directly from your products."
+            }
           </p>
         </div>
       </div>
@@ -153,39 +172,40 @@ export function DynamicAdConfig({
         </Label>
 
         {config.productSetId && selectedSet ? (
-          <div className="group relative overflow-hidden rounded-xl border border-primary/30 bg-primary/[0.03] transition-colors">
+          <div className="group relative overflow-hidden rounded-xl border border-border bg-card transition-colors">
             {/* Preview images strip */}
             {selectedSet.previewImages && selectedSet.previewImages.length > 0 && (
-              <div className="flex h-14 gap-px overflow-hidden bg-muted/30">
+              <div className="grid grid-cols-4 gap-px bg-border">
                 {selectedSet.previewImages.slice(0, 4).map((img, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={i}
-                    src={img}
-                    alt=""
-                    className="h-full flex-1 object-cover"
-                    crossOrigin="anonymous"
-                  />
+                  <div key={i} className="aspect-[4/3] overflow-hidden bg-muted">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={img}
+                      alt=""
+                      className="size-full object-cover"
+                      crossOrigin="anonymous"
+                    />
+                  </div>
                 ))}
                 {selectedSet.previewImages.length < 4 &&
                   Array.from({ length: 4 - selectedSet.previewImages.length }).map((_, i) => (
-                    <div key={`ph-${i}`} className="flex h-full flex-1 items-center justify-center bg-muted/40">
-                      <ImageIcon className="size-3 text-muted-foreground/30" />
+                    <div key={`ph-${i}`} className="flex aspect-[4/3] items-center justify-center bg-muted/40">
+                      <ImageIcon className="size-4 text-muted-foreground/20" />
                     </div>
                   ))
                 }
               </div>
             )}
 
-            <div className="flex items-center gap-3 px-3 py-2.5">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <Package className="size-4 text-primary" />
+            <div className="flex items-center gap-3 border-t border-[#a4ffe5]/50 bg-[#e6fff9]/60 px-4 py-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#004956] text-white">
+                <Package className="size-4.5" />
               </div>
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-foreground">{config.productSetName}</span>
+                  <span className="text-sm font-bold text-[#004956]">{config.productSetName}</span>
                   {selectedSet.autoRefresh && (
-                    <RefreshCw className="size-2.5 text-emerald-500" />
+                    <RefreshCw className="size-3 text-emerald-500" />
                   )}
                   {selectedSet.seasonalTag && (
                     <Badge
@@ -199,7 +219,7 @@ export function DynamicAdConfig({
                     </Badge>
                   )}
                 </div>
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-xs text-[#004956]/60">
                   {selectedSet.productCount} products {selectedSet.autoRefresh ? "· Auto-refreshing" : ""}
                 </span>
               </div>
@@ -207,16 +227,16 @@ export function DynamicAdConfig({
                 size="sm"
                 variant="outline"
                 onClick={openPicker}
-                className="h-7 gap-1 rounded-full text-[11px]"
+                className="h-8 gap-1.5 rounded-full border-[#004956]/20 bg-white px-4 text-xs font-medium text-[#004956] hover:bg-[#004956]/5"
               >
                 Change
               </Button>
               <button
                 type="button"
                 onClick={() => updateConfig({ productSetId: "", productSetName: "" })}
-                className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-destructive"
+                className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
               >
-                <X className="size-3.5" />
+                <X className="size-4" />
               </button>
             </div>
           </div>

@@ -32,6 +32,9 @@ import {
   Tag,
   ArrowRight,
   GripVertical,
+  Upload,
+  Sparkles,
+  Info,
 } from "lucide-react";
 import { type SallaProduct, PREVIEW_PRODUCTS, formatSAR } from "@/lib/salla/store-api";
 import { type CollectionTile, type AdGroup, type DynamicTemplateConfig, makeDefaultDynamicTemplate } from "@/lib/snapchat/campaign-types";
@@ -404,17 +407,21 @@ export function CollectionTilesSection({
   const dynamicConfig = ad.dynamicTemplateConfig ?? makeDefaultDynamicTemplate();
   const hasAutoOpened = useRef(false);
 
+  /** Catalog collection mode — always dynamic tiles, hero is STATIC (upload) or DYNAMIC (auto) */
+  const isCatalogMode = catalogEnabled && ad.dynamicCollectionEnabled === true;
+  const heroMode = ad.catalogRenderType ?? "STATIC";
+
   useEffect(() => {
     fetchProductSets("all").then(setProductSets);
   }, []);
 
   useEffect(() => {
-    if (tileCount === 0 && !isDynamic && !hasAutoOpened.current) {
+    if (tileCount === 0 && !isDynamic && !isCatalogMode && !hasAutoOpened.current) {
       hasAutoOpened.current = true;
       const timer = setTimeout(() => setPickerOpen(true), 300);
       return () => clearTimeout(timer);
     }
-  }, [tileCount, isDynamic]);
+  }, [tileCount, isDynamic, isCatalogMode]);
 
   const handleAddProducts = (products: SallaProduct[]) => {
     const newTiles: CollectionTile[] = products.map((p) => ({
@@ -446,6 +453,280 @@ export function CollectionTilesSection({
 
   const canAddMore = tileCount < 4;
 
+  /* ------------------------------------------------------------------ */
+  /*  Catalog Collection Mode (catalogEnabled + COLLECTION)             */
+  /* ------------------------------------------------------------------ */
+  if (isCatalogMode) {
+    return (
+      <div className="flex flex-col gap-5">
+        {/* ── Section: Hero Media Source ── */}
+        <div>
+          <div className="mb-2 flex items-center gap-2">
+            <Label className="text-sm font-bold text-foreground">Hero Media</Label>
+            <span className="rounded-full bg-[#e6fff9] px-2 py-0.5 text-[10px] font-medium text-[#004956]">Top Snap</span>
+          </div>
+          <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground">
+            The hero is the full-screen media shown first. Product tiles from your catalog appear below it.
+          </p>
+
+          {/* Hero source toggle cards */}
+          <div className="grid grid-cols-2 gap-2.5">
+            {/* Upload your own */}
+            <button
+              type="button"
+              onClick={() => onUpdate({ ...ad, catalogRenderType: "STATIC" })}
+              className={cn(
+                "flex flex-col items-center gap-2 rounded-xl border-2 px-3 py-4 text-center transition-all",
+                heroMode === "STATIC"
+                  ? "border-[#a4ffe5] bg-[#e6fff9]"
+                  : "border-border bg-card hover:border-[#a4ffe5] hover:bg-[#e6fff9]/40"
+              )}
+            >
+              <div className={cn(
+                "flex size-9 items-center justify-center rounded-full transition-colors",
+                heroMode === "STATIC" ? "bg-[#a4ffe5]" : "bg-muted/60"
+              )}>
+                <Upload className={cn("size-4", heroMode === "STATIC" ? "text-[#004956]" : "text-muted-foreground")} />
+              </div>
+              <div>
+                <p className={cn("text-xs font-bold", heroMode === "STATIC" ? "text-[#004956]" : "text-foreground")}>Upload Your Own</p>
+                <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">Image or video as hero snap</p>
+              </div>
+              {heroMode === "STATIC" && (
+                <div className="flex size-4 items-center justify-center rounded-full bg-[#004956]">
+                  <Check className="size-2.5 text-white" />
+                </div>
+              )}
+            </button>
+
+            {/* Auto from catalog */}
+            <button
+              type="button"
+              onClick={() => onUpdate({ ...ad, catalogRenderType: "DYNAMIC", assets: [] })}
+              className={cn(
+                "flex flex-col items-center gap-2 rounded-xl border-2 px-3 py-4 text-center transition-all",
+                heroMode === "DYNAMIC"
+                  ? "border-[#a4ffe5] bg-[#e6fff9]"
+                  : "border-border bg-card hover:border-[#a4ffe5] hover:bg-[#e6fff9]/40"
+              )}
+            >
+              <div className={cn(
+                "flex size-9 items-center justify-center rounded-full transition-colors",
+                heroMode === "DYNAMIC" ? "bg-[#a4ffe5]" : "bg-muted/60"
+              )}>
+                <Sparkles className={cn("size-4", heroMode === "DYNAMIC" ? "text-[#004956]" : "text-muted-foreground")} />
+              </div>
+              <div>
+                <p className={cn("text-xs font-bold", heroMode === "DYNAMIC" ? "text-[#004956]" : "text-foreground")}>Auto from Catalog</p>
+                <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">Best product as hero snap</p>
+              </div>
+              {heroMode === "DYNAMIC" && (
+                <div className="flex size-4 items-center justify-center rounded-full bg-[#004956]">
+                  <Check className="size-2.5 text-white" />
+                </div>
+              )}
+            </button>
+          </div>
+
+          {/* Info about selected mode */}
+          {heroMode === "STATIC" && (
+            <div className="mt-2.5 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+              <Info className="mt-0.5 size-3 shrink-0 text-blue-500" />
+              <p className="text-[11px] leading-relaxed text-blue-700">
+                Upload a custom image or video above in the <span className="font-medium">Ad Content</span> section. This becomes the first snap users see — catalog products appear as swipeable tiles below.
+              </p>
+            </div>
+          )}
+          {heroMode === "DYNAMIC" && (
+            <div className="mt-2.5 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+              <Sparkles className="mt-0.5 size-3 shrink-0 text-emerald-500" />
+              <p className="text-[11px] leading-relaxed text-emerald-700">
+                Snapchat will auto-select the best-performing product image from your catalog as the hero. No upload needed.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* ── Section: Product Set for Tiles ── */}
+        <div className="border-t border-border pt-4">
+          <div className="mb-2 flex items-center gap-2">
+            <Label className="text-sm font-bold text-foreground">Product Tiles</Label>
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">From Catalog</span>
+          </div>
+          <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground">
+            2-4 product tiles auto-populated from your catalog. Users can swipe through and tap to visit each product page.
+          </p>
+
+          {/* Product set selection */}
+          {dynamicConfig.productSetId ? (
+            <button
+              type="button"
+              onClick={() => setDynamicSetPicker(true)}
+              className="flex w-full items-center gap-2.5 rounded-xl border border-border bg-white px-3 py-2.5 text-left transition-colors hover:border-[#a4ffe5] hover:shadow-sm"
+            >
+              {(() => {
+                const matchedSet = productSets.find((s) => s.id === dynamicConfig.productSetId);
+                return matchedSet?.previewImages?.length ? (
+                  <div className="flex -space-x-1.5">
+                    {matchedSet.previewImages.slice(0, 3).map((img, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={i} src={img} alt="" className="size-8 rounded-lg border-2 border-white object-cover" crossOrigin="anonymous" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-[#e6fff9]">
+                    <Package className="size-4 text-[#004956]" />
+                  </div>
+                );
+              })()}
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-xs font-medium text-foreground">{dynamicConfig.productSetName}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {productSets.find((s) => s.id === dynamicConfig.productSetId)?.productCount ?? 0} products
+                </p>
+              </div>
+              <span className="rounded-full bg-[#e6fff9] px-2.5 py-1 text-[11px] font-medium text-[#004956] transition-colors hover:bg-[#a4ffe5]">Change</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setDynamicSetPicker(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#a4ffe5] bg-[#e6fff9]/30 py-4 text-[#004956] transition-colors hover:bg-[#e6fff9]"
+            >
+              <Package className="size-4" />
+              <span className="text-xs font-semibold">Select Product Set</span>
+              <ArrowRight className="size-3.5" />
+            </button>
+          )}
+
+          {/* Template options */}
+          <div className="mt-3 flex items-center gap-4">
+            <label className="flex items-center gap-1.5">
+              <Switch checked={dynamicConfig.showPrice} onCheckedChange={(v) => updateDynamicConfig({ showPrice: v })} className="scale-90" />
+              <span className="text-[11px] text-foreground">Show prices</span>
+            </label>
+            <label className="flex items-center gap-1.5">
+              <Switch checked={dynamicConfig.showSaleBadge} onCheckedChange={(v) => updateDynamicConfig({ showSaleBadge: v })} className="scale-90" />
+              <span className="text-[11px] text-foreground">Sale badge</span>
+            </label>
+          </div>
+
+          {/* Live tile preview */}
+          {dynamicConfig.productSetId && (
+            <div className="mt-3 grid grid-cols-4 gap-1.5 rounded-xl border border-border bg-white p-2">
+              {PREVIEW_PRODUCTS.slice(0, 4).map((p) => (
+                <div key={p.id} className="overflow-hidden rounded-lg bg-muted">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.image} alt={p.name} className="aspect-square w-full object-cover" crossOrigin="anonymous" />
+                  <div className="p-1">
+                    <p className="truncate text-[7px] font-medium text-foreground">{p.name}</p>
+                    {dynamicConfig.showPrice && (
+                      <p className="text-[7px] font-bold text-[#004956]">{formatSAR(p.salePrice ?? p.price)}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Product Set Picker Sheet (shared) */}
+        <Sheet open={dynamicSetPicker} onOpenChange={setDynamicSetPicker}>
+          <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[420px]">
+            <SheetHeader className="shrink-0 bg-[#004956] px-6 pb-4 pt-5">
+              <SheetTitle className="flex items-center gap-2.5 text-base font-bold text-white">
+                <div className="flex size-8 items-center justify-center rounded-xl bg-white/15">
+                  <Package className="size-4 text-[#a4ffe5]" />
+                </div>
+                Select Product Set
+              </SheetTitle>
+              <SheetDescription className="text-xs text-white/70">
+                Products from this set will auto-fill your collection tiles.
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="flex-1 overflow-y-auto bg-[#f8f8f8] px-4 py-3">
+              <div className="flex flex-col gap-2">
+                {productSets.map((set) => {
+                  const isSelected = dynamicConfig.productSetId === set.id;
+                  const isEmpty = set.productCount === 0;
+                  return (
+                    <button
+                      key={set.id}
+                      type="button"
+                      disabled={isEmpty}
+                      onClick={() => {
+                        if (isEmpty) return;
+                        updateDynamicConfig({ productSetId: set.id, productSetName: set.nameAr || set.name });
+                        setDynamicSetPicker(false);
+                      }}
+                      className={cn(
+                        "group flex flex-col overflow-hidden rounded-2xl border text-left shadow-sm transition-all",
+                        isEmpty
+                          ? "cursor-not-allowed border-border opacity-50"
+                          : isSelected
+                            ? "border-[#a4ffe5] bg-[#e6fff9] shadow-md"
+                            : "border-white bg-white hover:border-[#a4ffe5]"
+                      )}
+                    >
+                      {set.previewImages && set.previewImages.length > 0 && (
+                        <div className="flex h-[72px] gap-px overflow-hidden rounded-t-2xl">
+                          {set.previewImages.slice(0, 4).map((img, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={i} src={img} alt="" className="h-full flex-1 object-cover transition-transform duration-300 group-hover:scale-105" crossOrigin="anonymous" />
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-3 px-3 py-3">
+                        <div className={cn(
+                          "flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors",
+                          isSelected ? "bg-[#004956] text-white" : "bg-[#f4f4f4] text-muted-foreground group-hover:bg-[#e6fff9]"
+                        )}>
+                          <Package className="size-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className={cn("text-xs font-bold", isSelected ? "text-[#004956]" : "text-foreground")}>{set.nameAr || set.name}</p>
+                            {set.seasonalTag && (
+                              <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{set.seasonalTag}</Badge>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">{set.descriptionAr || set.description}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={cn("text-xs font-bold tabular-nums", isEmpty ? "text-red-500" : isSelected ? "text-[#004956]" : "text-foreground")}>{set.productCount}{isEmpty ? " (empty)" : ""}</span>
+                          {isSelected ? (
+                            <div className="flex size-5 items-center justify-center rounded-full bg-[#004956]">
+                              <Check className="size-3 text-white" />
+                            </div>
+                          ) : (
+                            <ArrowRight className="size-3.5 text-muted-foreground/30 transition-all group-hover:translate-x-0.5 group-hover:text-[#004956]" />
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-border px-5 py-3">
+              <p className="text-xs text-muted-foreground">
+                {productSets.length} product sets
+              </p>
+              <Button variant="outline" size="sm" onClick={() => setDynamicSetPicker(false)}>
+                Cancel
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+    );
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Standard Collection Mode (non-catalog)                            */
+  /* ------------------------------------------------------------------ */
   return (
     <div>
       {/* Section header */}
@@ -469,8 +750,8 @@ export function CollectionTilesSection({
         Swipeable product tiles shown below the top snap. Each tile links to its own product page.
       </p>
 
-      {/* Dynamic Collection Toggle */}
-      {catalogEnabled && (
+      {/* Dynamic Collection Toggle (non-catalog mode) */}
+      {catalogEnabled && !isCatalogMode && (
         <div className={cn(
           "mb-4 rounded-xl border p-3.5 transition-colors",
           isDynamic ? "border-primary/30 bg-primary/[0.02]" : "border-border"
