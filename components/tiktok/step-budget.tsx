@@ -927,7 +927,9 @@ export function TikTokStepBudget() {
                 infoTipText="Controls how fast TikTok spends your daily budget."
               />
 
-              {/* -- Skip Learning Phase & Comment Control -- */}
+              {/* -- Skip Learning Phase & Search Ads -- */}
+              {/* Hidden entirely for REACH/SHOW/VIDEO_VIEW/FOCUSED_VIEW where neither option applies */}
+              {!["REACH", "SHOW", "VIDEO_VIEW", "FOCUSED_VIEW"].includes(budget.optimizationGoal) && (
               <SectionCard>
                 <div className="mb-3 flex items-center gap-2">
                   <Settings2 className="size-4 text-primary" />
@@ -935,31 +937,35 @@ export function TikTokStepBudget() {
                   <InfoTip text="Additional options that affect how TikTok delivers your ads." />
                 </div>
 
-                {/* Skip Learning Phase */}
-                <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <SkipForward className="size-3.5 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs font-medium text-foreground">Skip learning phase</p>
-                      <p className="text-xs text-muted-foreground">Start full delivery immediately without the initial learning period. May result in higher initial CPA.</p>
+                {/* Skip Learning Phase (oCPM-billed conversion/event goals only) */}
+                {["CONVERSION", "VALUE", "LANDING_PAGE_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"].includes(budget.optimizationGoal) && (
+                  <>
+                    <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <SkipForward className="size-3.5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs font-medium text-foreground">Skip learning phase</p>
+                          <p className="text-xs text-muted-foreground">Start full delivery immediately without the initial learning period. May result in higher initial CPA.</p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={budget.skipLearningPhase}
+                        onCheckedChange={(checked) => updateNested("budget", { skipLearningPhase: checked })}
+                      />
                     </div>
-                  </div>
-                  <Switch
-                    checked={budget.skipLearningPhase}
-                    onCheckedChange={(checked) => updateNested("budget", { skipLearningPhase: checked })}
-                  />
-                </div>
 
-                {budget.skipLearningPhase && (
-                  <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5">
-                    <AlertCircle className="size-3 shrink-0 text-amber-600" />
-                    <p className="text-xs text-amber-700">Skipping the learning phase may lead to higher and more volatile costs initially. Recommended only for experienced advertisers.</p>
-                  </div>
+                    {budget.skipLearningPhase && (
+                      <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5">
+                        <AlertCircle className="size-3 shrink-0 text-amber-600" />
+                        <p className="text-xs text-amber-700">Skipping the learning phase may lead to higher and more volatile costs initially. Recommended only for experienced advertisers.</p>
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {/* Search Placement (Sales & Traffic only) */}
-                {(!isReach && !isVideoViews && !isLeadGen && !isAppPromo) && (
-                  <div className="mt-3 flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+                {/* Search Ads (all goals except REACH, SHOW, VIDEO_VIEW, FOCUSED_VIEW) */}
+                {!["REACH", "SHOW", "VIDEO_VIEW", "FOCUSED_VIEW"].includes(budget.optimizationGoal) && (
+                  <div className={cn("flex items-center justify-between rounded-lg border border-border px-3 py-2.5", ["CONVERSION", "VALUE", "LANDING_PAGE_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"].includes(budget.optimizationGoal) && "mt-3")}>
                     <div className="flex items-center gap-2">
                       <MousePointerClick className="size-3.5 text-muted-foreground" />
                       <div>
@@ -973,7 +979,7 @@ export function TikTokStepBudget() {
                     />
                   </div>
                 )}
-                {budget.searchResultEnabled && (!isReach && !isVideoViews && !isLeadGen && !isAppPromo) && (
+                {budget.searchResultEnabled && !["REACH", "SHOW", "VIDEO_VIEW", "FOCUSED_VIEW"].includes(budget.optimizationGoal) && (
                   <div className="mt-2 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2">
                     <Sparkles className="mt-0.5 size-3 shrink-0 text-primary" />
                     <p className="text-xs leading-relaxed text-muted-foreground">
@@ -983,6 +989,7 @@ export function TikTokStepBudget() {
                 )}
 
               </SectionCard>
+              )}
 
             </CollapsibleContent>
           </Collapsible>
