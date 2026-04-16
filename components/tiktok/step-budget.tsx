@@ -659,113 +659,43 @@ export function TikTokStepBudget() {
               }
             }}
             layout="buttons"
-            infoTipText="Choose how TikTok spends your daily budget. Maximum Delivery gets the most results; Cost Cap averages around your target; Bid Cap is a hard max per auction."
-            billingContext={[
-              {
-                label: "Billing model",
-                value: budget.billingEvent === "OCPM" ? "Optimized CPM (oCPM)" : budget.billingEvent === "CPC" ? "Cost per Click (CPC)" : budget.billingEvent === "CPV" ? "Cost per View (CPV)" : "CPM",
-              },
-              {
-                label: "What this means",
-                value: budget.billingEvent === "OCPM"
-                  ? "Charged per 1,000 impressions, optimized for conversions"
-                  : budget.billingEvent === "CPC"
-                    ? "Charged only when someone clicks your ad"
-                    : budget.billingEvent === "CPV"
-                      ? budget.optimizationGoal === "FOCUSED_VIEW" ? "Charged per 6-second focused view" : "Charged per 2-second video view"
-                      : "Charged per 1,000 impressions",
-              },
-            ]}
+            infoTipText="Choose how TikTok spends your daily budget. Auto Bid is recommended for most advertisers."
             contextNote={
-              budget.optimizationGoal !== "CONVERSION" ? (
-                <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-                  <Info className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-                  <p className="text-xs leading-relaxed text-amber-700">
-                    {budget.optimizationGoal === "SHOW"
-                      ? "Impressions optimization uses Maximum Delivery with CPM billing. TikTok will maximize total impressions — users may see your ad multiple times to reinforce your message."
-                      : isReach
-                      ? "Reach campaigns use Maximum Delivery with CPM billing. TikTok will auto-bid to show your ad to as many unique people as possible within your budget."
-                      : budget.optimizationGoal === "VALUE"
-                        ? "Value optimization always uses Maximum Delivery combined with your ROAS target. TikTok auto-bids to maximize total revenue while meeting your minimum ROAS."
-                        : budget.optimizationGoal === "LANDING_PAGE_VIEW"
-                          ? "Landing Page View optimization uses Maximum Delivery with oCPM billing. TikTok auto-bids to drive higher-quality traffic to your landing page."
-                          : budget.optimizationGoal === "VIDEO_VIEW"
-                            ? "Video View optimization uses CPV billing. TikTok auto-bids to get the most 2-second views within your budget. You can also set a Cost Cap for max CPV control."
-                            : budget.optimizationGoal === "FOCUSED_VIEW"
-                              ? "Focused View optimization uses CPV billing. TikTok auto-bids to get the most 6-second engaged views within your budget. You can also set a Cost Cap for max CPV control."
-                              : budget.optimizationGoal === "LEAD_GENERATION"
-                                ? "Lead Generation uses oCPM billing optimized for form submissions. TikTok auto-bids to maximize leads. You can set a Cost Cap to control your target cost per lead (CPL)."
-                                : budget.optimizationGoal === "CLICK"
-                                ? "Click optimization uses Maximum Delivery to get the most clicks within your budget. Cost Cap is not available for this goal."
-                                : "Traffic optimization uses Maximum Delivery to get the most clicks within your budget. Cost Cap is not available for this goal."}
-                  </p>
-                </div>
-              ) : undefined
+              budget.bidType !== "BID_TYPE_NO_BID" && budget.bidAmount > 0 && budget.bidAmount > budget.amount
+                ? (
+                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                      <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+                      <p className="text-xs leading-relaxed text-amber-700">
+                        Your bid of <span className="font-semibold">SAR {budget.bidAmount.toFixed(2)}</span> exceeds your daily budget of <span className="font-semibold">SAR {budget.amount}</span>. You may get very few results per day — consider increasing your budget or lowering your bid.
+                      </p>
+                    </div>
+                  )
+                : undefined
             }
             bidInputs={
-              budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "CONVERSION"
+              budget.bidType === "BID_TYPE_CUSTOM"
                 ? [{
-                    label: "Target Cost per Purchase (CPA)",
-                    desc: "The maximum average amount you want to pay per purchase. TikTok will try to keep your cost around this target.",
-                    value: budget.bidAmount ?? suggestedBid.min,
-                    onChange: (v) => updateNested("budget", { bidAmount: v }),
-                    prefix: "SAR",
+                    label: budget.bidStrategy === "BID_CAP" ? "Maximum Bid per Action" : "Target Cost per Action",
+                    desc: budget.bidStrategy === "BID_CAP"
+                      ? "TikTok will never bid above this amount. Set it too low and you may not win any auctions."
+                      : "TikTok will try to keep your average cost per result close to this amount.",
+                    value: budget.optimizationGoal === "VALUE" ? (budget.roasBid ?? 1) : (budget.bidAmount || undefined),
+                    onChange: budget.optimizationGoal === "VALUE"
+                      ? (v) => updateNested("budget", { roasBid: Math.max(0.01, v || 1) })
+                      : (v) => updateNested("budget", { bidAmount: v }),
+                    prefix: budget.optimizationGoal === "VALUE" ? "×" : "SAR",
+                    suffix: `per ${goalLabel.replace(/s$/, "")}`,
                     min: 0.01,
-                    step: 0.01,
-                    suggestedRange: suggestedBid,
-                    tip: "Calculate your target CPA as: average order value divided by your desired ROAS. For example, if your average order is SAR 150 and you want 3x ROAS, set CPA to SAR 50.",
+                    step: budget.optimizationGoal === "VALUE" ? 0.1 : 0.5,
+                    suggestedRange: budget.optimizationGoal === "VALUE" ? { min: 2.0, max: 5.0 } : suggestedBid,
+                    warning: budget.bidAmount > 0 && budget.bidAmount < suggestedBid.min && budget.optimizationGoal !== "VALUE"
+                      ? `Your bid of SAR ${budget.bidAmount.toFixed(2)} is below the suggested minimum of SAR ${suggestedBid.min.toFixed(2)}. You may get very few or no results.`
+                      : undefined,
+                    tip: budget.bidAmount >= suggestedBid.min && budget.bidAmount <= suggestedBid.max && budget.optimizationGoal !== "VALUE"
+                      ? "Your bid is within the suggested range — good balance between cost and delivery."
+                      : undefined,
                   }]
-                : budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "VALUE"
-                  ? [{
-                      label: "Target ROAS (Return on Ad Spend)",
-                      desc: "The minimum return on ad spend you want to achieve. For example, 3.0 means SAR 3 revenue for every SAR 1 spent.",
-                      value: budget.roasBid ?? 1,
-                      onChange: (v) => updateNested("budget", { roasBid: Math.max(0.01, v || 1) }),
-                      prefix: "×",
-                      min: 0.01,
-                      step: 0.1,
-                      suggestedRange: { min: 2.0, max: 5.0 },
-                      tip: "Start with a ROAS target of 2-3x for new campaigns. A higher target means fewer but more profitable conversions. TikTok will optimize delivery to hit your ROAS goal.",
-                    }]
-                : budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "LEAD_GENERATION"
-                  ? [{
-                      label: "Target Cost per Lead (CPL)",
-                      desc: "The maximum average amount you want to pay per lead form submission. TikTok will try to keep your cost around this target.",
-                      value: budget.bidAmount ?? suggestedBid.min,
-                      onChange: (v) => updateNested("budget", { bidAmount: v }),
-                      prefix: "SAR",
-                      min: 1,
-                      step: 0.5,
-                      suggestedRange: suggestedBid,
-                      tip: "Start with Maximum Delivery to let TikTok find the optimal CPL, then switch to Cost Cap once you know your ideal range. Average CPL for KSA e-commerce is SAR 8-15.",
-                    }]
-                  : budget.bidType === "BID_TYPE_CUSTOM" && (budget.optimizationGoal === "INSTALL" || budget.optimizationGoal === "IN_APP_EVENT")
-                    ? [{
-                        label: `Target Cost per ${budget.optimizationGoal === "INSTALL" ? "Install (CPI)" : "In-App Event"}`,
-                        desc: `The maximum average amount you want to pay per ${budget.optimizationGoal === "INSTALL" ? "app install" : "in-app event"}. TikTok will try to keep your cost around this target.`,
-                        value: budget.bidAmount ?? suggestedBid.min,
-                        onChange: (v) => updateNested("budget", { bidAmount: v }),
-                        prefix: "SAR",
-                        min: 1,
-                        step: 0.5,
-                        suggestedRange: suggestedBid,
-                        tip: `Start with Maximum Delivery to let TikTok find the optimal ${budget.optimizationGoal === "INSTALL" ? "CPI" : "cost per event"}, then switch to Cost Cap once you know your ideal range. Average CPI for KSA is SAR 5-12.`,
-                      }]
-                    : budget.bidType === "BID_TYPE_CUSTOM" && (budget.optimizationGoal === "VIDEO_VIEW" || budget.optimizationGoal === "FOCUSED_VIEW")
-                      ? [{
-                          label: "Target Cost per View (CPV)",
-                          desc: `The maximum average amount you want to pay per ${budget.optimizationGoal === "FOCUSED_VIEW" ? "6-second focused view" : "2-second video view"}. TikTok will try to keep your cost around this target.`,
-                          value: budget.bidAmount ?? suggestedBid.min,
-                          onChange: (v) => updateNested("budget", { bidAmount: v }),
-                          prefix: "SAR",
-                          min: 0.001,
-                          step: 0.001,
-                          suggestedRange: suggestedBid,
-                          tip: budget.optimizationGoal === "FOCUSED_VIEW"
-                            ? "Focused Views cost more per view but deliver higher engagement. Start with Maximum Delivery to let TikTok find the optimal CPV, then switch to Cost Cap once you know your ideal range."
-                            : "Video Views are very cost-effective. Start with Maximum Delivery to get the most views, then use Cost Cap if you want to control your per-view cost.",
-                        }]
-                      : undefined
+                : undefined
             }
           />
 
