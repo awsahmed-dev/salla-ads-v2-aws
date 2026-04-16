@@ -626,6 +626,7 @@ export function TikTokStepBudget() {
               events={CONVERSION_EVENTS}
               selectedEvent={budget.optimizationEvent}
               onEventChange={(v) => updateNested("budget", { optimizationEvent: v })}
+              layout="dropdown"
               infoTipText="The specific e-commerce action TikTok will optimize for. This must match an event fired by your TikTok Pixel on your Salla store."
               tip="Start with Purchase for maximum ROI. If your pixel has fewer than 50 weekly purchases, try Add to Cart first -- TikTok needs enough event data to optimize effectively."
               roas={
