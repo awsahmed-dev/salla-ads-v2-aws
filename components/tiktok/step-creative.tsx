@@ -931,10 +931,10 @@ function AdPanel({
           {/* Video Views: video-only notice */}
           {isVideoViews && (
             <div className="border-t border-border px-6 py-4">
-              <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
-                <Info className="mt-0.5 size-3.5 shrink-0 text-primary" />
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  <span className="font-medium text-foreground">Video Views campaigns</span> only support video formats (Single Video and Spark Ads). Upload engaging vertical videos (9:16) to maximize view completion rates.
+              <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2.5">
+                <Info className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                <p className="text-xs leading-relaxed text-[#004956]/80">
+                  <span className="font-medium text-[#004956]">Video Views campaigns</span> only support video formats (Single Video and Spark Ads). Upload engaging vertical videos (9:16) to maximize view completion rates.
                 </p>
               </div>
             </div>

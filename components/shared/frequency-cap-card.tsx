@@ -74,6 +74,7 @@ export interface FrequencyCapCardProps {
   hideToggle?: boolean;
   /** Optional className for the card wrapper */
   className?: string;
+  learnMoreTrigger?: React.ReactNode;
 }
 
 /**
@@ -100,6 +101,7 @@ export function FrequencyCapCard({
   summaryTip,
   hideToggle = false,
   className,
+  learnMoreTrigger,
 }: FrequencyCapCardProps) {
   const style = ACCENT[accent];
 
@@ -131,6 +133,7 @@ export function FrequencyCapCard({
               </span>
             )}
             {infoTipText && <InfoTip text={infoTipText} />}
+            {learnMoreTrigger}
           </div>
         </div>
         {!hideToggle && (

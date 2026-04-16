@@ -46,6 +46,7 @@ interface AttributionWindowCardProps {
   infoTipText?: string;
   goalContext?: string;
   children?: React.ReactNode;
+  learnMoreTrigger?: React.ReactNode;
 }
 
 export function AttributionWindowCard({
@@ -64,6 +65,7 @@ export function AttributionWindowCard({
   infoTipText = "A wider window gives the platform more data to optimize your results.",
   goalContext,
   children,
+  learnMoreTrigger,
 }: AttributionWindowCardProps) {
   const isCustomAccent = accent.startsWith("#");
   const accentStyle = isCustomAccent ? { color: accent } : undefined;
@@ -71,13 +73,16 @@ export function AttributionWindowCard({
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       {/* Header */}
-      <div className="px-6 py-5">
-        <h3 className="text-base font-bold text-foreground">
-          Attribution Window
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {infoTipText}
-        </p>
+      <div className="flex items-start justify-between px-6 py-5">
+        <div>
+          <h3 className="text-base font-bold text-foreground">
+            Attribution Window
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {infoTipText}
+          </p>
+        </div>
+        {learnMoreTrigger}
       </div>
 
       {/* Combined mode: cards */}

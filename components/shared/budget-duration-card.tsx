@@ -76,6 +76,7 @@ export interface BudgetDurationCardProps {
   onAutoIncreaseChange?: (state: AutoIncreaseState) => void;
   showSmartStart?: boolean;
   onBulkUpdate?: (updates: Record<string, unknown>) => void;
+  learnMoreTrigger?: React.ReactNode;
 }
 
 /* ================================================================ */
@@ -163,6 +164,7 @@ export function BudgetDurationCard({
   onAutoIncreaseChange,
   showSmartStart = false,
   onBulkUpdate,
+  learnMoreTrigger,
 }: BudgetDurationCardProps) {
   const MIN_CAMPAIGN_DAYS = minCampaignDays;
   const ai = autoIncrease ?? { enabled: false, mode: "schedule" as const, pct: 20, intervalDays: 7, maxDailyBudget: amount * 3, scaleUpRoas: 3, scaleUpPct: 20, scaleDownRoas: 1.5, scaleDownPct: 10 };
@@ -283,13 +285,16 @@ export function BudgetDurationCard({
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       {/* ── Header ── */}
-      <div className="px-6 py-5">
-        <h3 className="text-base font-bold text-foreground">
-          Budget &amp; Ad Duration
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Set your spend, schedule, and expansion strategy.
-        </p>
+      <div className="flex items-start justify-between px-6 py-5">
+        <div>
+          <h3 className="text-base font-bold text-foreground">
+            Budget &amp; Ad Duration
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Set your spend, schedule, and expansion strategy.
+          </p>
+        </div>
+        {learnMoreTrigger}
       </div>
 
       {/* ── 1. Payment Method ── */}

@@ -70,6 +70,13 @@ import { BidStrategyCard } from "@/components/shared/bid-strategy-card";
 import { ConversionEventCard } from "@/components/shared/conversion-event-card";
 import { AttributionWindowCard } from "@/components/shared/attribution-window-card";
 import { DeliveryPacingCard } from "@/components/shared/delivery-pacing-card";
+import {
+  LearnMoreTrigger,
+  LearnMoreSheet,
+  SheetSection,
+  SheetDecisionCard,
+  useLearnMore,
+} from "@/components/shared/learn-more-sheet";
 import type {
   OptimizationGoal,
   OptimizationEvent,
@@ -350,6 +357,13 @@ export function TikTokStepBudget() {
 
   /* Local UI state */
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const optimizationGoalLearnMore = useLearnMore();
+  const bidStrategyLearnMore = useLearnMore();
+  const budgetDurationLearnMore = useLearnMore();
+  const attributionWindowLearnMore = useLearnMore();
+  const performanceBoostLearnMore = useLearnMore();
+  const frequencyCapLearnMore = useLearnMore();
+  const deliveryOptionsLearnMore = useLearnMore();
 
   const endDateRequired = budget.paymentMethod === "prepaid";
 
@@ -468,6 +482,7 @@ export function TikTokStepBudget() {
               objectiveConfig.allowedGoals.includes(g.value)
             )}
             selectedGoal={budget.optimizationGoal}
+            learnMoreTrigger={<LearnMoreTrigger {...optimizationGoalLearnMore.triggerProps} />}
             onGoalChange={(value) => {
               const billingEvent: BillingEvent =
                 value === "CLICK" ? "CPC"
@@ -518,10 +533,10 @@ export function TikTokStepBudget() {
           >
             {/* Reach: CPM explanation */}
             {isReach && (
-              <div className="mt-3 flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Reach campaigns use <span className="font-medium text-foreground">CPM (Cost per 1,000 impressions)</span> billing. You are charged for every 1,000 times your ad is shown. No pixel or conversion tracking is needed.
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2.5">
+                <Info className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                <p className="text-xs leading-relaxed text-[#004956]/80">
+                  Reach campaigns use <span className="font-medium text-[#004956]">CPM (Cost per 1,000 impressions)</span> billing. You are charged for every 1,000 times your ad is shown. No pixel or conversion tracking is needed.
                 </p>
               </div>
             )}
@@ -529,12 +544,12 @@ export function TikTokStepBudget() {
             {/* Traffic: optimization explanation */}
             {isTraffic && (
               <div className="mt-3 flex flex-col gap-2">
-                <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                  <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                  <p className="text-xs leading-relaxed text-muted-foreground">
+                <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2.5">
+                  <Info className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                  <p className="text-xs leading-relaxed text-[#004956]/80">
                     {budget.optimizationGoal === "CLICK"
-                      ? <>Traffic campaigns with <span className="font-medium text-foreground">Clicks</span> use CPC billing. You are charged only when someone clicks your ad. No pixel is required.</>
-                      : <>Traffic campaigns with <span className="font-medium text-foreground">Landing Page View</span> use oCPM billing. A view is counted only when the user clicks AND your landing page fully loads. Requires a TikTok Pixel.</>
+                      ? <>Traffic campaigns with <span className="font-medium text-[#004956]">Clicks</span> use CPC billing. You are charged only when someone clicks your ad. No pixel is required.</>
+                      : <>Traffic campaigns with <span className="font-medium text-[#004956]">Landing Page View</span> use oCPM billing. A view is counted only when the user clicks AND your landing page fully loads. Requires a TikTok Pixel.</>
                     }
                   </p>
                 </div>
@@ -548,10 +563,10 @@ export function TikTokStepBudget() {
                   </div>
                 )}
 
-                <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-                  <p className="text-xs leading-relaxed text-emerald-700">
-                    <span className="font-semibold">Salla Tip:</span> Start with <span className="font-semibold">Clicks</span> for quick setup, or use <span className="font-semibold">Landing Page View</span> with a pixel for higher-quality visitors who actually reach your store.
+                <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-3 py-2">
+                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                  <p className="text-xs leading-relaxed text-[#004956]/80">
+                    <span className="font-semibold text-[#004956]">Salla Tip:</span> Start with <span className="font-semibold">Clicks</span> for quick setup, or use <span className="font-semibold">Landing Page View</span> with a pixel for higher-quality visitors who actually reach your store.
                   </p>
                 </div>
               </div>
@@ -560,16 +575,16 @@ export function TikTokStepBudget() {
             {/* Lead Gen: CPL explanation */}
             {isLeadGen && (
               <div className="mt-3 flex flex-col gap-2">
-                <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                  <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    Lead Generation campaigns use <span className="font-medium text-foreground">oCPM billing</span> (optimized CPM), but TikTok optimizes delivery to maximize form submissions. Your effective cost is measured as <span className="font-medium text-foreground">Cost per Lead (CPL)</span>.
+                <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2.5">
+                  <Info className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                  <p className="text-xs leading-relaxed text-[#004956]/80">
+                    Lead Generation campaigns use <span className="font-medium text-[#004956]">oCPM billing</span> (optimized CPM), but TikTok optimizes delivery to maximize form submissions. Your effective cost is measured as <span className="font-medium text-[#004956]">Cost per Lead (CPL)</span>.
                   </p>
                 </div>
-                <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-                  <p className="text-xs leading-relaxed text-emerald-700">
-                    <span className="font-semibold">Salla Tip:</span> Use <span className="font-semibold">More Volume</span> instant forms to get the most leads at the lowest CPL, or <span className="font-semibold">Higher Intent</span> forms for better lead quality. You can configure your form in the Ad Design step.
+                <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-3 py-2">
+                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                  <p className="text-xs leading-relaxed text-[#004956]/80">
+                    <span className="font-semibold text-[#004956]">Salla Tip:</span> Use <span className="font-semibold">More Volume</span> instant forms to get the most leads at the lowest CPL, or <span className="font-semibold">Higher Intent</span> forms for better lead quality. You can configure your form in the Ad Design step.
                   </p>
                 </div>
               </div>
@@ -578,17 +593,17 @@ export function TikTokStepBudget() {
             {/* App Promo: CPI explanation */}
             {isAppPromo && (
               <div className="mt-3 flex flex-col gap-2">
-                <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                  <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    App Install campaigns use <span className="font-medium text-foreground">oCPM billing</span> (optimized CPM), but TikTok optimizes delivery to maximize installs. Your effective cost is measured as <span className="font-medium text-foreground">Cost per Install (CPI)</span>.
+                <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2.5">
+                  <Info className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                  <p className="text-xs leading-relaxed text-[#004956]/80">
+                    App Install campaigns use <span className="font-medium text-[#004956]">oCPM billing</span> (optimized CPM), but TikTok optimizes delivery to maximize installs. Your effective cost is measured as <span className="font-medium text-[#004956]">Cost per Install (CPI)</span>.
                     {budget.optimizationGoal === "IN_APP_EVENT" && <>{" "}For AEO campaigns, TikTok optimizes for your chosen in-app event using SDK data.</>}
                   </p>
                 </div>
-                <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-                  <p className="text-xs leading-relaxed text-emerald-700">
-                    <span className="font-semibold">Salla Tip:</span> Start with <span className="font-semibold">App Install</span> optimization to build your user base, then switch to <span className="font-semibold">In-App Event (AEO)</span> once you have enough install data. Use engaging 15-30s video content showcasing your app.
+                <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-3 py-2">
+                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                  <p className="text-xs leading-relaxed text-[#004956]/80">
+                    <span className="font-semibold text-[#004956]">Salla Tip:</span> Start with <span className="font-semibold">App Install</span> optimization to build your user base, then switch to <span className="font-semibold">In-App Event (AEO)</span> once you have enough install data. Use engaging 15-30s video content showcasing your app.
                   </p>
                 </div>
               </div>
@@ -597,20 +612,20 @@ export function TikTokStepBudget() {
             {/* Video Views: CPV explanation */}
             {isVideoViews && (
               <div className="mt-3 flex flex-col gap-2">
-                <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                  <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                  <p className="text-xs leading-relaxed text-muted-foreground">
+                <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2.5">
+                  <Info className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                  <p className="text-xs leading-relaxed text-[#004956]/80">
                     {budget.optimizationGoal === "VIDEO_VIEW"
-                      ? <>Video View campaigns use <span className="font-medium text-foreground">CPV (Cost Per View)</span> billing. A view is counted when a user watches your video for at least <span className="font-medium text-foreground">2 seconds</span>. Ideal for maximizing view volume.</>
-                      : <>Focused View campaigns use <span className="font-medium text-foreground">CPV (Cost Per View)</span> billing. A focused view is counted when a user watches your video for at least <span className="font-medium text-foreground">6 seconds</span> or engages with it. Higher quality engagement.</>
+                      ? <>Video View campaigns use <span className="font-medium text-[#004956]">CPV (Cost Per View)</span> billing. A view is counted when a user watches your video for at least <span className="font-medium text-[#004956]">2 seconds</span>. Ideal for maximizing view volume.</>
+                      : <>Focused View campaigns use <span className="font-medium text-[#004956]">CPV (Cost Per View)</span> billing. A focused view is counted when a user watches your video for at least <span className="font-medium text-[#004956]">6 seconds</span> or engages with it. Higher quality engagement.</>
                     }
                   </p>
                 </div>
 
-                <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-                  <p className="text-xs leading-relaxed text-emerald-700">
-                    <span className="font-semibold">Salla Tip:</span> Start with <span className="font-semibold">Video View (2s)</span> to maximize view volume, or use <span className="font-semibold">Focused View (6s)</span> when you want viewers who truly engage with your content.
+                <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-3 py-2">
+                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                  <p className="text-xs leading-relaxed text-[#004956]/80">
+                    <span className="font-semibold text-[#004956]">Salla Tip:</span> Start with <span className="font-semibold">Video View (2s)</span> to maximize view volume, or use <span className="font-semibold">Focused View (6s)</span> when you want viewers who truly engage with your content.
                   </p>
                 </div>
               </div>
@@ -651,9 +666,9 @@ export function TikTokStepBudget() {
                 </span>
               </div>
               {(budget.roasBid ?? 1) >= 2.0 && (budget.roasBid ?? 1) <= 5.0 && (
-                <div className="mt-2 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5">
-                  <Sparkles className="size-3 shrink-0 text-emerald-600" />
-                  <p className="text-xs text-emerald-700">ROAS target is in the recommended range (2×–5×).</p>
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-3 py-1.5">
+                  <Sparkles className="size-3 shrink-0 text-[#004956]" />
+                  <p className="text-xs text-[#004956]/80">ROAS target is in the recommended range (2×–5×).</p>
                 </div>
               )}
               {(budget.roasBid ?? 1) > 5.0 && (
@@ -692,6 +707,7 @@ export function TikTokStepBudget() {
           {/* ======================================================= */}
           <BidStrategyCard
             strategies={BID_STRATEGIES.filter((s) => s.supportedGoals.includes(budget.optimizationGoal))}
+            learnMoreTrigger={<LearnMoreTrigger {...bidStrategyLearnMore.triggerProps} />}
             selectedStrategy={
               budget.bidType === "BID_TYPE_NO_BID" ? "LOWEST_COST"
                 : budget.bidStrategy === "BID_CAP" ? "BID_CAP"
@@ -759,6 +775,7 @@ export function TikTokStepBudget() {
           {/* ======================================================= */}
           <BudgetDurationCard
             budgetTypes={BUDGET_TYPES}
+            learnMoreTrigger={<LearnMoreTrigger {...budgetDurationLearnMore.triggerProps} />}
             paymentMethod={budget.paymentMethod}
             onPaymentMethodChange={(v) => updateNested("budget", { paymentMethod: v })}
             showLifetimeToggle={true}
@@ -796,6 +813,7 @@ export function TikTokStepBudget() {
           <PerformanceBoostCard
             enabled={budget.performanceBoost}
             onToggle={(checked) => updateNested("budget", { performanceBoost: checked })}
+            learnMoreTrigger={<LearnMoreTrigger {...performanceBoostLearnMore.triggerProps} />}
           />
 
           {/* ======================================================= */}
@@ -829,6 +847,7 @@ export function TikTokStepBudget() {
               enabled={true}
               onEnabledChange={() => {}}
               hideToggle={true}
+              learnMoreTrigger={<LearnMoreTrigger {...frequencyCapLearnMore.triggerProps} />}
               maxImpressions={budget.frequencyCap?.frequency ?? 3}
               onMaxImpressionsChange={(v) =>
                 updateNested("budget", {
@@ -871,10 +890,10 @@ export function TikTokStepBudget() {
                         ? "Balanced frequency — good mix of reach and message reinforcement. Recommended for most campaigns."
                         : "High frequency — strong message reinforcement but may cause ad fatigue. Best for short campaigns."}
                   </p>
-                  <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                    <Sparkles className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-                    <p className="text-xs leading-relaxed text-emerald-700">
-                      <span className="font-semibold">Salla Tip:</span> For product launches, use <span className="font-semibold">3 times per 7 days</span>. For ongoing brand awareness, use <span className="font-semibold">2 times per 7 days</span> to maximize unique reach.
+                  <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-3 py-2">
+                    <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                    <p className="text-xs leading-relaxed text-[#004956]/80">
+                      <span className="font-semibold text-[#004956]">Salla Tip:</span> For product launches, use <span className="font-semibold">3 times per 7 days</span>. For ongoing brand awareness, use <span className="font-semibold">2 times per 7 days</span> to maximize unique reach.
                     </p>
                   </div>
                 </>
@@ -886,6 +905,7 @@ export function TikTokStepBudget() {
               {!isReach && budget.optimizationGoal !== "CLICK" && budget.optimizationGoal !== "SHOW" && (
                 <AttributionWindowCard
                   mode="separate"
+                  learnMoreTrigger={<LearnMoreTrigger {...attributionWindowLearnMore.triggerProps} />}
                   clickOptions={CLICK_ATTRIBUTION_WINDOWS}
                   viewOptions={VIEW_ATTRIBUTION_WINDOWS}
                   clickValue={budget.clickAttributionWindow}
@@ -935,6 +955,7 @@ export function TikTokStepBudget() {
                   <Settings2 className="size-4 text-primary" />
                   <Label className="text-sm font-semibold text-foreground">Delivery Options</Label>
                   <InfoTip text="Additional options that affect how TikTok delivers your ads." />
+                  <LearnMoreTrigger {...deliveryOptionsLearnMore.triggerProps} />
                 </div>
 
                 {/* Skip Learning Phase (oCPM-billed conversion/event goals only) */}
@@ -980,9 +1001,9 @@ export function TikTokStepBudget() {
                   </div>
                 )}
                 {budget.searchResultEnabled && !["REACH", "SHOW", "VIDEO_VIEW", "FOCUSED_VIEW"].includes(budget.optimizationGoal) && (
-                  <div className="mt-2 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2">
-                    <Sparkles className="mt-0.5 size-3 shrink-0 text-primary" />
-                    <p className="text-xs leading-relaxed text-muted-foreground">
+                  <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2">
+                    <Sparkles className="mt-0.5 size-3 shrink-0 text-[#004956]" />
+                    <p className="text-xs leading-relaxed text-[#004956]/80">
                       Search ads appear when users search for keywords related to your products on TikTok. This can drive additional high-intent traffic at no extra cost.
                     </p>
                   </div>
@@ -997,8 +1018,8 @@ export function TikTokStepBudget() {
         </div>
 
         {/* ============= RIGHT COLUMN (Budget summary) ============= */}
-        <div className="hidden w-80 shrink-0 lg:block">
-          <div className="sticky top-6 flex flex-col gap-4">
+        <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
+          <div className="lg:sticky lg:top-20 flex flex-col gap-4">
 
             {/* Cost Summary (shared) */}
             <CostSummaryCard
@@ -1066,6 +1087,11 @@ export function TikTokStepBudget() {
                 { label: "Billing event", status: "ok" as const, text: budget.billingEvent === "OCPM" ? "oCPM (optimized)" : budget.billingEvent === "CPV" ? "CPV (per view)" : budget.billingEvent },
                 ...(isTraffic && budget.optimizationGoal === "LANDING_PAGE_VIEW" && !hasPixel ? [{ label: "Pixel", status: "error" as const, text: "Required for Landing Page View" }] : []),
               ]}
+              tips={[
+                ...(!budget.endDateOptional ? [{ text: "Ongoing campaigns perform up to 40% better. Switch to Ongoing for the best results." }] : []),
+                ...(dailyAmount < suggestedDaily ? [{ text: `Increasing your budget to SAR ${suggestedDaily}/day could significantly improve delivery and reach.` }] : []),
+                ...(budget.bidType !== "BID_TYPE_NO_BID" ? [{ text: "Maximum Delivery (auto-bid) is recommended for most advertisers — it lets TikTok optimize for the best results." }] : []),
+              ]}
             />
 
             {/* Disclaimer */}
@@ -1078,6 +1104,229 @@ export function TikTokStepBudget() {
           </div>
         </div>
       </div>
+      {/* ── Learn More Sheets ── */}
+      <LearnMoreSheet
+        open={optimizationGoalLearnMore.open}
+        onOpenChange={optimizationGoalLearnMore.setOpen}
+        title="Optimization Strategy"
+        description="Your optimization goal tells TikTok what result to maximize with your budget. It directly controls which users see your ad."
+        icon={<Target />}
+        proTip="Start with a higher-funnel goal (like Page Views) to build Pixel data, then switch to Purchase optimization once you have 50+ events per week."
+      >
+        <SheetSection icon={<Target />} title="Which goal should I pick?">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Page Views / Landing Page View"
+              description="Best for new Pixels with little data. Low cost, builds your retargeting pool quickly."
+            />
+            <SheetDecisionCard
+              title="Add to Cart / Initiate Checkout"
+              description="Mid-funnel goals. Use when you have 100+ page view events and want to push users deeper."
+            />
+            <SheetDecisionCard
+              title="Complete Payment (Purchase)"
+              description="Highest-value goal. Requires a mature Pixel with 50+ weekly purchases for stable optimization."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Value (ROAS)"
+              description="Optimizes for total revenue, not just conversion count. Best for stores with varied product prices."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info />} title="How it works">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            TikTok&apos;s algorithm uses your Pixel event data to find users most likely to take your chosen action. A well-fed Pixel (with enough historical conversions) allows the algorithm to model your ideal customer and bid accurately in the ad auction.
+          </p>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      <LearnMoreSheet
+        open={bidStrategyLearnMore.open}
+        onOpenChange={bidStrategyLearnMore.setOpen}
+        title="Bidding Strategy"
+        description="Your bid strategy controls how TikTok competes in the ad auction for each impression. It directly affects your cost per result and delivery volume."
+        icon={<Gauge />}
+        proTip="Start with Maximum Delivery (auto-bid) for the first 1–2 weeks. Once you know your average CPA, switch to Cost Cap to lock in that target."
+      >
+        <SheetSection icon={<Gauge />} title="Strategy comparison">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Maximum Delivery (Auto Bid)"
+              description="TikTok bids as aggressively as needed to spend your full daily budget. You get the most results, but individual CPA may vary. Best for learning-phase campaigns."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Cost Cap"
+              description="TikTok targets an average cost per result close to your cap. Delivery may slow if the market is competitive, but your average CPA stays controlled."
+            />
+            <SheetDecisionCard
+              title="Bid Cap"
+              description="Hard ceiling on each individual bid. Gives maximum cost control but can severely limit delivery if set too low. Best for experienced advertisers."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info />} title="When to switch">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Use auto-bid during the <span className="font-semibold text-foreground">learning phase</span> (first 50 conversions). Once your CPA stabilizes, consider switching to Cost Cap to prevent cost spikes during high-competition periods like weekends or salary week.
+          </p>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      <LearnMoreSheet
+        open={budgetDurationLearnMore.open}
+        onOpenChange={budgetDurationLearnMore.setOpen}
+        title="Budget & Duration"
+        description="Your budget and schedule determine how much TikTok can spend and for how long. Getting these right is critical for the learning phase."
+        icon={<Wallet />}
+        proTip="Set your daily budget to at least 50× your expected CPA. This gives TikTok enough room to exit the learning phase within 7 days."
+      >
+        <SheetSection icon={<DollarSign />} title="Daily vs Lifetime">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Daily Budget"
+              description="TikTok spends up to this amount each day. Spend is consistent and predictable. Works with auto-increase and ongoing campaigns."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Lifetime Budget"
+              description="TikTok spreads the total across the campaign duration. Allows TikTok to spend more on high-opportunity days and less on slow days."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<TrendingUp />} title="Auto-Increase">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Auto-Increase gradually raises your daily budget on a schedule or based on ROAS performance. This prevents the need to manually adjust budgets as campaigns scale. A <span className="font-semibold text-foreground">safety cap</span> ensures your daily spend never exceeds a set maximum.
+          </p>
+        </SheetSection>
+        <SheetSection icon={<Clock />} title="Campaign duration">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            <span className="font-semibold text-foreground">Ongoing campaigns</span> (no end date) tend to outperform fixed-duration ones by up to 40%. The algorithm continuously learns and improves over time. If you need a fixed schedule, aim for at least 14 days to clear the learning phase.
+          </p>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      <LearnMoreSheet
+        open={attributionWindowLearnMore.open}
+        onOpenChange={attributionWindowLearnMore.setOpen}
+        title="Attribution Window"
+        description="The attribution window defines how long after an ad interaction a conversion is credited to your campaign. It affects both reporting accuracy and delivery optimization."
+        icon={<Link />}
+        proTip="A wider window gives TikTok more conversion signals, which improves delivery optimization. Only narrow it if you sell impulse-buy products with very short purchase cycles."
+      >
+        <SheetSection icon={<MousePointerClick />} title="Click-through window">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Counts conversions that happen after a user <span className="font-semibold text-foreground">clicks</span> your ad. A 7-day click window means a purchase made 5 days after clicking still counts as a result. TikTok supports 1-day, 7-day, 14-day, and 28-day click windows.
+          </p>
+        </SheetSection>
+        <SheetSection icon={<Eye />} title="View-through window">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Counts conversions that happen after a user <span className="font-semibold text-foreground">views</span> (but doesn&apos;t click) your ad. This captures users who are influenced by your ad but convert later through a direct visit or search. Typically set to 1 day since view-through influence fades quickly.
+          </p>
+        </SheetSection>
+        <SheetSection icon={<Info />} title="Recommended setup">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="7-day click + 1-day view"
+              description="The most balanced setup for e-commerce. Captures the full purchase cycle while keeping view-through attribution tight."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="1-day click + off"
+              description="For impulse purchases or app installs where the decision happens immediately. Gives the tightest attribution but fewer signals for optimization."
+            />
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      <LearnMoreSheet
+        open={performanceBoostLearnMore.open}
+        onOpenChange={performanceBoostLearnMore.setOpen}
+        title="Performance Boost by Salla"
+        description="A one-time paid service where Salla's ads team actively monitors and optimizes your campaign for better results."
+        icon={<Sparkles />}
+        proTip="Performance Boost is most effective on new campaigns. Enable it before launch so the team can optimize from day one."
+      >
+        <SheetSection icon={<Zap />} title="What you get">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Priority Review"
+              description="Your ad gets top priority in the approval queue, so it launches faster than standard submissions."
+            />
+            <SheetDecisionCard
+              title="3-Day Human + AI Monitoring"
+              description="For the first 72 hours, Salla experts and AI watch your campaign's performance metrics and make real-time adjustments."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Smart Bid Adjustment"
+              description="AI reviews your bids regularly, with expert approval for all changes. This prevents overspending while maximizing delivery."
+            />
+            <SheetDecisionCard
+              title="Refund on Rejection"
+              description="If the ad platform rejects your advertisement, you get a full refund of the boost fee."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info />} title="Pricing">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Performance Boost is a <span className="font-semibold text-foreground">one-time fee of SAR 299</span> (40% off the regular SAR 500 price). It covers the full campaign lifecycle — no recurring charges.
+          </p>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      <LearnMoreSheet
+        open={frequencyCapLearnMore.open}
+        onOpenChange={frequencyCapLearnMore.setOpen}
+        title="Frequency Cap"
+        description="Controls how many times each individual user sees your ad within a time window. Essential for Reach campaigns to prevent ad fatigue."
+        icon={<Repeat />}
+        proTip="For Reach campaigns, start with 3 impressions per 7 days. This balances message reinforcement with audience freshness."
+      >
+        <SheetSection icon={<Repeat />} title="Why frequency matters">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Showing your ad too many times to the same person leads to <span className="font-semibold text-foreground">ad fatigue</span> — users start ignoring or hiding your content. But showing it too few times means your message doesn&apos;t stick. The right balance depends on your campaign goal.
+          </p>
+        </SheetSection>
+        <SheetSection icon={<Info />} title="Frequency guidelines">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="1-2 times (Low)"
+              description="Maximizes unique reach. Best for broad awareness when your goal is to touch as many different people as possible."
+            />
+            <SheetDecisionCard
+              title="3-5 times (Balanced)"
+              description="Good mix of reach and reinforcement. Recommended for most campaigns — enough repetition for recall without causing fatigue."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="6+ times (High)"
+              description="Heavy reinforcement for time-sensitive promotions or complex messages that need repetition. Monitor performance closely."
+            />
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      <LearnMoreSheet
+        open={deliveryOptionsLearnMore.open}
+        onOpenChange={deliveryOptionsLearnMore.setOpen}
+        title="Delivery Options"
+        description="Advanced settings that control how TikTok delivers your ads beyond the standard budget and bidding configuration."
+        icon={<Settings2 />}
+        proTip="Leave Skip Learning Phase off for your first campaign. The learning phase is when TikTok figures out who responds best to your ads."
+      >
+        <SheetSection icon={<SkipForward />} title="Skip Learning Phase">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Every new ad group enters a <span className="font-semibold text-foreground">learning phase</span> where TikTok experiments with different audiences and placements to find the best-performing combination. Skipping this phase starts full delivery immediately, but the algorithm won&apos;t have optimized targeting data — resulting in potentially <span className="font-semibold text-foreground">higher and more volatile costs</span>. Only recommended for experienced advertisers who already know their audience well.
+          </p>
+        </SheetSection>
+        <SheetSection icon={<MousePointerClick />} title="TikTok Search Ads">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            When enabled, your ads also appear in TikTok&apos;s search results when users search for related keywords. This captures <span className="font-semibold text-foreground">high-intent users</span> who are actively looking for products or content like yours. Search ads use the same budget and bidding as your main campaign — no additional cost configuration needed.
+          </p>
+        </SheetSection>
+      </LearnMoreSheet>
+
       <WizardStepFooter
         onPrevious={() => setStep(1)}
         onNext={() => setStep(3)}

@@ -20,6 +20,7 @@ export interface CustomAudiencesCardProps {
   accent?: CustomAudiencesAccent;
   infoTipText?: string;
   className?: string;
+  learnMoreTrigger?: React.ReactNode;
 }
 
 function toggle(arr: string[], id: string): string[] {
@@ -32,6 +33,7 @@ export function CustomAudiencesCard({
   excludeIds,
   onExcludeIdsChange,
   className,
+  learnMoreTrigger,
 }: CustomAudiencesCardProps) {
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<"include" | "exclude">("include");
@@ -69,7 +71,10 @@ export function CustomAudiencesCard({
       {/* Header */}
       <div className="flex items-center justify-between px-4 sm:px-6 py-5">
         <div>
-          <h3 className="text-base font-bold text-foreground">Custom Audiences</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-bold text-foreground">Custom Audiences</h3>
+            {learnMoreTrigger}
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">
             Use this feature for retargeting or to prevent showing ads to the same audience repeatedly.
           </p>

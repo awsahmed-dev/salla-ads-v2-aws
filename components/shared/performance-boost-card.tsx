@@ -86,11 +86,13 @@ const BOOST_FEATURES = [
 interface PerformanceBoostCardProps {
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
+  learnMoreTrigger?: React.ReactNode;
 }
 
 export function PerformanceBoostCard({
   enabled,
   onToggle,
+  learnMoreTrigger,
 }: PerformanceBoostCardProps) {
   return (
     <div
@@ -143,10 +145,13 @@ export function PerformanceBoostCard({
                 {DISCOUNT_PCT}% Off
               </Badge>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Salla&apos;s ads team will optimize your campaign using best
-              practices for superior results.
-            </p>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">
+                Salla&apos;s ads team will optimize your campaign using best
+                practices for superior results.
+              </p>
+              {learnMoreTrigger}
+            </div>
           </div>
         </div>
 
