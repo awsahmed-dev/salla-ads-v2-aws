@@ -60,7 +60,7 @@ export function makeTile(): CollectionTile {
 }
 
 /** Create a new ad from format + destination */
-export function makeAdGroup(format: AdFormat, index: number, destination?: AdDestination): AdGroup {
+export function makeAdGroup(format: AdFormat, index: number, destination?: AdDestination, catalogEnabled?: boolean): AdGroup {
   const dest = destination ?? "WEBSITE";
   const adType = deriveCreativeType(format, dest);
 
@@ -86,8 +86,12 @@ export function makeAdGroup(format: AdFormat, index: number, destination?: AdDes
   };
 
   const isInfluencer = format === "INFLUENCER";
+  /** Catalog COLLECTION/STORY: default to STATIC (merchant uploads hero) for COLLECTION, DYNAMIC for STORY */
+  const isCatalogCollection = catalogEnabled && format === "COLLECTION";
+  const isCatalogStory = catalogEnabled && format === "STORY";
+
   const assets: CreativeAsset[] =
-    format === "DYNAMIC"
+    format === "DYNAMIC" || isCatalogStory
       ? []
       : [makeAsset({
           ...(isInfluencer ? { mediaSource: "ad_code" as const } : defaultAssetForDestination()),
@@ -104,9 +108,10 @@ export function makeAdGroup(format: AdFormat, index: number, destination?: AdDes
     assets,
     collectionTiles: [],
     offerDisclaimer: { enabled: false, name: "", disclaimerText: "" },
-    dynamicTemplateConfig: format === "DYNAMIC" ? makeDefaultDynamicTemplate() : undefined,
-    dynamicCollectionEnabled: false,
-    discoverTile: format === "STORY" ? { enabled: true, headline: "", backgroundImageUrl: "", logoImageUrl: "" } : undefined,
+    dynamicTemplateConfig: (format === "DYNAMIC" || isCatalogCollection || isCatalogStory) ? makeDefaultDynamicTemplate() : undefined,
+    dynamicCollectionEnabled: isCatalogCollection ? true : false,
+    catalogRenderType: isCatalogCollection ? "STATIC" : isCatalogStory ? "DYNAMIC" : undefined,
+    discoverTile: format === "STORY" ? { enabled: true, headline: "", backgroundImageUrl: "", logoImageUrl: "", ...(isCatalogStory ? { renderType: "DYNAMIC" as const } : {}) } : undefined,
   };
 }
 
