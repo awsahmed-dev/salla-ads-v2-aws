@@ -233,9 +233,9 @@ export function ConversionEventCard({
               </div>
 
               <div className="flex flex-col gap-0">
-                {[...events].reverse().map((ev, idx, arr) => {
+                {events.map((ev, idx, arr) => {
                   const isSelected = ev.value === selectedEvent;
-                  const widthPct = 55 + ((arr.length - 1 - idx) / (arr.length - 1)) * 45;
+                  const widthPct = 100 - (idx / (arr.length - 1)) * 45;
 
                   return (
                     <div key={ev.value} className="flex flex-col items-center">
@@ -297,11 +297,11 @@ export function ConversionEventCard({
               <div className="mt-3 flex items-center justify-between px-2">
                 <div className="flex items-center gap-1">
                   <Eye className="size-3 text-muted-foreground" />
-                  <span className="text-[10px] text-muted-foreground">More volume, lower intent</span>
+                  <span className="text-[10px] text-muted-foreground">Top funnel — more volume</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <ShoppingCart className="size-3 text-[#004956]" />
-                  <span className="text-[10px] font-medium text-[#004956]">Fewer results, higher value</span>
+                  <span className="text-[10px] font-medium text-[#004956]">Bottom funnel — higher value</span>
                 </div>
               </div>
             </div>

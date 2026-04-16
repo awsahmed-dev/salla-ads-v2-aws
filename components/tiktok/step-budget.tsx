@@ -202,19 +202,11 @@ const CONVERSION_EVENTS: {
   recommended?: boolean;
 }[] = [
   {
-    value: "COMPLETE_PAYMENT",
-    label: "Purchase",
-    desc: "Optimizes for completed orders. This is the most common choice.",
-    icon: <CreditCard className="size-3.5" />,
-    funnelStage: "Bottom funnel",
-    recommended: true,
-  },
-  {
-    value: "INITIATE_CHECKOUT",
-    label: "Initiate Checkout",
-    desc: "Optimizes for users who start the checkout process.",
-    icon: <Wallet className="size-3.5" />,
-    funnelStage: "Mid funnel",
+    value: "VIEW_CONTENT",
+    label: "View Product",
+    desc: "Optimizes for product page views. Good for awareness.",
+    icon: <Eye className="size-3.5" />,
+    funnelStage: "Top funnel",
   },
   {
     value: "ADD_TO_CART",
@@ -224,11 +216,11 @@ const CONVERSION_EVENTS: {
     funnelStage: "Mid funnel",
   },
   {
-    value: "VIEW_CONTENT",
-    label: "View Product",
-    desc: "Optimizes for product page views. Good for awareness.",
-    icon: <Eye className="size-3.5" />,
-    funnelStage: "Top funnel",
+    value: "INITIATE_CHECKOUT",
+    label: "Initiate Checkout",
+    desc: "Optimizes for users who start the checkout process.",
+    icon: <Wallet className="size-3.5" />,
+    funnelStage: "Mid funnel",
   },
   {
     value: "ADD_BILLING",
@@ -236,6 +228,14 @@ const CONVERSION_EVENTS: {
     desc: "Optimizes for users who enter payment details.",
     icon: <CreditCard className="size-3.5" />,
     funnelStage: "Bottom funnel",
+  },
+  {
+    value: "COMPLETE_PAYMENT",
+    label: "Purchase",
+    desc: "Optimizes for completed orders. This is the most common choice.",
+    icon: <CreditCard className="size-3.5" />,
+    funnelStage: "Bottom funnel",
+    recommended: true,
   },
 ];
 
