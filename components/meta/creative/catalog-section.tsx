@@ -425,29 +425,6 @@ export function CatalogTemplateSection({
               </p>
             </div>
 
-            {/* API Mapping Reference */}
-            <div className="rounded-md border border-muted bg-muted/20 p-3">
-              <p className="mb-2 text-[10px] font-semibold text-muted-foreground">API Field Mapping</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                {[
-                  ["Product Set", "product_set_id"],
-                  ["Ad Message", "template_data.message"],
-                  ["Product Name", "template_data.name"],
-                  ["Landing Page", "template_data.link"],
-                  ["CTA", "call_to_action.type"],
-                  ["Format", "FORMAT_AUTOMATION"],
-                  ["Cover Media", "asset_feed_spec"],
-                  ["Overlays", "creative_features_spec"],
-                ].map(([label, field]) => (
-                  <div key={field} className="flex items-center justify-between">
-                    <span className="text-[9px] text-muted-foreground">{label}</span>
-                    <code className="rounded bg-muted px-1 text-[8px] text-muted-foreground">
-                      {field}
-                    </code>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         )}
       </div>

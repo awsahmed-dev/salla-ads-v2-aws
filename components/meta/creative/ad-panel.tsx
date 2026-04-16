@@ -15,7 +15,6 @@ import {
 } from "@/lib/meta/creative-constants";
 import {
   CharCounter,
-  ApiBadge,
   FORMAT_ICONS,
   makeCarouselCard,
 } from "./helpers";
@@ -23,7 +22,6 @@ import { CarouselCardEditor } from "./carousel-editor";
 import { CatalogTemplateSection } from "./catalog-section";
 import { UploadZone } from "@/components/shared/upload-zone";
 import { LinkTypeSection, type CtaOption } from "@/components/shared/link-type-section";
-import { InfoTip } from "@/components/shared/info-tip";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -338,7 +336,6 @@ export function MetaAdPanel({
                 <div className="mb-3 flex items-center gap-2">
                   <ShoppingBag className="size-4 text-[#1877F2]" />
                   <Label className="text-xs font-semibold text-foreground">Catalog Ad Setup</Label>
-                  <InfoTip text="Configure how your Salla products appear in ads. Meta automatically picks the best format per viewer." />
                 </div>
                 <CatalogTemplateSection ad={ad} onUpdate={onUpdate} />
               </div>

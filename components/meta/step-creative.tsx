@@ -22,15 +22,12 @@ import {
 } from "@/components/meta/creative-previews";
 import { MetaAdPanel } from "@/components/meta/creative/ad-panel";
 import {
-  ApiBadge,
   makeDefaultAd,
   makeCarouselCard,
   FORMAT_ICONS,
 } from "@/components/meta/creative/helpers";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { SectionCard } from "@/components/shared/section-card";
-import { InfoTip } from "@/components/shared/info-tip";
-import { CampaignReadinessCard, type ReadinessCheck } from "@/components/shared/campaign-readiness-card";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +39,7 @@ import {
   Info,
   Globe,
   Monitor,
+  Check,
   CheckCircle2,
   ChevronDown,
   Megaphone,
@@ -110,13 +108,9 @@ function PlacementSection() {
           <Globe className="size-4 text-[#1877F2]" />
         </div>
         <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <Label className="text-sm font-semibold text-foreground">Placement Configuration</Label>
-            <ApiBadge field="targeting.publisher_platforms" />
-            <InfoTip text="Controls where your ads appear across Facebook and Instagram. Advantage+ lets Meta optimize placement automatically for better results." />
-          </div>
+          <Label className="text-sm font-semibold text-foreground">Placement Configuration</Label>
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-            Choose where your ads are shown. More placements give Meta more flexibility to find results at lower cost.
+            Choose where your ads appear. More placements give Meta flexibility to optimize delivery at lower cost.
           </p>
         </div>
       </div>
@@ -274,6 +268,222 @@ function PlacementSection() {
 }
 
 /* ================================================================== */
+/*  Readiness Ring (matches TikTok / Snapchat)                         */
+/* ================================================================== */
+
+function ReadinessRing({ percent }: { percent: number }) {
+  const color = percent >= 90 ? "#059669" : percent >= 60 ? "#1877F2" : percent >= 30 ? "#d97706" : "#ef4444";
+  return (
+    <div className="relative flex size-11 items-center justify-center">
+      <svg className="size-11 -rotate-90" viewBox="0 0 44 44">
+        <circle cx="22" cy="22" r="18" fill="none" stroke="#eee" strokeWidth="3.5" />
+        <circle cx="22" cy="22" r="18" fill="none" stroke={color} strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${(percent / 100) * 113} 113`} className="transition-all duration-500" />
+      </svg>
+      <span className="absolute text-[10px] font-bold" style={{ color }}>{percent}%</span>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  Campaign Readiness (matches TikTok / Snapchat pattern)             */
+/* ================================================================== */
+
+function MetaCampaignReadiness({
+  ads,
+  objective,
+  catalogEnabled,
+}: {
+  ads: MetaAd[];
+  objective: { placementMode: string; facebookPositions: string[]; instagramPositions: string[]; facebookPageName?: string; objective: string };
+  catalogEnabled: boolean;
+}) {
+  const [showAllChecks, setShowAllChecks] = useState(false);
+
+  /* ── Build required checks across ALL ads ── */
+  const allChecks: { label: string; ok: boolean }[] = [];
+
+  allChecks.push({
+    label: "Facebook Page connected",
+    ok: !!objective.facebookPageName,
+  });
+  allChecks.push({
+    label: "Placements configured",
+    ok: objective.placementMode === "AUTOMATIC" || (objective.facebookPositions.length + objective.instagramPositions.length) > 0,
+  });
+
+  for (let i = 0; i < ads.length; i++) {
+    const ad = ads[i];
+    const isCatalog = ad.adFormat === "DYNAMIC" || ad.adFormat === "COLLECTION";
+    const isCarousel = ad.adFormat === "CAROUSEL";
+
+    if (isCatalog) {
+      allChecks.push({ label: `Ad ${i + 1}: ad text`, ok: ad.primaryText.length > 0 });
+      allChecks.push({ label: `Ad ${i + 1}: landing URL`, ok: ad.websiteUrl.length > 0 });
+      allChecks.push({ label: `Ad ${i + 1}: CTA selected`, ok: ad.callToAction !== "NO_BUTTON" });
+    } else if (isCarousel) {
+      allChecks.push({ label: `Ad ${i + 1}: min 2 cards`, ok: ad.carouselCards.length >= 2 });
+      allChecks.push({ label: `Ad ${i + 1}: card media`, ok: ad.carouselCards.some((c) => !!c.imageUrl) });
+      allChecks.push({ label: `Ad ${i + 1}: ad text`, ok: ad.primaryText.length > 0 });
+      allChecks.push({ label: `Ad ${i + 1}: headline`, ok: ad.headline.length > 0 });
+      allChecks.push({ label: `Ad ${i + 1}: landing URL`, ok: ad.websiteUrl.length > 0 });
+      allChecks.push({ label: `Ad ${i + 1}: CTA selected`, ok: ad.callToAction !== "NO_BUTTON" });
+    } else {
+      allChecks.push({ label: `Ad ${i + 1}: has media`, ok: ad.assets.length > 0 });
+      allChecks.push({ label: `Ad ${i + 1}: ad text`, ok: ad.primaryText.length > 0 });
+      allChecks.push({ label: `Ad ${i + 1}: headline`, ok: ad.headline.length > 0 });
+      allChecks.push({ label: `Ad ${i + 1}: landing URL`, ok: ad.websiteUrl.length > 0 });
+      allChecks.push({ label: `Ad ${i + 1}: CTA selected`, ok: ad.callToAction !== "NO_BUTTON" });
+    }
+  }
+
+  const passingChecks = allChecks.filter((c) => c.ok).length;
+  const failingChecks = allChecks.filter((c) => !c.ok);
+  const allPassed = passingChecks === allChecks.length && allChecks.length > 0;
+
+  /* ── Best-practice signals ── */
+  const bestPractices: { label: string; met: boolean; tip: string; metTip: string }[] = [];
+
+  if (catalogEnabled) {
+    bestPractices.push({
+      label: "Catalog connected",
+      met: true,
+      tip: "Connect your Salla catalog for auto-generated product ads",
+      metTip: "Salla catalog active",
+    });
+    bestPractices.push({
+      label: "Landing page set",
+      met: ads.length > 0 && !!ads[0].websiteUrl,
+      tip: "Set a landing page URL so users land on your store after clicking the ad",
+      metTip: "Landing page configured",
+    });
+  } else {
+    const hasMultipleAds = ads.length >= 2;
+    const hasVideoAd = ads.some((a) => a.adFormat === "SINGLE_VIDEO");
+    const hasImageAd = ads.some((a) => a.adFormat === "SINGLE_IMAGE" || a.adFormat === "CAROUSEL");
+    const hasBothMediaTypes = hasVideoAd && hasImageAd;
+    const hasMultipleFormats = new Set(ads.map((a) => a.adFormat)).size >= 2;
+
+    const objKey = objective.objective;
+    bestPractices.push({
+      label: "Multiple ads",
+      met: hasMultipleAds,
+      tip: objKey === "OUTCOME_SALES"
+        ? "Each ad supports one creative — add 2+ ads with different visuals or formats to find the best-performing sales driver"
+        : objKey === "OUTCOME_LEADS"
+          ? "Each ad supports one creative — add multiple ads to test different lead form approaches"
+          : "Each ad supports one creative — add 2+ ads to test different formats and creatives",
+      metTip: `${ads.length} ads — great for A/B testing`,
+    });
+
+    bestPractices.push({
+      label: "Video + Image ads",
+      met: hasBothMediaTypes,
+      tip: "Create both a video ad and an image ad — video drives engagement while images extend your reach",
+      metTip: "Both video and image ads included",
+    });
+
+    if (ads.length >= 2) {
+      bestPractices.push({
+        label: "Multiple formats",
+        met: hasMultipleFormats,
+        tip: "Mix formats (Single Image, Single Video, Carousel) to reach users in different placements",
+        metTip: `${new Set(ads.map((a) => a.adFormat)).size} formats in use`,
+      });
+
+      const hasDifferentCreatives = ads.some((a, idx) =>
+        idx > 0 && (a.primaryText !== ads[0].primaryText || a.callToAction !== ads[0].callToAction)
+      );
+      bestPractices.push({
+        label: "A/B testing",
+        met: hasDifferentCreatives,
+        tip: "Vary text, CTAs, or visuals across ads to find what resonates best with your audience",
+        metTip: "Different creatives across ads",
+      });
+    }
+  }
+
+  const bpMet = bestPractices.filter((bp) => bp.met).length;
+  const bpTotal = bestPractices.length;
+  const totalWeight = allChecks.length + bpTotal;
+  const totalScore = passingChecks + bpMet;
+  const overallPercent = totalWeight > 0 ? Math.round((totalScore / totalWeight) * 100) : 0;
+
+  return (
+    <div className="rounded-xl bg-card p-6">
+      {/* ── Header with progress ring ── */}
+      <div className="mb-6 flex items-center gap-4">
+        <ReadinessRing percent={overallPercent} />
+        <div className="flex-1">
+          <p className="text-sm font-bold text-foreground">Campaign Readiness</p>
+          <p className="text-xs text-muted-foreground">
+            {allPassed
+              ? "All requirements met"
+              : `${failingChecks.length} item${failingChecks.length !== 1 ? "s" : ""} need attention before launch`}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Required Steps ── */}
+      <div className="mb-6">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">Required Steps</p>
+          <span className="text-xs font-bold text-[#1877F2]">{passingChecks}/{allChecks.length}</span>
+        </div>
+        <div className="flex flex-col gap-3">
+          {allChecks.slice(0, showAllChecks ? allChecks.length : 6).map((c, i) => (
+            <div key={i} className="flex items-center gap-3 px-3">
+              <div className={cn(
+                "flex size-5 shrink-0 items-center justify-center rounded-full border-2",
+                c.ok ? "border-[#1877F2] bg-[#1877F2]" : "border-muted-foreground/30"
+              )}>
+                {c.ok && <Check className="size-3 text-white" strokeWidth={3} />}
+              </div>
+              <p className={cn("text-xs font-medium", c.ok ? "text-muted-foreground line-through" : "text-foreground")}>
+                {c.label.replace(/^Ad \d+ /, "").replace(/^Ad \d+: /, "")}
+              </p>
+            </div>
+          ))}
+          {!showAllChecks && allChecks.length > 6 && (
+            <button type="button" onClick={() => setShowAllChecks(true)} className="px-3 text-xs text-[#1877F2] underline">
+              Show all {allChecks.length} items
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Best Practices ── */}
+      {bpTotal > 0 && (
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">Best Practices</p>
+            <span className="text-xs font-bold text-[#1877F2]">{bpMet}/{bpTotal}</span>
+          </div>
+          <div className="flex flex-col gap-3">
+            {bestPractices.map((bp, i) => (
+              <div
+                key={i}
+                className={cn("flex items-start gap-3 rounded-lg px-3 py-3", bp.met && "bg-[#1877F2]/5")}
+              >
+                <div className={cn(
+                  "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2",
+                  bp.met ? "border-[#1877F2] bg-[#1877F2]" : "border-muted-foreground/30"
+                )}>
+                  {bp.met && <Check className="size-3 text-white" strokeWidth={3} />}
+                </div>
+                <div>
+                  <p className={cn("text-xs font-bold", bp.met ? "text-[#1877F2]" : "text-foreground")}>{bp.label}</p>
+                  <p className="text-xs text-muted-foreground">{bp.met ? bp.metTip : bp.tip}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================================================================== */
 /*  Main Component                                                     */
 /* ================================================================== */
 
@@ -347,26 +557,6 @@ export function MetaStepCreative() {
   /* Ensure preview placement is valid for current format */
   const activePlacement = supportedPlacements.includes(previewPlacement) ? previewPlacement : supportedPlacements[0];
   const isReelsOrStory = activePlacement.includes("REELS") || activePlacement.includes("STORY");
-
-  /* Readiness checks */
-  const readinessChecks: ReadinessCheck[] = isCatalogFormat
-    ? [
-        { label: "Placements configured", done: objective.placementMode === "AUTOMATIC" || (objective.facebookPositions.length + objective.instagramPositions.length) > 0 },
-        { label: "Product set selected", done: true },
-        { label: "Landing page URL set", done: currentAd.websiteUrl.length > 0 },
-        { label: "Ad message written", done: currentAd.primaryText.length > 0 },
-        { label: "CTA selected", done: currentAd.callToAction !== "NO_BUTTON" },
-        { label: "Product info configured", done: true },
-      ]
-    : [
-        { label: "Placements configured", done: objective.placementMode === "AUTOMATIC" || (objective.facebookPositions.length + objective.instagramPositions.length) > 0 },
-        { label: "Media uploaded", done: isCarousel ? currentAd.carouselCards.some((c) => !!c.imageUrl) : currentAd.assets.length > 0 },
-        { label: "Primary text written", done: currentAd.primaryText.length > 0 },
-        { label: "Headline set", done: currentAd.headline.length > 0 },
-        { label: "Website URL set", done: currentAd.websiteUrl.length > 0 },
-        { label: "CTA selected", done: currentAd.callToAction !== "NO_BUTTON" },
-        ...(isCarousel ? [{ label: "Min 2 carousel cards", done: currentAd.carouselCards.length >= 2 }] : []),
-      ];
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -666,8 +856,8 @@ export function MetaStepCreative() {
               <FacebookFeedPreview ad={currentAd} pageName={objective.facebookPageName} isCatalog={isCatalogFormat} />
             )}
 
-            {/* Campaign Readiness Card */}
-            <CampaignReadinessCard checks={readinessChecks} />
+            {/* Campaign Readiness */}
+            <MetaCampaignReadiness ads={ads} objective={objective} catalogEnabled={catalogEnabled} />
           </div>
         </div>
       </div>
