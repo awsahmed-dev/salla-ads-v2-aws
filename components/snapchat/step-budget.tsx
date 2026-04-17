@@ -69,6 +69,8 @@ import {
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { DeliveryPacingCard } from "@/components/shared/delivery-pacing-card";
 import { AttributionWindowCard } from "@/components/shared/attribution-window-card";
+import { LearnMoreSheet, LearnMoreTrigger, SheetSection, SheetDecisionCard, useLearnMore } from "@/components/shared/learn-more-sheet";
+import { Target, Gauge, Clock as ClockIcon, Info } from "lucide-react";
 import { FrequencyCapCard } from "@/components/shared/frequency-cap-card";
 import type { FrequencyPreset } from "@/components/shared/frequency-cap-card";
 
@@ -83,7 +85,6 @@ const ALL_OPTIMIZATION_GOALS: {
   icon: React.ReactNode;
   recommended?: Record<string, boolean>;
   requiresPixel?: boolean;
-  requiresMMP?: boolean;
   bestFor?: string;
   costHint?: string;
   }[] = [
@@ -182,30 +183,9 @@ const ALL_OPTIMIZATION_GOALS: {
     recommended: { APP_PROMOTION: true },
     costHint: "Moderate cost per install",
   },
-  {
-    value: "APP_PURCHASE",
-    label: "In-App Purchases",
-    desc: "Optimize for users most likely to make a purchase inside your app.",
-    icon: <ShoppingCart className="size-4" />,
-    requiresMMP: true,
-    costHint: "High cost, highest return",
-  },
-  {
-    value: "APP_SIGNUP",
-    label: "In-App Sign Ups",
-    desc: "Drive registrations within your app.",
-    icon: <FileText className="size-4" />,
-    requiresMMP: true,
-  },
-  {
-    value: "APP_ADD_TO_CART",
-    label: "In-App Add to Cart",
-    desc: "Drive add-to-cart actions within your app.",
-    icon: <TrendingUp className="size-4" />,
-    requiresMMP: true,
-  },
-  // APP_REENGAGE_OPEN removed from UI: requires MMP + app_install_state targeting.
-  // Will be added back when MMP integration is available.
+  // In-app event goals (APP_PURCHASE, APP_SIGNUP, APP_ADD_TO_CART) and APP_REENGAGE_OPEN
+  // require MMP integration which is not yet supported — they are omitted from the UI.
+  // Add them back when MMP integration is available.
 ];
 
 
@@ -333,7 +313,6 @@ export function StepBudget() {
    * incompatible with ACCELERATED pacing per the Snap Marketing API spec.
    */
   const canUseAccelerated = ACCELERATED_COMPATIBLE_GOALS.includes(budget.optimizationGoal);
-  const hasMMP = false; /* TODO: wire when MMP integration exists */
   const pixelMode = campaign.objective.pixelMode;
   const hasPixelConfigured = pixelMode === "salla_managed" || (pixelMode === "existing" && !!campaign.objective.pixelId);
   const pixelEligibleFor7Day = hasPixelConfigured && pixelMode === "salla_managed";
@@ -345,10 +324,9 @@ export function StepBudget() {
     icon: g.icon,
     recommended: !!g.recommended?.[campaign.objective.objective],
     requiresPixel: g.requiresPixel,
-    requiresMMP: g.requiresMMP,
     bestFor: g.bestFor,
     costHint: g.costHint,
-    locked: !!(g.requiresMMP && !hasMMP) || !!(g.requiresPixel && !hasPixelConfigured),
+    locked: !!(g.requiresPixel && !hasPixelConfigured),
   }));
   /* If the currently selected goal is now locked (e.g. pixel removed), fall back to the first unlocked goal */
   useEffect(() => {
@@ -359,7 +337,7 @@ export function StepBudget() {
         updateNested("budget", { optimizationGoal: firstUnlocked.value as OptimizationGoal });
       }
     }
-  }, [hasPixelConfigured, hasMMP]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasPixelConfigured]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (budget.conversionWindow === "SWIPE_7DAY" && !pixelEligibleFor7Day) {
@@ -385,6 +363,11 @@ export function StepBudget() {
     intervalDays: 7,
     maxDailyBudget: budget.amount * 3,
   };
+
+  /* Learn More sliders */
+  const goalLearnMore = useLearnMore();
+  const bidLearnMore = useLearnMore();
+  const attributionLearnMore = useLearnMore();
 
   /* Local UI state */
   const [showAdvanced, setShowAdvanced] = useState(
@@ -476,10 +459,6 @@ export function StepBudget() {
     USES: "lens uses",
     LEAD_FORM_SUBMISSIONS: "form submissions",
     APP_INSTALLS: "app installs",
-    APP_PURCHASE: "in-app purchases",
-    APP_SIGNUP: "in-app sign ups",
-    APP_ADD_TO_CART: "in-app add-to-carts",
-    APP_REENGAGE_OPEN: "re-engagements",
   };
   const goalLabel = goalLabelMap[budget.optimizationGoal] ?? "actions";
 
@@ -496,10 +475,6 @@ export function StepBudget() {
     USES: "Lens Use",
     LEAD_FORM_SUBMISSIONS: "Form Submission",
     APP_INSTALLS: "App Install",
-    APP_PURCHASE: "In-App Purchase",
-    APP_SIGNUP: "In-App Sign Up",
-    APP_ADD_TO_CART: "In-App Add to Cart",
-    APP_REENGAGE_OPEN: "App Re-open",
   };
   const goalName = goalNameMap[budget.optimizationGoal] ?? "Action";
 
@@ -597,6 +572,7 @@ export function StepBudget() {
             }}
             layout="grid"
             infoTipText="Choose what action you want to optimize for. This determines how your budget is spent."
+            learnMoreTrigger={<LearnMoreTrigger {...goalLearnMore.triggerProps} />}
             pixelReadiness={
               !hasPixelConfigured ? "none"
               : pixelMode === "salla_managed" ? "new"
@@ -604,20 +580,12 @@ export function StepBudget() {
             }
             warnings={
               <>
+                {/* Only show the pixel warning when goals in this objective actually need a pixel and no pixel is configured. */}
                 {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && !hasPixelConfigured && (
-                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                    <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-                    <p className="text-xs leading-relaxed text-amber-700">
-                      Some goals require a <span className="font-semibold">Snap Pixel</span>. Connect it in the Objective step to unlock them.
-                    </p>
-                  </div>
-                )}
-                {/* Pixel connected status removed — already shown in Step 0 */}
-                {OPTIMIZATION_GOALS.some((g) => g.requiresMMP) && (
-                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2">
-                    <Lock className="mt-0.5 size-3.5 shrink-0 text-orange-600" />
-                    <p className="text-xs text-orange-700">
-                      In-app event goals require an <span className="font-semibold">MMP</span> integration to track post-install events.
+                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                    <AlertCircle className="size-3.5 shrink-0 text-amber-600" />
+                    <p className="text-xs text-amber-700">
+                      Some goals need a <span className="font-semibold">Snap Pixel</span>. Connect one in Step 1 to unlock them.
                     </p>
                   </div>
                 )}
@@ -646,13 +614,14 @@ export function StepBudget() {
             }}
             layout="buttons"
             infoTipText="Choose how your budget competes for ad placements. Auto Bid is recommended for most advertisers."
+            learnMoreTrigger={<LearnMoreTrigger {...bidLearnMore.triggerProps} />}
             bidInputs={
               budget.bidStrategy !== "AUTO_BID"
                 ? [{
                     label: budget.bidStrategy === "TARGET_COST" ? "Target Cost per Action" : "Maximum Bid per Action",
                     desc: budget.bidStrategy === "TARGET_COST"
-                      ? "Snap will try to keep your average cost per result close to this amount."
-                      : "Snap will never bid above this amount. Set it too low and you may not win any auctions.",
+                      ? "Snap will average around this amount per result."
+                      : "Snap will never bid above this amount per result.",
                     value: budget.bidAmount || undefined,
                     onChange: (v) => updateNested("budget", { bidAmount: v }),
                     prefix: "SAR",
@@ -660,25 +629,16 @@ export function StepBudget() {
                     min: 0.01,
                     step: 0.5,
                     suggestedRange: suggestedBid,
-                    warning: budget.bidAmount > 0 && budget.bidAmount < suggestedBid.min
-                      ? `Your bid of SAR ${budget.bidAmount.toFixed(2)} is below the suggested minimum of SAR ${suggestedBid.min.toFixed(2)}. You may get very few or no results.`
-                      : undefined,
-                    tip: budget.bidAmount >= suggestedBid.min && budget.bidAmount <= suggestedBid.max
-                      ? "Your bid is within the suggested range — good balance between cost and delivery."
+                    // Priority-ordered: bid > budget (critical) → bid < min (caution) → in range (ok)
+                    warning: budget.bidAmount > 0 && budget.bidAmount > budget.amount
+                      ? `Bid exceeds your daily budget of SAR ${budget.amount}. Lower your bid or raise your budget.`
+                      : budget.bidAmount > 0 && budget.bidAmount < suggestedBid.min
+                        ? `Below suggested range (SAR ${suggestedBid.min.toFixed(2)}+). You may get few or no results.`
+                        : undefined,
+                    tip: budget.bidAmount >= suggestedBid.min && budget.bidAmount <= suggestedBid.max && budget.bidAmount <= budget.amount
+                      ? "Bid is within the suggested range."
                       : undefined,
                   }]
-                : undefined
-            }
-            contextNote={
-              budget.bidStrategy !== "AUTO_BID" && budget.bidAmount > 0 && budget.bidAmount > budget.amount
-                ? (
-                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                      <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-                      <p className="text-xs leading-relaxed text-amber-700">
-                        Your bid of <span className="font-semibold">SAR {budget.bidAmount.toFixed(2)}</span> exceeds your daily budget of <span className="font-semibold">SAR {budget.amount}</span>. You may get very few results per day — consider increasing your budget or lowering your bid.
-                      </p>
-                    </div>
-                  )
                 : undefined
             }
           />
@@ -758,6 +718,7 @@ export function StepBudget() {
                   combinedValue={budget.conversionWindow}
                   onCombinedChange={(v) => updateNested("budget", { conversionWindow: v as ConversionWindow })}
                   tip="Wider windows capture more conversions. Purchases often happen days after the first ad."
+                  learnMoreTrigger={<LearnMoreTrigger {...attributionLearnMore.triggerProps} />}
                 />
               )}
 
@@ -958,6 +919,171 @@ export function StepBudget() {
         nextDisabled={budgetNavDisabled}
         accent="primary"
       />
+      {/* ---- Learn More: Optimization Goal ---- */}
+      <LearnMoreSheet
+        open={goalLearnMore.open}
+        onOpenChange={goalLearnMore.setOpen}
+        title="Optimization Goal"
+        description="This tells Snapchat what action you want from users. Snapchat will show your ad to people most likely to take that action."
+        icon={<Target className="size-4" />}
+        proTip={
+          campaign.objective.objective === "SALES"
+            ? "Start with Page Views if your pixel is new (less than 2 weeks old). Move to Add to Cart after 50+ daily page views, then to Purchases after 10+ weekly purchases."
+            : campaign.objective.objective === "WEBSITE_VISITS"
+              ? "Swipe Ups gives you the most clicks at the lowest cost. Use Landing Page Views for higher-quality visitors who actually load your page."
+              : campaign.objective.objective === "LEADS"
+                ? "Form Submissions is best for collecting leads directly. Use Swipe Ups only if you want to drive traffic to your own website form."
+                : campaign.objective.objective === "ENGAGEMENT"
+                  ? "Impressions gets you maximum reach. Use Video Views if your creative is video — it finds people who actually watch."
+                  : campaign.objective.objective === "APP_PROMOTION"
+                    ? "App Installs drives the most downloads. Use Impressions if you want maximum reach instead of optimizing for installs."
+                    : "Use the recommended goal (highlighted) and give your campaign at least 3-5 days before changing it."
+        }
+      >
+        <SheetSection icon={<Target className="size-4" />} title="Available goals">
+          <div className="flex flex-col gap-2">
+            {goalsWithLocked.filter((g) => !g.locked).map((g) => (
+              <SheetDecisionCard
+                key={g.value}
+                title={g.label}
+                description={g.desc}
+                highlighted={g.recommended}
+              />
+            ))}
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info className="size-4" />} title="How does this affect my campaign?">
+          <div className="text-xs leading-relaxed text-muted-foreground">
+            <p className="mb-2">Your goal changes <span className="font-medium text-foreground">who sees your ad</span>. For example:</p>
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1">
+              <p><span className="font-medium text-foreground">Purchases</span> — Snapchat finds people with a history of buying online</p>
+              <p><span className="font-medium text-foreground">Impressions</span> — Snapchat shows your ad to as many people as possible</p>
+              <p><span className="font-medium text-foreground">Swipe Ups</span> — Snapchat targets people who regularly swipe up on ads</p>
+            </div>
+            <p className="mt-2">The more specific your goal, the smaller but higher-quality your audience will be.</p>
+          </div>
+        </SheetSection>
+        {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && (
+          <SheetSection icon={<Lock className="size-4" />} title="Why are some goals locked?">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Goals like Purchases, Add to Cart, and Page Views require a <span className="font-medium text-foreground">Snap Pixel</span> — a small tracking code on your website. Without it, Snapchat can&apos;t see what visitors do after clicking your ad. Go to the Objective step to connect your pixel.
+            </p>
+          </SheetSection>
+        )}
+      </LearnMoreSheet>
+
+      {/* ---- Learn More: Bid Strategy ---- */}
+      <LearnMoreSheet
+        open={bidLearnMore.open}
+        onOpenChange={bidLearnMore.setOpen}
+        title="Bidding Strategy"
+        description="When your ad competes for a placement, Snapchat uses your bid strategy to decide how much to pay. This affects how many people see your ad and what each result costs."
+        icon={<Gauge className="size-4" />}
+        proTip="Start with Auto Bid for your first campaign. After 7 days, check your cost per result — if it's too high, try Max Bid with a cap 10-20% above your average."
+      >
+        <SheetSection icon={<Gauge className="size-4" />} title="Which strategy is right for me?">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Auto Bid"
+              description="Snapchat handles everything — it bids the right amount to get you the most results within your budget. No setup needed. Best for beginners."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Max Bid"
+              description="You set the maximum you're willing to pay per result. Snapchat will never go above your limit. Use this when you know your target cost — but set it too low and your ads won't show."
+            />
+            {objectiveConfig.allowedBidStrategies.includes("TARGET_COST") && (
+              <SheetDecisionCard
+                title="Target Cost"
+                description="You set your ideal cost and Snapchat tries to stay close to it on average. Some results may cost more, others less. Good when you need predictable costs for budgeting."
+              />
+            )}
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info className="size-4" />} title="How does the auction work?">
+          <div className="flex flex-col gap-2 text-xs leading-relaxed text-muted-foreground">
+            <p>Every time there&apos;s a chance to show an ad, Snapchat runs a quick auction:</p>
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[10px] font-bold text-white">1</span>
+                  <p><span className="font-medium text-foreground">Your bid enters</span> — based on your strategy and budget</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[10px] font-bold text-white">2</span>
+                  <p><span className="font-medium text-foreground">Snapchat scores ads</span> — combines bid amount with ad quality and relevance</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[10px] font-bold text-white">3</span>
+                  <p><span className="font-medium text-foreground">Best ad wins</span> — you only pay what&apos;s needed to beat the next competitor</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Eye className="size-4" />} title="Things to watch out for">
+          <div className="flex flex-col gap-2 text-xs">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">
+              <p className="font-medium">Bid too low?</p>
+              <p>Your ads won&apos;t win any auctions and you&apos;ll get zero results. Always check the suggested bid range.</p>
+            </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">
+              <p className="font-medium">Bid much higher than suggested?</p>
+              <p>You&apos;ll win more auctions but pay more per result. Start within the range and adjust gradually.</p>
+            </div>
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      {/* ---- Learn More: Attribution Window ---- */}
+      <LearnMoreSheet
+        open={attributionLearnMore.open}
+        onOpenChange={attributionLearnMore.setOpen}
+        title="Conversion Window"
+        description="How long after seeing or clicking your ad should a purchase still count as a result? This setting controls that timeframe."
+        icon={<ClockIcon className="size-4" />}
+        proTip="Always start with 28-day. It gives Snapchat the most data to learn who your best customers are. Only switch to 7-day after you're getting 50+ conversions per week."
+      >
+        <SheetSection icon={<ClockIcon className="size-4" />} title="Simple example">
+          <div className="text-xs leading-relaxed text-muted-foreground">
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <p className="mb-2 font-medium text-foreground">A customer sees your ad on Saturday...</p>
+              <div className="space-y-1.5">
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-base">👀</span>
+                  <p>Visits your store on Tuesday</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-base">🛒</span>
+                  <p>Adds a product to cart on Wednesday</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-base">💳</span>
+                  <p>Buys it on Friday (6 days later)</p>
+                </div>
+              </div>
+              <div className="mt-3 border-t border-border pt-2 space-y-1">
+                <p><span className="font-medium text-foreground">28-day window:</span> This purchase counts as a result of your ad</p>
+                <p><span className="font-medium text-foreground">7-day window:</span> Also counts (it was within 7 days)</p>
+              </div>
+              <p className="mt-2 text-muted-foreground">If they bought 10 days later, only the 28-day window would count it.</p>
+            </div>
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Target className="size-4" />} title="Which should I choose?">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="28-Day Click + 1-Day View"
+              description="Counts purchases up to 28 days after a click, and 1 day after viewing your ad. Captures more conversions and gives Snapchat more data to optimize. Best for most stores."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="7-Day Click Only"
+              description="Only counts purchases within 7 days of clicking your ad. Stricter measurement, but needs a mature pixel with lots of conversion data to work well."
+            />
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
     </TooltipProvider>
   );
 }
