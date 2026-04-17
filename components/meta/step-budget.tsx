@@ -791,35 +791,63 @@ export function MetaStepBudget() {
         open={bidStrategyLearnMore.open}
         onOpenChange={bidStrategyLearnMore.setOpen}
         title="Bidding Strategy"
-        description="Your bid strategy controls how Meta competes in the ad auction for each impression. It directly affects your cost per result and delivery volume."
+        description="When your ad competes for a placement, Meta uses your bid strategy to decide how much to pay. This affects how many people see your ad and what each result costs."
         icon={<Gauge />}
-        proTip="Start with Lowest Cost (Auto) for the first 1-2 weeks. Once you know your average CPA, switch to Cost Cap to lock in that target while scaling."
+        proTip="Start with Lowest Cost (Auto) for your first 7-14 days. After you know your average cost per result, switch to Cost Cap to lock in that target as you scale."
       >
-        <SheetSection icon={<Gauge />} title="Strategy comparison">
+        <SheetSection icon={<Gauge />} title="Which strategy is right for me?">
           <div className="flex flex-col gap-2">
             <SheetDecisionCard
               title="Lowest Cost (Auto)"
-              description="Meta bids automatically to get the most results at the lowest possible cost. You get the most volume, but individual cost per result may vary. Best for new campaigns."
+              description="Meta handles everything — it bids the right amount to get you the most results within your budget. No setup needed. Best for beginners and new campaigns."
               highlighted
             />
             <SheetDecisionCard
               title="Cost Cap"
-              description="Meta targets an average cost per result close to your cap. Delivery may slow if the market is competitive, but your average CPA stays controlled."
+              description="You set your target cost per result and Meta averages around it. Some results cost more, others less. Good when you need predictable costs for budgeting."
             />
             <SheetDecisionCard
               title="Bid Cap"
-              description="Hard ceiling on each individual bid. Gives maximum cost control but can severely limit delivery if set too low. Best for experienced advertisers."
+              description="You set a ceiling — Meta never bids above your limit. Gives maximum cost control but can limit delivery if set too low. Best for experienced advertisers."
             />
             <SheetDecisionCard
               title="Minimum ROAS"
-              description="Only available with Value optimization. Sets a floor for return on ad spend. Meta won't bid unless it expects the conversion to meet your ROAS target."
+              description="Only with Value optimization. Meta won't bid unless it expects the conversion to meet your ROAS target. Strict but great for protecting margins."
             />
           </div>
         </SheetSection>
-        <SheetSection icon={<Info />} title="When to switch">
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Use auto-bid during the <span className="font-semibold text-foreground">learning phase</span> (first 50 conversions). Once your CPA stabilizes, consider switching to Cost Cap to prevent cost spikes during high-competition periods like weekends or salary week.
-          </p>
+        <SheetSection icon={<Info />} title="How does the auction work?">
+          <div className="flex flex-col gap-2 text-xs leading-relaxed text-muted-foreground">
+            <p>Every time there&apos;s a chance to show an ad, Meta runs a quick auction:</p>
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#1877F2] text-[10px] font-bold text-white">1</span>
+                  <p><span className="font-medium text-foreground">Your bid enters</span> — based on your strategy and budget</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#1877F2] text-[10px] font-bold text-white">2</span>
+                  <p><span className="font-medium text-foreground">Meta scores ads</span> — combines bid, quality, and estimated action rate</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#1877F2] text-[10px] font-bold text-white">3</span>
+                  <p><span className="font-medium text-foreground">Best ad wins</span> — you only pay what&apos;s needed to beat the next competitor</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Eye />} title="Things to watch out for">
+          <div className="flex flex-col gap-2 text-xs">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">
+              <p className="font-medium">Bid Cap too low?</p>
+              <p>Your ads won&apos;t win any auctions and delivery drops to zero. Use Cost Cap instead if you want control without risking delivery.</p>
+            </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">
+              <p className="font-medium">Switching strategies too early?</p>
+              <p>Changes restart Meta&apos;s learning phase. Give each strategy at least 7 days before judging performance.</p>
+            </div>
+          </div>
         </SheetSection>
       </LearnMoreSheet>
 
@@ -860,31 +888,56 @@ export function MetaStepBudget() {
         open={attributionWindowLearnMore.open}
         onOpenChange={attributionWindowLearnMore.setOpen}
         title="Attribution Window"
-        description="The attribution window defines how long after an ad interaction a conversion is credited to your campaign. It affects both reporting accuracy and delivery optimization."
+        description="How long after seeing or clicking your ad should a purchase still count as a result? This setting controls that timeframe."
         icon={<MousePointerClick />}
-        proTip="A wider window gives Meta more conversion signals, which improves delivery optimization. Only narrow it if you sell impulse-buy products with very short purchase cycles."
+        proTip="Start with 7-day click + 1-day view for e-commerce. It gives Meta the most signals to optimize while keeping view-through attribution tight."
       >
-        <SheetSection icon={<MousePointerClick />} title="Click-through window">
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Counts conversions that happen after a user <span className="font-semibold text-foreground">clicks</span> your ad. A 7-day click window means a purchase made 5 days after clicking still counts as a result. Meta supports 1-day, 7-day, and 28-day click windows.
-          </p>
+        <SheetSection icon={<MousePointerClick />} title="Simple example">
+          <div className="text-xs leading-relaxed text-muted-foreground">
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <p className="mb-2 font-medium text-foreground">A customer clicks your ad on Saturday...</p>
+              <div className="space-y-1.5">
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-base">👀</span>
+                  <p>Visits your store on Tuesday</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-base">🛒</span>
+                  <p>Adds a product to cart on Wednesday</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-base">💳</span>
+                  <p>Buys it on Friday (6 days later)</p>
+                </div>
+              </div>
+              <div className="mt-3 border-t border-border pt-2 space-y-1">
+                <p><span className="font-medium text-foreground">7-day window:</span> This purchase counts as a result of your ad</p>
+                <p><span className="font-medium text-foreground">1-day window:</span> Does NOT count (happened after day 1)</p>
+              </div>
+            </div>
+          </div>
         </SheetSection>
-        <SheetSection icon={<Eye />} title="View-through window">
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Counts conversions that happen after a user <span className="font-semibold text-foreground">views</span> (but doesn&apos;t click) your ad. This captures users who are influenced by your ad but convert later through a direct visit or search. Typically set to 1 day since view-through influence fades quickly.
-          </p>
-        </SheetSection>
-        <SheetSection icon={<Info />} title="Recommended setup">
+        <SheetSection icon={<Target />} title="Which setup should I choose?">
           <div className="flex flex-col gap-2">
             <SheetDecisionCard
               title="7-day click + 1-day view"
-              description="The most balanced setup for e-commerce. Captures the full purchase cycle while keeping view-through attribution tight."
+              description="Best for e-commerce. Captures the full consideration-to-purchase cycle while keeping view-through tight. Gives Meta the strongest signal to optimize."
               highlighted
             />
             <SheetDecisionCard
-              title="1-day click + off"
-              description="For impulse purchases where the decision happens immediately. Gives the tightest attribution but fewer signals for optimization."
+              title="1-day click only"
+              description="For impulse purchases where buyers decide immediately. Tightest attribution but fewer conversion signals — use only when data volume is very high."
             />
+            <SheetDecisionCard
+              title="28-day click + 1-day view"
+              description="For high-consideration products (furniture, electronics, jewelry). Captures long purchase cycles. Available only for specific objectives in Meta."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info />} title="Click vs view attribution">
+          <div className="text-xs leading-relaxed text-muted-foreground space-y-2">
+            <p><span className="font-medium text-foreground">Click-through:</span> The user clicked your ad, then converted within the window. Strong signal that your ad drove the purchase.</p>
+            <p><span className="font-medium text-foreground">View-through:</span> The user saw your ad but didn&apos;t click — they converted later via direct visit or search. Weaker signal, kept short (1 day) because influence fades quickly.</p>
           </div>
         </SheetSection>
       </LearnMoreSheet>

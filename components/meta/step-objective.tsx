@@ -33,12 +33,17 @@ import {
   LogIn,
   ExternalLink,
   Shield,
+  Scan,
+  Zap,
+  Info,
+  Target,
 } from "lucide-react";
 import {
   META_OBJECTIVE_CONFIGS,
   type MetaObjective,
   type MetaConversionLocation,
 } from "@/lib/meta/campaign-types";
+import { LearnMoreSheet, LearnMoreTrigger, SheetSection, SheetDecisionCard, useLearnMore } from "@/components/shared/learn-more-sheet";
 
 /* ------------------------------------------------------------------ */
 /*  Campaign objectives (Meta OUTCOME-based)                           */
@@ -140,6 +145,8 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
   const { campaign, setStep, updateNested } = useMetaCampaign();
   const obj = campaign.objective;
   const [objectiveSheetOpen, setObjectiveSheetOpen] = useState(false);
+  const pixelLearnMore = useLearnMore();
+  const catalogLearnMore = useLearnMore();
 
   const config = META_OBJECTIVE_CONFIGS[obj.objective] ?? META_OBJECTIVE_CONFIGS.OUTCOME_SALES;
   const selectedObj = CAMPAIGN_OBJECTIVES.find((o) => o.value === obj.objective)!;
@@ -459,12 +466,15 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
                     <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#1877F2]/10">
                       <LogIn className="size-5 text-[#1877F2]" />
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">
-                        Connect Meta Account <span className="text-red-500">*</span>
-                      </p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">
+                          Connect Meta Account <span className="text-red-500">*</span>
+                        </p>
+                        <LearnMoreTrigger {...pixelLearnMore.triggerProps} label="What gets connected?" />
+                      </div>
                       <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        Login with your Facebook or Instagram account to connect your Business Manager, Ad Account, Pixel, and Pages.
+                        Login with Facebook or Instagram to link your Business Manager, Ad Account, Pixel, and Pages.
                       </p>
                     </div>
                   </div>
@@ -506,10 +516,10 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
                         </button>
                       </div>
 
-                      <div className="flex items-start gap-2 rounded-lg bg-muted/30 px-3 py-2.5">
-                        <Shield className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                        <p className="text-[10px] leading-relaxed text-muted-foreground">
-                          You&apos;ll be redirected to Meta to authorize access. Salla will request permission to manage your ads, view your pages, and access your pixel data.
+                      <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2.5">
+                        <Shield className="size-3.5 shrink-0 text-muted-foreground" />
+                        <p className="text-[10px] text-muted-foreground">
+                          You&apos;ll be redirected to Meta to authorize access.
                         </p>
                       </div>
                     </div>
@@ -587,9 +597,12 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
                         <Tag className="size-5 text-[#1877F2]" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-foreground">
-                          Salla Product Catalog
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-foreground">
+                            Salla Product Catalog
+                          </p>
+                          <LearnMoreTrigger {...catalogLearnMore.triggerProps} label="What is this?" />
+                        </div>
                         <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
                           Show personalized product ads from your Salla catalog across Facebook and Instagram.
                         </p>
@@ -619,9 +632,6 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
                           Connected
                         </Badge>
                       </div>
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        Your products sync automatically to your Meta product catalog. No manual setup needed.
-                      </p>
                     </div>
                   )}
                 </div>
@@ -644,6 +654,108 @@ export function MetaStepObjective({ onCancel }: { onCancel?: () => void }) {
           />
         </div>
       </div>
+
+      {/* ---- Learn More: Meta Account + Pixel ---- */}
+      <LearnMoreSheet
+        open={pixelLearnMore.open}
+        onOpenChange={pixelLearnMore.setOpen}
+        title="Meta Account & Pixel"
+        description="Connecting your Meta account links everything Salla needs to run ads — your Business Manager, Ad Account, Pages, and Pixel — all in one step."
+        icon={<LogIn className="size-4" />}
+        proTip="If your store already has a Meta Pixel installed, Salla will detect and use it automatically. No duplicate pixels will be created."
+      >
+        <SheetSection icon={<Scan className="size-4" />} title="What is the Meta Pixel?">
+          <div className="text-xs leading-relaxed text-muted-foreground">
+            <p className="mb-2">The Meta Pixel is a small tracking code on your store. It tells Meta what visitors do after clicking your ad — so Meta can find more people like your buyers.</p>
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1">
+              <p>Tracks product views, add-to-carts, and purchases</p>
+              <p>Powers retargeting — reach people who visited but didn&apos;t buy</p>
+              <p>Builds lookalike audiences from your best customers</p>
+            </div>
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Zap className="size-4" />} title="What gets connected?">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Business Manager"
+              description="The parent account that holds your pages, ad account, and pixel. One-time link — you only do this once."
+            />
+            <SheetDecisionCard
+              title="Ad Account"
+              description="The account that pays for your ads. Salla uses this to charge, report, and manage campaigns."
+            />
+            <SheetDecisionCard
+              title="Facebook Page + Instagram Account"
+              description="Your ads run from these pages. Required for most objectives — your brand name and profile appear on every ad."
+            />
+            <SheetDecisionCard
+              title="Meta Pixel"
+              description="Auto-detected from your store. If you don't have one, Salla installs it for you — zero setup."
+              highlighted
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<TrendingUp className="size-4" />} title="How the pixel learns over time">
+          <div className="text-xs leading-relaxed text-muted-foreground">
+            <p className="mb-2">A pixel needs data before Meta can find the right people. Start with simpler goals, then graduate as data accumulates:</p>
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#1877F2] text-[10px] font-bold text-white">1</span>
+                  <p><span className="font-medium text-foreground">Week 1-2:</span> Start with <span className="font-medium text-foreground">Link Clicks</span> — easiest to collect</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#1877F2] text-[10px] font-bold text-white">2</span>
+                  <p><span className="font-medium text-foreground">After 50+ daily views:</span> Switch to <span className="font-medium text-foreground">Landing Page Views</span></p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#1877F2] text-[10px] font-bold text-white">3</span>
+                  <p><span className="font-medium text-foreground">After 50+ weekly purchases:</span> Graduate to <span className="font-medium text-foreground">Conversions</span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      {/* ---- Learn More: Salla Product Catalog ---- */}
+      <LearnMoreSheet
+        open={catalogLearnMore.open}
+        onOpenChange={catalogLearnMore.setOpen}
+        title="Product Catalog"
+        description="When your catalog is connected, Meta can automatically create personalized product ads from your Salla store. Different shoppers see different products — based on what they&apos;ve browsed."
+        icon={<Tag className="size-4" />}
+        proTip="Catalog ads typically deliver 30-40% lower cost per purchase than manual product ads because Meta tests thousands of product combinations automatically."
+      >
+        <SheetSection icon={<Store className="size-4" />} title="How it works">
+          <div className="text-xs leading-relaxed text-muted-foreground">
+            <p className="mb-2">Your Salla catalog syncs automatically to Meta. Once enabled, you can create:</p>
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1.5">
+              <p><span className="font-medium text-foreground">Advantage+ Catalog Ads:</span> Meta picks the best products for each viewer, automatically</p>
+              <p><span className="font-medium text-foreground">Collection Ads:</span> Hero image/video + product tiles in a single ad</p>
+              <p><span className="font-medium text-foreground">Carousel Ads:</span> Feature multiple products with individual links</p>
+            </div>
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Target className="size-4" />} title="When to enable the catalog">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Enable it"
+              description="You sell multiple products on your Salla store and want Meta to showcase the right product to the right shopper — without building separate ads."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Keep it off"
+              description="You&apos;re promoting a single product or a service. In that case, a Single Image/Video ad is simpler and more focused."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info className="size-4" />} title="Automatic sync">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Product names, prices, images, and availability update automatically from your Salla store. When you add a new product or change a price, Meta sees the update within hours. No manual upload needed.
+          </p>
+        </SheetSection>
+      </LearnMoreSheet>
     </TooltipProvider>
   );
 }
