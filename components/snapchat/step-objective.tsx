@@ -978,38 +978,52 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
         open={pixelLearnMore.open}
         onOpenChange={pixelLearnMore.setOpen}
         title="Snap Pixel"
-        description="A small piece of code on your website that tracks what visitors do after seeing your ad — like viewing a product, adding to cart, or purchasing."
+        description="The pixel is a small tracking code on your store. It tells Snapchat what visitors do after seeing your ad — so Snapchat can find more people like your buyers."
         icon={<Scan className="size-4" />}
-        proTip="New pixels need 50+ events to optimize well. Start with Page Views as your goal, then graduate to Add to Cart and Purchases as your pixel matures."
+        proTip="Choose Automatic (Salla) — it installs instantly. Then start your campaign with the Page Views goal. After your pixel collects 50+ daily page views, switch to Add to Cart or Purchases for better results."
       >
-        <SheetSection icon={<Eye className="size-4" />} title="Why does it matter?">
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Without a pixel, Snapchat can&apos;t see what happens after someone clicks your ad. It&apos;s like running a store without knowing which customers bought something — you can&apos;t optimize for what you can&apos;t measure.
-          </p>
+        <SheetSection icon={<Eye className="size-4" />} title="Why do I need this?">
+          <div className="text-xs leading-relaxed text-muted-foreground">
+            <p className="mb-2">Without a pixel, Snapchat only knows that someone <span className="font-medium text-foreground">saw</span> your ad. With a pixel, it also knows if they:</p>
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1">
+              <p>Viewed a product on your store</p>
+              <p>Added something to their cart</p>
+              <p>Made a purchase</p>
+            </div>
+            <p className="mt-2">This data helps Snapchat find <span className="font-medium text-foreground">more people like your buyers</span> — making every ad riyal more effective.</p>
+          </div>
         </SheetSection>
         <SheetSection icon={<Zap className="size-4" />} title="Which option should I pick?">
           <div className="flex flex-col gap-2">
             <SheetDecisionCard
               title="Automatic (Salla)"
-              description="We create and install a pixel on your Salla store automatically. Zero setup, works immediately. Best for most merchants."
+              description="Salla creates and installs the pixel on your store automatically. No code, no setup — works immediately. Best for most merchants."
               highlighted
             />
             <SheetDecisionCard
               title="Connect Existing"
-              description="Use a pixel you already created in Snapchat Ads Manager. Choose this only if you manage your pixel separately or use a custom website."
+              description="Link a pixel you already created in Snapchat Ads Manager. Only choose this if you manage your own pixel or use a custom (non-Salla) website."
             />
           </div>
         </SheetSection>
-        <SheetSection icon={<TrendingUp className="size-4" />} title="Pixel learning phase">
-          <div className="flex flex-col gap-2 text-xs leading-relaxed text-muted-foreground">
-            <p>A new pixel goes through a learning phase where it collects data about your visitors. The more data it has, the better Snapchat can find the right people for your ads.</p>
+        <SheetSection icon={<TrendingUp className="size-4" />} title="How the pixel learns over time">
+          <div className="text-xs leading-relaxed text-muted-foreground">
+            <p className="mb-2">A new pixel starts with zero data. As visitors interact with your store, it learns who your best customers are:</p>
             <div className="rounded-lg border border-border bg-muted/20 p-3">
-              <p className="font-semibold text-foreground">Recommended progression:</p>
-              <ol className="ml-4 mt-1 list-decimal space-y-0.5">
-                <li>Start with <span className="font-medium text-foreground">Page Views</span> goal (easiest to collect)</li>
-                <li>Switch to <span className="font-medium text-foreground">Add to Cart</span> after 50+ daily page views</li>
-                <li>Graduate to <span className="font-medium text-foreground">Purchases</span> after 10+ weekly purchases</li>
-              </ol>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[10px] font-bold text-white">1</span>
+                  <p><span className="font-medium text-foreground">Week 1-2:</span> Use <span className="font-medium text-foreground">Page Views</span> goal — collects data fastest</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[10px] font-bold text-white">2</span>
+                  <p><span className="font-medium text-foreground">After 50+ daily views:</span> Switch to <span className="font-medium text-foreground">Add to Cart</span></p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[10px] font-bold text-white">3</span>
+                  <p><span className="font-medium text-foreground">After 10+ weekly purchases:</span> Graduate to <span className="font-medium text-foreground">Purchases</span></p>
+                </div>
+              </div>
             </div>
           </div>
         </SheetSection>
@@ -1019,37 +1033,38 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
       <LearnMoreSheet
         open={convLocationLearnMore.open}
         onOpenChange={convLocationLearnMore.setOpen}
-        title="Conversion Location"
-        description="Choose where you want to collect lead information from potential customers."
+        title="Where to Collect Leads"
+        description="When users swipe up on your ad, where should they go to give you their information?"
         icon={<ClipboardList className="size-4" />}
-        proTip="Start with Native Lead Form — it has 3x higher completion rates because fields are pre-filled from the user's Snapchat profile."
+        proTip="Use the Native Lead Form for your first campaign — fields like name and email are auto-filled from the user's Snapchat account, which means 3x more people complete the form."
       >
-        <SheetSection icon={<ClipboardList className="size-4" />} title="Which should I pick?">
+        <SheetSection icon={<ClipboardList className="size-4" />} title="Which option is right for me?">
           <div className="flex flex-col gap-2">
             <SheetDecisionCard
               title="Lead Form (Native)"
-              description="Users fill out a form directly inside Snapchat. Fields like name, email, and phone are pre-filled from their profile — faster and higher completion rates."
+              description="The form opens directly inside Snapchat. Name, email, and phone are pre-filled from the user's profile — they just tap 'Submit'. Fastest way to collect leads."
               highlighted
             />
             <SheetDecisionCard
               title="Website (Pixel)"
-              description="Users swipe up and land on your website. You track form submissions with your Snap Pixel. More customizable but requires pixel setup and has lower completion rates."
+              description="Users land on your website and fill out your own form. You need a Snap Pixel to track submissions. More work to set up, but you get full control over the form design."
             />
           </div>
         </SheetSection>
-        <SheetSection icon={<Info className="size-4" />} title="Key differences">
+        <SheetSection icon={<Info className="size-4" />} title="Side-by-side comparison">
           <div className="rounded-lg border border-border overflow-hidden text-xs">
-            <div className="grid grid-cols-3 border-b border-border bg-muted/30 px-3 py-2 font-semibold text-foreground">
+            <div className="grid grid-cols-3 border-b border-border bg-[#004956] px-3 py-2.5 font-semibold text-white">
               <span />
               <span>Lead Form</span>
               <span>Website</span>
             </div>
             {[
-              ["Completion rate", "High", "Lower"],
+              ["Completion rate", "High (3x)", "Lower"],
               ["Pre-filled fields", "Yes", "No"],
-              ["Custom design", "Limited", "Full control"],
-              ["Pixel required", "No", "Yes"],
-              ["Best for", "Quick leads", "Complex forms"],
+              ["Form design", "Snapchat template", "Your own design"],
+              ["Pixel needed", "No", "Yes"],
+              ["Setup time", "5 minutes", "30+ minutes"],
+              ["Best for", "Quick leads", "Custom forms"],
             ].map(([label, form, web]) => (
               <div key={label} className="grid grid-cols-3 border-b border-border last:border-0 px-3 py-2 text-muted-foreground">
                 <span className="font-medium text-foreground">{label}</span>

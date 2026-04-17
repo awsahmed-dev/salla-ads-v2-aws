@@ -973,37 +973,49 @@ export function StepBudget() {
         open={goalLearnMore.open}
         onOpenChange={goalLearnMore.setOpen}
         title="Optimization Goal"
-        description="Your optimization goal tells Snapchat what result to maximize with your budget. It's the single most important setting in your campaign."
+        description="This tells Snapchat what action you want from users. Snapchat will show your ad to people most likely to take that action."
         icon={<Target className="size-4" />}
         proTip={
           campaign.objective.objective === "SALES"
-            ? "Start with Page Views if your pixel is new. Graduate to Add to Cart, then Purchases as your pixel collects more data."
-            : campaign.objective.objective === "LEADS"
-              ? "Form Submissions gives you the most leads. Use Swipe Ups only if you want maximum traffic to your form."
-              : "Start with Auto Bid + your recommended goal. Adjust after 3-5 days of data."
+            ? "Start with Page Views if your pixel is new (less than 2 weeks old). Move to Add to Cart after 50+ daily page views, then to Purchases after 10+ weekly purchases."
+            : campaign.objective.objective === "WEBSITE_VISITS"
+              ? "Swipe Ups gives you the most clicks at the lowest cost. Use Landing Page Views for higher-quality visitors who actually load your page."
+              : campaign.objective.objective === "LEADS"
+                ? "Form Submissions is best for collecting leads directly. Use Swipe Ups only if you want to drive traffic to your own website form."
+                : campaign.objective.objective === "ENGAGEMENT"
+                  ? "Impressions gets you maximum reach. Use Video Views if your creative is video — it finds people who actually watch."
+                  : campaign.objective.objective === "APP_PROMOTION"
+                    ? "App Installs drives the most downloads. In-app event goals (Purchases, Sign Ups) require an MMP integration."
+                    : "Use the recommended goal (highlighted) and give your campaign at least 3-5 days before changing it."
         }
       >
-        <SheetSection icon={<Target className="size-4" />} title="Which goal should I pick?">
+        <SheetSection icon={<Target className="size-4" />} title="Available goals">
           <div className="flex flex-col gap-2">
             {goalsWithLocked.filter((g) => !g.locked).map((g) => (
               <SheetDecisionCard
                 key={g.value}
                 title={g.label}
-                description={g.bestFor || g.costHint || g.desc}
+                description={g.desc}
                 highlighted={g.recommended}
               />
             ))}
           </div>
         </SheetSection>
-        <SheetSection icon={<Info className="size-4" />} title="How it works">
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Snapchat uses your goal to find the right people. If you optimize for Purchases, Snap shows your ad to people most likely to buy. If you optimize for Impressions, it maximizes how many people see it. The goal directly affects who sees your ad and what you pay.
-          </p>
+        <SheetSection icon={<Info className="size-4" />} title="How does this affect my campaign?">
+          <div className="text-xs leading-relaxed text-muted-foreground">
+            <p className="mb-2">Your goal changes <span className="font-medium text-foreground">who sees your ad</span>. For example:</p>
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1">
+              <p><span className="font-medium text-foreground">Purchases</span> — Snapchat finds people with a history of buying online</p>
+              <p><span className="font-medium text-foreground">Impressions</span> — Snapchat shows your ad to as many people as possible</p>
+              <p><span className="font-medium text-foreground">Swipe Ups</span> — Snapchat targets people who regularly swipe up on ads</p>
+            </div>
+            <p className="mt-2">The more specific your goal, the smaller but higher-quality your audience will be.</p>
+          </div>
         </SheetSection>
         {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && (
-          <SheetSection icon={<AlertCircle className="size-4" />} title="Pixel requirements">
+          <SheetSection icon={<Lock className="size-4" />} title="Why are some goals locked?">
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Goals marked with a lock icon require a Snap Pixel to be connected. The pixel tracks actions on your website so Snapchat can optimize delivery. Configure your pixel in the Objective step.
+              Goals like Purchases, Add to Cart, and Page Views require a <span className="font-medium text-foreground">Snap Pixel</span> — a small tracking code on your website. Without it, Snapchat can&apos;t see what visitors do after clicking your ad. Go to the Objective step to connect your pixel.
             </p>
           </SheetSection>
         )}
@@ -1014,45 +1026,60 @@ export function StepBudget() {
         open={bidLearnMore.open}
         onOpenChange={bidLearnMore.setOpen}
         title="Bidding Strategy"
-        description="Your bid strategy controls how Snapchat competes in the ad auction to show your ads. It determines your cost per result."
+        description="When your ad competes for a placement, Snapchat uses your bid strategy to decide how much to pay. This affects how many people see your ad and what each result costs."
         icon={<Gauge className="size-4" />}
-        proTip="Start with Auto Bid for the first 7 days. Once you have baseline data on your cost per result, switch to Max Bid or Target Cost for more control."
+        proTip="Start with Auto Bid for your first campaign. After 7 days, check your cost per result — if it's too high, try Max Bid with a cap 10-20% above your average."
       >
-        <SheetSection icon={<Gauge className="size-4" />} title="Strategy comparison">
+        <SheetSection icon={<Gauge className="size-4" />} title="Which strategy is right for me?">
           <div className="flex flex-col gap-2">
             <SheetDecisionCard
-              title="Auto Bid (Recommended)"
-              description="Snapchat sets your bid automatically to get the most results within your budget. Best for beginners and new campaigns — no manual input needed."
+              title="Auto Bid"
+              description="Snapchat handles everything — it bids the right amount to get you the most results within your budget. No setup needed. Best for beginners."
               highlighted
             />
             <SheetDecisionCard
               title="Max Bid"
-              description="You set a ceiling — Snapchat never bids above your limit per result. Good when you know exactly how much a result is worth to you. Risk: setting it too low means zero delivery."
+              description="You set the maximum you're willing to pay per result. Snapchat will never go above your limit. Use this when you know your target cost — but set it too low and your ads won't show."
             />
             {objectiveConfig.allowedBidStrategies.includes("TARGET_COST") && (
               <SheetDecisionCard
                 title="Target Cost"
-                description="You set your ideal cost per result. Snapchat tries to average around that amount — some results cost more, some less. Good for predictable budgeting."
+                description="You set your ideal cost and Snapchat tries to stay close to it on average. Some results may cost more, others less. Good when you need predictable costs for budgeting."
               />
             )}
           </div>
         </SheetSection>
-        <SheetSection icon={<Info className="size-4" />} title="How the auction works">
+        <SheetSection icon={<Info className="size-4" />} title="How does the auction work?">
           <div className="flex flex-col gap-2 text-xs leading-relaxed text-muted-foreground">
+            <p>Every time there&apos;s a chance to show an ad, Snapchat runs a quick auction:</p>
             <div className="rounded-lg border border-border bg-muted/20 p-3">
-              <ol className="ml-4 list-decimal space-y-1">
-                <li><span className="font-medium text-foreground">You set a bid</span> — how much a result is worth to you</li>
-                <li><span className="font-medium text-foreground">Snapchat competes</span> — your bid enters the auction against other advertisers</li>
-                <li><span className="font-medium text-foreground">Winner shows</span> — highest value ad (bid x relevance) wins the placement</li>
-              </ol>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[10px] font-bold text-white">1</span>
+                  <p><span className="font-medium text-foreground">Your bid enters</span> — based on your strategy and budget</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[10px] font-bold text-white">2</span>
+                  <p><span className="font-medium text-foreground">Snapchat scores ads</span> — combines bid amount with ad quality and relevance</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[10px] font-bold text-white">3</span>
+                  <p><span className="font-medium text-foreground">Best ad wins</span> — you only pay what&apos;s needed to beat the next competitor</p>
+                </div>
+              </div>
             </div>
-            <p>You only pay what&apos;s needed to win, not your full bid. Higher bids win more auctions but cost more per result.</p>
           </div>
         </SheetSection>
-        <SheetSection icon={<AlertCircle className="size-4" />} title="Common mistakes">
-          <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-            <p><span className="font-medium text-foreground">Max Bid too low:</span> You win zero auctions and get no delivery. Check the suggested range.</p>
-            <p><span className="font-medium text-foreground">Target Cost too aggressive:</span> Setting an unrealistically low target means Snap can&apos;t find enough users at that price.</p>
+        <SheetSection icon={<Eye className="size-4" />} title="Things to watch out for">
+          <div className="flex flex-col gap-2 text-xs">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">
+              <p className="font-medium">Bid too low?</p>
+              <p>Your ads won&apos;t win any auctions and you&apos;ll get zero results. Always check the suggested bid range.</p>
+            </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">
+              <p className="font-medium">Bid much higher than suggested?</p>
+              <p>You&apos;ll win more auctions but pay more per result. Start within the range and adjust gradually.</p>
+            </div>
           </div>
         </SheetSection>
       </LearnMoreSheet>
@@ -1062,31 +1089,46 @@ export function StepBudget() {
         open={attributionLearnMore.open}
         onOpenChange={attributionLearnMore.setOpen}
         title="Conversion Window"
-        description="The conversion window is the time period after a user sees or clicks your ad during which their actions count as a conversion."
+        description="How long after seeing or clicking your ad should a purchase still count as a result? This setting controls that timeframe."
         icon={<ClockIcon className="size-4" />}
-        proTip="Always start with 28-day Click + 1-day View. It gives Snapchat the strongest signal to optimize. Switch to 7-day only after your pixel has 50+ conversions per week."
+        proTip="Always start with 28-day. It gives Snapchat the most data to learn who your best customers are. Only switch to 7-day after you're getting 50+ conversions per week."
       >
-        <SheetSection icon={<ClockIcon className="size-4" />} title="What does this mean?">
+        <SheetSection icon={<ClockIcon className="size-4" />} title="Simple example">
           <div className="text-xs leading-relaxed text-muted-foreground">
-            <p className="mb-2">Imagine a customer sees your ad on Monday, browses your store on Wednesday, and buys on Friday. Should that purchase count as a result of your ad?</p>
             <div className="rounded-lg border border-border bg-muted/20 p-3">
-              <p className="font-semibold text-foreground">With 28-day window:</p>
-              <p>Yes — the purchase happened within 28 days of clicking. It counts.</p>
-              <p className="mt-2 font-semibold text-foreground">With 7-day window:</p>
-              <p>Only if they bought within 7 days of clicking. Friday (day 5) still counts.</p>
+              <p className="mb-2 font-medium text-foreground">A customer sees your ad on Saturday...</p>
+              <div className="space-y-1.5">
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-base">👀</span>
+                  <p>Visits your store on Tuesday</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-base">🛒</span>
+                  <p>Adds a product to cart on Wednesday</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 text-base">💳</span>
+                  <p>Buys it on Friday (6 days later)</p>
+                </div>
+              </div>
+              <div className="mt-3 border-t border-border pt-2 space-y-1">
+                <p><span className="font-medium text-foreground">28-day window:</span> This purchase counts as a result of your ad</p>
+                <p><span className="font-medium text-foreground">7-day window:</span> Also counts (it was within 7 days)</p>
+              </div>
+              <p className="mt-2 text-muted-foreground">If they bought 10 days later, only the 28-day window would count it.</p>
             </div>
           </div>
         </SheetSection>
         <SheetSection icon={<Target className="size-4" />} title="Which should I choose?">
           <div className="flex flex-col gap-2">
             <SheetDecisionCard
-              title="28-Day Click + 1-Day View (Recommended)"
-              description="Captures more conversions, gives Snapchat more data to optimize. Best for new campaigns and most e-commerce stores."
+              title="28-Day Click + 1-Day View"
+              description="Counts purchases up to 28 days after a click, and 1 day after viewing your ad. Captures more conversions and gives Snapchat more data to optimize. Best for most stores."
               highlighted
             />
             <SheetDecisionCard
               title="7-Day Click Only"
-              description="Stricter — only credits conversions within 7 days of a click. Requires mature pixel with sufficient conversion data. Use this when you want conservative attribution."
+              description="Only counts purchases within 7 days of clicking your ad. Stricter measurement, but needs a mature pixel with lots of conversion data to work well."
             />
           </div>
         </SheetSection>
