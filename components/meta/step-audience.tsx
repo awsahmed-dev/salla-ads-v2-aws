@@ -159,42 +159,55 @@ export function MetaStepAudience() {
             showExcludePurchasers={isSales}
           />
 
-          {/* ---- 5. Advanced Targeting (collapsible) ---- */}
-          <div>
+          {/* ---- 5. Advanced Settings (collapsible — matches Snapchat pattern) ---- */}
+          <div className={cn(
+            "rounded-2xl transition-colors",
+            showAdvanced ? "bg-muted/50 p-2" : ""
+          )}>
             <button
               type="button"
+              aria-expanded={showAdvanced}
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-5 py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-[#1877F2]/40 hover:text-foreground"
+              className={cn(
+                "flex w-full items-center justify-between px-4 pb-3 pt-4 sm:px-6 sm:pt-5 text-left transition-colors rounded-2xl",
+                !showAdvanced && "border border-border bg-card hover:bg-muted/30"
+              )}
             >
-              <ChevronDown className={cn("size-4 transition-transform", showAdvanced && "rotate-180")} />
-              Advanced Settings
-              <span className="ml-auto text-xs text-muted-foreground">Custom Audiences, Devices, Expansion</span>
+              <div>
+                <span className="text-base font-bold text-foreground">Advanced Settings</span>
+                <p className="mt-1 text-xs text-muted-foreground">Custom Audiences, Devices, Expansion</p>
+              </div>
+              <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", showAdvanced && "rotate-180")} />
             </button>
 
             {showAdvanced && (
-              <div className="mt-3 flex flex-col gap-4">
+              <div className="mt-2 flex flex-col gap-4">
 
                 {/* Custom Audiences (unified) */}
-                <CustomAudiencesCard
-                  includeIds={aud.customAudienceIds}
-                  onIncludeIdsChange={(ids) =>
-                    updateNested("audience", { customAudienceIds: ids })
-                  }
-                  excludeIds={aud.excludedAudienceIds}
-                  onExcludeIdsChange={(ids) =>
-                    updateNested("audience", { excludedAudienceIds: ids })
-                  }
-                  accent="meta"
-                />
+                <div className="overflow-hidden rounded-xl bg-card">
+                  <CustomAudiencesCard
+                    includeIds={aud.customAudienceIds}
+                    onIncludeIdsChange={(ids) =>
+                      updateNested("audience", { customAudienceIds: ids })
+                    }
+                    excludeIds={aud.excludedAudienceIds}
+                    onExcludeIdsChange={(ids) =>
+                      updateNested("audience", { excludedAudienceIds: ids })
+                    }
+                    accent="meta"
+                  />
+                </div>
 
                 {/* Device Targeting (unified) */}
-                <DeviceTargetingCard
-                  value={aud.operatingSystems}
-                  onChange={(ids) =>
-                    updateNested("audience", { operatingSystems: ids })
-                  }
-                  accent="meta"
-                />
+                <div className="overflow-hidden rounded-xl bg-card">
+                  <DeviceTargetingCard
+                    value={aud.operatingSystems}
+                    onChange={(ids) =>
+                      updateNested("audience", { operatingSystems: ids })
+                    }
+                    accent="meta"
+                  />
+                </div>
 
                 {/* Advantage+ Audience */}
                 <SectionCard>
@@ -204,7 +217,7 @@ export function MetaStepAudience() {
                       <div>
                         <p className="text-sm font-semibold text-foreground">Advantage+ Audience</p>
                         <p className="text-xs text-muted-foreground">
-                          Let Meta's AI expand your targeting beyond your settings to find better-converting audiences.
+                          Let Meta's AI expand beyond your targeting to find better-converting audiences.
                         </p>
                       </div>
                     </div>
@@ -213,14 +226,6 @@ export function MetaStepAudience() {
                       onCheckedChange={(v) => updateNested("audience", { advantagePlusAudience: v })}
                     />
                   </div>
-                  {aud.advantagePlusAudience && (
-                    <div className="mt-3 flex items-start gap-2 rounded-md border border-[#1877F2]/20 bg-[#1877F2]/5 px-3 py-2">
-                      <Sparkles className="mt-0.5 size-3 shrink-0 text-[#1877F2]" />
-                      <p className="text-[11px] leading-relaxed text-muted-foreground">
-                        <span className="font-medium text-foreground">Advantage+ is enabled.</span> Meta may show ads beyond your selected countries, interests, and demographics to find people most likely to convert. Your targeting acts as a suggestion, not a hard constraint.
-                      </p>
-                    </div>
-                  )}
                 </SectionCard>
               </div>
             )}
