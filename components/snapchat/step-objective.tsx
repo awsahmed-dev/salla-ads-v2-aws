@@ -585,7 +585,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                         <LearnMoreTrigger {...pixelLearnMore.triggerProps} label="What is a pixel?" />
                       </div>
                       <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-                        Tracks visitor actions on your store to measure and optimize results.
+                        Tracks what visitors do after clicking your ad.
                       </p>
                     </div>
                   </div>
@@ -717,30 +717,6 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                           <p className="text-xs text-emerald-700">Pixel will be verified before your campaign goes live.</p>
                         </div>
                       )}
-                    </div>
-                  )}
-
-                  {/* Salla managed detail */}
-                  {obj.pixelMode === "salla_managed" && (
-                    <div className="mt-4 rounded-lg border border-primary/20 bg-primary/[0.03] p-4">
-                      <div className="flex items-start gap-3">
-                        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" />
-                        <div>
-                          <p className="text-xs font-semibold text-foreground">Salla handles everything</p>
-                          <div className="mt-2 flex flex-col gap-1">
-                            {[
-                              "Creates and installs a tracking pixel automatically",
-                              "Tracks purchases, add-to-cart, and page views",
-                              "Verifies everything before your campaign goes live",
-                            ].map((item) => (
-                              <p key={item} className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
-                                <CheckCircle2 className="mt-0.5 size-2.5 shrink-0 text-primary" />
-                                {item}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   )}
 

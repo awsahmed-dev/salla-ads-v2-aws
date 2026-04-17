@@ -612,20 +612,21 @@ export function StepBudget() {
             }
             warnings={
               <>
+                {/* Only show the pixel warning when goals in this objective actually need a pixel and no pixel is configured. */}
                 {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && !hasPixelConfigured && (
-                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                    <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-                    <p className="text-xs leading-relaxed text-amber-700">
-                      Some goals require a <span className="font-semibold">Snap Pixel</span>. Connect it in the Objective step to unlock them.
+                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                    <AlertCircle className="size-3.5 shrink-0 text-amber-600" />
+                    <p className="text-xs text-amber-700">
+                      Some goals need a <span className="font-semibold">Snap Pixel</span>. Connect one in Step 1 to unlock them.
                     </p>
                   </div>
                 )}
-                {/* Pixel connected status removed — already shown in Step 0 */}
+                {/* Only show the MMP warning when goals in this objective actually need MMP (APP_PROMOTION only). */}
                 {OPTIMIZATION_GOALS.some((g) => g.requiresMMP) && (
-                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2">
-                    <Lock className="mt-0.5 size-3.5 shrink-0 text-orange-600" />
+                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2">
+                    <Lock className="size-3.5 shrink-0 text-orange-600" />
                     <p className="text-xs text-orange-700">
-                      In-app event goals require an <span className="font-semibold">MMP</span> integration to track post-install events.
+                      In-app event goals need an <span className="font-semibold">MMP</span> integration (not yet supported).
                     </p>
                   </div>
                 )}
@@ -660,8 +661,8 @@ export function StepBudget() {
                 ? [{
                     label: budget.bidStrategy === "TARGET_COST" ? "Target Cost per Action" : "Maximum Bid per Action",
                     desc: budget.bidStrategy === "TARGET_COST"
-                      ? "Snap will try to keep your average cost per result close to this amount."
-                      : "Snap will never bid above this amount. Set it too low and you may not win any auctions.",
+                      ? "Snap will average around this amount per result."
+                      : "Snap will never bid above this amount per result.",
                     value: budget.bidAmount || undefined,
                     onChange: (v) => updateNested("budget", { bidAmount: v }),
                     prefix: "SAR",
@@ -669,25 +670,16 @@ export function StepBudget() {
                     min: 0.01,
                     step: 0.5,
                     suggestedRange: suggestedBid,
-                    warning: budget.bidAmount > 0 && budget.bidAmount < suggestedBid.min
-                      ? `Your bid of SAR ${budget.bidAmount.toFixed(2)} is below the suggested minimum of SAR ${suggestedBid.min.toFixed(2)}. You may get very few or no results.`
-                      : undefined,
-                    tip: budget.bidAmount >= suggestedBid.min && budget.bidAmount <= suggestedBid.max
-                      ? "Your bid is within the suggested range — good balance between cost and delivery."
+                    // Priority-ordered: bid > budget (critical) → bid < min (caution) → in range (ok)
+                    warning: budget.bidAmount > 0 && budget.bidAmount > budget.amount
+                      ? `Bid exceeds your daily budget of SAR ${budget.amount}. Lower your bid or raise your budget.`
+                      : budget.bidAmount > 0 && budget.bidAmount < suggestedBid.min
+                        ? `Below suggested range (SAR ${suggestedBid.min.toFixed(2)}+). You may get few or no results.`
+                        : undefined,
+                    tip: budget.bidAmount >= suggestedBid.min && budget.bidAmount <= suggestedBid.max && budget.bidAmount <= budget.amount
+                      ? "Bid is within the suggested range."
                       : undefined,
                   }]
-                : undefined
-            }
-            contextNote={
-              budget.bidStrategy !== "AUTO_BID" && budget.bidAmount > 0 && budget.bidAmount > budget.amount
-                ? (
-                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                      <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-                      <p className="text-xs leading-relaxed text-amber-700">
-                        Your bid of <span className="font-semibold">SAR {budget.bidAmount.toFixed(2)}</span> exceeds your daily budget of <span className="font-semibold">SAR {budget.amount}</span>. You may get very few results per day — consider increasing your budget or lowering your bid.
-                      </p>
-                    </div>
-                  )
                 : undefined
             }
           />

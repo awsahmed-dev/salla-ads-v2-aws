@@ -397,10 +397,10 @@ export function StepCreative() {
                   </span>
                 )}
               </div>
-              <div className="flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5">
-                <Info className="mt-0.5 size-3.5 shrink-0 text-blue-600" />
+              <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5">
+                <Info className="size-3.5 shrink-0 text-blue-600" />
                 <p className="text-xs leading-relaxed text-blue-700">
-                  Catalog campaigns support <span className="font-semibold">Dynamic Product Ads</span>, <span className="font-semibold">Collection Ads</span> (hero image/video + catalog tiles), and <span className="font-semibold">Story Ads</span> (product story from catalog). Choose the format that best fits your campaign.
+                  Catalog is connected. You can now create Dynamic, Collection, or Story Ads.
                 </p>
               </div>
             </div>
@@ -542,16 +542,6 @@ export function StepCreative() {
                   </div>
                 </div>
 
-                <div className="rounded-lg bg-muted/50 p-3">
-                  <p className="mb-1 text-xs font-semibold text-foreground">Best Practices</p>
-                  <ul className="ml-3 list-disc space-y-0.5 text-xs text-muted-foreground">
-                    <li>Use UGC-style video under 10 seconds for your Snap creative</li>
-                    <li>Keep the headline short (24-28 chars) and spark curiosity</li>
-                    <li>Use a casual, conversational tone in chat messages</li>
-                    <li>Complete and verify your Public Profile for better engagement</li>
-                    <li>Consider adding a branded chat background for a premium feel</li>
-                  </ul>
-                </div>
               </div>
             </SectionCard>
           )}
@@ -832,24 +822,11 @@ export function StepCreative() {
             </p>
 
             {ads.length === 0 && !catalogEnabled && (
-              <div className="mb-3 flex items-start gap-2.5 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
-                <Zap className="mt-0.5 size-4 shrink-0 text-primary" />
-                <div>
-                  <p className="text-xs font-semibold text-foreground">Recommended Format</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {campaign.objective.objective === "SALES"
-                      ? "For Sales campaigns, Collection Ads with your store products perform 2.3x better."
-                      : campaign.objective.objective === "WEBSITE_VISITS"
-                        ? "Single Image/Video ads drive the most website traffic. Use eye-catching visuals with a clear CTA."
-                        : campaign.objective.objective === "ENGAGEMENT"
-                          ? "Story Ads generate 3x more engagement. Use 3-5 snaps to tell your brand story."
-                          : campaign.objective.objective === "LEADS"
-                            ? "Lead Generation ads with short video (under 10s) have 40% higher form completion rates."
-                            : campaign.objective.objective === "APP_PROMOTION"
-                              ? "App Install ads with demo videos of your app have 25% higher install rates."
-                              : "Start with a Single Image/Video ad for best results across all objectives."}
-                  </p>
-                </div>
+              <div className="mb-3 flex items-center gap-2.5 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
+                <Zap className="size-4 shrink-0 text-primary" />
+                <p className="text-xs text-muted-foreground">
+                  Snap recommends 3–5 ads to test different creatives. Start with one, then add more.
+                </p>
               </div>
             )}
 
