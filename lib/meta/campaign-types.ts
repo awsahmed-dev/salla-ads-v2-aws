@@ -12,7 +12,6 @@ export type MetaObjective =
   | "OUTCOME_TRAFFIC"
   | "OUTCOME_AWARENESS"
   | "OUTCOME_ENGAGEMENT"
-  | "OUTCOME_LEADS"
   | "OUTCOME_APP_PROMOTION";
 
 /** Maps to API optimization_goal at Ad Set level */
@@ -28,7 +27,6 @@ export type MetaOptimizationGoal =
   | "POST_ENGAGEMENT"      // Likes, comments, shares on post
   | "LEAD_GENERATION"      // Instant Form submissions
   | "APP_INSTALLS"         // App installations
-  | "APP_EVENTS"           // In-app event optimization (AEO)
   | "CONVERSATIONS";       // Messenger / WhatsApp / Instagram Direct
 
 /** Maps to API billing_event at Ad Set level */
@@ -110,7 +108,7 @@ export interface MetaFrequencyCap {
 }
 
 /** Click attribution window */
-export type MetaClickAttributionWindow = "1d_click" | "7d_click" | "28d_click";
+export type MetaClickAttributionWindow = "1d_click" | "7d_click";
 /** View attribution window */
 export type MetaViewAttributionWindow = "none" | "1d_view" | "7d_view";
 
@@ -196,13 +194,13 @@ export const META_OBJECTIVE_CONFIGS: Record<string, MetaObjectiveConfig> = {
     hasConversionWindow: true,
     conversionLocations: ["WEBSITE", "MESSAGING"],
     defaultDestinationType: "WEBSITE",
-    allowedDestinationTypes: ["WEBSITE", "MESSENGER", "PHONE_CALL"],
+    allowedDestinationTypes: ["WEBSITE", "MESSENGER", "PHONE_CALL", "APP"],
   },
   OUTCOME_TRAFFIC: {
     apiObjective: "OUTCOME_TRAFFIC",
     label: "Traffic",
     description: "Send more people to your website, app, or landing page",
-    allowedGoals: ["LINK_CLICKS", "LANDING_PAGE_VIEWS"],
+    allowedGoals: ["LINK_CLICKS", "LANDING_PAGE_VIEWS", "REACH", "IMPRESSIONS"],
     defaultGoal: "LINK_CLICKS",
     pixelRequirement: "optional",
     catalogAvailable: false,
@@ -210,15 +208,15 @@ export const META_OBJECTIVE_CONFIGS: Record<string, MetaObjectiveConfig> = {
     defaultCTA: "LEARN_MORE",
     allowedBidStrategies: ["LOWEST_COST_WITHOUT_CAP", "COST_CAP", "LOWEST_COST_WITH_BID_CAP"],
     hasConversionWindow: false,
-    conversionLocations: ["WEBSITE"],
+    conversionLocations: ["WEBSITE", "MESSAGING", "APP"],
     defaultDestinationType: "WEBSITE",
-    allowedDestinationTypes: ["WEBSITE"],
+    allowedDestinationTypes: ["WEBSITE", "MESSENGER", "APP"],
   },
   OUTCOME_AWARENESS: {
     apiObjective: "OUTCOME_AWARENESS",
     label: "Awareness",
     description: "Maximize reach and brand recognition among your target audience",
-    allowedGoals: ["REACH", "IMPRESSIONS", "AD_RECALL_LIFT"],
+    allowedGoals: ["REACH", "IMPRESSIONS", "AD_RECALL_LIFT", "THRUPLAY"],
     defaultGoal: "REACH",
     pixelRequirement: "none",
     catalogAvailable: false,
@@ -234,7 +232,7 @@ export const META_OBJECTIVE_CONFIGS: Record<string, MetaObjectiveConfig> = {
     apiObjective: "OUTCOME_ENGAGEMENT",
     label: "Engagement",
     description: "Get more video views, post interactions, or messages",
-    allowedGoals: ["THRUPLAY", "POST_ENGAGEMENT", "CONVERSATIONS"],
+    allowedGoals: ["THRUPLAY", "POST_ENGAGEMENT", "LINK_CLICKS", "REACH", "IMPRESSIONS"],
     defaultGoal: "THRUPLAY",
     pixelRequirement: "none",
     catalogAvailable: false,
@@ -242,41 +240,25 @@ export const META_OBJECTIVE_CONFIGS: Record<string, MetaObjectiveConfig> = {
     defaultCTA: "LEARN_MORE",
     allowedBidStrategies: ["LOWEST_COST_WITHOUT_CAP", "COST_CAP", "LOWEST_COST_WITH_BID_CAP"],
     hasConversionWindow: false,
-    conversionLocations: ["MESSAGING"],
+    conversionLocations: [],
     defaultDestinationType: "UNDEFINED",
-    allowedDestinationTypes: ["UNDEFINED", "MESSENGER", "WHATSAPP"],
-  },
-  OUTCOME_LEADS: {
-    apiObjective: "OUTCOME_LEADS",
-    label: "Leads",
-    description: "Collect leads with Meta Instant Forms, Messenger, or your website",
-    allowedGoals: ["LEAD_GENERATION", "LINK_CLICKS", "CONVERSATIONS"],
-    defaultGoal: "LEAD_GENERATION",
-    pixelRequirement: "none",
-    catalogAvailable: false,
-    allowedAdFormats: ["SINGLE_IMAGE", "SINGLE_VIDEO", "CAROUSEL"],
-    defaultCTA: "SIGN_UP",
-    allowedBidStrategies: ["LOWEST_COST_WITHOUT_CAP", "COST_CAP", "LOWEST_COST_WITH_BID_CAP"],
-    hasConversionWindow: false,
-    conversionLocations: ["INSTANT_FORM", "WEBSITE", "MESSAGING", "CALLS"],
-    defaultDestinationType: "ON_AD",
-    allowedDestinationTypes: ["ON_AD", "WEBSITE", "MESSENGER", "WHATSAPP", "PHONE_CALL"],
+    allowedDestinationTypes: ["UNDEFINED"],
   },
   OUTCOME_APP_PROMOTION: {
     apiObjective: "OUTCOME_APP_PROMOTION",
     label: "App Promotion",
     description: "Drive app installs and in-app actions from Facebook and Instagram",
-    allowedGoals: ["APP_INSTALLS", "APP_EVENTS", "LINK_CLICKS"],
+    allowedGoals: ["APP_INSTALLS", "OFFSITE_CONVERSIONS", "VALUE", "LINK_CLICKS"],
     defaultGoal: "APP_INSTALLS",
     pixelRequirement: "none",
     catalogAvailable: false,
     allowedAdFormats: ["SINGLE_IMAGE", "SINGLE_VIDEO", "CAROUSEL"],
     defaultCTA: "INSTALL_NOW",
-    allowedBidStrategies: ["LOWEST_COST_WITHOUT_CAP", "COST_CAP", "LOWEST_COST_WITH_BID_CAP"],
+    allowedBidStrategies: ["LOWEST_COST_WITHOUT_CAP", "COST_CAP", "LOWEST_COST_WITH_BID_CAP", "LOWEST_COST_WITH_MIN_ROAS"],
     hasConversionWindow: true,
     conversionLocations: ["APP"],
-    defaultDestinationType: "UNDEFINED",
-    allowedDestinationTypes: ["UNDEFINED"],
+    defaultDestinationType: "APP",
+    allowedDestinationTypes: ["APP"],
   },
 };
 
@@ -622,22 +604,23 @@ export function getBillingEventForGoal(goal: MetaOptimizationGoal): MetaBillingE
  * Maps the Salla UI conversion location to the Meta API destination_type.
  */
 export function getDestinationType(objective: MetaObjective, conversionLocation: MetaConversionLocation): string {
+  // Common conversion-location-to-destination mappings
+  if (conversionLocation === "MESSAGING") return "MESSENGER";
+  if (conversionLocation === "CALLS") return "PHONE_CALL";
+  if (conversionLocation === "APP") return "APP";
+  if (conversionLocation === "INSTANT_FORM") return "ON_AD";
+
   switch (objective) {
     case "OUTCOME_SALES":
-      return conversionLocation === "MESSAGING" ? "MESSENGER" : "WEBSITE";
-    case "OUTCOME_TRAFFIC":
       return "WEBSITE";
-    case "OUTCOME_LEADS":
-      if (conversionLocation === "INSTANT_FORM") return "ON_AD";
-      if (conversionLocation === "MESSAGING") return "MESSENGER";
-      if (conversionLocation === "CALLS") return "PHONE_CALL";
+    case "OUTCOME_TRAFFIC":
       return "WEBSITE";
     case "OUTCOME_ENGAGEMENT":
       return "UNDEFINED";
     case "OUTCOME_AWARENESS":
       return "UNDEFINED";
     case "OUTCOME_APP_PROMOTION":
-      return "UNDEFINED";
+      return "APP";
     default:
       return "WEBSITE";
   }

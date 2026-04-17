@@ -91,6 +91,24 @@ const GOAL_LABELS: Record<string, string> = {
   LINK_CLICKS: "Link Clicks",
   LANDING_PAGE_VIEWS: "Landing Page Views",
   CONVERSATIONS: "Conversations",
+  REACH: "Maximize Reach",
+  IMPRESSIONS: "Maximize Impressions",
+  AD_RECALL_LIFT: "Ad Recall Lift",
+  THRUPLAY: "Video Views (ThruPlay)",
+  POST_ENGAGEMENT: "Post Engagement",
+  LEAD_GENERATION: "Lead Generation",
+  APP_INSTALLS: "App Installs",
+};
+
+const DESTINATION_LABELS: Record<string, string> = {
+  WEBSITE: "Website",
+  APP: "App",
+  UNDEFINED: "Automatic",
+  MESSENGER: "Messenger",
+  WHATSAPP: "WhatsApp",
+  INSTAGRAM_DIRECT: "Instagram Direct",
+  ON_AD: "Instant Form",
+  PHONE_CALL: "Phone Call",
 };
 
 const BRAND_SAFETY_LABELS: Record<string, string> = {
@@ -107,6 +125,8 @@ const EVENT_LABELS: Record<string, string> = {
   VIEW_CONTENT: "View Content",
   ADD_PAYMENT_INFO: "Add Payment Info",
   COMPLETE_REGISTRATION: "Registration",
+  LEAD: "Lead",
+  SEARCH: "Search",
 };
 
 const BID_LABELS: Record<string, string> = {
@@ -154,6 +174,11 @@ export function MetaStepReview() {
   const totalBudget = budget.budgetType === "lifetime" ? budget.amount : budget.amount * durationDays;
 
   /* Validation */
+  const isAppPromo = objective.objective === "OUTCOME_APP_PROMOTION";
+  const isAwareness = objective.objective === "OUTCOME_AWARENESS";
+  const isEngagement = objective.objective === "OUTCOME_ENGAGEMENT";
+  const urlOptional = isAwareness || isEngagement;
+
   const checks = useMemo(() => {
     const list: { id: string; label: string; ok: boolean; detail?: string }[] = [];
 
@@ -178,18 +203,38 @@ export function MetaStepReview() {
       detail: objective.facebookPageName || "Missing",
     });
 
-    list.push({
-      id: "pixel",
-      label: "Meta Pixel configured",
-      ok: objective.pixelMode !== "none" && (objective.pixelMode === "salla_managed" || !!objective.pixelId),
-      detail: objective.pixelMode === "salla_managed" ? "Salla Managed" : objective.pixelId ? "Connected" : "Missing",
-    });
+    // Pixel check — conditional on objective requirement
+    if (objConfig.pixelRequirement === "required") {
+      list.push({
+        id: "pixel",
+        label: "Meta Pixel configured",
+        ok: objective.pixelMode !== "none" && (objective.pixelMode === "salla_managed" || !!objective.pixelId),
+        detail: objective.pixelMode === "salla_managed" ? "Salla Managed" : objective.pixelId ? "Connected" : "Missing (required)",
+      });
+    } else if (objConfig.pixelRequirement === "optional" && objective.pixelMode !== "none") {
+      list.push({
+        id: "pixel",
+        label: "Meta Pixel configured",
+        ok: true,
+        detail: objective.pixelMode === "salla_managed" ? "Salla Managed" : "Connected",
+      });
+    }
+
+    // App check — for App Promotion
+    if (isAppPromo) {
+      list.push({
+        id: "app",
+        label: "App configured",
+        ok: !!objective.appSettings.appId && !!objective.appSettings.appStoreUrl,
+        detail: objective.appSettings.appId ? `${objective.appSettings.appPlatform} app` : "Missing",
+      });
+    }
 
     list.push({
       id: "budget",
       label: "Budget configured",
       ok: budget.amount > 0,
-      detail: `SAR ${budget.amount}/day`,
+      detail: `SAR ${budget.amount}/${budget.budgetType === "daily" ? "day" : "total"}`,
     });
 
     list.push({
@@ -202,19 +247,22 @@ export function MetaStepReview() {
     list.push({
       id: "ad_copy",
       label: "Ad copy completed",
-      ok: creative.ads.length > 0 && creative.ads.every((a) => a.primaryText && a.headline),
-      detail: creative.ads.length > 0 && creative.ads.every((a) => a.primaryText && a.headline) ? "Complete" : "Missing text",
+      ok: creative.ads.length > 0 && creative.ads.every((a) => a.primaryText && (urlOptional || a.headline)),
+      detail: creative.ads.length > 0 && creative.ads.every((a) => a.primaryText) ? "Complete" : "Missing text",
     });
 
-    list.push({
-      id: "url",
-      label: "Landing page URL set",
-      ok: creative.ads.length > 0 && creative.ads.every((a) => a.websiteUrl),
-      detail: creative.ads[0]?.websiteUrl || "Missing",
-    });
+    // URL check — required for most objectives, optional for Awareness/Engagement
+    if (!urlOptional) {
+      list.push({
+        id: "url",
+        label: isAppPromo ? "App Store URL set" : "Landing page URL set",
+        ok: creative.ads.length > 0 && creative.ads.every((a) => a.websiteUrl),
+        detail: creative.ads[0]?.websiteUrl || "Missing",
+      });
+    }
 
     return list;
-  }, [objective, audience, budget, creative]);
+  }, [objective, audience, budget, creative, objConfig, isAppPromo, urlOptional]);
 
   const allPassed = checks.every((c) => c.ok);
 
@@ -222,8 +270,82 @@ export function MetaStepReview() {
   const destinationType = getDestinationType(objective.objective, objective.conversionLocation);
 
   const apiJson = useMemo(() => {
-    const clickDays = budget.clickAttributionWindow === "1d_click" ? 1 : budget.clickAttributionWindow === "7d_click" ? 7 : 28;
+    const clickDays = budget.clickAttributionWindow === "1d_click" ? 1 : 7;
     const viewDays = budget.viewAttributionWindow === "1d_view" ? 1 : budget.viewAttributionWindow === "7d_view" ? 7 : 0;
+
+    /* Build promoted_object based on objective + destination */
+    const buildPromotedObject = () => {
+      const obj = objective.objective;
+      const isAppPromo = obj === "OUTCOME_APP_PROMOTION";
+      const isAwareness = obj === "OUTCOME_AWARENESS";
+      const hasPixel = objective.pixelMode !== "none" && objective.pixelId;
+      const isConversionGoal = budget.optimizationGoal === "OFFSITE_CONVERSIONS" || budget.optimizationGoal === "VALUE";
+
+      // Awareness: no promoted_object needed
+      if (isAwareness) return undefined;
+
+      // App Promotion: application_id + object_store_url
+      if (isAppPromo) {
+        return {
+          application_id: objective.appSettings.appId || "<APP_ID>",
+          object_store_url: objective.appSettings.appStoreUrl || "<APP_STORE_URL>",
+          ...(isConversionGoal && { custom_event_type: budget.conversionEvent }),
+        };
+      }
+
+      // Sales/Leads with pixel: pixel_id + custom_event_type
+      if (obj === "OUTCOME_SALES" && hasPixel && isConversionGoal) {
+        return {
+          pixel_id: objective.pixelId,
+          custom_event_type: budget.conversionEvent,
+          ...(objective.facebookPageId && { page_id: objective.facebookPageId }),
+          ...(objective.catalogEnabled && objective.catalogId && { product_catalog_id: objective.catalogId }),
+        };
+      }
+
+      // Engagement / Traffic / other: page_id
+      if (objective.facebookPageId) {
+        return { page_id: objective.facebookPageId };
+      }
+
+      return undefined;
+    };
+
+    /* Build tracking_specs based on objective */
+    const buildTrackingSpecs = () => {
+      const obj = objective.objective;
+      const hasPixel = objective.pixelMode !== "none" && objective.pixelId;
+
+      // App Promotion: app tracking
+      if (obj === "OUTCOME_APP_PROMOTION" && objective.appSettings.appId) {
+        return [{ "action.type": ["mobile_app_install"], application: [objective.appSettings.appId] }];
+      }
+
+      // Pixel-based tracking (Sales, Leads, Traffic with pixel)
+      if (hasPixel && (obj === "OUTCOME_SALES" || obj === "OUTCOME_TRAFFIC")) {
+        return [{ "action.type": ["offsite_conversion"], fb_pixel: [objective.pixelId] }];
+      }
+
+      // Awareness / Engagement without pixel: no tracking_specs
+      return undefined;
+    };
+
+    /* Build attribution_spec only when relevant */
+    const buildAttributionSpec = () => {
+      const hasPixel = objective.pixelMode !== "none";
+      const isConversionGoal = budget.optimizationGoal === "OFFSITE_CONVERSIONS" || budget.optimizationGoal === "VALUE";
+      if (objConfig.hasConversionWindow || (hasPixel && isConversionGoal)) {
+        return [
+          { event_type: "CLICK_THROUGH", window_days: clickDays },
+          ...(viewDays > 0 ? [{ event_type: "VIEW_THROUGH", window_days: viewDays }] : []),
+        ];
+      }
+      return undefined;
+    };
+
+    const promotedObject = buildPromotedObject();
+    const trackingSpecs = buildTrackingSpecs();
+    const attributionSpec = buildAttributionSpec();
 
     return {
       // POST /act_{ad_account_id}/campaigns
@@ -232,7 +354,6 @@ export function MetaStepReview() {
         objective: objective.objective,
         special_ad_categories: objective.specialAdCategories.filter((c) => c !== "NONE"),
         bid_strategy: budget.bidStrategy,
-        ...(budget.bidStrategy === "COST_CAP" && budget.bidAmount > 0 && { daily_budget: undefined }),
         status: "PAUSED",
       },
       // POST /act_{ad_account_id}/adsets
@@ -251,13 +372,8 @@ export function MetaStepReview() {
         ...(budget.bidStrategy === "COST_CAP" && budget.bidAmount > 0 && { bid_amount: Math.round(budget.bidAmount * 100) }),
         ...(budget.bidStrategy === "LOWEST_COST_WITH_BID_CAP" && budget.bidAmount > 0 && { bid_amount: Math.round(budget.bidAmount * 100) }),
         ...(budget.bidStrategy === "LOWEST_COST_WITH_MIN_ROAS" && { roas_average_floor: budget.roasTarget }),
-        // Promoted Object (required for OUTCOME_SALES)
-        promoted_object: {
-          pixel_id: objective.pixelId || "<PIXEL_ID>",
-          custom_event_type: budget.conversionEvent,
-          ...(objective.facebookPageId && { page_id: objective.facebookPageId }),
-          ...(objective.catalogEnabled && objective.catalogId && { product_catalog_id: objective.catalogId }),
-        },
+        // Promoted Object (objective-aware)
+        ...(promotedObject && { promoted_object: promotedObject }),
         // Targeting
         targeting: {
           geo_locations: {
@@ -282,11 +398,8 @@ export function MetaStepReview() {
             excluded_custom_audiences: audience.excludedAudienceIds.map((id) => ({ id })),
           }),
         },
-        // Attribution spec
-        attribution_spec: [
-          { event_type: "CLICK_THROUGH", window_days: clickDays },
-          ...(viewDays > 0 ? [{ event_type: "VIEW_THROUGH", window_days: viewDays }] : []),
-        ],
+        // Attribution spec (only when pixel or app conversion tracking is active)
+        ...(attributionSpec && { attribution_spec: attributionSpec }),
         // Frequency cap
         ...(budget.frequencyCap.enabled && {
           frequency_control_specs: [{
@@ -324,9 +437,7 @@ export function MetaStepReview() {
             },
           },
         },
-        tracking_specs: [
-          { "action.type": ["offsite_conversion"], fb_pixel: [objective.pixelId || "<PIXEL_ID>"] },
-        ],
+        ...(trackingSpecs && { tracking_specs: trackingSpecs }),
       })),
     };
   }, [objective, audience, budget, creative, destinationType]);
@@ -389,7 +500,7 @@ export function MetaStepReview() {
             <ReviewRow label="Campaign Name" value={objective.campaignName || "Not set"} warn={!objective.campaignName} />
             <ReviewRow label="Pixel" value={objective.pixelMode === "salla_managed" ? "Salla Managed" : objective.pixelId || "Not set"} warn={objective.pixelMode === "none"} />
             <ReviewRow label="Conversion Location" value={objective.conversionLocation} />
-            <ReviewRow label="Destination Type" value={destinationType} />
+            <ReviewRow label="Destination Type" value={DESTINATION_LABELS[destinationType] || destinationType} />
             <ReviewRow label="Facebook Page" value={objective.facebookPageName || "Not set"} warn={!objective.facebookPageName} />
             {objective.instagramAccountName && (
               <ReviewRow label="Instagram Account" value={objective.instagramAccountName} />
