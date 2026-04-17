@@ -745,13 +745,13 @@ export function MetaStepCreative() {
                     <LearnMoreTrigger {...brandSafetyLearnMore.triggerProps} />
                   </div>
                   <p className="mb-4 mt-1 text-xs text-muted-foreground">
-                    Control what types of content your ads can appear alongside.
+                    Control what content appears around your ads.
                   </p>
                   <div className="grid gap-3 sm:grid-cols-3">
                     {([
-                      { value: "FACEBOOK_STANDARD" as const, label: "Standard Inventory", desc: "Excludes sensitive content categories. Appropriate for most brands.", tradeoff: "Balanced reach and safety", recommended: true },
-                      { value: "FULL_INVENTORY" as const, label: "Full Inventory", desc: "No content restrictions. Maximum reach with ads appearing alongside all content.", tradeoff: "Maximum reach, less control" },
-                      { value: "LIMITED_INVENTORY" as const, label: "Limited Inventory", desc: "Most restrictive. Excludes all mature themes and controversial content.", tradeoff: "Highest safety, reduced reach" },
+                      { value: "FACEBOOK_STANDARD" as const, label: "Standard", tagline: "Balanced reach and safety", recommended: true },
+                      { value: "FULL_INVENTORY" as const, label: "Full", tagline: "Maximum reach" },
+                      { value: "LIMITED_INVENTORY" as const, label: "Limited", tagline: "Strictest safety" },
                     ]).map((opt) => {
                       const selected = creative.brandSafetyLevel === opt.value;
                       return (
@@ -760,7 +760,7 @@ export function MetaStepCreative() {
                           type="button"
                           onClick={() => updateNested("creative", { brandSafetyLevel: opt.value })}
                           className={cn(
-                            "flex flex-1 flex-col gap-2 rounded-xl border px-5 py-4 text-left transition-all",
+                            "flex flex-1 flex-col gap-1.5 rounded-xl border px-5 py-4 text-left transition-all",
                             selected
                               ? "border-[#1877F2] bg-[#1877F2]/[0.04]"
                               : "border-border bg-card hover:border-[#1877F2]/40"
@@ -769,11 +769,10 @@ export function MetaStepCreative() {
                           <div className="flex items-center gap-2">
                             <span className={cn("text-sm font-bold", selected ? "text-[#1877F2]" : "text-foreground")}>{opt.label}</span>
                             {opt.recommended && (
-                              <Badge className="rounded-full bg-[#1877F2] px-1.5 py-0 text-[9px] text-white">Recommended</Badge>
+                              <Badge className="rounded-full bg-[#1877F2] px-1.5 py-0 text-[9px] text-white">Best</Badge>
                             )}
                           </div>
-                          <p className="text-xs leading-relaxed text-muted-foreground">{opt.desc}</p>
-                          <span className="text-[10px] font-medium text-muted-foreground/70">{opt.tradeoff}</span>
+                          <p className="text-xs text-muted-foreground">{opt.tagline}</p>
                         </button>
                       );
                     })}
