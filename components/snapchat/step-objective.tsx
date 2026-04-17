@@ -35,10 +35,12 @@ import {
   MousePointerClick,
   ArrowRight,
   User,
+  Info,
 } from "lucide-react";
 import { OBJECTIVE_CONFIGS, getGoalsForLocation, type CampaignObjective, type ConversionLocation, type AppPlatform, makeDefaultLeadForm, makeDefaultAppSettings } from "@/lib/snapchat/campaign-types";
 import { getSnapPixel, getSnapPublicProfile, type SnapPixelInfo, type SnapPublicProfile } from "@/lib/salla/store-api";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
+import { LearnMoreSheet, LearnMoreTrigger, SheetSection, SheetDecisionCard, useLearnMore } from "@/components/shared/learn-more-sheet";
 
 
 /* ------------------------------------------------------------------ */
@@ -135,6 +137,8 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
   const [objectiveSheetOpen, setObjectiveSheetOpen] = useState(false);
   const [connectedPixel, setConnectedPixel] = useState<SnapPixelInfo | null>(null);
   const [snapProfile, setSnapProfile] = useState<SnapPublicProfile | null>(null);
+  const pixelLearnMore = useLearnMore();
+  const convLocationLearnMore = useLearnMore();
 
   // Load connected Snap Pixel from Salla
   useEffect(() => {
@@ -293,7 +297,10 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                 {/* Conversion Location Selector — shown when objective supports multiple locations */}
                 {currentConfig.conversionLocations.length > 1 && (
                   <div className="border-t border-border px-4 sm:px-8 py-5">
-                    <p className="mb-3 text-sm font-semibold text-foreground">Where do you want to collect leads?</p>
+                    <div className="mb-3 flex items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground">Where do you want to collect leads?</p>
+                      <LearnMoreTrigger {...convLocationLearnMore.triggerProps} />
+                    </div>
                     <div className="flex gap-3">
                       {currentConfig.conversionLocations.map((loc) => {
                         const selected = obj.conversionLocation === loc;
@@ -575,6 +582,7 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                         <Badge variant={currentConfig.pixelRequirement === "required" ? "secondary" : "outline"} className="rounded-full px-1.5 py-0 text-xs">
                           {currentConfig.pixelRequirement === "required" ? "Required" : "Optional"}
                         </Badge>
+                        <LearnMoreTrigger {...pixelLearnMore.triggerProps} label="What is a pixel?" />
                       </div>
                       <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
                         Tracks visitor actions on your store to measure and optimize results.
@@ -965,6 +973,93 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
           />
         </div>
       </div>
+      {/* ---- Learn More: Snap Pixel ---- */}
+      <LearnMoreSheet
+        open={pixelLearnMore.open}
+        onOpenChange={pixelLearnMore.setOpen}
+        title="Snap Pixel"
+        description="A small piece of code on your website that tracks what visitors do after seeing your ad — like viewing a product, adding to cart, or purchasing."
+        icon={<Scan className="size-4" />}
+        proTip="New pixels need 50+ events to optimize well. Start with Page Views as your goal, then graduate to Add to Cart and Purchases as your pixel matures."
+      >
+        <SheetSection icon={<Eye className="size-4" />} title="Why does it matter?">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Without a pixel, Snapchat can&apos;t see what happens after someone clicks your ad. It&apos;s like running a store without knowing which customers bought something — you can&apos;t optimize for what you can&apos;t measure.
+          </p>
+        </SheetSection>
+        <SheetSection icon={<Zap className="size-4" />} title="Which option should I pick?">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Automatic (Salla)"
+              description="We create and install a pixel on your Salla store automatically. Zero setup, works immediately. Best for most merchants."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Connect Existing"
+              description="Use a pixel you already created in Snapchat Ads Manager. Choose this only if you manage your pixel separately or use a custom website."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<TrendingUp className="size-4" />} title="Pixel learning phase">
+          <div className="flex flex-col gap-2 text-xs leading-relaxed text-muted-foreground">
+            <p>A new pixel goes through a learning phase where it collects data about your visitors. The more data it has, the better Snapchat can find the right people for your ads.</p>
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <p className="font-semibold text-foreground">Recommended progression:</p>
+              <ol className="ml-4 mt-1 list-decimal space-y-0.5">
+                <li>Start with <span className="font-medium text-foreground">Page Views</span> goal (easiest to collect)</li>
+                <li>Switch to <span className="font-medium text-foreground">Add to Cart</span> after 50+ daily page views</li>
+                <li>Graduate to <span className="font-medium text-foreground">Purchases</span> after 10+ weekly purchases</li>
+              </ol>
+            </div>
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      {/* ---- Learn More: Conversion Location ---- */}
+      <LearnMoreSheet
+        open={convLocationLearnMore.open}
+        onOpenChange={convLocationLearnMore.setOpen}
+        title="Conversion Location"
+        description="Choose where you want to collect lead information from potential customers."
+        icon={<ClipboardList className="size-4" />}
+        proTip="Start with Native Lead Form — it has 3x higher completion rates because fields are pre-filled from the user's Snapchat profile."
+      >
+        <SheetSection icon={<ClipboardList className="size-4" />} title="Which should I pick?">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Lead Form (Native)"
+              description="Users fill out a form directly inside Snapchat. Fields like name, email, and phone are pre-filled from their profile — faster and higher completion rates."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Website (Pixel)"
+              description="Users swipe up and land on your website. You track form submissions with your Snap Pixel. More customizable but requires pixel setup and has lower completion rates."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info className="size-4" />} title="Key differences">
+          <div className="rounded-lg border border-border overflow-hidden text-xs">
+            <div className="grid grid-cols-3 border-b border-border bg-muted/30 px-3 py-2 font-semibold text-foreground">
+              <span />
+              <span>Lead Form</span>
+              <span>Website</span>
+            </div>
+            {[
+              ["Completion rate", "High", "Lower"],
+              ["Pre-filled fields", "Yes", "No"],
+              ["Custom design", "Limited", "Full control"],
+              ["Pixel required", "No", "Yes"],
+              ["Best for", "Quick leads", "Complex forms"],
+            ].map(([label, form, web]) => (
+              <div key={label} className="grid grid-cols-3 border-b border-border last:border-0 px-3 py-2 text-muted-foreground">
+                <span className="font-medium text-foreground">{label}</span>
+                <span>{form}</span>
+                <span>{web}</span>
+              </div>
+            ))}
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
     </TooltipProvider>
   );
 }

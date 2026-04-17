@@ -30,10 +30,12 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  Globe,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
+import { LearnMoreSheet, LearnMoreTrigger, SheetSection, SheetDecisionCard, useLearnMore } from "@/components/shared/learn-more-sheet";
 import {
   OBJECTIVE_CONFIGS,
   makeDefaultLeadForm,
@@ -66,6 +68,9 @@ export function StepCreative() {
   const [snapProfile, setSnapProfile] = useState<SnapPublicProfile | null>(null);
   const [showNewAdPicker, setShowNewAdPicker] = useState(false);
   const [placementExpanded, setPlacementExpanded] = useState(false);
+  const placementLearnMore = useLearnMore();
+  const safetyLearnMore = useLearnMore();
+  const formatLearnMore = useLearnMore();
 
   const ads = creative.ads ?? [];
   const activeAd = ads[activeAdIdx] ?? ads[0] ?? null;
@@ -575,7 +580,10 @@ export function StepCreative() {
 
             {/* ── Content Safety ── */}
             <div className="rounded-xl bg-card px-6 py-5">
-              <h3 className="text-sm font-bold text-foreground">Content Safety</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-foreground">Content Safety</h3>
+                <LearnMoreTrigger {...safetyLearnMore.triggerProps} />
+              </div>
               <p className="mt-1 mb-4 text-xs text-muted-foreground">
                 Defines the type of content your ads appear next to. This doesn&apos;t change your ad—it controls its environment.
               </p>
@@ -627,7 +635,10 @@ export function StepCreative() {
             {/* ── Ad Placement ── */}
 
             <div className="rounded-xl bg-card px-6 py-5">
-              <h3 className="text-sm font-bold text-foreground">Ad Placement</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-foreground">Ad Placement</h3>
+                <LearnMoreTrigger {...placementLearnMore.triggerProps} />
+              </div>
               <p className="mt-1 mb-4 text-xs text-muted-foreground">
                 Where your ads appear on Snapchat. Auto-placement finds the best locations for performance, while manual lets you choose.
               </p>
@@ -865,7 +876,10 @@ export function StepCreative() {
               <div className="overflow-hidden rounded-xl border border-border bg-card">
                 {/* Header */}
                 <div className="px-6 py-5">
-                  <h3 className="text-xs font-bold text-foreground">Ad Type</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-foreground">Ad Type</h3>
+                    <LearnMoreTrigger {...formatLearnMore.triggerProps} label="Compare formats" />
+                  </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Choose a format for this ad. You can add more ads in different formats.
                   </p>
@@ -1160,6 +1174,143 @@ export function StepCreative() {
           text: allChecks.find((c) => !c.ok)?.label ? `Missing: ${allChecks.find((c) => !c.ok)!.label}` : "Complete all required fields",
         } : undefined}
       />
+
+      {/* ---- Learn More: Ad Placement ---- */}
+      <LearnMoreSheet
+        open={placementLearnMore.open}
+        onOpenChange={placementLearnMore.setOpen}
+        title="Ad Placement"
+        description="Placements determine where your ads appear across Snapchat. Each placement reaches users in a different context."
+        icon={<Globe className="size-4" />}
+        proTip="Use Automatic placement unless you have data showing one specific placement outperforms others. Automatic typically delivers 20-40% more impressions at lower cost."
+      >
+        <SheetSection icon={<Sparkles className="size-4" />} title="Automatic vs Manual">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Automatic (Recommended)"
+              description="Snapchat optimizes across all available placements to find the best results for your budget. Best for most campaigns."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Manual"
+              description="You choose exactly where ads appear. Useful when you know your audience prefers a specific placement (e.g., Spotlight for younger users)."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<LayoutGrid className="size-4" />} title="Where each placement appears">
+          <div className="flex flex-col gap-1.5 text-xs">
+            {[
+              { name: "Between User Stories", desc: "Full-screen ads between friend stories — highest reach" },
+              { name: "Spotlight", desc: "TikTok-like vertical feed — great for discovery" },
+              { name: "Discover Feed", desc: "Story Ad tiles in the Discover tab — drives content engagement" },
+              { name: "Chat Feed", desc: "Ads between conversations — high visibility, Sponsored Ads primary placement" },
+              { name: "Within Publisher Stories", desc: "Mid-roll in premium content — brand-safe, engaged viewers" },
+              { name: "Camera", desc: "AR Lens placements in the camera — interactive, high engagement" },
+            ].map((p) => (
+              <div key={p.name} className="rounded-lg border border-border px-3 py-2">
+                <p className="font-semibold text-foreground">{p.name}</p>
+                <p className="text-muted-foreground">{p.desc}</p>
+              </div>
+            ))}
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      {/* ---- Learn More: Content Safety ---- */}
+      <LearnMoreSheet
+        open={safetyLearnMore.open}
+        onOpenChange={safetyLearnMore.setOpen}
+        title="Content Safety"
+        description="Content safety controls what type of Snapchat content your ads appear next to — it doesn't change your ad itself."
+        icon={<ShieldCheck className="size-4" />}
+        proTip="Most e-commerce brands can safely use Full Access. Only switch to Safe Access if you sell sensitive products (healthcare, finance) or have strict brand guidelines."
+      >
+        <SheetSection icon={<ShieldCheck className="size-4" />} title="Which should I pick?">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Full Access"
+              description="Your ads can appear next to all Snapchat content — user stories, publisher content, Spotlight. Maximum reach and lowest cost per result."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Safe Access"
+              description="Your ads only appear next to moderated, brand-safe content. Certain placements become unavailable. Smaller audience but greater control over brand environment."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info className="size-4" />} title="What gets filtered">
+          <div className="text-xs leading-relaxed text-muted-foreground">
+            <p className="mb-2">With Safe Access, Snapchat excludes content categories like:</p>
+            <ul className="ml-4 list-disc space-y-0.5">
+              <li>News and political content</li>
+              <li>User-generated content with mature themes</li>
+              <li>Controversial or edgy creator content</li>
+            </ul>
+            <p className="mt-2">Your ads still appear in Spotlight, Discover, and curated publisher content — just not next to anything flagged as sensitive.</p>
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      {/* ---- Learn More: Ad Format ---- */}
+      <LearnMoreSheet
+        open={formatLearnMore.open}
+        onOpenChange={formatLearnMore.setOpen}
+        title="Ad Formats"
+        description="Each format creates a different experience for the user. Choose based on your content and what you want to achieve."
+        icon={<LayoutGrid className="size-4" />}
+        proTip={
+          campaign.objective.objective === "SALES"
+            ? "Collection Ads with your store products perform 2.3x better for Sales. Use Single Image/Video for quick A/B testing."
+            : campaign.objective.objective === "ENGAGEMENT"
+              ? "Story Ads generate 3x more engagement. Use 3-5 snaps to tell your brand story."
+              : campaign.objective.objective === "LEADS"
+                ? "Lead Generation only supports Single Image/Video. Use short video (under 10s) for 40% higher form completion."
+                : "Start with Single Image/Video — it's the most versatile format across all placements."
+        }
+      >
+        <SheetSection icon={<LayoutGrid className="size-4" />} title="Format comparison">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Single Image / Video"
+              description="One full-screen image or video with a swipe-up CTA. The most versatile format — works in all placements. Upload up to 8 creative variations per ad."
+              highlighted={campaign.objective.objective === "LEADS"}
+            />
+            {objectiveConfig.allowedFormats.includes("COLLECTION") && (
+              <SheetDecisionCard
+                title="Collection Ad"
+                description="A hero image/video at the top + 2-4 product tiles below. Users can browse products without leaving Snapchat. Great for showcasing multiple products."
+                highlighted={campaign.objective.objective === "SALES"}
+              />
+            )}
+            {objectiveConfig.allowedFormats.includes("STORY") && (
+              <SheetDecisionCard
+                title="Story Ad"
+                description="3-20 snaps played in sequence, each with its own CTA. Appears as a branded tile in Discover. Best for storytelling and longer content."
+                highlighted={campaign.objective.objective === "ENGAGEMENT"}
+              />
+            )}
+            {objectiveConfig.allowedFormats.includes("DYNAMIC") && (
+              <SheetDecisionCard
+                title="Dynamic Product Ad"
+                description="Auto-generated from your product catalog. Shows different products to different users based on their browsing behavior. Requires a connected catalog."
+              />
+            )}
+            {objectiveConfig.allowedFormats.includes("INFLUENCER") && (
+              <SheetDecisionCard
+                title="Influencer Content"
+                description="Run a creator's content as your ad using their Ad Code. Appears as authentic creator content with a paid partnership label."
+              />
+            )}
+          </div>
+        </SheetSection>
+        {campaign.objective.objective === "LEADS" && (
+          <SheetSection icon={<Info className="size-4" />} title="Why only Single format?">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Lead Generation ads use Snapchat&apos;s native form that opens when users swipe up. This requires a single full-screen creative (image or video) with a clear call-to-action. Collection and Story formats aren&apos;t compatible with the native form experience.
+            </p>
+          </SheetSection>
+        )}
+      </LearnMoreSheet>
     </TooltipProvider>
   );
 }

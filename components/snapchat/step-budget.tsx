@@ -69,6 +69,8 @@ import {
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { DeliveryPacingCard } from "@/components/shared/delivery-pacing-card";
 import { AttributionWindowCard } from "@/components/shared/attribution-window-card";
+import { LearnMoreSheet, LearnMoreTrigger, SheetSection, SheetDecisionCard, useLearnMore } from "@/components/shared/learn-more-sheet";
+import { Target, Gauge, Clock as ClockIcon, Info } from "lucide-react";
 import { FrequencyCapCard } from "@/components/shared/frequency-cap-card";
 import type { FrequencyPreset } from "@/components/shared/frequency-cap-card";
 
@@ -386,6 +388,11 @@ export function StepBudget() {
     maxDailyBudget: budget.amount * 3,
   };
 
+  /* Learn More sliders */
+  const goalLearnMore = useLearnMore();
+  const bidLearnMore = useLearnMore();
+  const attributionLearnMore = useLearnMore();
+
   /* Local UI state */
   const [showAdvanced, setShowAdvanced] = useState(
     budget.pacingType !== "STANDARD" || budget.frequencyCapEnabled || budget.schedule === "custom"
@@ -597,6 +604,7 @@ export function StepBudget() {
             }}
             layout="grid"
             infoTipText="Choose what action you want to optimize for. This determines how your budget is spent."
+            learnMoreTrigger={<LearnMoreTrigger {...goalLearnMore.triggerProps} />}
             pixelReadiness={
               !hasPixelConfigured ? "none"
               : pixelMode === "salla_managed" ? "new"
@@ -646,6 +654,7 @@ export function StepBudget() {
             }}
             layout="buttons"
             infoTipText="Choose how your budget competes for ad placements. Auto Bid is recommended for most advertisers."
+            learnMoreTrigger={<LearnMoreTrigger {...bidLearnMore.triggerProps} />}
             bidInputs={
               budget.bidStrategy !== "AUTO_BID"
                 ? [{
@@ -758,6 +767,7 @@ export function StepBudget() {
                   combinedValue={budget.conversionWindow}
                   onCombinedChange={(v) => updateNested("budget", { conversionWindow: v as ConversionWindow })}
                   tip="Wider windows capture more conversions. Purchases often happen days after the first ad."
+                  learnMoreTrigger={<LearnMoreTrigger {...attributionLearnMore.triggerProps} />}
                 />
               )}
 
@@ -958,6 +968,129 @@ export function StepBudget() {
         nextDisabled={budgetNavDisabled}
         accent="primary"
       />
+      {/* ---- Learn More: Optimization Goal ---- */}
+      <LearnMoreSheet
+        open={goalLearnMore.open}
+        onOpenChange={goalLearnMore.setOpen}
+        title="Optimization Goal"
+        description="Your optimization goal tells Snapchat what result to maximize with your budget. It's the single most important setting in your campaign."
+        icon={<Target className="size-4" />}
+        proTip={
+          campaign.objective.objective === "SALES"
+            ? "Start with Page Views if your pixel is new. Graduate to Add to Cart, then Purchases as your pixel collects more data."
+            : campaign.objective.objective === "LEADS"
+              ? "Form Submissions gives you the most leads. Use Swipe Ups only if you want maximum traffic to your form."
+              : "Start with Auto Bid + your recommended goal. Adjust after 3-5 days of data."
+        }
+      >
+        <SheetSection icon={<Target className="size-4" />} title="Which goal should I pick?">
+          <div className="flex flex-col gap-2">
+            {goalsWithLocked.filter((g) => !g.locked).map((g) => (
+              <SheetDecisionCard
+                key={g.value}
+                title={g.label}
+                description={g.bestFor || g.costHint || g.desc}
+                highlighted={g.recommended}
+              />
+            ))}
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info className="size-4" />} title="How it works">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Snapchat uses your goal to find the right people. If you optimize for Purchases, Snap shows your ad to people most likely to buy. If you optimize for Impressions, it maximizes how many people see it. The goal directly affects who sees your ad and what you pay.
+          </p>
+        </SheetSection>
+        {OPTIMIZATION_GOALS.some((g) => g.requiresPixel) && (
+          <SheetSection icon={<AlertCircle className="size-4" />} title="Pixel requirements">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Goals marked with a lock icon require a Snap Pixel to be connected. The pixel tracks actions on your website so Snapchat can optimize delivery. Configure your pixel in the Objective step.
+            </p>
+          </SheetSection>
+        )}
+      </LearnMoreSheet>
+
+      {/* ---- Learn More: Bid Strategy ---- */}
+      <LearnMoreSheet
+        open={bidLearnMore.open}
+        onOpenChange={bidLearnMore.setOpen}
+        title="Bidding Strategy"
+        description="Your bid strategy controls how Snapchat competes in the ad auction to show your ads. It determines your cost per result."
+        icon={<Gauge className="size-4" />}
+        proTip="Start with Auto Bid for the first 7 days. Once you have baseline data on your cost per result, switch to Max Bid or Target Cost for more control."
+      >
+        <SheetSection icon={<Gauge className="size-4" />} title="Strategy comparison">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Auto Bid (Recommended)"
+              description="Snapchat sets your bid automatically to get the most results within your budget. Best for beginners and new campaigns — no manual input needed."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Max Bid"
+              description="You set a ceiling — Snapchat never bids above your limit per result. Good when you know exactly how much a result is worth to you. Risk: setting it too low means zero delivery."
+            />
+            {objectiveConfig.allowedBidStrategies.includes("TARGET_COST") && (
+              <SheetDecisionCard
+                title="Target Cost"
+                description="You set your ideal cost per result. Snapchat tries to average around that amount — some results cost more, some less. Good for predictable budgeting."
+              />
+            )}
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info className="size-4" />} title="How the auction works">
+          <div className="flex flex-col gap-2 text-xs leading-relaxed text-muted-foreground">
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <ol className="ml-4 list-decimal space-y-1">
+                <li><span className="font-medium text-foreground">You set a bid</span> — how much a result is worth to you</li>
+                <li><span className="font-medium text-foreground">Snapchat competes</span> — your bid enters the auction against other advertisers</li>
+                <li><span className="font-medium text-foreground">Winner shows</span> — highest value ad (bid x relevance) wins the placement</li>
+              </ol>
+            </div>
+            <p>You only pay what&apos;s needed to win, not your full bid. Higher bids win more auctions but cost more per result.</p>
+          </div>
+        </SheetSection>
+        <SheetSection icon={<AlertCircle className="size-4" />} title="Common mistakes">
+          <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+            <p><span className="font-medium text-foreground">Max Bid too low:</span> You win zero auctions and get no delivery. Check the suggested range.</p>
+            <p><span className="font-medium text-foreground">Target Cost too aggressive:</span> Setting an unrealistically low target means Snap can&apos;t find enough users at that price.</p>
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      {/* ---- Learn More: Attribution Window ---- */}
+      <LearnMoreSheet
+        open={attributionLearnMore.open}
+        onOpenChange={attributionLearnMore.setOpen}
+        title="Conversion Window"
+        description="The conversion window is the time period after a user sees or clicks your ad during which their actions count as a conversion."
+        icon={<ClockIcon className="size-4" />}
+        proTip="Always start with 28-day Click + 1-day View. It gives Snapchat the strongest signal to optimize. Switch to 7-day only after your pixel has 50+ conversions per week."
+      >
+        <SheetSection icon={<ClockIcon className="size-4" />} title="What does this mean?">
+          <div className="text-xs leading-relaxed text-muted-foreground">
+            <p className="mb-2">Imagine a customer sees your ad on Monday, browses your store on Wednesday, and buys on Friday. Should that purchase count as a result of your ad?</p>
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <p className="font-semibold text-foreground">With 28-day window:</p>
+              <p>Yes — the purchase happened within 28 days of clicking. It counts.</p>
+              <p className="mt-2 font-semibold text-foreground">With 7-day window:</p>
+              <p>Only if they bought within 7 days of clicking. Friday (day 5) still counts.</p>
+            </div>
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Target className="size-4" />} title="Which should I choose?">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="28-Day Click + 1-Day View (Recommended)"
+              description="Captures more conversions, gives Snapchat more data to optimize. Best for new campaigns and most e-commerce stores."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="7-Day Click Only"
+              description="Stricter — only credits conversions within 7 days of a click. Requires mature pixel with sufficient conversion data. Use this when you want conservative attribution."
+            />
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
     </TooltipProvider>
   );
 }
