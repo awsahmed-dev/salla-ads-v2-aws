@@ -115,11 +115,33 @@ export function StepCreative() {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-create first ad for LEADS objective (single-format: only SINGLE allowed).
+  // Skips the redundant format picker and drops the advertiser straight into the creative editor.
+  useEffect(() => {
+    if (
+      campaign.objective.objective === "LEADS" &&
+      ads.length === 0
+    ) {
+      const dest = campaign.objective.conversionLocation === "WEB" ? "WEBSITE" as AdDestination : "LEAD_FORM" as AdDestination;
+      const newAd = makeAdGroup("SINGLE", 0, dest, false);
+      newAd.assets = newAd.assets.map((a) => ({ ...a, cta: defaultCTA }));
+      updateNested("creative", { ads: [newAd] });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaign.objective.objective, campaign.objective.conversionLocation]);
   const allowedFormats: AdFormat[] = catalogEnabled
     ? ["DYNAMIC", "COLLECTION", "STORY"]
     : (objectiveConfig.allowedFormats ?? ["SINGLE", "COLLECTION", "STORY", "INFLUENCER"]).filter((f) => f !== "DYNAMIC");
 
-  const allowedDestinations: AdDestination[] = objectiveConfig.allowedDestinations ?? ["WEBSITE"];
+  // For LEADS, the allowed destinations depend on the conversion location:
+  // LEAD_FORM → only LEAD_FORM destination; WEB → only WEBSITE destination.
+  const allowedDestinations: AdDestination[] = (() => {
+    if (campaign.objective.objective === "LEADS") {
+      return campaign.objective.conversionLocation === "WEB" ? ["WEBSITE"] : ["LEAD_FORM"];
+    }
+    return objectiveConfig.allowedDestinations ?? ["WEBSITE"];
+  })();
 
   const FILTERED_AD_FORMATS = FORMAT_OPTIONS.filter((o) => allowedFormats.includes(o.value));
 
@@ -190,9 +212,10 @@ export function StepCreative() {
     });
     allChecks.push({ label: "At least 1 valid placement selected", ok: validPositions.length > 0 });
   }
-  const urlRequired = objectiveConfig.conversionLocation !== "NONE" && objectiveConfig.conversionLocation !== "LEAD_FORM" && objectiveConfig.conversionLocation !== "APP";
+  const convLoc = campaign.objective.conversionLocation;
+  const urlRequired = convLoc !== "NONE" && convLoc !== "LEAD_FORM" && convLoc !== "APP";
 
-  if (campaign.objective.objective === "LEADS") {
+  if (campaign.objective.objective === "LEADS" && convLoc === "LEAD_FORM") {
     const lf = creative.leadForm;
     const lfTypes = (lf?.form_fields ?? []).map((f) => f.type);
     allChecks.push({ label: "Lead form title set", ok: !!(lf?.title?.trim()) });
@@ -526,14 +549,6 @@ export function StepCreative() {
                 </div>
               </div>
             </SectionCard>
-          )}
-
-          {/* ---- Lead Generation Form (LEADS objective) ---- */}
-          {campaign.objective.objective === "LEADS" && (
-            <LeadFormBuilder
-              form={creative.leadForm ?? makeDefaultLeadForm()}
-              onChange={(updated) => updateNested("creative", { leadForm: updated })}
-            />
           )}
 
           {/* ---- Ad Placement & Brand Safety ---- */}
@@ -998,6 +1013,26 @@ export function StepCreative() {
             )}
           </SectionCard>
 
+          {/* ---- Lead Generation Form (LEADS + LEAD_FORM) ---- */}
+          {/* Placed AFTER the ad creative so the flow is: create ad → configure form */}
+          {campaign.objective.objective === "LEADS" && campaign.objective.conversionLocation === "LEAD_FORM" && (
+            <>
+              {/* Connecting explainer between ad creative and lead form */}
+              <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+                  <ChevronDown className="size-4 text-blue-600" />
+                </div>
+                <p className="text-xs leading-relaxed text-blue-700">
+                  <span className="font-semibold">Your ad above is what users see.</span> When they swipe up, the form below opens. Keep the form short for higher completion rates.
+                </p>
+              </div>
+              <LeadFormBuilder
+                form={creative.leadForm ?? makeDefaultLeadForm()}
+                onChange={(updated) => updateNested("creative", { leadForm: updated })}
+              />
+            </>
+          )}
+
         </div>
 
         {/* ============ RIGHT COLUMN ============ */}
@@ -1018,8 +1053,8 @@ export function StepCreative() {
               setPreviewAssetIdx={setPreviewAssetIdx}
             />
 
-            {/* ---- LEAD FORM SUMMARY (only for LEADS) ---- */}
-            {campaign.objective.objective === "LEADS" && creative.leadForm && (
+            {/* ---- LEAD FORM SUMMARY (only for LEADS + LEAD_FORM) ---- */}
+            {campaign.objective.objective === "LEADS" && campaign.objective.conversionLocation === "LEAD_FORM" && creative.leadForm && (
               <SectionCard className="p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <FileText className="size-4 text-primary" />
@@ -1075,6 +1110,24 @@ export function StepCreative() {
                       <span className="mt-0.5 text-[11px] text-muted-foreground">End Page</span>
                     </div>
                   </div>
+
+                  {/* Form length indicator */}
+                  {(() => {
+                    const fc = creative.leadForm.form_fields.length;
+                    const lengthLabel = fc <= 3 ? "Short form" : fc <= 5 ? "Moderate form" : "Long form";
+                    const lengthHint = fc <= 3 ? "High completion rate expected" : fc <= 5 ? "Good balance of data and completion" : "May reduce completion rate";
+                    const lengthColor = fc <= 3
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : fc <= 5
+                        ? "border-amber-200 bg-amber-50 text-amber-700"
+                        : "border-red-200 bg-red-50 text-red-700";
+                    return (
+                      <div className={cn("flex items-center gap-2 rounded-lg border px-3 py-2", lengthColor)}>
+                        <span className="text-xs font-semibold">{lengthLabel}</span>
+                        <span className="text-[11px]">{lengthHint}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </SectionCard>
             )}
@@ -1089,6 +1142,7 @@ export function StepCreative() {
               frequencyCapEnabled={campaign.budget.frequencyCapEnabled}
               objective={campaign.objective.objective}
               catalogEnabled={catalogEnabled}
+              leadForm={campaign.objective.objective === "LEADS" && campaign.objective.conversionLocation === "LEAD_FORM" ? creative.leadForm : undefined}
             />
 
           </div>
@@ -1279,6 +1333,7 @@ function CampaignReadinessCard({
   frequencyCapEnabled = false,
   objective,
   catalogEnabled = false,
+  leadForm,
 }: {
   ads: AdGroup[];
   totalCreatives: number;
@@ -1288,6 +1343,7 @@ function CampaignReadinessCard({
   frequencyCapEnabled?: boolean;
   objective?: string;
   catalogEnabled?: boolean;
+  leadForm?: import("@/lib/snapchat/campaign-types").LeadGenerationForm;
 }) {
   const [showAllChecks, setShowAllChecks] = useState(false);
   const failingChecks = allChecks.filter((c) => !c.ok);
@@ -1310,7 +1366,7 @@ function CampaignReadinessCard({
       tip: objective === "SALES"
         ? "Each ad supports one creative — add 2+ ads with different visuals or formats to find the best-performing sales driver"
         : objective === "LEADS"
-          ? "Each ad supports one creative — add multiple ads to test different lead form approaches"
+          ? "Add 2+ ads with different images, videos, or headlines to find what drives the most form submissions"
           : "Each ad supports one creative — add 2+ ads to test different formats and creatives",
       metTip: `${ads.length} ads — great for A/B testing`,
     });
@@ -1322,12 +1378,16 @@ function CampaignReadinessCard({
       met: hasBothMediaTypes,
       tip: objective === "ENGAGEMENT"
         ? "Create one video ad and one image ad — video gets 3x more engagement, images provide broader reach"
-        : "Create both a video ad and an image ad — video drives engagement while images extend your reach",
+        : objective === "LEADS"
+          ? "Create one video ad (under 10s) and one image ad — video drives 40% higher form completion"
+          : "Create both a video ad and an image ad — video drives engagement while images extend your reach",
       metTip: "Both video and image ads included",
     });
   }
 
-  if (ads.length >= 2 && !frequencyCapEnabled && !catalogEnabled) {
+  // "Multiple formats" only applies when the objective supports more than SINGLE format.
+  // LEADS only supports SINGLE, so this best practice is hidden.
+  if (ads.length >= 2 && !frequencyCapEnabled && !catalogEnabled && objective !== "LEADS") {
     bestPractices.push({
       label: "Multiple formats",
       met: hasMultipleFormats,
@@ -1344,8 +1404,39 @@ function CampaignReadinessCard({
     bestPractices.push({
       label: "A/B testing",
       met: hasDifferentCreatives,
-      tip: "Vary headlines, CTAs, or visuals across ads to find what resonates best with your audience",
+      tip: objective === "LEADS"
+        ? "Test different headlines, CTAs, or visuals — small changes can significantly impact form completion rates"
+        : "Vary headlines, CTAs, or visuals across ads to find what resonates best with your audience",
       metTip: "Different creatives across ads",
+    });
+  }
+
+  /* ── LEADS-specific best practices ── */
+  if (objective === "LEADS" && leadForm) {
+    bestPractices.push({
+      label: "Short form (3-5 fields)",
+      met: leadForm.form_fields.length >= 1 && leadForm.form_fields.length <= 5,
+      tip: "Forms with 3-5 fields have 60% higher completion rates than longer forms",
+      metTip: `${leadForm.form_fields.length} fields — optimal length`,
+    });
+    bestPractices.push({
+      label: "Thank You page",
+      met: !!leadForm.end_page_properties,
+      tip: "Add a Thank You page with a CTA to continue engagement after form submission",
+      metTip: "End page configured with redirect",
+    });
+    bestPractices.push({
+      label: "Banner image",
+      met: !!leadForm.bannerPreviewUrl,
+      tip: "Forms with a banner image are more visually appealing and build trust",
+      metTip: "Banner image uploaded",
+    });
+    const hasVideo = ads.some((a) => a.assets.some((asset) => asset.mediaType === "VIDEO"));
+    bestPractices.push({
+      label: "Video creative",
+      met: hasVideo,
+      tip: "Lead ads with short video (under 10s) have 40% higher form completion rates",
+      metTip: "Video creative included",
     });
   }
 
