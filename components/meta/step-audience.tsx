@@ -6,14 +6,13 @@ import { cn } from "@/lib/utils";
 import { getCountryByCode, getCityById } from "@/lib/locations";
 import { LocationSelector } from "@/components/shared/location-selector";
 import { LocationReachCard } from "@/components/shared/location-reach-card";
-import { DeliveryCheckCard } from "@/components/shared/delivery-check-card";
 import { DemographicsCard } from "@/components/shared/demographics-card";
 import { SallaSmartFeaturesCard } from "@/components/shared/salla-smart-features-card";
 import { CustomAudiencesCard } from "@/components/shared/custom-audiences-card";
 import { DeviceTargetingCard } from "@/components/shared/device-targeting-card";
 import { LegacyInterestTargetingCard as InterestTargetingCard } from "@/components/shared/interest-targeting-card";
 import { TargetingSummaryCard } from "@/components/shared/targeting-summary-card";
-import { AudienceReadinessChecklist } from "@/components/shared/audience-readiness-checklist";
+import { CampaignReadinessCard } from "@/components/shared/campaign-readiness-card";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { SectionCard } from "@/components/shared/section-card";
 import { minMaxToAgeBands, ageBandsToMinMax, SUPPORTED_LANGUAGES } from "@/lib/demographics";
@@ -60,14 +59,15 @@ export function MetaStepAudience() {
 
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  /* Readiness checks */
+  /* Readiness checks (actionable suggestions matching Snapchat pattern) */
   const readinessChecks = [
-    { label: "At least 1 country selected", done: aud.countries.length > 0 },
-    { label: "Language set", done: aud.languages.length > 0 },
-    { label: "Age range configured", done: aud.ageMin >= 18 && aud.ageMax > aud.ageMin },
-    { label: "Multi-country requires language", done: aud.countries.length <= 1 || aud.languages.length > 0 },
+    { label: "Define a clear geographic location for the campaign.", done: aud.countries.length > 0 },
+    { label: "Select an appropriate age range for the target audience.", done: aud.ageMin >= 18 && aud.ageMax > aud.ageMin },
+    { label: "Exclude recent buyers to acquire new customers.", done: aud.excludeRecentPurchasers },
+    { label: "Use lookalike audiences to reach new customers.", done: aud.autoTargetingEnabled },
+    { label: "Use custom audiences for targeting or exclusion.", done: aud.customAudienceIds.length > 0 || aud.excludedAudienceIds.length > 0 },
   ];
-  const allReady = readinessChecks.every((c) => c.done);
+  const allReady = aud.countries.length > 0 && aud.ageMin < aud.ageMax;
 
 
   return (
@@ -252,21 +252,8 @@ export function MetaStepAudience() {
                 }))}
             />
 
-            {/* Delivery Check (shared) */}
-            <DeliveryCheckCard
-              issues={(() => {
-                const issues: { message: string }[] = [];
-                if (aud.countries.length === 0) issues.push({ message: "No country selected" });
-                if (aud.languages.length === 0) issues.push({ message: "No language set" });
-                if (aud.countries.length > 1 && aud.languages.length === 0) issues.push({ message: "Multi-country requires language" });
-                if (aud.ageMin >= aud.ageMax) issues.push({ message: "Invalid age range" });
-                return issues;
-              })()}
-              cityCount={aud.cities.length}
-              accent="meta"
-            />
-
-            <AudienceReadinessChecklist checks={readinessChecks} accent="meta" />
+            {/* Campaign Readiness (shared — matches Snapchat pattern) */}
+            <CampaignReadinessCard checks={readinessChecks} />
 
             {/* Targeting Summary (shared) */}
             <TargetingSummaryCard
