@@ -46,8 +46,6 @@ import {
   Settings2,
   Download,
   Lock,
-  ShieldCheck,
-  Users,
   Clock,
 } from "lucide-react";
 import { InfoTip } from "@/components/shared/info-tip";
@@ -69,6 +67,8 @@ import {
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { DeliveryPacingCard } from "@/components/shared/delivery-pacing-card";
 import { AttributionWindowCard } from "@/components/shared/attribution-window-card";
+import { FrequencyCapCard } from "@/components/shared/frequency-cap-card";
+import type { FrequencyPreset } from "@/components/shared/frequency-cap-card";
 
 /* ================================================================== */
 /*  Static config                                                     */
@@ -796,104 +796,49 @@ export function StepBudget() {
 
               {/* -- Frequency Capping (Snapchat API: ad_squad.cap_and_exclusion_config.frequency_cap_config) -- */}
               {/* Snap API only supports frequency cap when optimization_goal = IMPRESSIONS */}
-              {budget.optimizationGoal === "IMPRESSIONS" && (() => {
-                const FREQ_PRESETS = [
-                  { id: "conservative", label: "Conservative", count: 2, interval: 168, window: "7 days", hint: "Less fatigue" },
-                  { id: "balanced", label: "Balanced", count: 4, interval: 168, window: "7 days", hint: "Recommended", recommended: true },
-                  { id: "moderate", label: "Moderate", count: 3, interval: 72, window: "3 days", hint: "Promotions" },
-                  { id: "aggressive", label: "Aggressive", count: 6, interval: 168, window: "7 days", hint: "Flash sales" },
-                ] as const;
-                const activePreset = FREQ_PRESETS.find(
-                  (p) => budget.frequencyCapCount === p.count && budget.frequencyCapInterval === p.interval
-                );
-                return (
-                  <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck className={cn("size-4", budget.frequencyCapEnabled ? "text-primary" : "text-muted-foreground")} />
-                        <Label className="text-sm font-semibold text-foreground">Frequency Cap</Label>
-                        <InfoTip text="Limit how many times one person sees your ad. Prevents fatigue and improves efficiency." />
-                      </div>
-                      <Switch
-                        checked={budget.frequencyCapEnabled}
-                        onCheckedChange={(checked) => {
-                          if (checked && (!budget.frequencyCapCount || budget.frequencyCapInterval < 24)) {
-                            updateNested("budget", { frequencyCapEnabled: true, frequencyCapCount: 4, frequencyCapInterval: 168 });
-                          } else {
-                            updateNested("budget", { frequencyCapEnabled: checked });
-                          }
-                        }}
-                      />
-                    </div>
-
-                    {budget.frequencyCapEnabled ? (
-                      <div className="mt-4 space-y-3">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          {FREQ_PRESETS.map((preset) => {
-                            const isActive = activePreset?.id === preset.id;
-                            return (
-                              <button
-                                key={preset.id}
-                                type="button"
-                                onClick={() => updateNested("budget", { frequencyCapCount: preset.count, frequencyCapInterval: preset.interval })}
-                                className={cn(
-                                  "flex flex-col items-center rounded-xl border py-3 transition-all",
-                                  isActive
-                                    ? "border-primary bg-primary/5 shadow-sm"
-                                    : "border-border bg-background hover:border-primary/40"
-                                )}
-                              >
-                                <span className={cn("text-lg font-bold tabular-nums", isActive ? "text-primary" : "text-foreground")}>
-                                  {preset.count}x
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  / {preset.window}
-                                </span>
-                                <span className={cn(
-                                  "mt-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium",
-                                  isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                                )}>
-                                  {preset.recommended && !isActive ? "★ " : ""}{preset.hint}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Summary */}
-                        <div className="flex items-center gap-2 rounded-lg bg-[#e6fff9] px-3 py-2">
-                          <Users className="size-3.5 text-[#004956]" />
-                          <p className="text-xs font-medium text-[#004956]">
-                            Each person sees your ad up to <span className="font-bold">{budget.frequencyCapCount}x</span> every <span className="font-bold">{budget.frequencyCapInterval === 24 ? "day" : `${budget.frequencyCapInterval / 24} days`}</span>
-                          </p>
-                        </div>
-
-                        {/* Single format requirement — always visible */}
-                        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                          <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-                          <p className="text-[11px] leading-relaxed text-amber-700">
-                            Frequency cap requires all ads to use <span className="font-semibold">one ad format</span> (e.g. all Single Image or all Video). Mixed formats are not supported by Snapchat when frequency cap is active.
-                          </p>
-                        </div>
-
-                        {/* Mixed formats error — shows when actually mixed */}
-                        {campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1 && (
-                          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-                            <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-red-600" />
-                            <p className="text-[11px] leading-relaxed text-red-700">
-                              Your ads currently use mixed formats. Fix in <span className="font-semibold">Ad Design</span> or disable frequency cap.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        No limit on how many times a person sees your ad.
+              {budget.optimizationGoal === "IMPRESSIONS" && (
+                <FrequencyCapCard
+                  enabled={budget.frequencyCapEnabled}
+                  onEnabledChange={(checked) => {
+                    if (checked && (!budget.frequencyCapCount || budget.frequencyCapInterval < 24)) {
+                      updateNested("budget", { frequencyCapEnabled: true, frequencyCapCount: 4, frequencyCapInterval: 168 });
+                    } else {
+                      updateNested("budget", { frequencyCapEnabled: checked });
+                    }
+                  }}
+                  maxImpressions={budget.frequencyCapCount}
+                  onMaxImpressionsChange={(v) => updateNested("budget", { frequencyCapCount: v })}
+                  timeWindowValue={String(budget.frequencyCapInterval)}
+                  timeWindowOptions={[
+                    { value: "72", label: "3 days" },
+                    { value: "168", label: "7 days" },
+                  ]}
+                  onTimeWindowChange={(v) => updateNested("budget", { frequencyCapInterval: Number(v) })}
+                  timeWindowSummaryLabel={budget.frequencyCapInterval === 24 ? "day" : `${budget.frequencyCapInterval / 24} days`}
+                  accent="primary"
+                  infoTipText="Limit how many times one person sees your ad. Prevents fatigue and improves efficiency."
+                  showFormatWarning
+                  presets={[
+                    { id: "conservative", count: 2, timeWindowValue: "168", timeWindowLabel: "7 days", hint: "Less fatigue" },
+                    { id: "balanced", count: 4, timeWindowValue: "168", timeWindowLabel: "7 days", hint: "Recommended", recommended: true },
+                    { id: "moderate", count: 3, timeWindowValue: "72", timeWindowLabel: "3 days", hint: "Promotions" },
+                    { id: "aggressive", count: 6, timeWindowValue: "168", timeWindowLabel: "7 days", hint: "Flash sales" },
+                  ]}
+                  onPresetSelect={(count, tw) =>
+                    updateNested("budget", { frequencyCapCount: count, frequencyCapInterval: Number(tw) })
+                  }
+                >
+                  {/* Mixed formats error — shows when actually mixed */}
+                  {campaign.creative.ads.length > 1 && new Set(campaign.creative.ads.map((a) => a.adFormat ?? "SINGLE")).size > 1 && (
+                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                      <AlertCircle className="mt-0.5 size-3.5 shrink-0 text-red-600" />
+                      <p className="text-[11px] leading-relaxed text-red-700">
+                        Your ads currently use mixed formats. Fix in <span className="font-semibold">Ad Design</span> or disable frequency cap.
                       </p>
-                    )}
-                  </div>
-                );
-              })()}
+                    </div>
+                  )}
+                </FrequencyCapCard>
+              )}
 
 
             </CollapsibleContent>

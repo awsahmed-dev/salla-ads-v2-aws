@@ -773,7 +773,7 @@ export function MetaStepCreative() {
                       <Plus className="size-5 text-[#1877F2]" />
                     </div>
                     <p className="text-sm font-bold text-[#1877F2]">Add Another Ad</p>
-                    <p className="text-xs text-muted-foreground">A/B test different creatives to optimize performance</p>
+                    <p className="text-xs text-muted-foreground text-center">A/B test different creatives to optimize performance</p>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2 px-6 sm:grid-cols-4">
                     {AD_FORMAT_OPTIONS.filter((f) => objConfig.allowedAdFormats.includes(f.value))

@@ -126,7 +126,7 @@ export function LinkTypeSection({
       </div>
 
       {/* Link + CTA row */}
-      <div className={cn("grid gap-4", showCta ? "grid-cols-2" : "grid-cols-1")}>
+      <div className={cn("grid gap-4", showCta ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
         <div className="flex flex-col gap-2">
           <Label className="text-sm font-medium text-foreground">Link</Label>
           {linkType === "store" ? (

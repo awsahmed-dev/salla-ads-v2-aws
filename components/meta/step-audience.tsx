@@ -2,41 +2,27 @@
 
 import { useState } from "react";
 import { useMetaCampaign } from "@/lib/meta/campaign-context";
-import { META_OBJECTIVE_CONFIGS } from "@/lib/meta/campaign-types";
 import { cn } from "@/lib/utils";
 import { getCountryByCode, getCityById } from "@/lib/locations";
 import { LocationSelector } from "@/components/shared/location-selector";
 import { LocationReachCard } from "@/components/shared/location-reach-card";
-import { LocationMapPreview } from "@/components/shared/location-map-preview";
-import { DeliveryCheckCard } from "@/components/shared/delivery-check-card";
 import { DemographicsCard } from "@/components/shared/demographics-card";
 import { SallaSmartFeaturesCard } from "@/components/shared/salla-smart-features-card";
 import { CustomAudiencesCard } from "@/components/shared/custom-audiences-card";
 import { DeviceTargetingCard } from "@/components/shared/device-targeting-card";
 import { LegacyInterestTargetingCard as InterestTargetingCard } from "@/components/shared/interest-targeting-card";
 import { TargetingSummaryCard } from "@/components/shared/targeting-summary-card";
-import { AudienceReadinessChecklist } from "@/components/shared/audience-readiness-checklist";
+import { CampaignReadinessCard } from "@/components/shared/campaign-readiness-card";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { SectionCard } from "@/components/shared/section-card";
-import { InfoTip } from "@/components/shared/info-tip";
 import { minMaxToAgeBands, ageBandsToMinMax, SUPPORTED_LANGUAGES } from "@/lib/demographics";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  Target,
   ChevronDown,
-  Store,
-  X,
   Sparkles,
-  Search,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -58,15 +44,6 @@ const INTERESTS = [
   { id: "META_12", label: "Parenting" },
 ];
 
-const BEHAVIORS = [
-  { id: "BEHAV_1", label: "Engaged Shoppers" },
-  { id: "BEHAV_2", label: "Frequent Travelers" },
-  { id: "BEHAV_3", label: "Small Business Owners" },
-  { id: "BEHAV_4", label: "Technology Early Adopters" },
-  { id: "BEHAV_5", label: "Mobile Payment Users" },
-  { id: "BEHAV_6", label: "Anniversary within 30 days" },
-];
-
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -81,20 +58,17 @@ export function MetaStepAudience() {
   const isSales = campaign.objective.objective === "OUTCOME_SALES";
 
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [behaviorSearch, setBehaviorSearch] = useState("");
 
-  const toggleInArray = (arr: string[], val: string) =>
-    arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val];
-
-  /* Readiness checks */
+  /* Readiness checks (actionable suggestions matching Snapchat pattern) */
   const readinessChecks = [
-    { label: "At least 1 country selected", done: aud.countries.length > 0 },
-    { label: "Language set", done: aud.languages.length > 0 },
-    { label: "Age range configured", done: aud.ageMin >= 18 && aud.ageMax > aud.ageMin },
-    { label: "Multi-country requires language", done: aud.countries.length <= 1 || aud.languages.length > 0 },
+    { label: "Define a clear geographic location for the campaign.", done: aud.countries.length > 0 },
+    { label: "Select an appropriate age range for the target audience.", done: aud.ageMin >= 18 && aud.ageMax > aud.ageMin },
+    { label: "Exclude recent buyers to acquire new customers.", done: aud.excludeRecentPurchasers },
+    { label: "Use lookalike audiences to reach new customers.", done: aud.autoTargetingEnabled },
+    { label: "Use custom audiences for targeting or exclusion.", done: aud.customAudienceIds.length > 0 || aud.excludedAudienceIds.length > 0 },
   ];
-  const allReady = readinessChecks.every((c) => c.done);
-  const readinessPassed = readinessChecks.filter((c) => c.done).length;
+  const allReady = aud.countries.length > 0 && aud.ageMin < aud.ageMax;
+
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -104,14 +78,6 @@ export function MetaStepAudience() {
         {/* LEFT COLUMN                                                   */}
         {/* ============================================================ */}
         <div className="flex flex-1 flex-col gap-5">
-          {/* Step header: title + description (align with other platforms) */}
-          <div className="mb-1">
-            <h2 className="text-xl font-bold tracking-tight text-foreground">Audience & targeting</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Define who sees your ads on Facebook and Instagram by location, demographics, and interests.
-            </p>
-          </div>
-
           {/* ---- 1. Location (shared component — Meta: countries + cities, maps to geo_locations.countries & .cities) ---- */}
           <SectionCard>
             <LocationSelector
@@ -141,7 +107,6 @@ export function MetaStepAudience() {
               enableRadiusPerCity
               accent="meta"
               label="Location"
-              tooltipText="Choose countries and/or cities where your ads will be shown on Facebook and Instagram. Maps to API geo_locations.countries and geo_locations.cities."
             />
           </SectionCard>
 
@@ -161,7 +126,6 @@ export function MetaStepAudience() {
             }}
             accent="meta"
             languageRequired={aud.countries.length > 1}
-            headerTooltip="Define who sees your ads by gender, age, and language. Maps to API genders, age_min, age_max, locales."
           />
 
           {/* ---- 3. Interest Targeting (unified) ---- */}
@@ -171,11 +135,9 @@ export function MetaStepAudience() {
             onChange={(ids) => updateNested("audience", { interests: ids })}
             accent="meta"
             title="Interest Targeting"
-            infoTipText="Maps to API flexible_spec.interests. Select interests to narrow your audience."
-            apiBadge="flexible_spec"
           />
 
-          {/* ---- 4. Salla Smart Features (shared) —— before Behavior so "my store" settings come first ---- */}
+          {/* ---- 4. Salla Smart Features (shared) ---- */}
           <SallaSmartFeaturesCard
             excludeRecentPurchasers={aud.excludeRecentPurchasers}
             onExcludeRecentPurchasersChange={(v) =>
@@ -197,90 +159,7 @@ export function MetaStepAudience() {
             showExcludePurchasers={isSales}
           />
 
-          {/* ---- 5. Behavior Targeting (Meta-specific) ---- */}
-          <SectionCard>
-            <div className="mb-3 flex items-center gap-2">
-              <Target className="size-4 text-[#1877F2]" />
-              <Label className="text-sm font-semibold text-foreground">Behavior Targeting</Label>
-              <InfoTip text="Maps to API flexible_spec.behaviors. Target people based on purchase behavior, device usage, travel, and more." />
-              <Badge variant="secondary" className="ml-auto rounded-full px-1.5 py-0 text-[10px]">
-                behaviors
-              </Badge>
-            </div>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Optional -- target users by real-world purchase and activity data unique to Meta.
-            </p>
-
-            <div className="relative mb-3">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search behaviors..."
-                value={behaviorSearch}
-                onChange={(e) => setBehaviorSearch(e.target.value)}
-                className="h-9 pl-9 text-sm"
-              />
-            </div>
-
-            {aud.behaviors.length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-1.5">
-                {aud.behaviors.map((id) => (
-                  <Badge
-                    key={id}
-                    variant="secondary"
-                    className="cursor-pointer gap-1 text-xs"
-                    onClick={() =>
-                      updateNested("audience", { behaviors: aud.behaviors.filter((x) => x !== id) })
-                    }
-                  >
-                    {BEHAVIORS.find((b) => b.id === id)?.label}
-                    <X className="size-2.5" />
-                  </Badge>
-                ))}
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-1.5">
-              {BEHAVIORS
-                .filter((b) => !behaviorSearch || b.label.toLowerCase().includes(behaviorSearch.toLowerCase()))
-                .map((behavior) => {
-                  const selected = aud.behaviors.includes(behavior.id);
-                  return (
-                    <button
-                      key={behavior.id}
-                      type="button"
-                      onClick={() =>
-                        updateNested("audience", {
-                          behaviors: toggleInArray(aud.behaviors, behavior.id),
-                        })
-                      }
-                      className={cn(
-                        "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
-                        selected
-                          ? "border-[#1877F2] bg-[#1877F2] text-white"
-                          : "border-border bg-background text-foreground hover:border-[#1877F2]/40"
-                      )}
-                    >
-                      {behavior.label}
-                    </button>
-                  );
-                })}
-            </div>
-
-            {aud.behaviors.length > 0 && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                {aud.behaviors.length} behavior{aud.behaviors.length !== 1 ? "s" : ""} selected.{" "}
-                <button
-                  type="button"
-                  onClick={() => updateNested("audience", { behaviors: [] })}
-                  className="text-[#1877F2] underline"
-                >
-                  Clear all
-                </button>
-              </p>
-            )}
-          </SectionCard>
-
-          {/* ---- 6. Advanced Targeting (collapsible) ---- */}
+          {/* ---- 5. Advanced Targeting (collapsible) ---- */}
           <div>
             <button
               type="button"
@@ -289,7 +168,7 @@ export function MetaStepAudience() {
             >
               <ChevronDown className={cn("size-4 transition-transform", showAdvanced && "rotate-180")} />
               Advanced Settings
-              <span className="ml-auto text-xs text-muted-foreground">Custom audiences, devices, Advantage+</span>
+              <span className="ml-auto text-xs text-muted-foreground">Custom Audiences, Devices, Expansion</span>
             </button>
 
             {showAdvanced && (
@@ -306,7 +185,6 @@ export function MetaStepAudience() {
                     updateNested("audience", { excludedAudienceIds: ids })
                   }
                   accent="meta"
-                  infoTipText="Include or exclude specific groups. Maps to API custom_audiences and excluded_custom_audiences."
                 />
 
                 {/* Device Targeting (unified) */}
@@ -316,8 +194,6 @@ export function MetaStepAudience() {
                     updateNested("audience", { operatingSystems: ids })
                   }
                   accent="meta"
-                  infoTipText="Choose which devices to target. Maps to API user_os. Both selected is recommended for maximum reach."
-                  apiBadge="user_os"
                 />
 
                 {/* Advantage+ Audience */}
@@ -376,21 +252,8 @@ export function MetaStepAudience() {
                 }))}
             />
 
-            {/* Delivery Check (shared) */}
-            <DeliveryCheckCard
-              issues={(() => {
-                const issues: { message: string }[] = [];
-                if (aud.countries.length === 0) issues.push({ message: "No country selected" });
-                if (aud.languages.length === 0) issues.push({ message: "No language set" });
-                if (aud.countries.length > 1 && aud.languages.length === 0) issues.push({ message: "Multi-country requires language" });
-                if (aud.ageMin >= aud.ageMax) issues.push({ message: "Invalid age range" });
-                return issues;
-              })()}
-              cityCount={aud.cities.length}
-              accent="meta"
-            />
-
-            <AudienceReadinessChecklist checks={readinessChecks} accent="meta" />
+            {/* Campaign Readiness (shared — matches Snapchat pattern) */}
+            <CampaignReadinessCard checks={readinessChecks} />
 
             {/* Targeting Summary (shared) */}
             <TargetingSummaryCard
@@ -402,7 +265,6 @@ export function MetaStepAudience() {
                 { label: "Age", value: `${aud.ageMin} - ${aud.ageMax === 65 ? "65+" : aud.ageMax}` },
                 { label: "Languages", value: aud.languages.length > 0 ? aud.languages.map((l) => SUPPORTED_LANGUAGES.find((x) => x.code === l)?.label || l).join(", ") : "All" },
                 { label: "Interests", value: aud.interests.length > 0 ? `${aud.interests.length} selected` : "Broad (all)" },
-                { label: "Behaviors", value: aud.behaviors.length > 0 ? `${aud.behaviors.length} selected` : "None" },
                 { label: "Devices", value: aud.operatingSystems.length === 2 ? "All" : aud.operatingSystems.join(", ") || "None" },
                 { label: "Advantage+", value: aud.advantagePlusAudience ? "On" : "Off" },
                 ...(aud.excludeRecentPurchasers ? [{ label: "Exclude Buyers", value: `${aud.excludeRecentPurchasersDays}d` }] : []),
@@ -410,18 +272,6 @@ export function MetaStepAudience() {
               ]}
             />
 
-            {/* Salla Tip (Meta-specific) */}
-            <div className="rounded-xl border border-[#1877F2]/20 bg-[#1877F2]/5 p-4">
-              <div className="flex items-start gap-2">
-                <Store className="mt-0.5 size-4 shrink-0 text-[#1877F2]" />
-                <div>
-                  <p className="text-xs font-semibold text-foreground">Salla Tip</p>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-                    For Sales campaigns, start with <span className="font-medium text-foreground">Engaged Shoppers</span> behavior + <span className="font-medium text-foreground">Online Shopping</span> interest in your primary country. Enable Advantage+ to let Meta find more converters.
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>

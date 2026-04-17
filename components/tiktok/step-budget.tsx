@@ -361,7 +361,6 @@ export function TikTokStepBudget() {
   const bidStrategyLearnMore = useLearnMore();
   const budgetDurationLearnMore = useLearnMore();
   const attributionWindowLearnMore = useLearnMore();
-  const performanceBoostLearnMore = useLearnMore();
   const frequencyCapLearnMore = useLearnMore();
   const deliveryOptionsLearnMore = useLearnMore();
 
@@ -813,7 +812,6 @@ export function TikTokStepBudget() {
           <PerformanceBoostCard
             enabled={budget.performanceBoost}
             onToggle={(checked) => updateNested("budget", { performanceBoost: checked })}
-            learnMoreTrigger={<LearnMoreTrigger {...performanceBoostLearnMore.triggerProps} />}
           />
 
           {/* ======================================================= */}
@@ -1236,42 +1234,6 @@ export function TikTokStepBudget() {
               description="For impulse purchases or app installs where the decision happens immediately. Gives the tightest attribution but fewer signals for optimization."
             />
           </div>
-        </SheetSection>
-      </LearnMoreSheet>
-
-      <LearnMoreSheet
-        open={performanceBoostLearnMore.open}
-        onOpenChange={performanceBoostLearnMore.setOpen}
-        title="Performance Boost by Salla"
-        description="A one-time paid service where Salla's ads team actively monitors and optimizes your campaign for better results."
-        icon={<Sparkles />}
-        proTip="Performance Boost is most effective on new campaigns. Enable it before launch so the team can optimize from day one."
-      >
-        <SheetSection icon={<Zap />} title="What you get">
-          <div className="flex flex-col gap-2">
-            <SheetDecisionCard
-              title="Priority Review"
-              description="Your ad gets top priority in the approval queue, so it launches faster than standard submissions."
-            />
-            <SheetDecisionCard
-              title="3-Day Human + AI Monitoring"
-              description="For the first 72 hours, Salla experts and AI watch your campaign's performance metrics and make real-time adjustments."
-              highlighted
-            />
-            <SheetDecisionCard
-              title="Smart Bid Adjustment"
-              description="AI reviews your bids regularly, with expert approval for all changes. This prevents overspending while maximizing delivery."
-            />
-            <SheetDecisionCard
-              title="Refund on Rejection"
-              description="If the ad platform rejects your advertisement, you get a full refund of the boost fee."
-            />
-          </div>
-        </SheetSection>
-        <SheetSection icon={<Info />} title="Pricing">
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Performance Boost is a <span className="font-semibold text-foreground">one-time fee of SAR 299</span> (40% off the regular SAR 500 price). It covers the full campaign lifecycle — no recurring charges.
-          </p>
         </SheetSection>
       </LearnMoreSheet>
 
