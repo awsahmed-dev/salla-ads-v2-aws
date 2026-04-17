@@ -85,7 +85,6 @@ const ALL_OPTIMIZATION_GOALS: {
   icon: React.ReactNode;
   recommended?: Record<string, boolean>;
   requiresPixel?: boolean;
-  requiresMMP?: boolean;
   bestFor?: string;
   costHint?: string;
   }[] = [
@@ -184,30 +183,9 @@ const ALL_OPTIMIZATION_GOALS: {
     recommended: { APP_PROMOTION: true },
     costHint: "Moderate cost per install",
   },
-  {
-    value: "APP_PURCHASE",
-    label: "In-App Purchases",
-    desc: "Optimize for users most likely to make a purchase inside your app.",
-    icon: <ShoppingCart className="size-4" />,
-    requiresMMP: true,
-    costHint: "High cost, highest return",
-  },
-  {
-    value: "APP_SIGNUP",
-    label: "In-App Sign Ups",
-    desc: "Drive registrations within your app.",
-    icon: <FileText className="size-4" />,
-    requiresMMP: true,
-  },
-  {
-    value: "APP_ADD_TO_CART",
-    label: "In-App Add to Cart",
-    desc: "Drive add-to-cart actions within your app.",
-    icon: <TrendingUp className="size-4" />,
-    requiresMMP: true,
-  },
-  // APP_REENGAGE_OPEN removed from UI: requires MMP + app_install_state targeting.
-  // Will be added back when MMP integration is available.
+  // In-app event goals (APP_PURCHASE, APP_SIGNUP, APP_ADD_TO_CART) and APP_REENGAGE_OPEN
+  // require MMP integration which is not yet supported — they are omitted from the UI.
+  // Add them back when MMP integration is available.
 ];
 
 
@@ -335,7 +313,6 @@ export function StepBudget() {
    * incompatible with ACCELERATED pacing per the Snap Marketing API spec.
    */
   const canUseAccelerated = ACCELERATED_COMPATIBLE_GOALS.includes(budget.optimizationGoal);
-  const hasMMP = false; /* TODO: wire when MMP integration exists */
   const pixelMode = campaign.objective.pixelMode;
   const hasPixelConfigured = pixelMode === "salla_managed" || (pixelMode === "existing" && !!campaign.objective.pixelId);
   const pixelEligibleFor7Day = hasPixelConfigured && pixelMode === "salla_managed";
@@ -347,10 +324,9 @@ export function StepBudget() {
     icon: g.icon,
     recommended: !!g.recommended?.[campaign.objective.objective],
     requiresPixel: g.requiresPixel,
-    requiresMMP: g.requiresMMP,
     bestFor: g.bestFor,
     costHint: g.costHint,
-    locked: !!(g.requiresMMP && !hasMMP) || !!(g.requiresPixel && !hasPixelConfigured),
+    locked: !!(g.requiresPixel && !hasPixelConfigured),
   }));
   /* If the currently selected goal is now locked (e.g. pixel removed), fall back to the first unlocked goal */
   useEffect(() => {
@@ -361,7 +337,7 @@ export function StepBudget() {
         updateNested("budget", { optimizationGoal: firstUnlocked.value as OptimizationGoal });
       }
     }
-  }, [hasPixelConfigured, hasMMP]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasPixelConfigured]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (budget.conversionWindow === "SWIPE_7DAY" && !pixelEligibleFor7Day) {
@@ -483,10 +459,6 @@ export function StepBudget() {
     USES: "lens uses",
     LEAD_FORM_SUBMISSIONS: "form submissions",
     APP_INSTALLS: "app installs",
-    APP_PURCHASE: "in-app purchases",
-    APP_SIGNUP: "in-app sign ups",
-    APP_ADD_TO_CART: "in-app add-to-carts",
-    APP_REENGAGE_OPEN: "re-engagements",
   };
   const goalLabel = goalLabelMap[budget.optimizationGoal] ?? "actions";
 
@@ -503,10 +475,6 @@ export function StepBudget() {
     USES: "Lens Use",
     LEAD_FORM_SUBMISSIONS: "Form Submission",
     APP_INSTALLS: "App Install",
-    APP_PURCHASE: "In-App Purchase",
-    APP_SIGNUP: "In-App Sign Up",
-    APP_ADD_TO_CART: "In-App Add to Cart",
-    APP_REENGAGE_OPEN: "App Re-open",
   };
   const goalName = goalNameMap[budget.optimizationGoal] ?? "Action";
 
@@ -618,15 +586,6 @@ export function StepBudget() {
                     <AlertCircle className="size-3.5 shrink-0 text-amber-600" />
                     <p className="text-xs text-amber-700">
                       Some goals need a <span className="font-semibold">Snap Pixel</span>. Connect one in Step 1 to unlock them.
-                    </p>
-                  </div>
-                )}
-                {/* Only show the MMP warning when goals in this objective actually need MMP (APP_PROMOTION only). */}
-                {OPTIMIZATION_GOALS.some((g) => g.requiresMMP) && (
-                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2">
-                    <Lock className="size-3.5 shrink-0 text-orange-600" />
-                    <p className="text-xs text-orange-700">
-                      In-app event goals need an <span className="font-semibold">MMP</span> integration (not yet supported).
                     </p>
                   </div>
                 )}
@@ -977,7 +936,7 @@ export function StepBudget() {
                 : campaign.objective.objective === "ENGAGEMENT"
                   ? "Impressions gets you maximum reach. Use Video Views if your creative is video — it finds people who actually watch."
                   : campaign.objective.objective === "APP_PROMOTION"
-                    ? "App Installs drives the most downloads. In-app event goals (Purchases, Sign Ups) require an MMP integration."
+                    ? "App Installs drives the most downloads. Use Impressions if you want maximum reach instead of optimizing for installs."
                     : "Use the recommended goal (highlighted) and give your campaign at least 3-5 days before changing it."
         }
       >

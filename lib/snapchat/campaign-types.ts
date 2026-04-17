@@ -20,7 +20,11 @@ export type CampaignObjective =
  */
 export type ConversionLocation = "WEB" | "APP" | "LEAD_FORM" | "NONE";
 
-/** Maps to API optimization_goal -- per-objective valid goals */
+/**
+ * Maps to API optimization_goal -- per-objective valid goals.
+ * App in-app event goals (APP_PURCHASE, APP_SIGNUP, APP_ADD_TO_CART, APP_REENGAGE_*)
+ * require MMP integration which is not yet supported — they are omitted from this type.
+ */
 export type OptimizationGoal =
   | "PIXEL_PURCHASE"
   | "PIXEL_ADD_TO_CART"
@@ -34,17 +38,14 @@ export type OptimizationGoal =
   | "VIDEO_VIEWS_15_SEC"
   | "USES"
   | "LEAD_FORM_SUBMISSIONS"
-  | "APP_INSTALLS"
-  | "APP_PURCHASE"        // Snap API uses singular form
-  | "APP_SIGNUP"
-  | "APP_ADD_TO_CART"
-  | "APP_REENGAGE_OPEN";  // Snap API: re-engagement goal (open app)
+  | "APP_INSTALLS";
 
 /**
  * Snap API: TARGET_COST bid_strategy is only valid for these optimization_goal values.
  * Source: Ad Squads API — "Bid Strategy to Optimization Goal mapping" table.
  * NOT valid for: IMPRESSIONS, VIDEO_VIEWS, LEAD_FORM_SUBMISSIONS.
- * APP_REENGAGE_PURCHASE and APP_REENGAGE_OPEN omitted (require MMP integration).
+ * In-app event goals (APP_PURCHASE, APP_SIGNUP, APP_ADD_TO_CART, APP_REENGAGE_*) omitted
+ * since they require MMP integration which is not yet supported.
  */
 export const TARGET_COST_COMPATIBLE_GOALS: OptimizationGoal[] = [
   "APP_INSTALLS",
@@ -55,9 +56,6 @@ export const TARGET_COST_COMPATIBLE_GOALS: OptimizationGoal[] = [
   "PIXEL_SIGNUP",
   "PIXEL_PAGE_VIEW",
   "PIXEL_ADD_TO_CART",
-  "APP_PURCHASE",
-  "APP_SIGNUP",
-  "APP_ADD_TO_CART",
   "STORY_OPENS",
   "LANDING_PAGE_VIEW",
 ];
@@ -194,12 +192,13 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
     snapObjectiveV2: "APP_PROMOTION",
     conversionLocations: ["APP"],
     goalsByLocation: {
-      // IMPRESSIONS and SWIPES do not require MMP. APP_PURCHASE/SIGNUP/ADD_TO_CART require MMP.
-      // APP_LEVEL_COMPLETE, APP_ACHIEVEMENT_UNLOCKED, APP_AD_VIEW omitted (require MMP).
-      APP: ["APP_INSTALLS", "IMPRESSIONS", "APP_PURCHASE", "APP_SIGNUP", "APP_ADD_TO_CART", "SWIPES"],
+      // Only goals that don't require MMP integration are enabled.
+      // In-app event goals (APP_PURCHASE, APP_SIGNUP, APP_ADD_TO_CART, APP_LEVEL_COMPLETE,
+      // APP_ACHIEVEMENT_UNLOCKED, APP_AD_VIEW, APP_REENGAGE_*) are omitted until MMP is supported.
+      APP: ["APP_INSTALLS", "IMPRESSIONS", "SWIPES"],
     },
     label: "App Promotion",
-    allowedGoals: ["APP_INSTALLS", "IMPRESSIONS", "APP_PURCHASE", "APP_SIGNUP", "APP_ADD_TO_CART", "SWIPES"],
+    allowedGoals: ["APP_INSTALLS", "IMPRESSIONS", "SWIPES"],
     defaultGoal: "APP_INSTALLS",
     pixelRequirement: "none",
     catalogAvailable: false,
