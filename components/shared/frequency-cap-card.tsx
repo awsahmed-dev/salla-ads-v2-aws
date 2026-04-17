@@ -11,11 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { ShieldCheck, Users, AlertCircle } from "lucide-react";
 import { InfoTip } from "@/components/shared/info-tip";
 
@@ -42,11 +37,33 @@ const ACCENT = {
   },
 } as const;
 
+/* ------------------------------------------------------------------ */
+/*  Preset type                                                        */
+/* ------------------------------------------------------------------ */
+
+export interface FrequencyPreset {
+  id: string;
+  /** Number of impressions (e.g. 2, 4, 3, 6) */
+  count: number;
+  /** The time window value passed to onTimeWindowChange when selected */
+  timeWindowValue: string;
+  /** Display label for the time window (e.g. "7 days", "3 days") */
+  timeWindowLabel: string;
+  /** Short hint shown below the count (e.g. "Less fatigue", "Flash sales") */
+  hint: string;
+  /** Whether this preset is the recommended default */
+  recommended?: boolean;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Props                                                              */
+/* ------------------------------------------------------------------ */
+
 export interface FrequencyCapCardProps {
   /** Whether frequency cap is enabled */
   enabled: boolean;
   onEnabledChange: (v: boolean) => void;
-  /** Max impressions per user (1–maxImpressionsMax) */
+  /** Max impressions per user (1-maxImpressionsMax) */
   maxImpressions: number;
   onMaxImpressionsChange: (v: number) => void;
   minImpressions?: number;
@@ -75,13 +92,18 @@ export interface FrequencyCapCardProps {
   /** Optional className for the card wrapper */
   className?: string;
   learnMoreTrigger?: React.ReactNode;
+  /** Preset cards — when provided, renders a clickable grid instead of slider+dropdown */
+  presets?: FrequencyPreset[];
+  /** Called when a preset is clicked — use to batch-update both count and time window in one state update */
+  onPresetSelect?: (count: number, timeWindowValue: string) => void;
+  /** Additional content rendered at the bottom when enabled (e.g. mixed-format errors) */
+  children?: React.ReactNode;
 }
 
-/**
- * Reusable Frequency Cap card for step 2 (Budget). Use only on platforms/objectives
- * where the API supports frequency capping (e.g. Snapchat ad_squad.frequency_cap_config,
- * TikTok Reach frequency/frequency_schedule, DV360 frequencyCap).
- */
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
+
 export function FrequencyCapCard({
   enabled,
   onEnabledChange,
@@ -102,8 +124,12 @@ export function FrequencyCapCard({
   hideToggle = false,
   className,
   learnMoreTrigger,
+  presets,
+  onPresetSelect,
+  children,
 }: FrequencyCapCardProps) {
   const style = ACCENT[accent];
+  const isActive = enabled || hideToggle;
 
   return (
     <div
@@ -117,8 +143,8 @@ export function FrequencyCapCard({
           <div
             className={cn(
               "flex size-9 shrink-0 items-center justify-center rounded-lg",
-              enabled ? style.summaryBg : "bg-muted/50",
-              enabled ? style.icon : "text-muted-foreground"
+              isActive ? style.summaryBg : "bg-muted/50",
+              isActive ? style.icon : "text-muted-foreground"
             )}
           >
             <ShieldCheck className="size-4" />
@@ -146,58 +172,115 @@ export function FrequencyCapCard({
       </div>
 
       <p className="mt-1.5 text-sm text-muted-foreground">
-        {(enabled || hideToggle)
+        {isActive
           ? "Limit how often one person sees your ad. Prevents fatigue and improves conversion efficiency."
           : "No limit on how many times a user sees your ad. Enable to control ad frequency."}
       </p>
 
-      {(enabled || hideToggle) && (
-        <div className="mt-4 space-y-4">
-          <div className="rounded-lg border border-border bg-muted/10 p-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-              <div className="min-w-0 flex-1">
-                <Label className="mb-1.5 block text-xs font-medium text-foreground">
-                  Max impressions per user
-                </Label>
-                <div className="flex items-center gap-3">
-                  <Slider
-                    value={[Math.max(minImpressions, Math.min(maxImpressionsMax, maxImpressions))]}
-                    min={minImpressions}
-                    max={maxImpressionsMax}
-                    step={1}
-                    onValueChange={([v]) =>
-                      onMaxImpressionsChange(Math.max(minImpressions, Math.min(maxImpressionsMax, v ?? minImpressions)))
-                    }
-                    className="flex-1"
-                  />
-                  <span className="w-9 shrink-0 text-right text-sm font-bold tabular-nums text-foreground">
-                    {maxImpressions}
-                  </span>
+      {isActive && (
+        <div className="mt-4 space-y-3">
+
+          {/* ---- Preset cards mode ---- */}
+          {presets && presets.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {presets.map((preset) => {
+                const isSelected =
+                  maxImpressions === preset.count &&
+                  timeWindowValue === preset.timeWindowValue;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => {
+                      if (onPresetSelect) {
+                        onPresetSelect(preset.count, preset.timeWindowValue);
+                      } else {
+                        onMaxImpressionsChange(preset.count);
+                        onTimeWindowChange(preset.timeWindowValue);
+                      }
+                    }}
+                    className={cn(
+                      "flex flex-col items-center rounded-xl border py-3 transition-all",
+                      isSelected
+                        ? cn("border-current shadow-sm", style.summaryBg, style.summaryText)
+                        : "border-border bg-background hover:border-current/40"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "text-lg font-bold tabular-nums",
+                        isSelected ? style.summaryText : "text-foreground"
+                      )}
+                    >
+                      {preset.count}x
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      / {preset.timeWindowLabel}
+                    </span>
+                    <span
+                      className={cn(
+                        "mt-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                        isSelected
+                          ? cn(style.summaryBg, style.summaryText)
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {preset.recommended && !isSelected ? "\u2605 " : ""}
+                      {preset.hint}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            /* ---- Slider + dropdown mode ---- */
+            <div className="rounded-lg border border-border bg-muted/10 p-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1">
+                  <Label className="mb-1.5 block text-xs font-medium text-foreground">
+                    Max impressions per user
+                  </Label>
+                  <div className="flex items-center gap-3">
+                    <Slider
+                      value={[Math.max(minImpressions, Math.min(maxImpressionsMax, maxImpressions))]}
+                      min={minImpressions}
+                      max={maxImpressionsMax}
+                      step={1}
+                      onValueChange={([v]) =>
+                        onMaxImpressionsChange(Math.max(minImpressions, Math.min(maxImpressionsMax, v ?? minImpressions)))
+                      }
+                      className="flex-1"
+                    />
+                    <span className="w-9 shrink-0 text-right text-sm font-bold tabular-nums text-foreground">
+                      {maxImpressions}
+                    </span>
+                  </div>
+                </div>
+                <div className="w-full sm:w-36">
+                  <Label className="mb-1.5 block text-xs font-medium text-foreground">
+                    Per time window
+                  </Label>
+                  <Select
+                    value={timeWindowValue}
+                    onValueChange={onTimeWindowChange}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timeWindowOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              <div className="w-full sm:w-36">
-                <Label className="mb-1.5 block text-xs font-medium text-foreground">
-                  Per time window
-                </Label>
-                <Select
-                  value={timeWindowValue}
-                  onValueChange={onTimeWindowChange}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timeWindowOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
-          </div>
+          )}
 
+          {/* ---- Summary bar ---- */}
           <div
             className={cn(
               "flex items-start gap-2 rounded-lg px-3 py-2.5",
@@ -206,11 +289,10 @@ export function FrequencyCapCard({
           >
             <Users className={cn("mt-0.5 size-4 shrink-0", style.summaryIcon)} />
             <p className={cn("text-sm font-medium", style.summaryText)}>
-              Each user will see your ad a maximum of{" "}
-              <span className="font-semibold">{maxImpressions}</span>{" "}
-              {maxImpressions === 1 ? "time" : "times"}{" "}
+              Each person sees your ad up to{" "}
+              <span className="font-bold">{maxImpressions}x</span>{" "}
               {summaryMode === "per" ? "per " : "every "}
-              <span className="font-semibold">{timeWindowSummaryLabel}</span>.
+              <span className="font-bold">{timeWindowSummaryLabel}</span>
             </p>
           </div>
 
@@ -227,6 +309,8 @@ export function FrequencyCapCard({
               </p>
             </div>
           )}
+
+          {children}
         </div>
       )}
     </div>

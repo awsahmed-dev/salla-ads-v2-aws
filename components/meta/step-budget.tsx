@@ -17,17 +17,8 @@ import type {
 } from "@/lib/meta/campaign-types";
 import { cn } from "@/lib/utils";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
   Collapsible,
@@ -36,28 +27,24 @@ import {
 } from "@/components/ui/collapsible";
 import {
   DollarSign,
-  Calendar,
   TrendingUp,
   Info,
   Target,
   Zap,
   CreditCard,
   ShoppingCart,
-  AlertCircle,
   BarChart3,
   MousePointerClick,
   ChevronDown,
-  ChevronRight,
-  ArrowLeft,
   CheckCircle2,
   Wallet,
   Eye,
   Gauge,
-  CalendarClock,
-  ArrowUpRight,
   Settings2,
   MessageSquare,
   Globe,
+  Clock,
+  Repeat,
 } from "lucide-react";
 import { BudgetDurationCard } from "@/components/shared/budget-duration-card";
 import { BidStrategyCard } from "@/components/shared/bid-strategy-card";
@@ -70,6 +57,13 @@ import { FrequencyCapCard } from "@/components/shared/frequency-cap-card";
 import { ConversionEventCard } from "@/components/shared/conversion-event-card";
 import { OptimizationGoalCard } from "@/components/shared/optimization-goal-card";
 import { AttributionWindowCard } from "@/components/shared/attribution-window-card";
+import {
+  LearnMoreSheet,
+  LearnMoreTrigger,
+  SheetSection,
+  SheetDecisionCard,
+  useLearnMore,
+} from "@/components/shared/learn-more-sheet";
 import { fmt } from "@/components/shared/fmt";
 
 /* ================================================================== */
@@ -88,7 +82,7 @@ const OPTIMIZATION_GOALS: {
   {
     value: "OFFSITE_CONVERSIONS",
     label: "Maximum Conversions",
-    desc: "Get the most conversion events within your budget. Meta bids to maximize total events.",
+    desc: "Maximize purchases from your store.",
     bestFor: "Best for most Salla merchants. Start here to maximize purchases from your online store.",
     icon: <Target className="size-4" />,
     billingLabel: "CPM",
@@ -97,7 +91,7 @@ const OPTIMIZATION_GOALS: {
   {
     value: "VALUE",
     label: "Maximum Value (ROAS)",
-    desc: "Maximize total purchase value, not just volume. Best for varied product prices.",
+    desc: "Prioritize high-value orders over volume.",
     bestFor: "Best when you have varied product prices and want to prioritize high-value conversions.",
     icon: <TrendingUp className="size-4" />,
     billingLabel: "CPM",
@@ -105,7 +99,7 @@ const OPTIMIZATION_GOALS: {
   {
     value: "LINK_CLICKS",
     label: "Link Clicks",
-    desc: "Drive clicks to your website. No conversion optimization applied.",
+    desc: "Drive traffic to your website.",
     bestFor: "Best for new stores that need traffic, or when testing creatives before optimizing for purchases.",
     icon: <MousePointerClick className="size-4" />,
     billingLabel: "CPM",
@@ -113,7 +107,7 @@ const OPTIMIZATION_GOALS: {
   {
     value: "LANDING_PAGE_VIEWS",
     label: "Landing Page Views",
-    desc: "Optimize for quality clicks that actually load your landing page.",
+    desc: "Only count visitors who load your page.",
     bestFor: "Best when you want to ensure visitors reach your store, not just click the ad.",
     icon: <Globe className="size-4" />,
     billingLabel: "CPM",
@@ -121,7 +115,7 @@ const OPTIMIZATION_GOALS: {
   {
     value: "CONVERSATIONS",
     label: "Conversations",
-    desc: "Messenger, WhatsApp, or IG Direct conversations that lead to purchases.",
+    desc: "Start WhatsApp or Messenger chats.",
     bestFor: "Best for high-consideration products where customers need to chat before buying.",
     icon: <MessageSquare className="size-4" />,
     billingLabel: "CPM",
@@ -139,7 +133,7 @@ const CONVERSION_EVENTS: {
   { value: "PURCHASE", label: "Purchase", desc: "Optimizes for completed orders. The most common choice for e-commerce.", icon: <CreditCard className="size-3.5" />, funnelStage: "Bottom funnel", recommended: true },
   { value: "INITIATE_CHECKOUT", label: "Initiate Checkout", desc: "Optimizes for users who start the checkout process.", icon: <Wallet className="size-3.5" />, funnelStage: "Mid funnel" },
   { value: "ADD_TO_CART", label: "Add to Cart", desc: "Optimizes for users who add products to their cart.", icon: <ShoppingCart className="size-3.5" />, funnelStage: "Mid funnel" },
-  { value: "VIEW_CONTENT", label: "View Content", desc: "Optimizes for product page views. Good for awareness.", icon: <Eye className="size-3.5" />, funnelStage: "Top funnel" },
+  { value: "VIEW_CONTENT", label: "View Content", desc: "Optimizes for product page views. Good for building pixel data.", icon: <Eye className="size-3.5" />, funnelStage: "Top funnel" },
   { value: "ADD_PAYMENT_INFO", label: "Add Payment Info", desc: "Optimizes for users who enter payment details.", icon: <CreditCard className="size-3.5" />, funnelStage: "Bottom funnel" },
   { value: "COMPLETE_REGISTRATION", label: "Registration", desc: "Optimizes for account sign-ups on your website.", icon: <CheckCircle2 className="size-3.5" />, funnelStage: "Top funnel" },
 ];
@@ -168,7 +162,7 @@ const BID_STRATEGIES: {
     value: "COST_CAP",
     label: "Cost Cap",
     apiLabel: "Cost Cap (target CPA)",
-    desc: "Set a target cost per result. Meta keeps your average cost per result around this amount.",
+    desc: "Set a target cost per result. Meta keeps your average cost around this amount.",
     bestFor: "Best when you know your target CPA and want to maintain profitability at scale.",
     icon: <Target className="size-4" />,
     supportedGoals: ["OFFSITE_CONVERSIONS", "LINK_CLICKS", "LANDING_PAGE_VIEWS", "CONVERSATIONS"],
@@ -177,7 +171,7 @@ const BID_STRATEGIES: {
     value: "LOWEST_COST_WITH_BID_CAP",
     label: "Bid Cap",
     apiLabel: "Maximum bid per auction",
-    desc: "Set a maximum bid. Meta won't bid above this in any auction.",
+    desc: "Set a maximum bid per auction. Meta won't bid above this amount.",
     bestFor: "Best for advertisers who want strict cost control and understand their auction dynamics.",
     icon: <BarChart3 className="size-4" />,
     supportedGoals: ["OFFSITE_CONVERSIONS", "VALUE", "LINK_CLICKS", "LANDING_PAGE_VIEWS", "CONVERSATIONS"],
@@ -205,6 +199,11 @@ const VIEW_ATTRIBUTION_WINDOWS: { value: MetaViewAttributionWindow; label: strin
   { value: "7d_view", label: "7 days" },
 ];
 
+const BUDGET_TYPES: { value: string; label: string; desc: string; icon: React.ReactNode }[] = [
+  { value: "pay_as_you_go", label: "Pay as You Go", desc: "Charged daily, stop anytime", icon: <CreditCard className="size-4" /> },
+  { value: "prepaid", label: "Prepaid (Fixed)", desc: "Pay upfront, fixed budget", icon: <Wallet className="size-4" /> },
+];
+
 /* ================================================================== */
 /*  Component                                                          */
 /* ================================================================== */
@@ -224,6 +223,13 @@ export function MetaStepBudget() {
 
   /* Local UI state */
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  /* Learn More hooks */
+  const optimizationGoalLearnMore = useLearnMore();
+  const bidStrategyLearnMore = useLearnMore();
+  const budgetDurationLearnMore = useLearnMore();
+  const attributionWindowLearnMore = useLearnMore();
+  const frequencyCapLearnMore = useLearnMore();
 
   const updateBudget = (updates: Partial<typeof budget>) => {
     updateNested("budget", updates);
@@ -269,7 +275,6 @@ export function MetaStepBudget() {
     { min: Math.round(300 * goalMultiplier), pct: 75, color: "bg-emerald-400", textColor: "text-emerald-600", label: "Good" },
     { min: Math.round(500 * goalMultiplier), pct: 100, color: "bg-[#1877F2]", textColor: "text-[#1877F2]", label: "Strong" },
   ];
-  const currentTier = [...strengthTiers].reverse().find((t) => dailyAmount >= t.min)!;
 
   /* Goal labels */
   const goalLabelMap: Record<string, string> = {
@@ -292,6 +297,9 @@ export function MetaStepBudget() {
 
   const isValid = budget.amount > 0 && budget.startDate;
 
+  /* Whether conversion-based goals are selected */
+  const isConversionGoal = budget.optimizationGoal === "OFFSITE_CONVERSIONS" || budget.optimizationGoal === "VALUE";
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className={cn("flex flex-col gap-6 lg:flex-row", WIZARD_FOOTER_PADDING_BOTTOM)}>
@@ -302,10 +310,102 @@ export function MetaStepBudget() {
         <div className="flex flex-1 flex-col gap-5">
 
           {/* ======================================================= */}
-          {/* SECTION 1: Budget, Duration (shared card)                */}
+          {/* SECTION 1: Optimization Goal                             */}
+          {/* ======================================================= */}
+          <OptimizationGoalCard
+            goals={OPTIMIZATION_GOALS.filter((goal) => objectiveConfig.allowedGoals.includes(goal.value))}
+            selectedGoal={budget.optimizationGoal}
+            onGoalChange={(value) => {
+              updateBudget({
+                optimizationGoal: value as MetaOptimizationGoal,
+                billingEvent: getBillingEventForGoal(value as MetaOptimizationGoal) as MetaBillingEvent,
+                ...(value === "VALUE" && budget.bidStrategy !== "LOWEST_COST_WITH_MIN_ROAS"
+                  ? { bidStrategy: "LOWEST_COST_WITHOUT_CAP" as MetaBidStrategy }
+                  : {}),
+                ...(value !== "VALUE" && budget.bidStrategy === "LOWEST_COST_WITH_MIN_ROAS"
+                  ? { bidStrategy: "LOWEST_COST_WITHOUT_CAP" as MetaBidStrategy }
+                  : {}),
+              });
+            }}
+            layout="grid"
+            accent="#1877F2"
+            learnMoreTrigger={<LearnMoreTrigger {...optimizationGoalLearnMore.triggerProps} />}
+          >
+            {budget.optimizationGoal === "VALUE" && (
+              <div className="mt-3 flex items-start gap-2 rounded-md border border-[#1877F2]/20 bg-[#1877F2]/5 px-3 py-2">
+                <TrendingUp className="mt-0.5 size-3 shrink-0 text-[#1877F2]" />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  <span className="font-medium text-foreground">Value optimization</span> requires your pixel to send purchase values via the Conversions API. Meta will prioritize higher-value conversions.
+                </p>
+              </div>
+            )}
+          </OptimizationGoalCard>
+
+          {/* ======================================================= */}
+          {/* SECTION 2: Conversion Event (for conversion goals)       */}
+          {/* ======================================================= */}
+          {isConversionGoal && (
+            <ConversionEventCard
+              accent="#1877F2"
+              layout="dropdown"
+              events={CONVERSION_EVENTS}
+              selectedEvent={budget.conversionEvent}
+              onEventChange={(v) => updateBudget({ conversionEvent: v })}
+              roas={
+                budget.optimizationGoal === "VALUE"
+                  ? {
+                      value: budget.roasTarget,
+                      onChange: (v) => updateBudget({ roasTarget: Math.max(0.01, v || 1) }),
+                    }
+                  : undefined
+              }
+            />
+          )}
+
+          {/* ======================================================= */}
+          {/* SECTION 3: Bid Strategy                                  */}
+          {/* ======================================================= */}
+          <BidStrategyCard
+            strategies={BID_STRATEGIES.filter((s) => s.supportedGoals.includes(budget.optimizationGoal))}
+            selectedStrategy={budget.bidStrategy}
+            onStrategyChange={(v) => updateBudget({ bidStrategy: v as MetaBidStrategy })}
+            layout="buttons"
+            learnMoreTrigger={<LearnMoreTrigger {...bidStrategyLearnMore.triggerProps} />}
+            bidInputs={
+              budget.bidStrategy === "COST_CAP" || budget.bidStrategy === "LOWEST_COST_WITH_BID_CAP"
+                ? [{
+                    label: budget.bidStrategy === "COST_CAP" ? "Target Cost per Result" : "Maximum Bid",
+                    desc: budget.bidStrategy === "COST_CAP"
+                      ? "The maximum average amount you want to pay per result. Meta will try to keep your cost around this target."
+                      : "The absolute maximum Meta will bid in any single auction. Strict ceiling, not an average.",
+                    value: budget.bidAmount || undefined,
+                    onChange: (v: number) => updateBudget({ bidAmount: v || 0 }),
+                    suggestedRange: suggestedBid,
+                    prefix: "SAR",
+                    suffix: `per ${goalLabel}`,
+                    min: 0,
+                    step: 0.01,
+                  }]
+                : budget.bidStrategy === "LOWEST_COST_WITH_MIN_ROAS"
+                  ? [{
+                      label: "Minimum ROAS Target",
+                      desc: "A ROAS of 2.0 means SAR 2 revenue for every SAR 1 spent. Meta ensures your return meets this minimum.",
+                      value: budget.roasTarget || undefined,
+                      onChange: (v: number) => updateBudget({ roasTarget: v || 1.0 }),
+                      min: 0.01,
+                      step: 0.1,
+                    }]
+                  : undefined
+            }
+          />
+
+          {/* ======================================================= */}
+          {/* SECTION 4: Budget, Duration & Payment                    */}
           {/* ======================================================= */}
           <BudgetDurationCard
-            budgetTypes={[]}
+            budgetTypes={BUDGET_TYPES}
+            paymentMethod={budget.paymentMethod}
+            onPaymentMethodChange={(v) => updateBudget({ paymentMethod: v as "pay_as_you_go" | "prepaid" })}
             showLifetimeToggle={true}
             budgetMode={budget.budgetType}
             onBudgetModeChange={(m) => updateBudget({ budgetType: m })}
@@ -327,159 +427,19 @@ export function MetaStepBudget() {
             onAutoIncreaseChange={(ai) => updateBudget({ autoIncrease: ai })}
             onBulkUpdate={(updates) => updateBudget(updates as Partial<typeof budget>)}
             showSmartStart={true}
-          />
-
-
-          {/* ======================================================= */}
-          {/* SECTION 2: Optimization Goal                             */}
-          {/* ======================================================= */}
-          <OptimizationGoalCard
-            goals={OPTIMIZATION_GOALS.filter((goal) => objectiveConfig.allowedGoals.includes(goal.value))}
-            selectedGoal={budget.optimizationGoal}
-            onGoalChange={(value) => {
-              updateBudget({
-                optimizationGoal: value as MetaOptimizationGoal,
-                billingEvent: getBillingEventForGoal(value as MetaOptimizationGoal) as MetaBillingEvent,
-                ...(value === "VALUE" && budget.bidStrategy !== "LOWEST_COST_WITH_MIN_ROAS"
-                  ? { bidStrategy: "LOWEST_COST_WITHOUT_CAP" as MetaBidStrategy }
-                  : {}),
-                ...(value !== "VALUE" && budget.bidStrategy === "LOWEST_COST_WITH_MIN_ROAS"
-                  ? { bidStrategy: "LOWEST_COST_WITHOUT_CAP" as MetaBidStrategy }
-                  : {}),
-              });
-            }}
-            layout="list"
-            accent="#1877F2"
-            apiBadge="optimization_goal"
-            subtitle="What outcome do you want from this campaign? Meta will allocate your budget to maximize the chosen goal."
-            infoTipText="Tell Meta what result matters most. The delivery algorithm optimizes towards this goal using your Pixel and CAPI data. Maps to optimization_goal at the Ad Set level."
-          >
-            {budget.optimizationGoal === "VALUE" && (
-              <div className="mt-3 flex items-start gap-2 rounded-md border border-[#1877F2]/20 bg-[#1877F2]/5 px-3 py-2">
-                <TrendingUp className="mt-0.5 size-3 shrink-0 text-[#1877F2]" />
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  <span className="font-medium text-foreground">Value optimization</span> requires your pixel to send purchase values via the Conversions API. Meta will prioritize higher-value conversions.
-                </p>
-              </div>
-            )}
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-                <p className="text-[11px] text-muted-foreground">Billing model</p>
-                <p className="text-xs font-semibold text-foreground">
-                  {budget.billingEvent === "IMPRESSIONS" ? "CPM (per 1,000 impressions)" : budget.billingEvent === "LINK_CLICKS" ? "CPC (per click)" : "ThruPlay (per view)"}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-                <p className="text-[11px] text-muted-foreground">What this means</p>
-                <p className="text-xs font-medium text-foreground">
-                  {budget.billingEvent === "IMPRESSIONS"
-                    ? "Charged per 1,000 impressions, optimized for your goal"
-                    : budget.billingEvent === "LINK_CLICKS"
-                      ? "Charged only when someone clicks your ad"
-                      : "Charged per completed video view (15s+)"}
-                </p>
-              </div>
-            </div>
-          </OptimizationGoalCard>
-
-          {/* ======================================================= */}
-          {/* SECTION 3: Conversion Event (for OFFSITE_CONVERSIONS/VALUE) */}
-          {/* ======================================================= */}
-          {(budget.optimizationGoal === "OFFSITE_CONVERSIONS" || budget.optimizationGoal === "VALUE") && (
-            <ConversionEventCard
-              accent="#1877F2"
-              apiBadge="custom_event_type"
-              events={CONVERSION_EVENTS}
-              selectedEvent={budget.conversionEvent}
-              onEventChange={(v) => updateBudget({ conversionEvent: v })}
-              infoTipText="The specific website event Meta will optimize for. This must match an event sent by your Meta Pixel and Conversions API on your Salla store."
-              tip="Start with Purchase for maximum ROI. If your pixel has fewer than 50 weekly purchases, try Add to Cart first -- Meta needs enough event data to exit the learning phase effectively."
-              roas={
-                budget.optimizationGoal === "VALUE"
-                  ? {
-                      value: budget.roasTarget,
-                      onChange: (v) => updateBudget({ roasTarget: Math.max(0.01, v || 1) }),
-                      apiBadge: "roas_average_floor",
-                    }
-                  : undefined
-              }
-            />
-          )}
-
-          {/* ======================================================= */}
-          {/* SECTION 4: Bid Strategy                                  */}
-          {/* ======================================================= */}
-          <BidStrategyCard
-            strategies={BID_STRATEGIES.filter((s) => s.supportedGoals.includes(budget.optimizationGoal))}
-            selectedStrategy={budget.bidStrategy}
-            onStrategyChange={(v) => updateBudget({ bidStrategy: v as MetaBidStrategy })}
-            layout="cards"
-            infoTipText="Controls how Meta bids in the ad auction. Maps to bid_strategy at the Campaign or Ad Set level. Lowest Cost = LOWEST_COST_WITHOUT_CAP (auto-bid). Cost Cap = COST_CAP with bid_amount."
-            billingContext={[
-              {
-                label: "Billing model",
-                value: budget.billingEvent === "IMPRESSIONS" ? "CPM (per 1,000 impressions)" : budget.billingEvent === "LINK_CLICKS" ? "CPC (per click)" : "ThruPlay (per view)",
-              },
-              {
-                label: "What this means",
-                value: budget.billingEvent === "IMPRESSIONS"
-                  ? "Charged per 1,000 impressions, optimized for your goal"
-                  : budget.billingEvent === "LINK_CLICKS"
-                    ? "Charged only when someone clicks your ad"
-                    : "Charged per completed video view (15s+)",
-              },
-            ]}
-            bidInputs={
-              budget.bidStrategy === "COST_CAP" || budget.bidStrategy === "LOWEST_COST_WITH_BID_CAP"
-                ? [{
-                    label: budget.bidStrategy === "COST_CAP" ? "Target Cost per Result" : "Maximum Bid",
-                    desc: budget.bidStrategy === "COST_CAP"
-                      ? "The maximum average amount you want to pay per result. Meta will try to keep your cost around this target."
-                      : "The absolute maximum Meta will bid in any single auction. Strict ceiling, not an average.",
-                    value: budget.bidAmount || undefined,
-                    onChange: (v: number) => updateBudget({ bidAmount: v || 0 }),
-                    suggestedRange: suggestedBid,
-                    prefix: "SAR",
-                    suffix: "per action",
-                    min: 0,
-                    step: 0.01,
-                  }]
-                : budget.bidStrategy === "LOWEST_COST_WITH_MIN_ROAS"
-                  ? [{
-                      label: "Minimum ROAS Target",
-                      desc: "A ROAS of 2.0 means SAR 2 revenue for every SAR 1 spent. Maps to roas_average_floor.",
-                      value: budget.roasTarget || undefined,
-                      onChange: (v: number) => updateBudget({ roasTarget: v || 1.0 }),
-                      min: 0.01,
-                      step: 0.1,
-                    }]
-                  : undefined
-            }
+            learnMoreTrigger={<LearnMoreTrigger {...budgetDurationLearnMore.triggerProps} />}
           />
 
           {/* ======================================================= */}
-          {/* SECTION 5: Attribution Window                             */}
+          {/* SECTION 5: Performance Boost (Salla Upsell)              */}
           {/* ======================================================= */}
-          {(budget.optimizationGoal === "OFFSITE_CONVERSIONS" || budget.optimizationGoal === "VALUE") && (
-            <AttributionWindowCard
-              mode="separate"
-              clickOptions={CLICK_ATTRIBUTION_WINDOWS}
-              viewOptions={VIEW_ATTRIBUTION_WINDOWS}
-              clickValue={budget.clickAttributionWindow}
-              viewValue={budget.viewAttributionWindow}
-              onClickChange={(v) => updateBudget({ clickAttributionWindow: v as MetaClickAttributionWindow })}
-              onViewChange={(v) => updateBudget({ viewAttributionWindow: v as MetaViewAttributionWindow })}
-              accent="#1877F2"
-              apiBadge="attribution_spec"
-              subtitle="How long after someone interacts with your ad should a purchase still count as a result? This affects both reporting and how Meta optimizes delivery."
-              infoTipText="Defines the time window in which a conversion is credited to your ad after a user clicks or views it. Maps to attribution_spec on the Ad Set."
-              tip="Use 7-day click + 1-day view for your online store. Most customers take 1-3 days to decide on a purchase after clicking an ad."
-            />
-          )}
+          <PerformanceBoostCard
+            enabled={budget.performanceBoost}
+            onToggle={(checked) => updateNested("budget", { performanceBoost: checked })}
+          />
 
           {/* ======================================================= */}
-          {/* SECTION 6: Advanced (collapsible)                        */}
+          {/* SECTION 6: Advanced Settings (collapsible)               */}
           {/* ======================================================= */}
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
             <CollapsibleTrigger asChild>
@@ -492,45 +452,60 @@ export function MetaStepBudget() {
               >
                 <div>
                   <span className="text-base font-bold text-foreground">Advanced Settings</span>
-                  <p className="mt-1 text-xs text-muted-foreground">Pacing, frequency cap, and delivery type</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Attribution window, pacing, and frequency cap</p>
                 </div>
                 <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", showAdvanced && "rotate-180")} />
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent className={cn("flex flex-col gap-4 rounded-b-2xl px-2 pb-2", showAdvanced && "bg-muted/50")}>
 
+              {/* Attribution Window */}
+              {isConversionGoal && (
+                <AttributionWindowCard
+                  mode="separate"
+                  clickOptions={CLICK_ATTRIBUTION_WINDOWS}
+                  viewOptions={VIEW_ATTRIBUTION_WINDOWS}
+                  clickValue={budget.clickAttributionWindow}
+                  viewValue={budget.viewAttributionWindow}
+                  onClickChange={(v) => updateBudget({ clickAttributionWindow: v as MetaClickAttributionWindow })}
+                  onViewChange={(v) => updateBudget({ viewAttributionWindow: v as MetaViewAttributionWindow })}
+                  accent="#1877F2"
+                  subtitle="How long after an ad interaction should a conversion still count?"
+                  tip="Use 7-day click + 1-day view for your online store. Most customers take 1-3 days to decide after clicking."
+                  learnMoreTrigger={<LearnMoreTrigger {...attributionWindowLearnMore.triggerProps} />}
+                />
+              )}
+
               {/* Delivery Pacing */}
               <DeliveryPacingCard
                 layout="cards"
                 accent="#1877F2"
-                apiBadge="pacing_type"
                 options={[
-                  { value: "standard", label: "Standard", desc: "Spend budget evenly throughout the day. Recommended for most campaigns.", icon: <Gauge className="size-4" />, recommended: true },
-                  { value: "no_pacing", label: "Accelerated", desc: "Spend budget as fast as possible. Use for flash sales and time-sensitive promos.", icon: <Zap className="size-4" /> },
+                  { value: "standard", label: "Standard", desc: "Spend evenly throughout the day.", icon: <Gauge className="size-4" />, recommended: true },
+                  { value: "no_pacing", label: "Accelerated", desc: "Spend as fast as possible. For flash sales.", icon: <Zap className="size-4" /> },
                 ]}
                 selectedPacing={budget.pacing}
                 onPacingChange={(v) => updateBudget({ pacing: v as MetaPacing })}
-                infoTipText="Controls how fast Meta spends your daily budget. Maps to pacing_type: STANDARD or NO_PACING."
               />
 
               {/* Frequency Capping */}
               <FrequencyCapCard
                 enabled={budget.frequencyCap.enabled}
-                onEnabledChange={(v) =>
-                  updateBudget({ frequencyCap: { ...budget.frequencyCap, enabled: v } })
-                }
+                onEnabledChange={(v) => {
+                  if (v && !budget.frequencyCap.maxFrequency) {
+                    updateBudget({ frequencyCap: { enabled: true, maxFrequency: 4, intervalDays: 7 } });
+                  } else {
+                    updateBudget({ frequencyCap: { ...budget.frequencyCap, enabled: v } });
+                  }
+                }}
                 maxImpressions={budget.frequencyCap.maxFrequency}
                 onMaxImpressionsChange={(v) =>
                   updateBudget({ frequencyCap: { ...budget.frequencyCap, maxFrequency: v } })
                 }
-                minImpressions={1}
-                maxImpressionsMax={20}
                 timeWindowValue={String(budget.frequencyCap.intervalDays)}
                 timeWindowOptions={[
-                  { value: "1", label: "1 day" },
+                  { value: "3", label: "3 days" },
                   { value: "7", label: "7 days" },
-                  { value: "14", label: "14 days" },
-                  { value: "30", label: "30 days" },
                 ]}
                 onTimeWindowChange={(v) =>
                   updateBudget({ frequencyCap: { ...budget.frequencyCap, intervalDays: Number(v) } })
@@ -540,32 +515,31 @@ export function MetaStepBudget() {
                     ? "day"
                     : `${budget.frequencyCap.intervalDays} days`
                 }
-                summaryMode={budget.frequencyCap.intervalDays === 1 ? "per" : "every"}
                 accent="meta"
-                apiBadge="frequency_control_specs"
-                infoTipText="Limit how often one person sees your ad. Maps to API frequency_control_specs on the Ad Set. Helps prevent ad fatigue and improve cost efficiency."
+                learnMoreTrigger={<LearnMoreTrigger {...frequencyCapLearnMore.triggerProps} />}
+                presets={[
+                  { id: "conservative", count: 2, timeWindowValue: "7", timeWindowLabel: "7 days", hint: "Less fatigue" },
+                  { id: "balanced", count: 4, timeWindowValue: "7", timeWindowLabel: "7 days", hint: "Recommended", recommended: true },
+                  { id: "moderate", count: 3, timeWindowValue: "3", timeWindowLabel: "3 days", hint: "Promotions" },
+                  { id: "aggressive", count: 6, timeWindowValue: "7", timeWindowLabel: "7 days", hint: "Flash sales" },
+                ]}
+                onPresetSelect={(count, tw) =>
+                  updateBudget({ frequencyCap: { ...budget.frequencyCap, maxFrequency: count, intervalDays: Number(tw) } })
+                }
               />
 
             </CollapsibleContent>
           </Collapsible>
 
-          {/* ======================================================= */}
-          {/* PERFORMANCE BOOST (Salla Upsell)                         */}
-          {/* ======================================================= */}
-          <PerformanceBoostCard
-            enabled={budget.performanceBoost}
-            onToggle={(checked) => updateNested("budget", { performanceBoost: checked })}
-          />
-
         </div>
 
         {/* ============================================================ */}
-        {/* RIGHT COLUMN - Sticky Sidebar                                 */}
+        {/* RIGHT COLUMN - Sidebar                                        */}
         {/* ============================================================ */}
-        <div className="hidden w-80 shrink-0 lg:block">
+        <div className="w-full shrink-0 lg:w-80">
           <div className="sticky top-6 flex flex-col gap-4">
 
-            {/* Cost Summary (shared) */}
+            {/* Cost Summary */}
             <CostSummaryCard
               budgetLabel={budget.budgetType === "daily" ? "Daily budget" : "Lifetime budget"}
               budgetAmount={budget.amount}
@@ -578,7 +552,7 @@ export function MetaStepBudget() {
               endDate={budget.endDate}
             />
 
-            {/* Estimated Results (shared) */}
+            {/* Estimated Results */}
             <EstimatedResultsCard
               badge="Predicted"
               rows={[
@@ -586,39 +560,201 @@ export function MetaStepBudget() {
                 { label: "Daily reach", value: `${fmt(dailyAmount * 40)} - ${fmt(dailyAmount * 120)}` },
                 { label: "Est. cost per result", value: `SAR ${suggestedBid.min.toFixed(2)} - ${suggestedBid.max.toFixed(2)}` },
               ]}
-              disclaimer="Estimates based on similar campaigns. Actual results vary by creative quality and competition."
             />
 
-            {/* Configuration + Delivery (shared) */}
+            {/* Configuration Check */}
             <ConfigCheckCard
-              configRows={[
-                ...(budget.optimizationGoal === "OFFSITE_CONVERSIONS" || budget.optimizationGoal === "VALUE" ? [{ label: "Event", value: CONVERSION_EVENTS.find((e) => e.value === budget.conversionEvent)?.label ?? budget.conversionEvent }] : []),
-                { label: "Goal", value: OPTIMIZATION_GOALS.find((g) => g.value === budget.optimizationGoal)?.label ?? budget.optimizationGoal },
-                { label: "Bid strategy", value: BID_STRATEGIES.find((s) => s.value === budget.bidStrategy)?.label ?? budget.bidStrategy },
-                { label: "Billing", value: budget.billingEvent === "IMPRESSIONS" ? "CPM" : budget.billingEvent === "LINK_CLICKS" ? "CPC" : "ThruPlay" },
-                ...(budget.optimizationGoal === "OFFSITE_CONVERSIONS" || budget.optimizationGoal === "VALUE" ? [{ label: "Attribution", value: `${budget.clickAttributionWindow === "7d_click" ? "7d click" : budget.clickAttributionWindow === "1d_click" ? "1d click" : "28d click"} + ${budget.viewAttributionWindow === "1d_view" ? "1d view" : budget.viewAttributionWindow === "7d_view" ? "7d view" : "none"}` }] : []),
-                ...(budget.optimizationGoal === "VALUE" ? [{ label: "ROAS target", value: `${budget.roasTarget}x` }] : []),
-                { label: "Pacing", value: budget.pacing === "standard" ? "Standard" : "Accelerated" },
-              ]}
+              configRows={[]}
               checkItems={[
                 { label: "Budget", status: dailyAmount >= 50 ? "ok" as const : "warning" as const, text: dailyAmount >= 50 ? "Budget is healthy" : "Below recommended minimum" },
                 { label: "Duration", status: (durationDays >= 7 || (budget.endDateOptional ?? false)) ? "ok" as const : "warning" as const, text: (durationDays >= 7 || (budget.endDateOptional ?? false)) ? "Sufficient learning time" : "Too short for optimization" },
                 { label: "Pixel", status: campaign.objective.pixelMode !== "none" ? "ok" as const : "error" as const, text: campaign.objective.pixelMode !== "none" ? "Pixel connected" : "No pixel (required)" },
-                { label: "Bid strategy", status: "ok" as const, text: budget.bidStrategy === "LOWEST_COST_WITHOUT_CAP" ? "Lowest Cost (Auto)" : `${BID_STRATEGIES.find((s) => s.value === budget.bidStrategy)?.label ?? budget.bidStrategy}${budget.bidAmount ? `: SAR ${budget.bidAmount}` : ""}` },
-                { label: "Billing", status: "ok" as const, text: budget.billingEvent === "IMPRESSIONS" ? "CPM (standard)" : budget.billingEvent },
               ]}
             />
 
-            {/* Disclaimer */}
-            <div className="rounded-xl border border-border p-3">
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Estimates are approximate and based on Meta Ads API. Actual results depend on ad quality, competition, and audience engagement.
-              </p>
-            </div>
 
           </div>
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* Learn More Sheets                                              */}
+      {/* ============================================================ */}
+
+      <LearnMoreSheet
+        open={optimizationGoalLearnMore.open}
+        onOpenChange={optimizationGoalLearnMore.setOpen}
+        title="Optimization Strategy"
+        description="Your optimization goal tells Meta what result to maximize with your budget. It directly controls which users see your ad."
+        icon={<Target />}
+        proTip="Start with Maximum Conversions (Purchase) if your Pixel has 50+ weekly purchases. For newer stores, start with Link Clicks to build traffic, then upgrade to Conversions once you have enough Pixel data."
+      >
+        <SheetSection icon={<Target />} title="Which goal should I pick?">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Maximum Conversions (Purchase)"
+              description="Best for established stores. Meta finds people most likely to buy. Requires a mature Pixel with at least 50 weekly purchase events for stable optimization."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Maximum Value (ROAS)"
+              description="Optimizes for total revenue, not just conversion count. Best for stores with varied product prices where you want to prioritize high-value orders."
+            />
+            <SheetDecisionCard
+              title="Link Clicks"
+              description="Drives the most clicks to your store. Good for new stores building traffic, or when testing creatives before switching to conversion optimization."
+            />
+            <SheetDecisionCard
+              title="Landing Page Views"
+              description="Like Link Clicks, but only counts visitors who actually load your page. Filters out accidental clicks and slow connections."
+            />
+            <SheetDecisionCard
+              title="Conversations"
+              description="Optimizes for WhatsApp, Messenger, or Instagram Direct chats. Best for high-consideration products where customers need to ask questions before buying."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info />} title="How it works">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Meta&apos;s algorithm uses your Pixel event data to find users most likely to take your chosen action. The more historical conversion data your Pixel has, the better Meta can model your ideal customer and bid accurately in the ad auction.
+          </p>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      <LearnMoreSheet
+        open={bidStrategyLearnMore.open}
+        onOpenChange={bidStrategyLearnMore.setOpen}
+        title="Bidding Strategy"
+        description="Your bid strategy controls how Meta competes in the ad auction for each impression. It directly affects your cost per result and delivery volume."
+        icon={<Gauge />}
+        proTip="Start with Lowest Cost (Auto) for the first 1-2 weeks. Once you know your average CPA, switch to Cost Cap to lock in that target while scaling."
+      >
+        <SheetSection icon={<Gauge />} title="Strategy comparison">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Lowest Cost (Auto)"
+              description="Meta bids automatically to get the most results at the lowest possible cost. You get the most volume, but individual cost per result may vary. Best for new campaigns."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Cost Cap"
+              description="Meta targets an average cost per result close to your cap. Delivery may slow if the market is competitive, but your average CPA stays controlled."
+            />
+            <SheetDecisionCard
+              title="Bid Cap"
+              description="Hard ceiling on each individual bid. Gives maximum cost control but can severely limit delivery if set too low. Best for experienced advertisers."
+            />
+            <SheetDecisionCard
+              title="Minimum ROAS"
+              description="Only available with Value optimization. Sets a floor for return on ad spend. Meta won't bid unless it expects the conversion to meet your ROAS target."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<Info />} title="When to switch">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Use auto-bid during the <span className="font-semibold text-foreground">learning phase</span> (first 50 conversions). Once your CPA stabilizes, consider switching to Cost Cap to prevent cost spikes during high-competition periods like weekends or salary week.
+          </p>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      <LearnMoreSheet
+        open={budgetDurationLearnMore.open}
+        onOpenChange={budgetDurationLearnMore.setOpen}
+        title="Budget & Duration"
+        description="Your budget and schedule determine how much Meta can spend and for how long. Getting these right is critical for the learning phase."
+        icon={<Wallet />}
+        proTip="Set your daily budget to at least 50x your expected CPA. This gives Meta enough room to exit the learning phase within 7 days and stabilize your cost per result."
+      >
+        <SheetSection icon={<DollarSign />} title="Daily vs Lifetime">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="Daily Budget"
+              description="Meta spends up to this amount each day. Spend is consistent and predictable. Works with auto-increase and ongoing campaigns."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Lifetime Budget"
+              description="Meta spreads the total across the campaign duration. Allows Meta to spend more on high-opportunity days and less on slow days."
+            />
+          </div>
+        </SheetSection>
+        <SheetSection icon={<TrendingUp />} title="Auto-Increase">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Auto-Increase gradually raises your daily budget on a schedule or based on ROAS performance. This prevents the need to manually adjust budgets as campaigns scale. A <span className="font-semibold text-foreground">safety cap</span> ensures your daily spend never exceeds a set maximum.
+          </p>
+        </SheetSection>
+        <SheetSection icon={<Clock />} title="Campaign duration">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            <span className="font-semibold text-foreground">Ongoing campaigns</span> (no end date) tend to outperform fixed-duration ones by up to 40%. The algorithm continuously learns and improves over time. If you need a fixed schedule, aim for at least 14 days to clear the learning phase.
+          </p>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      <LearnMoreSheet
+        open={attributionWindowLearnMore.open}
+        onOpenChange={attributionWindowLearnMore.setOpen}
+        title="Attribution Window"
+        description="The attribution window defines how long after an ad interaction a conversion is credited to your campaign. It affects both reporting accuracy and delivery optimization."
+        icon={<MousePointerClick />}
+        proTip="A wider window gives Meta more conversion signals, which improves delivery optimization. Only narrow it if you sell impulse-buy products with very short purchase cycles."
+      >
+        <SheetSection icon={<MousePointerClick />} title="Click-through window">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Counts conversions that happen after a user <span className="font-semibold text-foreground">clicks</span> your ad. A 7-day click window means a purchase made 5 days after clicking still counts as a result. Meta supports 1-day, 7-day, and 28-day click windows.
+          </p>
+        </SheetSection>
+        <SheetSection icon={<Eye />} title="View-through window">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Counts conversions that happen after a user <span className="font-semibold text-foreground">views</span> (but doesn&apos;t click) your ad. This captures users who are influenced by your ad but convert later through a direct visit or search. Typically set to 1 day since view-through influence fades quickly.
+          </p>
+        </SheetSection>
+        <SheetSection icon={<Info />} title="Recommended setup">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="7-day click + 1-day view"
+              description="The most balanced setup for e-commerce. Captures the full purchase cycle while keeping view-through attribution tight."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="1-day click + off"
+              description="For impulse purchases where the decision happens immediately. Gives the tightest attribution but fewer signals for optimization."
+            />
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      <LearnMoreSheet
+        open={frequencyCapLearnMore.open}
+        onOpenChange={frequencyCapLearnMore.setOpen}
+        title="Frequency Cap"
+        description="Controls how many times each individual user sees your ad within a time window. Prevents ad fatigue and improves cost efficiency."
+        icon={<Repeat />}
+        proTip="For conversion campaigns, start with 3 impressions per 7 days. This balances message reinforcement with audience freshness."
+      >
+        <SheetSection icon={<Repeat />} title="Why frequency matters">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Showing your ad too many times to the same person leads to <span className="font-semibold text-foreground">ad fatigue</span> — users start ignoring or hiding your content. But showing it too few times means your message doesn&apos;t stick. The right balance depends on your campaign goal and creative quality.
+          </p>
+        </SheetSection>
+        <SheetSection icon={<Info />} title="Frequency guidelines">
+          <div className="flex flex-col gap-2">
+            <SheetDecisionCard
+              title="1-2 times (Low)"
+              description="Maximizes unique reach. Best for broad awareness when your goal is to touch as many different people as possible."
+            />
+            <SheetDecisionCard
+              title="3-5 times (Balanced)"
+              description="Good mix of reach and reinforcement. Recommended for most campaigns — enough repetition for recall without causing fatigue."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="6+ times (High)"
+              description="Heavy reinforcement for time-sensitive promotions or complex messages that need repetition. Monitor performance closely."
+            />
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
+
       <WizardStepFooter
         onPrevious={() => setStep(1)}
         onNext={() => setStep(3)}

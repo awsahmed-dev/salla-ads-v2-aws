@@ -519,14 +519,6 @@ export function BudgetDurationCard({
           </p>
         )}
 
-        {showSmartStart && startDate && (
-          <div className="mt-2 flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2">
-            <div className="size-2 shrink-0 rounded-full bg-amber-500" />
-            <p className="text-xs text-muted-foreground">
-              Your campaign will go live after <span className="font-semibold text-foreground">Salla review</span> and <span className="font-semibold text-foreground">platform approval</span>
-            </p>
-          </div>
-        )}
       </div>
 
       {/* ── 3. Daily Budget ── */}

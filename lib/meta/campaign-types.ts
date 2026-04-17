@@ -426,6 +426,8 @@ export interface MetaBudgetSettings {
   clickAttributionWindow: MetaClickAttributionWindow;
   /** View attribution window */
   viewAttributionWindow: MetaViewAttributionWindow;
+  /** Payment method: pay as you go or prepaid */
+  paymentMethod: "pay_as_you_go" | "prepaid";
   /** Salla performance boost upsell */
   performanceBoost: boolean;
   /** Salla auto-increase configuration */
@@ -575,6 +577,7 @@ export const defaultMetaCampaign: MetaCampaignData = {
     endDateOptional: false,
     clickAttributionWindow: "7d_click",
     viewAttributionWindow: "1d_view",
+    paymentMethod: "pay_as_you_go",
     performanceBoost: true,
     autoIncrease: {
       enabled: false,
