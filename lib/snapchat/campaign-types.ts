@@ -347,11 +347,13 @@ export type AdFormat = "SINGLE" | "COLLECTION" | "STORY" | "DYNAMIC" | "INFLUENC
 export type AdDestination = "WEBSITE" | "DEEP_LINK" | "APP_INSTALL" | "NO_CTA" | "LEAD_FORM";
 
 /**
- * Snap API constraint: COLLECTION creatives must have call_to_action = null.
- * The interaction zone headline is used instead. This helper should be used when
- * building the API payload to ensure compliance.
+ * Snap API: COLLECTION creatives set call_to_action = null at the creative level,
+ * but the CTA value is sent as the interaction zone `headline` field instead.
+ * The UI still shows a CTA dropdown — the payload builder must map asset.cta
+ * to interaction_zone.headline for COLLECTION, and to creative.call_to_action
+ * for all other formats.
  */
-export function shouldNullCTA(format: AdFormat): boolean {
+export function shouldMapCTAToInteractionZone(format: AdFormat): boolean {
   return format === "COLLECTION";
 }
 
