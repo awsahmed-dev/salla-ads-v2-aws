@@ -165,7 +165,7 @@ export function CreativeCard({
   const isInfluencer = (asset.mediaSource ?? "upload") === "ad_code";
   const isSingleFormat = adFormat === "SINGLE" || adFormat === "DYNAMIC" || adFormat === "COLLECTION" || adFormat === "INFLUENCER";
   const showUrl = !isLeadGen && !isAppInstall && !isSnapAd && !isDeepLink;
-  const showCta = !isCollection && !isSnapAd;
+  const showCta = !isSnapAd;
   const showAdvancedWebView = !isSnapAd && !isDeepLink && !isLeadGen && !isAppInstall && !isInfluencer;
   const showLinkTypePills = (isSingleFormat || isStory) && showUrl && !isDeepLink;
 
@@ -609,7 +609,7 @@ export function CreativeCard({
           {/* ── CTA & Destination (fallback for non-pills formats) ── */}
           {(showCta || showUrl || isDeepLink) && !showLinkTypePills && (
             <div className="flex flex-col gap-4 border-t border-border px-3 py-3">
-              <div className={cn("grid gap-2", showCta && !isCollection ? "grid-cols-2" : "grid-cols-1")}>
+              <div className={cn("grid gap-2", showCta ? "grid-cols-2" : "grid-cols-1")}>
                   {showCta && (
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-1">
