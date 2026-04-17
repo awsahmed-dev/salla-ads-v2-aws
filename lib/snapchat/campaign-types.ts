@@ -13,6 +13,13 @@ export type CampaignObjective =
   | "SPONSORED_CHAT"
   | "LEADS";
 
+/**
+ * Maps to API ad_squad_ui_render_data.conversion_location.
+ * Determines which optimization_goal values are valid for a given objective.
+ * The combination of (objective_v2_type + conversion_location) → valid goals.
+ */
+export type ConversionLocation = "WEB" | "APP" | "LEAD_FORM" | "NONE";
+
 /** Maps to API optimization_goal -- per-objective valid goals */
 export type OptimizationGoal =
   | "PIXEL_PURCHASE"
@@ -33,16 +40,50 @@ export type OptimizationGoal =
   | "APP_ADD_TO_CART"
   | "APP_REENGAGE_OPEN";  // Snap API: re-engagement goal (open app)
 
+/**
+ * Snap API: TARGET_COST bid_strategy is only valid for these optimization_goal values.
+ * Source: Ad Squads API — "Bid Strategy to Optimization Goal mapping" table.
+ * NOT valid for: IMPRESSIONS, VIDEO_VIEWS, LEAD_FORM_SUBMISSIONS.
+ * APP_REENGAGE_PURCHASE and APP_REENGAGE_OPEN omitted (require MMP integration).
+ */
+export const TARGET_COST_COMPATIBLE_GOALS: OptimizationGoal[] = [
+  "APP_INSTALLS",
+  "SWIPES",
+  "USES",
+  "VIDEO_VIEWS_15_SEC",
+  "PIXEL_PURCHASE",
+  "PIXEL_SIGNUP",
+  "PIXEL_PAGE_VIEW",
+  "PIXEL_ADD_TO_CART",
+  "APP_PURCHASE",
+  "APP_SIGNUP",
+  "APP_ADD_TO_CART",
+  "STORY_OPENS",
+  "LANDING_PAGE_VIEW",
+];
+
 /* ---- Objective-to-config mapping ---- */
 
 export interface ObjectiveConfig {
   /** Snap API objective_v2_type */
   snapObjectiveV2: string;
-  /** Snap API conversion_location */
-  conversionLocation: string;
+  /**
+   * Allowed conversion locations for this objective.
+   * First entry is the default. When length > 1 a selector is shown in Step 0.
+   * Maps to API ad_squad_ui_render_data.conversion_location.
+   */
+  conversionLocations: ConversionLocation[];
+  /**
+   * Optimization goals keyed by conversion location.
+   * The budget step filters the goal list based on the advertiser's selected location.
+   */
+  goalsByLocation: Partial<Record<ConversionLocation, OptimizationGoal[]>>;
   /** Human-readable label */
   label: string;
-  /** Allowed optimization goals for this objective */
+  /**
+   * Union of all goals across all conversion locations.
+   * Kept for backward compat — budget step uses goalsByLocation for filtering.
+   */
   allowedGoals: OptimizationGoal[];
   /** Default optimization goal */
   defaultGoal: OptimizationGoal;
@@ -64,12 +105,27 @@ export interface ObjectiveConfig {
   defaultCTA: string;
 }
 
+/**
+ * Returns the valid optimization goals for a specific (objective, conversionLocation) pair.
+ * Falls back to the full allowedGoals list when no location-specific mapping exists.
+ */
+export function getGoalsForLocation(
+  objective: CampaignObjective,
+  location: ConversionLocation
+): OptimizationGoal[] {
+  const config = OBJECTIVE_CONFIGS[objective];
+  return config.goalsByLocation[location] ?? config.allowedGoals;
+}
+
 export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
   SALES: {
     snapObjectiveV2: "SALES",
-    conversionLocation: "WEB",
+    conversionLocations: ["WEB"],
+    goalsByLocation: {
+      WEB: ["PIXEL_PURCHASE", "PIXEL_ADD_TO_CART", "PIXEL_PAGE_VIEW", "LANDING_PAGE_VIEW", "SWIPES"],
+    },
     label: "Sales",
-    allowedGoals: ["PIXEL_PURCHASE", "PIXEL_ADD_TO_CART", "PIXEL_PAGE_VIEW"],
+    allowedGoals: ["PIXEL_PURCHASE", "PIXEL_ADD_TO_CART", "PIXEL_PAGE_VIEW", "LANDING_PAGE_VIEW", "SWIPES"],
     defaultGoal: "PIXEL_PURCHASE",
     pixelRequirement: "required",
     catalogAvailable: true,
@@ -82,14 +138,17 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
   },
   WEBSITE_VISITS: {
     snapObjectiveV2: "TRAFFIC",
-    conversionLocation: "WEB",
+    conversionLocations: ["WEB"],
+    goalsByLocation: {
+      WEB: ["SWIPES", "PIXEL_PAGE_VIEW", "LANDING_PAGE_VIEW"],
+    },
     label: "Website Visits",
     allowedGoals: ["SWIPES", "PIXEL_PAGE_VIEW", "LANDING_PAGE_VIEW"],
     defaultGoal: "SWIPES",
     pixelRequirement: "optional",
     catalogAvailable: false,
     hasConversionWindow: false,
-    allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID"],
+    allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID", "TARGET_COST"],
     allowedAdFormats: ["WEB_VIEW", "DEEP_LINK", "COLLECTION", "COMPOSITE", "INFLUENCER"],
     allowedFormats: ["SINGLE", "COLLECTION", "STORY", "INFLUENCER"],
     allowedDestinations: ["WEBSITE", "DEEP_LINK"],
@@ -97,14 +156,17 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
   },
   ENGAGEMENT: {
     snapObjectiveV2: "AWARENESS_AND_ENGAGEMENT",
-    conversionLocation: "NONE",
+    conversionLocations: ["NONE"],
+    goalsByLocation: {
+      NONE: ["IMPRESSIONS", "SWIPES", "STORY_OPENS", "VIDEO_VIEWS", "VIDEO_VIEWS_15_SEC", "USES"],
+    },
     label: "Interaction",
     allowedGoals: ["IMPRESSIONS", "SWIPES", "STORY_OPENS", "VIDEO_VIEWS", "VIDEO_VIEWS_15_SEC", "USES"],
     defaultGoal: "IMPRESSIONS",
     pixelRequirement: "none",
     catalogAvailable: false,
     hasConversionWindow: false,
-    allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID"],
+    allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID", "TARGET_COST"],
     allowedAdFormats: ["WEB_VIEW", "SNAP_AD", "COLLECTION", "COMPOSITE", "INFLUENCER"],
     allowedFormats: ["SINGLE", "COLLECTION", "STORY", "INFLUENCER"],
     allowedDestinations: ["WEBSITE", "NO_CTA"],
@@ -112,14 +174,17 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
   },
   SPONSORED_CHAT: {
     snapObjectiveV2: "AWARENESS_AND_ENGAGEMENT",
-    conversionLocation: "NONE",
+    conversionLocations: ["NONE"],
+    goalsByLocation: {
+      NONE: ["IMPRESSIONS", "SWIPES"],
+    },
     label: "Sponsored Ads",
     allowedGoals: ["IMPRESSIONS", "SWIPES"],
     defaultGoal: "IMPRESSIONS",
     pixelRequirement: "none",
     catalogAvailable: false,
     hasConversionWindow: false,
-    allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID"],
+    allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID", "TARGET_COST"],
     allowedAdFormats: ["WEB_VIEW", "APP_INSTALL", "COMPOSITE", "INFLUENCER"],
     allowedFormats: ["SINGLE", "STORY", "INFLUENCER"],
     allowedDestinations: ["WEBSITE", "APP_INSTALL"],
@@ -127,9 +192,13 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
   },
   APP_PROMOTION: {
     snapObjectiveV2: "APP_PROMOTION",
-    conversionLocation: "APP",
+    conversionLocations: ["APP"],
+    goalsByLocation: {
+      // IMPRESSIONS and SWIPES do not require MMP. APP_PURCHASE/SIGNUP/ADD_TO_CART require MMP.
+      // APP_LEVEL_COMPLETE, APP_ACHIEVEMENT_UNLOCKED, APP_AD_VIEW omitted (require MMP).
+      APP: ["APP_INSTALLS", "IMPRESSIONS", "APP_PURCHASE", "APP_SIGNUP", "APP_ADD_TO_CART", "SWIPES"],
+    },
     label: "App Promotion",
-    // IMPRESSIONS and SWIPES do not require MMP. APP_PURCHASE/SIGNUP/ADD_TO_CART require MMP.
     allowedGoals: ["APP_INSTALLS", "IMPRESSIONS", "APP_PURCHASE", "APP_SIGNUP", "APP_ADD_TO_CART", "SWIPES"],
     defaultGoal: "APP_INSTALLS",
     pixelRequirement: "none",
@@ -143,19 +212,33 @@ export const OBJECTIVE_CONFIGS: Record<CampaignObjective, ObjectiveConfig> = {
   },
   LEADS: {
     snapObjectiveV2: "LEADS",
-    conversionLocation: "LEAD_FORM",
+    /**
+     * LEADS supports two conversion locations:
+     *  - LEAD_FORM: Snapchat native lead form (goals: LEAD_FORM_SUBMISSIONS, SWIPES)
+     *  - WEB: Website with pixel tracking (goals: SWIPES, LANDING_PAGE_VIEW)
+     * A selector is shown in Step 0 when this objective is selected.
+     */
+    conversionLocations: ["LEAD_FORM", "WEB"],
+    goalsByLocation: {
+      LEAD_FORM: ["LEAD_FORM_SUBMISSIONS", "SWIPES"],
+      WEB: ["SWIPES", "LANDING_PAGE_VIEW"],
+    },
     label: "Lead Generation",
-    // Snap API only allows LEAD_FORM_SUBMISSIONS and SWIPES for LEADS/LEAD_FORM.
-    // IMPRESSIONS is NOT valid per the API objective-to-goal mapping.
-    allowedGoals: ["LEAD_FORM_SUBMISSIONS", "SWIPES"],
+    allowedGoals: ["LEAD_FORM_SUBMISSIONS", "SWIPES", "LANDING_PAGE_VIEW"],
     defaultGoal: "LEAD_FORM_SUBMISSIONS",
-    pixelRequirement: "none",
+    pixelRequirement: "optional",
     catalogAvailable: false,
     hasConversionWindow: false,
+    /**
+     * TARGET_COST is in the list but filtered at runtime by goal compatibility:
+     * LEAD_FORM_SUBMISSIONS does NOT support TARGET_COST (API will reject).
+     * SWIPES and LANDING_PAGE_VIEW DO support TARGET_COST.
+     * See TARGET_COST_COMPATIBLE_GOALS and step-budget.tsx filtering logic.
+     */
     allowedBidStrategies: ["AUTO_BID", "LOWEST_COST_WITH_MAX_BID", "TARGET_COST"],
-    allowedAdFormats: ["LEAD_GENERATION"],
+    allowedAdFormats: ["LEAD_GENERATION", "WEB_VIEW"],
     allowedFormats: ["SINGLE"],
-    allowedDestinations: ["LEAD_FORM"],
+    allowedDestinations: ["LEAD_FORM", "WEBSITE"],
     defaultCTA: "SIGN_UP",
   },
 };
@@ -216,6 +299,13 @@ export type PixelMode = "existing" | "salla_managed" | "none";
 export interface ObjectiveSettings {
   campaignName: string;
   objective: CampaignObjective;
+  /**
+   * Selected conversion location for this objective.
+   * Determines which optimization goals are available in the budget step.
+   * Set automatically to the first entry of OBJECTIVE_CONFIGS[objective].conversionLocations.
+   * When the objective supports multiple locations, a selector is shown in Step 0.
+   */
+  conversionLocation: ConversionLocation;
   catalogEnabled: boolean;
   catalogSource: string;
   /** Snap API: ad_squad.pixel_id -- required for PIXEL_* optimization goals */
@@ -680,7 +770,7 @@ export type CreatorPartnershipType = "NONE" | "AD_PARTNERSHIP" | "BRAND_PARTNERS
 
 /**
  * A single creative asset (maps to one Snap Creative entity).
- * Supports image (1080x1920, PNG/JPG, <=5MB) and video (1080x1920, mp4/mov, 3-180s, <=32MB).
+ * Supports image (1080x1920, PNG/JPG, <=5MB) and video (1080x1920, mp4/mov, 3-180s, <=100MB).
  */
 /**
  * Media source: upload local file, or claim influencer content via Ad Code.
@@ -964,6 +1054,7 @@ export const defaultCampaign: CampaignData = {
   objective: {
     campaignName: "",
     objective: "SALES",
+    conversionLocation: "WEB",
     catalogEnabled: false,
     catalogSource: "",
     pixelMode: "none",
@@ -1021,7 +1112,7 @@ export const defaultCampaign: CampaignData = {
     ads: [],
     placement: "AUTOMATIC",
     brandSafety: "FULL_INVENTORY",
-    customPositions: ["INTERSTITIAL_USER", "INTERSTITIAL_CONTENT", "INTERSTITIAL_SPOTLIGHT", "FEED", "INSTREAM", "PUBLIC_STORIES_INSTREAM", "CAMERA"],
+    customPositions: ["INTERSTITIAL_USER", "INTERSTITIAL_CONTENT", "INTERSTITIAL_SPOTLIGHT", "FEED", "INSTREAM", "PUBLIC_STORIES_INSTREAM", "CAMERA", "CHAT_FEED", "POST_CAPTURE_CAROUSEL"],
     catalogProductSetId: "",
     catalogProductSetName: "",
     sponsoredAdConfig: {

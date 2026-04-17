@@ -36,7 +36,7 @@ import {
   ArrowRight,
   User,
 } from "lucide-react";
-import { OBJECTIVE_CONFIGS, type CampaignObjective, type AppPlatform, makeDefaultLeadForm, makeDefaultAppSettings } from "@/lib/snapchat/campaign-types";
+import { OBJECTIVE_CONFIGS, getGoalsForLocation, type CampaignObjective, type ConversionLocation, type AppPlatform, makeDefaultLeadForm, makeDefaultAppSettings } from "@/lib/snapchat/campaign-types";
 import { getSnapPixel, getSnapPublicProfile, type SnapPixelInfo, type SnapPublicProfile } from "@/lib/salla/store-api";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 
@@ -155,22 +155,22 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
 
   const handleObjectiveChange = (value: CampaignObjective) => {
     const config = OBJECTIVE_CONFIGS[value];
+    const defaultLocation = config.conversionLocations[0];
     updateNested("objective", {
       objective: value,
+      conversionLocation: defaultLocation,
       ...(config.pixelRequirement === "none" && { pixelMode: "none" as const, pixelId: "", pixelName: "" }),
       ...(!config.catalogAvailable && { catalogEnabled: false, catalogSource: "" }),
     });
+    const defaultGoalForLocation = (config.goalsByLocation[defaultLocation] ?? config.allowedGoals)[0] ?? config.defaultGoal;
     const currentBid = campaign.budget.bidStrategy;
     const bidStrategyReset = config.allowedBidStrategies.includes(currentBid) ? currentBid : "AUTO_BID";
     updateNested("budget", {
       optimizationGoal: config.defaultGoal,
       bidStrategy: bidStrategyReset,
-      // Frequency cap only supported for IMPRESSIONS goal — auto-disable when switching to non-IMPRESSIONS objective
-      ...(config.defaultGoal !== "IMPRESSIONS" && campaign.budget.frequencyCapEnabled
-        ? { frequencyCapEnabled: false }
-        : {}),
     });
-    if (value === "LEADS" && !campaign.creative.leadForm) {
+    // LEADS: default location is LEAD_FORM → show lead form. WEB → no lead form.
+    if (value === "LEADS" && defaultLocation === "LEAD_FORM" && !campaign.creative.leadForm) {
       updateNested("creative", { leadForm: makeDefaultLeadForm() });
     } else if (value !== "LEADS") {
       updateNested("creative", { leadForm: undefined });
@@ -189,7 +189,30 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
       });
     } else if (campaign.objective.objective === "SPONSORED_CHAT") {
       // Switching away from SPONSORED_CHAT — reset to automatic placement
-      updateNested("creative", { placement: "AUTOMATIC" as const, customPositions: ["INTERSTITIAL_USER", "INTERSTITIAL_CONTENT", "INTERSTITIAL_SPOTLIGHT", "FEED", "INSTREAM", "PUBLIC_STORIES_INSTREAM", "CAMERA"] });
+      updateNested("creative", { placement: "AUTOMATIC" as const, customPositions: ["INTERSTITIAL_USER", "INTERSTITIAL_CONTENT", "INTERSTITIAL_SPOTLIGHT", "FEED", "INSTREAM", "PUBLIC_STORIES_INSTREAM", "CAMERA", "CHAT_FEED", "POST_CAPTURE_CAROUSEL"] });
+    }
+  };
+
+  /** Handles conversion location change within the same objective (e.g. LEADS: LEAD_FORM ↔ WEB) */
+  const handleConversionLocationChange = (location: ConversionLocation) => {
+    const config = OBJECTIVE_CONFIGS[obj.objective];
+    const goalsForLocation = getGoalsForLocation(obj.objective, location);
+    const currentGoal = campaign.budget.optimizationGoal;
+    const goalReset = goalsForLocation.includes(currentGoal) ? currentGoal : goalsForLocation[0];
+
+    updateNested("objective", { conversionLocation: location });
+    updateNested("budget", { optimizationGoal: goalReset, bidStrategy: "AUTO_BID" as const });
+
+    // LEADS: switching between LEAD_FORM and WEB changes creative requirements
+    if (obj.objective === "LEADS") {
+      if (location === "LEAD_FORM") {
+        if (!campaign.creative.leadForm) {
+          updateNested("creative", { leadForm: makeDefaultLeadForm() });
+        }
+      } else {
+        // WEB location doesn't use lead form — remove it
+        updateNested("creative", { leadForm: undefined });
+      }
     }
   };
 
@@ -266,6 +289,41 @@ export function StepObjective({ onCancel }: { onCancel?: () => void }) {
                     );
                   })}
                 </div>
+
+                {/* Conversion Location Selector — shown when objective supports multiple locations */}
+                {currentConfig.conversionLocations.length > 1 && (
+                  <div className="border-t border-border px-4 sm:px-8 py-5">
+                    <p className="mb-3 text-sm font-semibold text-foreground">Where do you want to collect leads?</p>
+                    <div className="flex gap-3">
+                      {currentConfig.conversionLocations.map((loc) => {
+                        const selected = obj.conversionLocation === loc;
+                        const locLabels: Record<string, { label: string; desc: string }> = {
+                          LEAD_FORM: { label: "Lead Form (Native)", desc: "Collect leads with Snapchat's built-in form" },
+                          WEB: { label: "Website (Pixel)", desc: "Track conversions on your website via Snap Pixel" },
+                          APP: { label: "App", desc: "Track in-app events" },
+                          NONE: { label: "None", desc: "No conversion tracking" },
+                        };
+                        const info = locLabels[loc] ?? { label: loc, desc: "" };
+                        return (
+                          <button
+                            key={loc}
+                            type="button"
+                            onClick={() => handleConversionLocationChange(loc)}
+                            className={cn(
+                              "flex-1 rounded-xl border px-4 py-3 text-left transition-all",
+                              selected
+                                ? "border-[#a4ffe5] bg-[#e6fff9] shadow-sm"
+                                : "border-border bg-white hover:border-[#a4ffe5] hover:shadow-sm"
+                            )}
+                          >
+                            <p className={cn("text-sm font-bold", selected ? "text-[#004956]" : "text-foreground")}>{info.label}</p>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">{info.desc}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Selected objective detail bar */}
                 <div className="border-t border-border bg-[#f4f4f4] px-4 sm:px-8 py-4">

@@ -59,6 +59,8 @@ import { BidStrategyCard } from "@/components/shared/bid-strategy-card";
 import { OptimizationGoalCard } from "@/components/shared/optimization-goal-card";
 import {
   OBJECTIVE_CONFIGS,
+  getGoalsForLocation,
+  TARGET_COST_COMPATIBLE_GOALS,
   type OptimizationGoal,
   type ConversionWindow,
   type BidStrategy,
@@ -316,9 +318,13 @@ export function StepBudget() {
   const budget = campaign.budget;
   const objectiveConfig = OBJECTIVE_CONFIGS[campaign.objective.objective];
 
-  /* Filter goals and bid strategies based on selected objective */
+  /* Filter goals based on selected objective + conversion location */
+  const locationGoals = getGoalsForLocation(
+    campaign.objective.objective,
+    campaign.objective.conversionLocation
+  );
   const OPTIMIZATION_GOALS = ALL_OPTIMIZATION_GOALS.filter((g) =>
-    objectiveConfig.allowedGoals.includes(g.value)
+    locationGoals.includes(g.value)
   );
 
   /**
@@ -361,9 +367,16 @@ export function StepBudget() {
     }
   }, [pixelEligibleFor7Day]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const FILTERED_BID_STRATEGIES = BID_STRATEGIES.filter((s) =>
-    objectiveConfig.allowedBidStrategies.includes(s.value)
-  );
+  /**
+   * Filter bid strategies by objective allowlist AND goal compatibility.
+   * TARGET_COST is only valid for specific goals (see TARGET_COST_COMPATIBLE_GOALS).
+   * This prevents API rejections like LEADS + LEAD_FORM_SUBMISSIONS + TARGET_COST.
+   */
+  const FILTERED_BID_STRATEGIES = BID_STRATEGIES.filter((s) => {
+    if (!objectiveConfig.allowedBidStrategies.includes(s.value)) return false;
+    if (s.value === "TARGET_COST" && !TARGET_COST_COMPATIBLE_GOALS.includes(budget.optimizationGoal)) return false;
+    return true;
+  });
 
   /* Auto-increase reads from persisted campaign context (fallback for old drafts missing the field) */
   const autoIncrease = budget.autoIncrease ?? {
@@ -570,14 +583,15 @@ export function StepBudget() {
               const newGoal = v as OptimizationGoal;
               // When the new goal is incompatible with ACCELERATED pacing, revert to STANDARD
               const isNewGoalAcceleratedCompatible = ACCELERATED_COMPATIBLE_GOALS.includes(newGoal);
+              // When switching to a goal that doesn't support TARGET_COST, revert to AUTO_BID
+              const isTargetCostCompatible = TARGET_COST_COMPATIBLE_GOALS.includes(newGoal);
               updateNested("budget", {
                 optimizationGoal: newGoal,
                 ...(!isNewGoalAcceleratedCompatible && budget.pacingType === "ACCELERATED"
                   ? { pacingType: "STANDARD" }
                   : {}),
-                // Frequency cap only supported for IMPRESSIONS goal — auto-disable when switching away
-                ...(newGoal !== "IMPRESSIONS" && budget.frequencyCapEnabled
-                  ? { frequencyCapEnabled: false }
+                ...(!isTargetCostCompatible && budget.bidStrategy === "TARGET_COST"
+                  ? { bidStrategy: "AUTO_BID" as BidStrategy }
                   : {}),
               });
             }}
@@ -795,8 +809,8 @@ export function StepBudget() {
               )}
 
               {/* -- Frequency Capping (Snapchat API: ad_squad.cap_and_exclusion_config.frequency_cap_config) -- */}
-              {/* Snap API only supports frequency cap when optimization_goal = IMPRESSIONS */}
-              {budget.optimizationGoal === "IMPRESSIONS" && (
+              {/* Snap API supports frequency cap for ALL optimization goals.
+                  Only restriction: incompatible with multi-format delivery (different ad types in same ad squad). */}
                 <FrequencyCapCard
                   enabled={budget.frequencyCapEnabled}
                   onEnabledChange={(checked) => {
@@ -838,7 +852,6 @@ export function StepBudget() {
                     </div>
                   )}
                 </FrequencyCapCard>
-              )}
 
 
             </CollapsibleContent>
