@@ -45,7 +45,20 @@ import {
   Megaphone,
   Sparkles,
   ShoppingBag,
+  ImagePlus,
+  ShieldCheck,
+  Image,
+  LayoutGrid,
+  Rss,
+  BookOpen,
 } from "lucide-react";
+import {
+  LearnMoreSheet,
+  LearnMoreTrigger,
+  SheetSection,
+  SheetDecisionCard,
+  useLearnMore,
+} from "@/components/shared/learn-more-sheet";
 
 
 /* ================================================================== */
@@ -78,6 +91,7 @@ function PlacementSection() {
   const { campaign, updateNested } = useMetaCampaign();
   const obj = campaign.objective;
   const [showManualDetails, setShowManualDetails] = useState(false);
+  const placementLearnMore = useLearnMore();
 
   const togglePublisherPlatform = (plat: MetaPublisherPlatform) => {
     const current = obj.publisherPlatforms;
@@ -108,7 +122,10 @@ function PlacementSection() {
           <Globe className="size-4 text-[#1877F2]" />
         </div>
         <div className="flex-1">
-          <Label className="text-sm font-semibold text-foreground">Placement Configuration</Label>
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-semibold text-foreground">Placement Configuration</Label>
+            <LearnMoreTrigger {...placementLearnMore.triggerProps} />
+          </div>
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
             Choose where your ads appear. More placements give Meta flexibility to optimize delivery at lower cost.
           </p>
@@ -263,6 +280,55 @@ function PlacementSection() {
           </div>
         </div>
       )}
+
+      {/* Placement Learn More Sheet */}
+      <LearnMoreSheet
+        open={placementLearnMore.open}
+        onOpenChange={placementLearnMore.setOpen}
+        title="Ad Placements"
+        description="Where your ads appear across Facebook and Instagram. The right placement strategy can significantly impact your cost per result."
+        icon={<Globe />}
+        proTip="Advantage+ typically delivers 10-20% lower cost per result than manual. Only go manual if you have a specific reason."
+      >
+        <SheetSection icon={<Sparkles />} title="Placement Strategies">
+          <div className="flex flex-col gap-3">
+            <SheetDecisionCard
+              title="Advantage+ Placements (Recommended)"
+              description="Meta AI distributes your budget across all placements automatically to find the lowest cost per result. Best for most advertisers -- lets the algorithm discover which placements work best for your audience."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Manual Placements"
+              description="You choose exactly where ads appear. Best when you need brand control over ad environment, have placement-specific creatives, or want to exclude low-performing placements based on past data."
+            />
+          </div>
+        </SheetSection>
+
+        <SheetSection icon={<LayoutGrid />} title="What Each Placement Means">
+          <div className="flex flex-col gap-3">
+            <SheetDecisionCard
+              title="Feed"
+              description="The main scrolling timeline on Facebook and Instagram. Highest volume placement with strong engagement for both image and video ads."
+            />
+            <SheetDecisionCard
+              title="Stories"
+              description="Full-screen vertical content between friends' stories. Immersive format ideal for visually rich creatives. Disappears after 24 hours of viewing."
+            />
+            <SheetDecisionCard
+              title="Reels"
+              description="Short-form vertical video placement. Growing rapidly in reach and engagement. Best for video-first creatives under 30 seconds."
+            />
+            <SheetDecisionCard
+              title="Explore & Search"
+              description="Ads shown when users are actively browsing or searching. Reaches people in discovery mode who are open to new brands and products."
+            />
+            <SheetDecisionCard
+              title="Marketplace & Right Column"
+              description="Facebook-specific placements. Marketplace reaches shoppers with purchase intent. Right Column is desktop-only with lower cost but smaller format."
+            />
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
     </div>
   );
 }
@@ -298,6 +364,9 @@ function MetaCampaignReadiness({
   catalogEnabled: boolean;
 }) {
   const [showAllChecks, setShowAllChecks] = useState(false);
+  const objKey = objective.objective;
+  const urlRequired = objKey !== "OUTCOME_AWARENESS" && objKey !== "OUTCOME_ENGAGEMENT";
+  const urlLabel = objKey === "OUTCOME_APP_PROMOTION" ? "app store URL" : "landing URL";
 
   /* ── Build required checks across ALL ads ── */
   const allChecks: { label: string; ok: boolean }[] = [];
@@ -318,20 +387,20 @@ function MetaCampaignReadiness({
 
     if (isCatalog) {
       allChecks.push({ label: `Ad ${i + 1}: ad text`, ok: ad.primaryText.length > 0 });
-      allChecks.push({ label: `Ad ${i + 1}: landing URL`, ok: ad.websiteUrl.length > 0 });
+      if (urlRequired) allChecks.push({ label: `Ad ${i + 1}: ${urlLabel}`, ok: ad.websiteUrl.length > 0 });
       allChecks.push({ label: `Ad ${i + 1}: CTA selected`, ok: ad.callToAction !== "NO_BUTTON" });
     } else if (isCarousel) {
       allChecks.push({ label: `Ad ${i + 1}: min 2 cards`, ok: ad.carouselCards.length >= 2 });
       allChecks.push({ label: `Ad ${i + 1}: card media`, ok: ad.carouselCards.some((c) => !!c.imageUrl) });
       allChecks.push({ label: `Ad ${i + 1}: ad text`, ok: ad.primaryText.length > 0 });
       allChecks.push({ label: `Ad ${i + 1}: headline`, ok: ad.headline.length > 0 });
-      allChecks.push({ label: `Ad ${i + 1}: landing URL`, ok: ad.websiteUrl.length > 0 });
+      if (urlRequired) allChecks.push({ label: `Ad ${i + 1}: ${urlLabel}`, ok: ad.websiteUrl.length > 0 });
       allChecks.push({ label: `Ad ${i + 1}: CTA selected`, ok: ad.callToAction !== "NO_BUTTON" });
     } else {
       allChecks.push({ label: `Ad ${i + 1}: has media`, ok: ad.assets.length > 0 });
       allChecks.push({ label: `Ad ${i + 1}: ad text`, ok: ad.primaryText.length > 0 });
       allChecks.push({ label: `Ad ${i + 1}: headline`, ok: ad.headline.length > 0 });
-      allChecks.push({ label: `Ad ${i + 1}: landing URL`, ok: ad.websiteUrl.length > 0 });
+      if (urlRequired) allChecks.push({ label: `Ad ${i + 1}: ${urlLabel}`, ok: ad.websiteUrl.length > 0 });
       allChecks.push({ label: `Ad ${i + 1}: CTA selected`, ok: ad.callToAction !== "NO_BUTTON" });
     }
   }
@@ -369,9 +438,7 @@ function MetaCampaignReadiness({
       met: hasMultipleAds,
       tip: objKey === "OUTCOME_SALES"
         ? "Each ad supports one creative — add 2+ ads with different visuals or formats to find the best-performing sales driver"
-        : objKey === "OUTCOME_LEADS"
-          ? "Each ad supports one creative — add multiple ads to test different lead form approaches"
-          : "Each ad supports one creative — add 2+ ads to test different formats and creatives",
+        : "Each ad supports one creative — add 2+ ads to test different formats and creatives",
       metTip: `${ads.length} ads — great for A/B testing`,
     });
 
@@ -496,8 +563,14 @@ export function MetaStepCreative() {
   const [previewPlacement, setPreviewPlacement] = useState<PreviewPlacement>("FACEBOOK_FEED");
   const [placementSafetyOpen, setPlacementSafetyOpen] = useState(false);
   const objConfig = META_OBJECTIVE_CONFIGS[objective.objective] ?? META_OBJECTIVE_CONFIGS.OUTCOME_SALES;
+  const formatLearnMore = useLearnMore();
+  const brandSafetyLearnMore = useLearnMore();
 
   const catalogEnabled = objective.catalogEnabled;
+  const isAwareness = objective.objective === "OUTCOME_AWARENESS";
+  const isEngagement = objective.objective === "OUTCOME_ENGAGEMENT";
+  const isAppPromo = objective.objective === "OUTCOME_APP_PROMOTION";
+  const urlOptional = isAwareness || isEngagement;
 
   const updateAds = (updatedAds: MetaAd[]) => updateNested("creative", { ads: updatedAds });
 
@@ -511,6 +584,14 @@ export function MetaStepCreative() {
     const newAd = makeDefaultAd(format, ads.length);
     if (format === "CAROUSEL" && newAd.carouselCards.length < 2) {
       newAd.carouselCards = [makeCarouselCard(0), makeCarouselCard(1)];
+    }
+    // Pre-fill app store URL for App Promotion
+    if (isAppPromo && objective.appSettings.appStoreUrl) {
+      newAd.websiteUrl = objective.appSettings.appStoreUrl;
+    }
+    // Set objective-appropriate default CTA
+    if (objConfig.defaultCTA) {
+      newAd.callToAction = objConfig.defaultCTA;
     }
     updateAds([...ads, newAd]);
     setActiveAdIndex(ads.length);
@@ -538,6 +619,12 @@ export function MetaStepCreative() {
   /* Auto-create first ad if none exists */
   if (ads.length === 0) {
     const firstAd = makeDefaultAd(catalogEnabled ? "DYNAMIC" : "SINGLE_IMAGE", 0);
+    if (isAppPromo && objective.appSettings.appStoreUrl) {
+      firstAd.websiteUrl = objective.appSettings.appStoreUrl;
+    }
+    if (objConfig.defaultCTA) {
+      firstAd.callToAction = objConfig.defaultCTA;
+    }
     updateAds([firstAd]);
     return null;
   }
@@ -551,8 +638,8 @@ export function MetaStepCreative() {
   const supportedPlacements = formatConfig?.supportedPlacements || ["FACEBOOK_FEED"];
 
   const isValid = isCatalogFormat
-    ? ads.every((ad) => ad.primaryText && ad.websiteUrl)
-    : ads.every((ad) => ad.primaryText && ad.headline && ad.websiteUrl);
+    ? ads.every((ad) => ad.primaryText && (urlOptional || ad.websiteUrl))
+    : ads.every((ad) => ad.primaryText && (urlOptional || (ad.headline && ad.websiteUrl)));
 
   /* Ensure preview placement is valid for current format */
   const activePlacement = supportedPlacements.includes(previewPlacement) ? previewPlacement : supportedPlacements[0];
@@ -653,7 +740,10 @@ export function MetaStepCreative() {
               <div className="mt-2 flex flex-col gap-4">
                 {/* ── Content Safety ── */}
                 <div className="rounded-xl bg-card px-6 py-5">
-                  <h3 className="text-sm font-bold text-foreground">Content Safety</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-foreground">Content Safety</h3>
+                    <LearnMoreTrigger {...brandSafetyLearnMore.triggerProps} />
+                  </div>
                   <p className="mb-4 mt-1 text-xs text-muted-foreground">
                     Control what types of content your ads can appear alongside.
                   </p>
@@ -722,8 +812,9 @@ export function MetaStepCreative() {
           {/* ---- 5. Campaign Content (AdPanel list) ---- */}
           <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="px-5 pt-5 pb-1">
-              <div className="mb-1">
+              <div className="mb-1 flex items-center gap-2">
                 <Label className="text-base font-bold text-foreground">Campaign Content</Label>
+                <LearnMoreTrigger {...formatLearnMore.triggerProps} label="Which format?" />
               </div>
               <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
                 Create and manage your ads. Click an ad to expand and edit its format, media, copy, and destination.
@@ -767,35 +858,50 @@ export function MetaStepCreative() {
                 )}
 
                 {/* Add Another Ad */}
-                <div className="rounded-xl border-2 border-dashed border-border py-6">
-                  <div className="flex flex-col items-center gap-1">
+                {catalogEnabled ? (
+                  /* Catalog campaign: single button — always adds another catalog ad */
+                  <button
+                    type="button"
+                    onClick={() => addAd("DYNAMIC")}
+                    className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border py-6 transition-colors hover:border-[#1877F2]/40 hover:bg-[#1877F2]/[0.02]"
+                  >
                     <div className="flex size-10 items-center justify-center rounded-full bg-[#1877F2]/10">
                       <Plus className="size-5 text-[#1877F2]" />
                     </div>
-                    <p className="text-sm font-bold text-[#1877F2]">Add Another Ad</p>
-                    <p className="text-xs text-muted-foreground text-center">A/B test different creatives to optimize performance</p>
+                    <p className="text-sm font-bold text-[#1877F2]">Add Another Catalog Ad</p>
+                    <p className="text-xs text-muted-foreground text-center">Test different ad messages, product sets, or CTAs</p>
+                  </button>
+                ) : (
+                  /* Non-catalog: format picker grid */
+                  <div className="rounded-xl border-2 border-dashed border-border py-6">
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="flex size-10 items-center justify-center rounded-full bg-[#1877F2]/10">
+                        <Plus className="size-5 text-[#1877F2]" />
+                      </div>
+                      <p className="text-sm font-bold text-[#1877F2]">Add Another Ad</p>
+                      <p className="text-xs text-muted-foreground text-center">A/B test different creatives to optimize performance</p>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-2 px-6 sm:grid-cols-4">
+                      {AD_FORMAT_OPTIONS.filter((f) => objConfig.allowedAdFormats.includes(f.value))
+                        .filter((f) => f.value !== "COLLECTION" && f.value !== "DYNAMIC")
+                        .map((fmt) => (
+                          <button
+                            key={fmt.value}
+                            type="button"
+                            onClick={() => addAd(fmt.value)}
+                            className="flex flex-col items-center gap-1.5 rounded-lg border border-border px-2 py-3 text-center transition-colors hover:border-[#1877F2]/40 hover:bg-[#1877F2]/[0.02]"
+                          >
+                            <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                              {FORMAT_ICONS[fmt.value]}
+                            </div>
+                            <span className="text-[10px] font-medium text-foreground">
+                              {fmt.label}
+                            </span>
+                          </button>
+                        ))}
+                    </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2 px-6 sm:grid-cols-4">
-                    {AD_FORMAT_OPTIONS.filter((f) => objConfig.allowedAdFormats.includes(f.value))
-                      .filter((f) => f.value !== "COLLECTION")
-                      .filter((f) => f.value !== "DYNAMIC" || catalogEnabled)
-                      .map((fmt) => (
-                        <button
-                          key={fmt.value}
-                          type="button"
-                          onClick={() => addAd(fmt.value)}
-                          className="flex flex-col items-center gap-1.5 rounded-lg border border-border px-2 py-3 text-center transition-colors hover:border-[#1877F2]/40 hover:bg-[#1877F2]/[0.02]"
-                        >
-                          <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                            {FORMAT_ICONS[fmt.value]}
-                          </div>
-                          <span className="text-[10px] font-medium text-foreground">
-                            {fmt.value === "DYNAMIC" ? "Catalog Ads" : fmt.label}
-                          </span>
-                        </button>
-                      ))}
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -861,6 +967,92 @@ export function MetaStepCreative() {
           </div>
         </div>
       </div>
+      {/* ── Learn More: Ad Format ── */}
+      <LearnMoreSheet
+        open={formatLearnMore.open}
+        onOpenChange={formatLearnMore.setOpen}
+        title="Choosing Your Ad Format"
+        description="Each format has unique strengths. Pick the one that matches your creative assets and campaign goals."
+        icon={<ImagePlus />}
+        proTip="Start with one image ad and one video ad. This gives Meta enough variety to find your best-performing format while keeping creative production manageable."
+      >
+        <SheetSection icon={<Image />} title="Format Comparison">
+          <div className="flex flex-col gap-3">
+            <SheetDecisionCard
+              title="Single Image"
+              description="Fastest to create and works across every placement. Best for product photos, promotional offers, and simple messages. Great starting point if you're new to Meta ads."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Single Video"
+              description="Highest engagement format with 2x more interactions than static images. Best for product demos, storytelling, brand building, and tutorials. Keep videos under 15 seconds for Stories/Reels."
+            />
+            <SheetDecisionCard
+              title="Carousel"
+              description="Showcase up to 10 images or videos in a single ad. Best for product collections, multi-step stories, before/after comparisons, and highlighting multiple features or benefits."
+            />
+          </div>
+        </SheetSection>
+
+        <SheetSection icon={<BookOpen />} title="When to Use Each">
+          <div className="flex flex-col gap-3">
+            <SheetDecisionCard
+              title="Single Image -- Quick Launch"
+              description="You have product photos ready and want to start running ads quickly. No video production needed. Works in every placement including right column and search."
+            />
+            <SheetDecisionCard
+              title="Single Video -- Maximum Impact"
+              description="You want to tell a story, show a product in action, or build brand awareness. Video captures attention in the feed and performs exceptionally in Reels and Stories placements."
+            />
+            <SheetDecisionCard
+              title="Carousel -- Showcase Range"
+              description="You want to feature multiple products, walk through a process step by step, or tell a visual story across cards. Each card can have its own link, making it ideal for product catalogs."
+            />
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
+
+      {/* ── Learn More: Brand Safety ── */}
+      <LearnMoreSheet
+        open={brandSafetyLearnMore.open}
+        onOpenChange={brandSafetyLearnMore.setOpen}
+        title="Brand Safety & Content"
+        description="Control what content your ads appear alongside to protect your brand reputation."
+        icon={<ShieldCheck />}
+        proTip="Standard Inventory works for most brands. Only use Limited if you sell premium products where brand perception is critical."
+      >
+        <SheetSection icon={<ShieldCheck />} title="Inventory Levels">
+          <div className="flex flex-col gap-3">
+            <SheetDecisionCard
+              title="Standard Inventory (Recommended)"
+              description="Good balance of brand safety and reach. Excludes sensitive content categories like violence, adult content, and controversial topics. Appropriate for most brands and advertisers."
+              highlighted
+            />
+            <SheetDecisionCard
+              title="Full Inventory"
+              description="Maximum reach with no content restrictions. Your ads may appear alongside all types of content. Best when reach is your top priority and brand sensitivity is not a concern."
+            />
+            <SheetDecisionCard
+              title="Limited Inventory"
+              description="Most restrictive option with highest brand protection. Excludes all mature themes and controversial content. Reduced reach but ensures your ads only appear next to brand-safe content."
+            />
+          </div>
+        </SheetSection>
+
+        <SheetSection icon={<Rss />} title="What Gets Filtered">
+          <div className="flex flex-col gap-3">
+            <SheetDecisionCard
+              title="Standard filters out"
+              description="Graphic violence, adult content, sensationalized news, debated social topics, and explicit language. Your ads will appear in safe, mainstream content environments."
+            />
+            <SheetDecisionCard
+              title="Limited additionally filters"
+              description="All of Standard plus dating content, gambling references, weight-loss content, political topics, and any content with mild profanity. Significantly reduces available inventory."
+            />
+          </div>
+        </SheetSection>
+      </LearnMoreSheet>
+
       <WizardStepFooter
         onPrevious={() => setStep(2)}
         onNext={() => setStep(4)}

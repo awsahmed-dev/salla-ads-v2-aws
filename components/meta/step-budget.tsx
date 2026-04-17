@@ -45,6 +45,10 @@ import {
   Globe,
   Clock,
   Repeat,
+  Users,
+  Play,
+  Smartphone,
+  Heart,
 } from "lucide-react";
 import { BudgetDurationCard } from "@/components/shared/budget-duration-card";
 import { BidStrategyCard } from "@/components/shared/bid-strategy-card";
@@ -120,6 +124,59 @@ const OPTIMIZATION_GOALS: {
     icon: <MessageSquare className="size-4" />,
     billingLabel: "CPM",
   },
+  /* ---- Awareness & Engagement goals ---- */
+  {
+    value: "REACH",
+    label: "Maximize Reach",
+    desc: "Show your ad to the maximum number of unique people.",
+    bestFor: "Best for brand awareness, product launches, and getting your store name in front of new audiences.",
+    icon: <Users className="size-4" />,
+    billingLabel: "CPM",
+    recommended: true,
+  },
+  {
+    value: "IMPRESSIONS",
+    label: "Maximize Impressions",
+    desc: "Show your ad as many times as possible, including repeat views.",
+    bestFor: "Best when frequency matters — repeated exposure helps reinforce your message.",
+    icon: <Eye className="size-4" />,
+    billingLabel: "CPM",
+  },
+  {
+    value: "AD_RECALL_LIFT",
+    label: "Ad Recall Lift",
+    desc: "Maximize estimated ad recall — people who remember seeing your ad.",
+    bestFor: "Best for brand campaigns where recall and recognition are the primary metrics.",
+    icon: <BarChart3 className="size-4" />,
+    billingLabel: "CPM",
+  },
+  {
+    value: "THRUPLAY",
+    label: "Video Views (ThruPlay)",
+    desc: "Maximize 15-second video views or complete views for shorter videos.",
+    bestFor: "Best for video campaigns where watch time and storytelling matter.",
+    icon: <Play className="size-4" />,
+    billingLabel: "CPM",
+    recommended: true,
+  },
+  {
+    value: "POST_ENGAGEMENT",
+    label: "Post Engagement",
+    desc: "Maximize likes, comments, shares, and reactions on your posts.",
+    bestFor: "Best for building social proof and community engagement around your brand.",
+    icon: <Heart className="size-4" />,
+    billingLabel: "CPM",
+  },
+  /* ---- App Promotion goals ---- */
+  {
+    value: "APP_INSTALLS",
+    label: "App Installs",
+    desc: "Maximize the number of people who install your mobile app.",
+    bestFor: "Best for growing your app user base and driving new installations.",
+    icon: <Smartphone className="size-4" />,
+    billingLabel: "CPM",
+    recommended: true,
+  },
 ];
 
 const CONVERSION_EVENTS: {
@@ -136,6 +193,8 @@ const CONVERSION_EVENTS: {
   { value: "VIEW_CONTENT", label: "View Content", desc: "Optimizes for product page views. Good for building pixel data.", icon: <Eye className="size-3.5" />, funnelStage: "Top funnel" },
   { value: "ADD_PAYMENT_INFO", label: "Add Payment Info", desc: "Optimizes for users who enter payment details.", icon: <CreditCard className="size-3.5" />, funnelStage: "Bottom funnel" },
   { value: "COMPLETE_REGISTRATION", label: "Registration", desc: "Optimizes for account sign-ups on your website.", icon: <CheckCircle2 className="size-3.5" />, funnelStage: "Top funnel" },
+  { value: "LEAD", label: "Lead", desc: "Optimizes for lead form submissions on your website.", icon: <Users className="size-3.5" />, funnelStage: "Bottom funnel", recommended: true },
+  { value: "SEARCH", label: "Search", desc: "Optimizes for search actions on your website.", icon: <Globe className="size-3.5" />, funnelStage: "Top funnel" },
 ];
 
 const BID_STRATEGIES: {
@@ -156,7 +215,7 @@ const BID_STRATEGIES: {
     bestFor: "Best for most Salla merchants, especially when starting a new campaign or testing new products.",
     icon: <Zap className="size-4" />,
     recommended: true,
-    supportedGoals: ["OFFSITE_CONVERSIONS", "VALUE", "LINK_CLICKS", "LANDING_PAGE_VIEWS", "CONVERSATIONS"],
+    supportedGoals: ["OFFSITE_CONVERSIONS", "VALUE", "LINK_CLICKS", "LANDING_PAGE_VIEWS", "CONVERSATIONS", "REACH", "IMPRESSIONS", "AD_RECALL_LIFT", "THRUPLAY", "POST_ENGAGEMENT", "APP_INSTALLS"],
   },
   {
     value: "COST_CAP",
@@ -165,7 +224,7 @@ const BID_STRATEGIES: {
     desc: "Set a target cost per result. Meta keeps your average cost around this amount.",
     bestFor: "Best when you know your target CPA and want to maintain profitability at scale.",
     icon: <Target className="size-4" />,
-    supportedGoals: ["OFFSITE_CONVERSIONS", "LINK_CLICKS", "LANDING_PAGE_VIEWS", "CONVERSATIONS"],
+    supportedGoals: ["OFFSITE_CONVERSIONS", "LINK_CLICKS", "LANDING_PAGE_VIEWS", "CONVERSATIONS", "THRUPLAY", "POST_ENGAGEMENT", "APP_INSTALLS"],
   },
   {
     value: "LOWEST_COST_WITH_BID_CAP",
@@ -174,7 +233,7 @@ const BID_STRATEGIES: {
     desc: "Set a maximum bid per auction. Meta won't bid above this amount.",
     bestFor: "Best for advertisers who want strict cost control and understand their auction dynamics.",
     icon: <BarChart3 className="size-4" />,
-    supportedGoals: ["OFFSITE_CONVERSIONS", "VALUE", "LINK_CLICKS", "LANDING_PAGE_VIEWS", "CONVERSATIONS"],
+    supportedGoals: ["OFFSITE_CONVERSIONS", "VALUE", "LINK_CLICKS", "LANDING_PAGE_VIEWS", "CONVERSATIONS", "REACH", "IMPRESSIONS", "AD_RECALL_LIFT", "THRUPLAY", "POST_ENGAGEMENT", "APP_INSTALLS"],
   },
   {
     value: "LOWEST_COST_WITH_MIN_ROAS",
@@ -190,7 +249,6 @@ const BID_STRATEGIES: {
 const CLICK_ATTRIBUTION_WINDOWS: { value: MetaClickAttributionWindow; label: string }[] = [
   { value: "1d_click", label: "1 day" },
   { value: "7d_click", label: "7 days" },
-  { value: "28d_click", label: "28 days" },
 ];
 
 const VIEW_ATTRIBUTION_WINDOWS: { value: MetaViewAttributionWindow; label: string }[] = [
@@ -252,6 +310,13 @@ export function MetaStepBudget() {
     VALUE: { min: 20.0, max: 40.0 },
     LINK_CLICKS: { min: 0.5, max: 2.0 },
     CONVERSATIONS: { min: 8.0, max: 25.0 },
+    REACH: { min: 0.3, max: 1.0 },
+    IMPRESSIONS: { min: 0.1, max: 0.5 },
+    AD_RECALL_LIFT: { min: 0.5, max: 2.0 },
+    THRUPLAY: { min: 0.3, max: 1.5 },
+    POST_ENGAGEMENT: { min: 0.2, max: 1.0 },
+    LANDING_PAGE_VIEWS: { min: 0.8, max: 3.0 },
+    APP_INSTALLS: { min: 3.0, max: 10.0 },
   };
   const suggestedBid = suggestedBidMap[budget.optimizationGoal] ?? { min: 1.0, max: 5.0 };
 
@@ -260,14 +325,31 @@ export function MetaStepBudget() {
     VALUE: 300,
     LINK_CLICKS: 75,
     CONVERSATIONS: 150,
+    REACH: 50,
+    IMPRESSIONS: 50,
+    AD_RECALL_LIFT: 75,
+    THRUPLAY: 60,
+    POST_ENGAGEMENT: 50,
+    LANDING_PAGE_VIEWS: 100,
+    APP_INSTALLS: 150,
   };
   const suggestedDaily = suggestedDailyMap[budget.optimizationGoal] ?? 100;
 
   /* Budget strength */
-  const goalMultiplier = budget.optimizationGoal === "OFFSITE_CONVERSIONS" ? 1
-    : budget.optimizationGoal === "VALUE" ? 1.2
-    : budget.optimizationGoal === "LINK_CLICKS" ? 0.3
-    : 0.8;
+  const goalMultiplierMap: Record<string, number> = {
+    OFFSITE_CONVERSIONS: 1,
+    VALUE: 1.2,
+    LINK_CLICKS: 0.3,
+    LANDING_PAGE_VIEWS: 0.4,
+    CONVERSATIONS: 0.8,
+    REACH: 0.2,
+    IMPRESSIONS: 0.15,
+    AD_RECALL_LIFT: 0.3,
+    THRUPLAY: 0.25,
+    POST_ENGAGEMENT: 0.2,
+    APP_INSTALLS: 0.8,
+  };
+  const goalMultiplier = goalMultiplierMap[budget.optimizationGoal] ?? 0.5;
   const strengthTiers = [
     { min: 0, pct: 10, color: "bg-red-400", textColor: "text-red-600", label: "Very Low" },
     { min: Math.round(50 * goalMultiplier), pct: 30, color: "bg-orange-400", textColor: "text-orange-600", label: "Limited" },
@@ -281,7 +363,14 @@ export function MetaStepBudget() {
     OFFSITE_CONVERSIONS: "purchases",
     VALUE: "revenue",
     LINK_CLICKS: "clicks",
+    LANDING_PAGE_VIEWS: "page views",
     CONVERSATIONS: "conversations",
+    REACH: "people reached",
+    IMPRESSIONS: "impressions",
+    AD_RECALL_LIFT: "ad recall",
+    THRUPLAY: "video views",
+    POST_ENGAGEMENT: "engagements",
+    APP_INSTALLS: "installs",
   };
   const goalLabel = goalLabelMap[budget.optimizationGoal] ?? "results";
 
@@ -297,8 +386,11 @@ export function MetaStepBudget() {
 
   const isValid = budget.amount > 0 && budget.startDate;
 
-  /* Whether conversion-based goals are selected */
+  /* Whether conversion-based goals are selected (need conversion event + attribution) */
   const isConversionGoal = budget.optimizationGoal === "OFFSITE_CONVERSIONS" || budget.optimizationGoal === "VALUE";
+
+  /* Whether attribution window should be visible */
+  const showAttribution = objectiveConfig.hasConversionWindow || (campaign.objective.pixelMode !== "none" && isConversionGoal);
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -350,7 +442,7 @@ export function MetaStepBudget() {
               layout="dropdown"
               events={CONVERSION_EVENTS}
               selectedEvent={budget.conversionEvent}
-              onEventChange={(v) => updateBudget({ conversionEvent: v })}
+              onEventChange={(v) => updateBudget({ conversionEvent: v as MetaConversionEvent })}
               roas={
                 budget.optimizationGoal === "VALUE"
                   ? {
@@ -460,7 +552,7 @@ export function MetaStepBudget() {
             <CollapsibleContent className={cn("flex flex-col gap-4 rounded-b-2xl px-2 pb-2", showAdvanced && "bg-muted/50")}>
 
               {/* Attribution Window */}
-              {isConversionGoal && (
+              {showAttribution && (
                 <AttributionWindowCard
                   mode="separate"
                   clickOptions={CLICK_ATTRIBUTION_WINDOWS}
@@ -568,7 +660,20 @@ export function MetaStepBudget() {
               checkItems={[
                 { label: "Budget", status: dailyAmount >= 50 ? "ok" as const : "warning" as const, text: dailyAmount >= 50 ? "Budget is healthy" : "Below recommended minimum" },
                 { label: "Duration", status: (durationDays >= 7 || (budget.endDateOptional ?? false)) ? "ok" as const : "warning" as const, text: (durationDays >= 7 || (budget.endDateOptional ?? false)) ? "Sufficient learning time" : "Too short for optimization" },
-                { label: "Pixel", status: campaign.objective.pixelMode !== "none" ? "ok" as const : "error" as const, text: campaign.objective.pixelMode !== "none" ? "Pixel connected" : "No pixel (required)" },
+                ...(objectiveConfig.pixelRequirement === "required" ? [{
+                  label: "Pixel",
+                  status: (campaign.objective.pixelMode !== "none" ? "ok" : "error") as "ok" | "error",
+                  text: campaign.objective.pixelMode !== "none" ? "Pixel connected" : "No pixel (required)",
+                }] : objectiveConfig.pixelRequirement === "optional" ? [{
+                  label: "Pixel",
+                  status: (campaign.objective.pixelMode !== "none" ? "ok" : "warning") as "ok" | "warning",
+                  text: campaign.objective.pixelMode !== "none" ? "Pixel connected" : "No pixel (optional, recommended)",
+                }] : []),
+                ...(campaign.objective.objective === "OUTCOME_APP_PROMOTION" ? [{
+                  label: "App",
+                  status: (campaign.objective.appSettings.appStoreUrl ? "ok" : "error") as "ok" | "error",
+                  text: campaign.objective.appSettings.appStoreUrl ? "App configured" : "App store URL required",
+                }] : []),
               ]}
             />
 
@@ -587,36 +692,97 @@ export function MetaStepBudget() {
         title="Optimization Strategy"
         description="Your optimization goal tells Meta what result to maximize with your budget. It directly controls which users see your ad."
         icon={<Target />}
-        proTip="Start with Maximum Conversions (Purchase) if your Pixel has 50+ weekly purchases. For newer stores, start with Link Clicks to build traffic, then upgrade to Conversions once you have enough Pixel data."
+        proTip={
+          campaign.objective.objective === "OUTCOME_AWARENESS"
+            ? "For awareness, Reach gives you the widest unique audience. Use Ad Recall Lift when measuring brand impact is the priority."
+            : campaign.objective.objective === "OUTCOME_ENGAGEMENT"
+              ? "Start with ThruPlay if you have video content — it drives the deepest engagement. Use Post Engagement to build social proof."
+              : campaign.objective.objective === "OUTCOME_APP_PROMOTION"
+                ? "Use App Installs for growth. Once you have 50+ weekly in-app events, switch to In-App Events to optimize for higher-value users."
+                : "Start with Maximum Conversions (Purchase) if your Pixel has 50+ weekly purchases. For newer stores, start with Link Clicks to build traffic, then upgrade to Conversions once you have enough Pixel data."
+        }
       >
         <SheetSection icon={<Target />} title="Which goal should I pick?">
           <div className="flex flex-col gap-2">
-            <SheetDecisionCard
-              title="Maximum Conversions (Purchase)"
-              description="Best for established stores. Meta finds people most likely to buy. Requires a mature Pixel with at least 50 weekly purchase events for stable optimization."
-              highlighted
-            />
-            <SheetDecisionCard
-              title="Maximum Value (ROAS)"
-              description="Optimizes for total revenue, not just conversion count. Best for stores with varied product prices where you want to prioritize high-value orders."
-            />
-            <SheetDecisionCard
-              title="Link Clicks"
-              description="Drives the most clicks to your store. Good for new stores building traffic, or when testing creatives before switching to conversion optimization."
-            />
-            <SheetDecisionCard
-              title="Landing Page Views"
-              description="Like Link Clicks, but only counts visitors who actually load your page. Filters out accidental clicks and slow connections."
-            />
-            <SheetDecisionCard
-              title="Conversations"
-              description="Optimizes for WhatsApp, Messenger, or Instagram Direct chats. Best for high-consideration products where customers need to ask questions before buying."
-            />
+            {/* Sales & Leads goals */}
+            {objectiveConfig.allowedGoals.includes("OFFSITE_CONVERSIONS") && (
+              <SheetDecisionCard
+                title="Maximum Conversions"
+                description="Meta finds people most likely to complete your desired action (purchase, lead, etc.). Requires a Pixel with at least 50 weekly events for stable optimization."
+                highlighted
+              />
+            )}
+            {objectiveConfig.allowedGoals.includes("VALUE") && (
+              <SheetDecisionCard
+                title="Maximum Value (ROAS)"
+                description="Optimizes for total revenue, not just conversion count. Best for stores with varied product prices where you want to prioritize high-value orders."
+              />
+            )}
+            {objectiveConfig.allowedGoals.includes("LINK_CLICKS") && (
+              <SheetDecisionCard
+                title="Link Clicks"
+                description="Drives the most clicks to your destination. Good for new stores building traffic, or when testing creatives before switching to conversion optimization."
+              />
+            )}
+            {objectiveConfig.allowedGoals.includes("LANDING_PAGE_VIEWS") && (
+              <SheetDecisionCard
+                title="Landing Page Views"
+                description="Like Link Clicks, but only counts visitors who actually load your page. Filters out accidental clicks and slow connections."
+              />
+            )}
+            {objectiveConfig.allowedGoals.includes("CONVERSATIONS") && (
+              <SheetDecisionCard
+                title="Conversations"
+                description="Optimizes for WhatsApp, Messenger, or Instagram Direct chats. Best for high-consideration products where customers need to chat before buying."
+              />
+            )}
+            {/* Awareness goals */}
+            {objectiveConfig.allowedGoals.includes("REACH") && (
+              <SheetDecisionCard
+                title="Maximize Reach"
+                description="Shows your ad to the maximum number of unique people. Best for brand launches and getting your name in front of new audiences."
+                highlighted={campaign.objective.objective === "OUTCOME_AWARENESS"}
+              />
+            )}
+            {objectiveConfig.allowedGoals.includes("IMPRESSIONS") && (
+              <SheetDecisionCard
+                title="Maximize Impressions"
+                description="Shows your ad as many times as possible, including repeat views. Best when repeated exposure matters for message reinforcement."
+              />
+            )}
+            {objectiveConfig.allowedGoals.includes("AD_RECALL_LIFT") && (
+              <SheetDecisionCard
+                title="Ad Recall Lift"
+                description="Maximizes estimated ad recall — people who remember seeing your ad. Best for brand campaigns where recall and recognition are the key metrics."
+              />
+            )}
+            {/* Engagement goals */}
+            {objectiveConfig.allowedGoals.includes("THRUPLAY") && (
+              <SheetDecisionCard
+                title="Video Views (ThruPlay)"
+                description="Maximizes 15-second video views or complete views for shorter videos. Best for video campaigns where watch time and storytelling matter."
+                highlighted={campaign.objective.objective === "OUTCOME_ENGAGEMENT"}
+              />
+            )}
+            {objectiveConfig.allowedGoals.includes("POST_ENGAGEMENT") && (
+              <SheetDecisionCard
+                title="Post Engagement"
+                description="Maximizes likes, comments, shares, and reactions. Best for building social proof and community engagement around your brand."
+              />
+            )}
+            {/* App goals */}
+            {objectiveConfig.allowedGoals.includes("APP_INSTALLS") && (
+              <SheetDecisionCard
+                title="App Installs"
+                description="Maximizes the number of people who install your app. Best for growing your user base when app download volume is the primary goal."
+                highlighted={campaign.objective.objective === "OUTCOME_APP_PROMOTION"}
+              />
+            )}
           </div>
         </SheetSection>
         <SheetSection icon={<Info />} title="How it works">
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Meta&apos;s algorithm uses your Pixel event data to find users most likely to take your chosen action. The more historical conversion data your Pixel has, the better Meta can model your ideal customer and bid accurately in the ad auction.
+            Meta&apos;s algorithm uses your event data to find users most likely to take your chosen action. For conversion goals, the more historical data your Pixel or app SDK has, the better Meta can model your ideal audience and bid accurately in the ad auction.
           </p>
         </SheetSection>
       </LearnMoreSheet>

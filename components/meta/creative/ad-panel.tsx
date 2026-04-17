@@ -246,100 +246,90 @@ export function MetaAdPanel({
         <div className="flex flex-col border-t border-border">
 
           {/* ── Ad Format Picker ── */}
-          <div className="px-6 py-5">
-            <p className="mb-1 text-xs font-bold text-foreground">Ad Format</p>
-            <p className="mb-3 text-[11px] text-muted-foreground">
-              Choose a format for this ad. You can add more ads in different formats.
-            </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {AD_FORMAT_OPTIONS.filter((f) => objConfig.allowedAdFormats.includes(f.value))
-                .filter((f) => f.value !== "COLLECTION")
-                .filter((f) => f.value !== "DYNAMIC" || catalogEnabled)
-                .map((fmt) => {
-                  const selected =
-                    fmt.value === "DYNAMIC"
-                      ? ad.adFormat === "DYNAMIC" || ad.adFormat === "COLLECTION"
-                      : ad.adFormat === fmt.value;
-                  const isCatalog = fmt.value === "DYNAMIC";
-                  const displayLabel = isCatalog ? "Catalog Ads" : fmt.label;
-
-                  return (
-                    <button
-                      key={fmt.value}
-                      type="button"
-                      onClick={() => {
-                        if (fmt.value === ad.adFormat) return;
-                        const updates: Partial<MetaAd> = {
-                          adFormat: fmt.value,
-                          assets: [],
-                          carouselCards: fmt.value === "CAROUSEL"
-                            ? (ad.carouselCards.length >= 2 ? ad.carouselCards : [makeCarouselCard(0), makeCarouselCard(1)])
-                            : [],
-                        };
-                        onUpdate(updates);
-                      }}
-                      className={cn(
-                        "group flex flex-col items-center rounded-xl border-2 px-3 py-4 text-center transition-all",
-                        selected
-                          ? "border-[#1877F2] bg-[#1877F2]/[0.04] shadow-sm"
-                          : "border-border hover:border-[#1877F2]/40"
-                      )}
-                    >
-                      <div
+          {catalogEnabled ? (
+            /* Catalog campaign: locked to catalog format — no format switching */
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 rounded-xl border-2 border-[#1877F2] bg-[#1877F2]/[0.04] p-4">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#1877F2]/10 text-[#1877F2]">
+                  {FORMAT_ICONS.DYNAMIC}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-semibold text-[#1877F2]">Advantage+ Catalog Ads</p>
+                    <Badge className="rounded-full bg-[#1877F2] px-1.5 py-0 text-[8px] text-white">Catalog</Badge>
+                  </div>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    Meta automatically generates ads from your Salla products — picks Carousel or Collection per viewer for best results.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Non-catalog: full format picker */
+            <div className="px-6 py-5">
+              <p className="mb-1 text-xs font-bold text-foreground">Ad Format</p>
+              <p className="mb-3 text-[11px] text-muted-foreground">
+                Choose a format for this ad. You can add more ads in different formats.
+              </p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {AD_FORMAT_OPTIONS.filter((f) => objConfig.allowedAdFormats.includes(f.value))
+                  .filter((f) => f.value !== "COLLECTION" && f.value !== "DYNAMIC")
+                  .map((fmt) => {
+                    const selected = ad.adFormat === fmt.value;
+                    return (
+                      <button
+                        key={fmt.value}
+                        type="button"
+                        onClick={() => {
+                          if (fmt.value === ad.adFormat) return;
+                          const updates: Partial<MetaAd> = {
+                            adFormat: fmt.value,
+                            assets: [],
+                            carouselCards: fmt.value === "CAROUSEL"
+                              ? (ad.carouselCards.length >= 2 ? ad.carouselCards : [makeCarouselCard(0), makeCarouselCard(1)])
+                              : [],
+                          };
+                          onUpdate(updates);
+                        }}
                         className={cn(
-                          "mb-2 flex size-10 items-center justify-center rounded-xl transition-colors",
+                          "group flex flex-col items-center rounded-xl border-2 px-3 py-4 text-center transition-all",
                           selected
-                            ? "bg-[#1877F2]/10 text-[#1877F2]"
-                            : "bg-muted text-muted-foreground group-hover:bg-[#1877F2]/10 group-hover:text-[#1877F2]"
+                            ? "border-[#1877F2] bg-[#1877F2]/[0.04] shadow-sm"
+                            : "border-border hover:border-[#1877F2]/40"
                         )}
                       >
-                        {FORMAT_ICONS[fmt.value]}
-                      </div>
-                      <p className={cn(
-                        "text-xs font-semibold",
-                        selected ? "text-[#1877F2]" : "text-foreground"
-                      )}>
-                        {displayLabel}
-                      </p>
-                      <p className="mt-0.5 text-[9px] leading-relaxed text-muted-foreground">
-                        {fmt.desc}
-                      </p>
-                      {(fmt.recommended || isCatalog) && catalogEnabled && (
-                        <Badge className="mt-1 w-fit rounded-full bg-[#1877F2] px-1.5 py-0 text-[8px] text-white">
-                          {isCatalog ? "Recommended" : "Recommended"}
-                        </Badge>
-                      )}
-                    </button>
-                  );
-                })}
+                        <div
+                          className={cn(
+                            "mb-2 flex size-10 items-center justify-center rounded-xl transition-colors",
+                            selected
+                              ? "bg-[#1877F2]/10 text-[#1877F2]"
+                              : "bg-muted text-muted-foreground group-hover:bg-[#1877F2]/10 group-hover:text-[#1877F2]"
+                          )}
+                        >
+                          {FORMAT_ICONS[fmt.value]}
+                        </div>
+                        <p className={cn(
+                          "text-xs font-semibold",
+                          selected ? "text-[#1877F2]" : "text-foreground"
+                        )}>
+                          {fmt.label}
+                        </p>
+                        <p className="mt-0.5 text-[9px] leading-relaxed text-muted-foreground">
+                          {fmt.desc}
+                        </p>
+                      </button>
+                    );
+                  })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* ── Format-specific content ── */}
           {isCatalogFormat ? (
             /* ---- CATALOG FORMAT ---- */
-            <div className="flex flex-col border-t border-border">
-              {/* Link Type + CTA */}
-              <div className="px-6 py-5">
-                <LinkTypeSection
-                  url={ad.websiteUrl}
-                  onUrlChange={(url) => onUpdate({ websiteUrl: url })}
-                  cta={ad.callToAction}
-                  onCtaChange={(v) => onUpdate({ callToAction: v as MetaCTA })}
-                  recommendedCtas={RECOMMENDED_CTAS}
-                  otherCtas={OTHER_CTAS}
-                />
-              </div>
-
-              {/* Catalog Setup */}
-              <div className="border-t border-border px-6 py-5">
-                <div className="mb-3 flex items-center gap-2">
-                  <ShoppingBag className="size-4 text-[#1877F2]" />
-                  <Label className="text-xs font-semibold text-foreground">Catalog Ad Setup</Label>
-                </div>
-                <CatalogTemplateSection ad={ad} onUpdate={onUpdate} />
-              </div>
-
+            /* CatalogTemplateSection has its own URL + CTA — no duplicate LinkTypeSection needed */
+            <div className="border-t border-border px-6 py-5">
+              <CatalogTemplateSection ad={ad} onUpdate={onUpdate} />
             </div>
           ) : isCarousel ? (
             /* ---- CAROUSEL ---- */
