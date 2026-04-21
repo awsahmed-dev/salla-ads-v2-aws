@@ -254,6 +254,22 @@ export function TikTokStepReview() {
         ok: objective.instantForm.personalInfoFields.length > 0,
         detail: `${objective.instantForm.personalInfoFields.length} field${objective.instantForm.personalInfoFields.length !== 1 ? "s" : ""}`,
       });
+      // Phase 4 fix: Instant Form must be created on TikTok (returns page_id)
+      // before the ad group can reference it. Inline forms never worked — the
+      // ad group requires a resolved page_id from POST /page/lead_gen/create/.
+      list.push({
+        id: "lead_form_saved",
+        label: "Instant Form saved to TikTok",
+        ok: objective.instantForm.createStatus === "saved" && !!objective.instantForm.pageId.trim(),
+        detail:
+          objective.instantForm.createStatus === "saved"
+            ? `Page ID: ${objective.instantForm.pageId}`
+            : objective.instantForm.createStatus === "saving"
+              ? "Saving…"
+              : objective.instantForm.createStatus === "error"
+                ? objective.instantForm.createError || "Save failed"
+                : "Not saved — use \"Save form\" on step 4 before launching",
+      });
     }
 
     // App Promo: App details required

@@ -57,7 +57,10 @@ export const GOAL_TO_API: Record<string, string> = {
   // Impressions are controlled via frequency + frequency_schedule alone.
   VIDEO_VIEW: "VIDEO_VIEW",
   FOCUSED_VIEW: "FOCUSED_VIEW",
-  LEAD_GENERATION: "LEAD_GENERATION",
+  // Phase 4 fix: Lead Gen uses CONVERT at the API level with
+  // optimization_event=FORM (instant form) or FORM/SUBMIT_FORM (website).
+  // "LEAD_GENERATION" was never a documented optimization_goal enum.
+  LEAD_GENERATION: "CONVERT",
   INSTALL: "INSTALL",
   IN_APP_EVENT: "IN_APP_EVENT",
 };
@@ -182,8 +185,17 @@ export function buildTikTokApiPayload(
       ...(budget.bidType === "BID_TYPE_CUSTOM" && isTraffic && budget.optimizationGoal === "LANDING_PAGE_VIEW" && { conversion_bid_price: budget.bidAmount }),
       ...(budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "LEAD_GENERATION" && { conversion_bid_price: budget.bidAmount }),
       ...(budget.bidType === "BID_TYPE_CUSTOM" && (budget.optimizationGoal === "INSTALL" || budget.optimizationGoal === "IN_APP_EVENT") && { conversion_bid_price: budget.bidAmount }),
-      ...(isLeadGen && { optimization_location: objective.leadOptimizationLocation }),
-      ...(isLeadGen && objective.leadOptimizationLocation === "WEBSITE" && { optimization_event: "SubmitForm" }),
+      // Phase 4 fix: optimization_location was not a real API field — removed.
+      // Instant vs Website is conveyed via page_id (Instant Form) or
+      // pixel_id + optimization_event (Website form).
+      // Lead Gen optimization_event is the canonical "FORM" enum in both
+      // cases (docs V14 to confirm the exact token per Ad Group Create).
+      ...(isLeadGen && { optimization_event: "FORM" }),
+      // Phase 4 fix: Instant Form is created via POST /page/lead_gen/create/
+      // and referenced here by page_id. Inline instant_form object removed.
+      ...(isLeadGen && objective.leadOptimizationLocation === "INSTANT_FORM" && {
+        page_id: objective.instantForm.pageId || "<LEAD_FORM_PAGE_ID>",
+      }),
       // Phase 2 fix: VBO (Value Optimization) requires deep_external_action —
       // the deep event whose value is optimized. Previously only deep_bid_type
       // and roas_bid were emitted, so Sales VBO campaigns rejected.
@@ -257,32 +269,11 @@ export function buildTikTokApiPayload(
       ...(creative.contentControls?.shareDisabled && { share_disabled: true }),
       ...(creative.contentControls?.videoDownloadDisabled && { video_download_disabled: true }),
     },
-    ...(isLeadGen && objective.leadOptimizationLocation === "INSTANT_FORM" && {
-      instant_form: {
-        form_name: objective.instantForm.formName || `${objective.campaignName} - Lead Form`,
-        form_type: objective.instantForm.formType,
-        form_template: objective.instantForm.formTemplate,
-        ...(objective.instantForm.headline && { headline: objective.instantForm.headline }),
-        ...(objective.instantForm.description && { description: objective.instantForm.description }),
-        personal_info_fields: objective.instantForm.personalInfoFields,
-        custom_questions: objective.instantForm.questions.map((q) => ({
-          question_type: q.type,
-          question_text: q.questionText,
-          ...(q.options.length > 0 && { options: q.options }),
-          required: q.required,
-        })),
-        privacy: {
-          company_name: objective.instantForm.companyName,
-          privacy_policy_url: objective.instantForm.privacyPolicyUrl,
-        },
-        thank_you_page: {
-          headline: objective.instantForm.thankYouHeadline,
-          description: objective.instantForm.thankYouDescription,
-          button_text: objective.instantForm.thankYouButtonText,
-          ...(objective.instantForm.thankYouUrl && { button_url: objective.instantForm.thankYouUrl }),
-        },
-      },
-    }),
+    // Phase 4 fix: the inline instant_form {...} object was never a real API
+    // shape. Instant Forms must be created separately via POST
+    // /page/lead_gen/create/ (see app/api/tiktok/lead-form/route.ts — TODO)
+    // which returns a page_id. That page_id is then referenced on the ad
+    // group (see adgroup.page_id above).
     ads: isCatalogListing
       ? []
       : creative.ads.map((ad) => {

@@ -287,29 +287,43 @@ describe("VIDEO_VIEWS", () => {
 /*  LEAD_GENERATION                                                   */
 /* ------------------------------------------------------------------ */
 
-describe("LEAD_GENERATION", () => {
-  it("instant_form path emits inline form object at top level (pre-fix; Phase 4 will rework)", () => {
+describe("LEAD_GENERATION (Phase 4 fixed)", () => {
+  it("instant form: optimization_goal=CONVERT, optimization_event=FORM, page_id reference, no inline form", () => {
     const campaign = withCampaign((c) => {
       c.objective.objective = "LEAD_GENERATION";
       c.objective.leadOptimizationLocation = "INSTANT_FORM";
       c.objective.instantForm.formName = "My Lead Form";
       c.objective.instantForm.companyName = "Salla Inc";
       c.objective.instantForm.privacyPolicyUrl = "https://salla.sa/privacy";
+      c.objective.instantForm.pageId = "form_abc123";
+      c.objective.instantForm.createStatus = "saved";
       c.budget.optimizationGoal = "LEAD_GENERATION";
       c.budget.billingEvent = "OCPM";
     });
     const payload = buildTikTokApiPayload(campaign);
     expect(payload.campaign.objective_type).toBe("LEAD_GENERATION");
-    expect(payload.adgroup.optimization_goal).toBe("LEAD_GENERATION"); // Phase 4: → CONVERT
-    expect(payload.adgroup.optimization_location).toBe("INSTANT_FORM"); // Phase 4: remove
+    expect(payload.adgroup.optimization_goal).toBe("CONVERT");
+    expect(payload.adgroup.optimization_event).toBe("FORM");
+    expect(payload.adgroup.page_id).toBe("form_abc123");
+    // No more inline form object
+    expect(payload.instant_form).toBeUndefined();
+    // Non-existent optimization_location field no longer emitted
+    expect(payload.adgroup.optimization_location).toBeUndefined();
+    // Pixel not required for Instant Form flow
     expect(payload.adgroup.pixel_id).toBeUndefined();
-    expect(payload.instant_form).toMatchObject({
-      form_name: "My Lead Form",
-      privacy: { company_name: "Salla Inc" },
-    });
   });
 
-  it("website lead path emits pixel + SubmitForm event (pre-fix)", () => {
+  it("instant form without a saved page_id still emits a placeholder (preview mode)", () => {
+    const campaign = withCampaign((c) => {
+      c.objective.objective = "LEAD_GENERATION";
+      c.objective.leadOptimizationLocation = "INSTANT_FORM";
+      c.budget.optimizationGoal = "LEAD_GENERATION";
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    expect(payload.adgroup.page_id).toBe("<LEAD_FORM_PAGE_ID>");
+  });
+
+  it("website lead path: pixel + optimization_event=FORM (Phase 4 fix)", () => {
     const campaign = withCampaign((c) => {
       c.objective.objective = "LEAD_GENERATION";
       c.objective.leadOptimizationLocation = "WEBSITE";
@@ -318,8 +332,10 @@ describe("LEAD_GENERATION", () => {
       c.budget.billingEvent = "OCPM";
     });
     const payload = buildTikTokApiPayload(campaign);
-    expect(payload.adgroup.optimization_event).toBe("SubmitForm"); // Phase 4: reverify enum
+    expect(payload.adgroup.optimization_goal).toBe("CONVERT");
+    expect(payload.adgroup.optimization_event).toBe("FORM");
     expect(payload.adgroup.pixel_id).toBe("CMOCK1234567890");
+    expect(payload.adgroup.page_id).toBeUndefined();
     expect(payload.instant_form).toBeUndefined();
   });
 });

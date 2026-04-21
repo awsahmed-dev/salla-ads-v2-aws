@@ -87,6 +87,8 @@ import {
   CalendarDays,
   RefreshCw,
   ArrowRight,
+  Loader2,
+  Save as SaveIcon,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
@@ -2275,6 +2277,61 @@ function InstantFormBuilder() {
 
   const isInstantForm = obj.leadOptimizationLocation === "INSTANT_FORM";
 
+  // Phase 4: Instant Forms must be created separately via TikTok's
+  // POST /page/lead_gen/create/ endpoint, which returns a page_id. The ad
+  // group then references that page_id. This handler simulates the save
+  // (mock page_id). Real integration hits /api/tiktok/lead-form (TODO route).
+  const canSaveForm =
+    !!form.companyName.trim()
+    && !!form.privacyPolicyUrl
+    && form.privacyPolicyUrl.startsWith("https://")
+    && form.personalInfoFields.length > 0;
+
+  const saveForm = async () => {
+    if (!canSaveForm || form.createStatus === "saving") return;
+    updateForm({ createStatus: "saving", createError: "" });
+    try {
+      // TODO(Phase 4 backend): replace with fetch("/api/tiktok/lead-form", ...)
+      // that proxies POST /page/lead_gen/create/ with the BC access token.
+      await new Promise((r) => setTimeout(r, 800));
+      const mockPageId = `form_${Date.now().toString(36)}`;
+      updateForm({
+        pageId: mockPageId,
+        createStatus: "saved",
+        createError: "",
+      });
+    } catch (e) {
+      updateForm({
+        createStatus: "error",
+        createError: e instanceof Error ? e.message : "Form save failed",
+      });
+    }
+  };
+
+  // Editing any form field invalidates the previous save (a new page_id
+  // must be generated because TikTok pages are effectively immutable).
+  const formFingerprint = JSON.stringify({
+    t: form.formTemplate, i: form.formType,
+    h: form.headline, d: form.description,
+    q: form.questions, p: form.personalInfoFields,
+    c: form.companyName, u: form.privacyPolicyUrl,
+    th: form.thankYouHeadline, td: form.thankYouDescription,
+    tb: form.thankYouButtonText, tu: form.thankYouUrl,
+  });
+  const lastSavedFingerprintRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (form.createStatus === "saved") {
+      if (lastSavedFingerprintRef.current === null) {
+        lastSavedFingerprintRef.current = formFingerprint;
+      } else if (lastSavedFingerprintRef.current !== formFingerprint) {
+        updateForm({ createStatus: "unsaved", pageId: "" });
+        lastSavedFingerprintRef.current = null;
+      }
+    } else if (form.createStatus === "unsaved") {
+      lastSavedFingerprintRef.current = null;
+    }
+  }, [formFingerprint, form.createStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="space-y-5">
       {/* ---- Where to collect leads ---- */}
@@ -2755,6 +2812,60 @@ function InstantFormBuilder() {
             </div>
           </div>
         </div>
+      </SectionCard>
+
+      {/* Phase 4: Save Form to TikTok (produces the page_id referenced by the ad group) */}
+      <SectionCard>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-lg",
+              form.createStatus === "saved" ? "bg-emerald-100 text-emerald-600"
+                : form.createStatus === "error" ? "bg-red-100 text-red-600"
+                : form.createStatus === "saving" ? "bg-primary/10 text-primary"
+                : "bg-muted text-muted-foreground"
+            )}>
+              {form.createStatus === "saving" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : form.createStatus === "saved" ? (
+                <CheckCircle2 className="size-4" />
+              ) : form.createStatus === "error" ? (
+                <AlertCircle className="size-4" />
+              ) : (
+                <SaveIcon className="size-4" />
+              )}
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-foreground">Save Form to TikTok</h4>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {form.createStatus === "saved"
+                  ? <>Saved. Page ID: <span className="font-mono text-foreground">{form.pageId}</span></>
+                  : form.createStatus === "error"
+                    ? <span className="text-red-600">{form.createError || "Save failed. Try again."}</span>
+                    : form.createStatus === "saving"
+                      ? "Creating the form on TikTok…"
+                      : "The ad group references your form by ID — save it before launching the campaign."}
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant={form.createStatus === "saved" ? "outline" : "default"}
+            disabled={!canSaveForm || form.createStatus === "saving"}
+            onClick={saveForm}
+          >
+            {form.createStatus === "saved" ? "Re-save form" : form.createStatus === "saving" ? "Saving…" : "Save form"}
+          </Button>
+        </div>
+        {!canSaveForm && form.createStatus !== "saved" && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <AlertCircle className="mt-0.5 size-3 shrink-0 text-amber-600" />
+            <p className="text-xs text-amber-700">
+              Set the company name, privacy policy URL (https://), and at least one personal info field before saving.
+            </p>
+          </div>
+        )}
       </SectionCard>
 
       {/* Form Preview Card */}

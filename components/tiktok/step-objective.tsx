@@ -235,6 +235,9 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
           thankYouDescription: "We will get back to you shortly.",
           thankYouButtonText: "Visit Website",
           thankYouUrl: "",
+          pageId: "",
+          createStatus: "unsaved" as const,
+          createError: "",
         },
       }),
       // Reset App Promo settings when leaving App Promotion

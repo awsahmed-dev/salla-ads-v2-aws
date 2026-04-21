@@ -228,6 +228,9 @@ export interface InstantFormQuestion {
   required: boolean;
 }
 
+/** Form creation status — tracks the POST /page/lead_gen/create/ flow */
+export type InstantFormCreateStatus = "unsaved" | "saving" | "saved" | "error";
+
 /** Instant Form configuration */
 export interface InstantFormConfig {
   /** Form name for reference */
@@ -258,6 +261,14 @@ export interface InstantFormConfig {
   thankYouButtonText: string;
   /** Thank you page CTA URL (optional -- redirect after form) */
   thankYouUrl: string;
+  /** Phase 4: page_id returned by POST /page/lead_gen/create/.
+   *  The ad group references the form by this id (the form is NOT sent
+   *  inline on the ad group). Empty until the merchant saves the form. */
+  pageId: string;
+  /** Phase 4: server-side creation status for the form */
+  createStatus: InstantFormCreateStatus;
+  /** Phase 4: last error message if createStatus === "error" */
+  createError: string;
 }
 
 /* ---- App Promotion: App Settings ---- */
@@ -673,6 +684,9 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
       thankYouDescription: "We will get back to you shortly.",
       thankYouButtonText: "Visit Website",
       thankYouUrl: "",
+      pageId: "",
+      createStatus: "unsaved",
+      createError: "",
     },
   },
   audience: {
