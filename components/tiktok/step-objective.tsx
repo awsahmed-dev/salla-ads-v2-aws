@@ -55,7 +55,9 @@ import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
 import {
   OBJECTIVE_CONFIGS,
+  getAllowedPlacements,
   type AppPlatform,
+  type TikTokObjective,
 } from "@/lib/tiktok/campaign-types";
 
 /* ------------------------------------------------------------------ */
@@ -170,7 +172,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
       promotionType: enabled ? "CATALOG" : "WEBSITE",
       // Reset catalog fields when disabling
       ...(!enabled && {
-        shoppingAdsType: "VIDEO_SHOPPING" as const,
+        shoppingAdsType: "VIDEO_SHOPPING_ADS" as const,
         productSelectionMode: "ALL" as const,
         productSetId: "",
         specificProductIds: [],
@@ -211,7 +213,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
         catalogEnabled: false,
         promotionType: "WEBSITE" as const,
         catalogId: "",
-        shoppingAdsType: "VIDEO_SHOPPING" as const,
+        shoppingAdsType: "VIDEO_SHOPPING_ADS" as const,
         productSelectionMode: "ALL" as const,
         productSetId: "",
         specificProductIds: [],
@@ -235,6 +237,9 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
           thankYouDescription: "We will get back to you shortly.",
           thankYouButtonText: "Visit Website",
           thankYouUrl: "",
+          pageId: "",
+          createStatus: "unsaved" as const,
+          createError: "",
         },
       }),
       // Reset App Promo settings when leaving App Promotion
@@ -242,9 +247,12 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
         appSettings: {
           appId: "",
           appName: "",
-          appPlatform: "ANDROID" as const,
+          appPlatform: "APP_ANDROID" as const,
           appDownloadUrl: "",
           appPromotionType: "APP_INSTALL" as const,
+          appEventId: "",
+          appEventName: "",
+          deepExternalAction: "",
         },
       }),
     });
@@ -270,8 +278,23 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
     const allowed = new Set(newConfig.allowedAdFormats);
     const currentAds = campaign.creative.ads ?? [];
     const compatibleAds = currentAds.filter((ad) => allowed.has(ad.adFormat));
-    if (compatibleAds.length !== currentAds.length) {
-      updateNested("creative", { ads: compatibleAds });
+
+    // Phase 6 fix: Prune placements that the new objective doesn't support.
+    // REACH / VIDEO_VIEWS / LEAD_GEN don't allow Pangle or Global App Bundle,
+    // and TRAFFIC doesn't allow Global App Bundle. Previously, switching to
+    // these objectives kept the old (unsupported) placements in state.
+    const allowedPlacements = new Set(getAllowedPlacements(value as TikTokObjective));
+    const currentPlacements = campaign.creative.placements ?? [];
+    const prunedPlacements = currentPlacements.filter((p) => allowedPlacements.has(p));
+    const needsPlacementReset = prunedPlacements.length !== currentPlacements.length;
+
+    if (compatibleAds.length !== currentAds.length || needsPlacementReset) {
+      updateNested("creative", {
+        ...(compatibleAds.length !== currentAds.length && { ads: compatibleAds }),
+        ...(needsPlacementReset && {
+          placements: prunedPlacements.length > 0 ? prunedPlacements : ["PLACEMENT_TIKTOK" as const],
+        }),
+      });
     }
   };
 
@@ -1711,8 +1734,8 @@ function AppPromotionSection() {
             <Label className="mb-1.5 block text-xs font-medium text-muted-foreground">App Platform</Label>
             <div className="grid grid-cols-2 gap-3">
               {([
-                { value: "ANDROID" as AppPlatform, label: "Android", desc: "Google Play Store" },
-                { value: "IOS" as AppPlatform, label: "iOS", desc: "Apple App Store" },
+                { value: "APP_ANDROID" as AppPlatform, label: "Android", desc: "Google Play Store" },
+                { value: "APP_IOS" as AppPlatform, label: "iOS", desc: "Apple App Store" },
               ]).map((platform) => {
                 const selected = app.appPlatform === platform.value;
                 return (
@@ -1750,7 +1773,7 @@ function AppPromotionSection() {
               App Download URL <span className="text-destructive">*</span>
             </Label>
             <Input
-              placeholder={app.appPlatform === "IOS"
+              placeholder={app.appPlatform === "APP_IOS"
                 ? "https://apps.apple.com/app/your-app/id123456789"
                 : "https://play.google.com/store/apps/details?id=com.example.app"
               }
@@ -1759,7 +1782,7 @@ function AppPromotionSection() {
               className="h-10 text-sm"
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              The direct link to your app in the {app.appPlatform === "IOS" ? "Apple App Store" : "Google Play Store"}.
+              The direct link to your app in the {app.appPlatform === "APP_IOS" ? "Apple App Store" : "Google Play Store"}.
             </p>
           </div>
 

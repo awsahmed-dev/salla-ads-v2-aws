@@ -22,8 +22,9 @@ export type OptimizationGoal =
   | "CONVERSION"
   | "VALUE"
   | "CLICK"
-  | "REACH"              // Reach objective: maximize unique users reached
-  | "SHOW"               // Reach objective: maximize impressions (frequency-focused)
+  | "REACH"              // Reach objective: maximize unique users reached.
+                         // (Phase 3: SHOW was removed — TikTok has no such goal; impression
+                         //  capping is controlled via frequency + frequency_schedule.)
   | "LANDING_PAGE_VIEW"  // Traffic objective: higher-quality clicks that load the landing page
   | "VIDEO_VIEW"         // Video Views objective: maximize 2-second video views
   | "FOCUSED_VIEW"       // Video Views objective: maximize 6-second focused views (higher intent)
@@ -142,7 +143,7 @@ export const OBJECTIVE_CONFIGS: Record<string, ObjectiveConfig> = {
     apiObjective: "REACH",
     label: "Reach",
     description: "Show your ad to the maximum number of people",
-    allowedGoals: ["REACH", "SHOW"],
+    allowedGoals: ["REACH"],
     defaultGoal: "REACH",
     pixelRequirement: "none",
     catalogAvailable: false,
@@ -227,6 +228,9 @@ export interface InstantFormQuestion {
   required: boolean;
 }
 
+/** Form creation status — tracks the POST /page/lead_gen/create/ flow */
+export type InstantFormCreateStatus = "unsaved" | "saving" | "saved" | "error";
+
 /** Instant Form configuration */
 export interface InstantFormConfig {
   /** Form name for reference */
@@ -257,15 +261,28 @@ export interface InstantFormConfig {
   thankYouButtonText: string;
   /** Thank you page CTA URL (optional -- redirect after form) */
   thankYouUrl: string;
+  /** Phase 4: page_id returned by POST /page/lead_gen/create/.
+   *  The ad group references the form by this id (the form is NOT sent
+   *  inline on the ad group). Empty until the merchant saves the form. */
+  pageId: string;
+  /** Phase 4: server-side creation status for the form */
+  createStatus: InstantFormCreateStatus;
+  /** Phase 4: last error message if createStatus === "error" */
+  createError: string;
 }
 
 /* ---- App Promotion: App Settings ---- */
 
-/** Maps to API promotion_type for APP_PROMOTION objective */
+/** Internal mode distinguishing New Installs vs Retargeting audiences.
+ *  Phase 5 note: this is NOT a TikTok API enum. The API's promotion_type
+ *  field for App Promotion takes the platform value (APP_ANDROID / APP_IOS).
+ *  Retargeting is expressed via an audience-targeting rule (custom audience
+ *  of app users), not via a different promotion_type. */
 export type AppPromotionType = "APP_INSTALL" | "APP_RETARGETING";
 
-/** Maps to API app_type -- the mobile platform of the app */
-export type AppPlatform = "IOS" | "ANDROID";
+/** Maps to API app_type AND promotion_type for APP_PROMOTION objective.
+ *  Phase 5 fix: API values are APP_IOS / APP_ANDROID (previously IOS / ANDROID). */
+export type AppPlatform = "APP_IOS" | "APP_ANDROID";
 
 /** App configuration for APP_PROMOTION campaigns */
 export interface AppSettings {
@@ -273,12 +290,25 @@ export interface AppSettings {
   appId: string;
   /** Display name of the app (used in sidebar summary, not an API field) */
   appName: string;
-  /** Maps to API app_type */
+  /** Maps to API app_type (APP_IOS | APP_ANDROID).
+   *  Phase 5 fix: values switched from IOS/ANDROID. */
   appPlatform: AppPlatform;
-  /** Maps to API app_download_url -- App Store or Google Play URL */
+  /** App Store or Google Play URL.
+   *  Phase 5 note: NOT sent on the ad group — the store URL is carried by
+   *  the app_id registered in TikTok Events Manager. Kept here for display
+   *  and pre-launch validation only. */
   appDownloadUrl: string;
-  /** Maps to API promotion_type within APP_PROMOTION */
+  /** Internal mode: New Installs vs Retargeting. Drives audience requirements. */
   appPromotionType: AppPromotionType;
+  /** Phase 5: in-app event id from TikTok Events Manager, required for AEO
+   *  (optimization_goal = IN_APP_EVENT) and App VBO (optimization_goal = VALUE).
+   *  Maps to API app_event_id. */
+  appEventId: string;
+  /** Display label for the selected event (UI only, not an API field). */
+  appEventName: string;
+  /** Phase 5: deep event category, e.g. "PURCHASE", "REGISTRATION", "LEVEL_UP".
+   *  Maps to API deep_external_action. Required for AEO + App VBO. */
+  deepExternalAction: string;
 }
 
 /* ---- Step: Objective ---- */
@@ -294,7 +324,7 @@ export type PixelLinkStatus =
 
 /** Maps to API shopping_ads_type at the ad-group level */
 export type ShoppingAdsType =
-  | "VIDEO_SHOPPING"       // Video Shopping Ads (with catalog)
+  | "VIDEO_SHOPPING_ADS"       // Video Shopping Ads (with catalog)
   | "CATALOG_LISTING_ADS"  // Catalog Listing Ads (dynamic product cards)
   | "PRODUCT_SHOPPING_ADS"; // Product Shopping Ads
 
@@ -606,7 +636,29 @@ export interface IdentitySettings {
   linkStatus: TikTokAccountLinkStatus;
 }
 
-export type TikTokPlacement = "PLACEMENT_TIKTOK" | "PLACEMENT_PANGLE" | "PLACEMENT_GLOBALAPP_BUNDLE";
+export type TikTokPlacement = "PLACEMENT_TIKTOK" | "PLACEMENT_PANGLE" | "PLACEMENT_GLOBAL_APP_BUNDLE";
+
+/** Phase 6: which placements each objective can target. Based on the
+ *  availability notes in TikTok's placement docs.
+ *   - PRODUCT_SALES / REACH / VIDEO_VIEWS / LEAD_GENERATION → TikTok only.
+ *     Pangle/GlobalAppBundle don't support these optimization goals.
+ *   - TRAFFIC → TikTok + Pangle.
+ *   - APP_PROMOTION → TikTok + Pangle + Global App Bundle.
+ */
+export function getAllowedPlacements(objective: TikTokObjective): TikTokPlacement[] {
+  switch (objective) {
+    case "TRAFFIC":
+      return ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE"];
+    case "APP_PROMOTION":
+      return ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBAL_APP_BUNDLE"];
+    case "PRODUCT_SALES":
+    case "REACH":
+    case "VIDEO_VIEWS":
+    case "LEAD_GENERATION":
+    default:
+      return ["PLACEMENT_TIKTOK"];
+  }
+}
 
 export interface CreativeSettings {
   /** All ads in this campaign */
@@ -644,7 +696,7 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
     pixelLinkStatus: "not_started",
     catalogEnabled: false,
     catalogId: "",
-    shoppingAdsType: "VIDEO_SHOPPING",
+    shoppingAdsType: "VIDEO_SHOPPING_ADS",
     productSelectionMode: "ALL",
     productSetId: "",
     specificProductIds: [],
@@ -653,9 +705,12 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
     appSettings: {
       appId: "",
       appName: "",
-      appPlatform: "ANDROID",
+      appPlatform: "APP_ANDROID",
       appDownloadUrl: "",
       appPromotionType: "APP_INSTALL",
+      appEventId: "",
+      appEventName: "",
+      deepExternalAction: "",
     },
     instantForm: {
       formName: "",
@@ -672,6 +727,9 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
       thankYouDescription: "We will get back to you shortly.",
       thankYouButtonText: "Visit Website",
       thankYouUrl: "",
+      pageId: "",
+      createStatus: "unsaved",
+      createError: "",
     },
   },
   audience: {
@@ -725,7 +783,11 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
   creative: {
     ads: [],
     placementType: "PLACEMENT_TYPE_AUTOMATIC",
-    placements: ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBALAPP_BUNDLE"],
+    // Phase 6 fix: default to TikTok only. Pangle / Global App Bundle are
+    // enabled only for objectives that support them (see getAllowedPlacements).
+    // Previous default shipped Pangle + Global App Bundle for every manual-
+    // placement campaign, which failed for REACH / VIDEO_VIEWS / LEAD_GEN.
+    placements: ["PLACEMENT_TIKTOK"],
     identity: {
       identityType: "BC_AUTH_TT",
       identityId: "",

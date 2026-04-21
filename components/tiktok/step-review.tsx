@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useTikTokCampaign } from "@/lib/tiktok/campaign-context";
 import { OBJECTIVE_CONFIGS } from "@/lib/tiktok/campaign-types";
-import { minMaxToAgeBands } from "@/lib/demographics";
+import { buildTikTokApiPayload } from "@/lib/tiktok/api-payload";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -49,38 +49,6 @@ import {
   Smartphone,
   Download,
 } from "lucide-react";
-
-/* ------------------------------------------------------------------ */
-/*  API Constants & Helpers                                            */
-/* ------------------------------------------------------------------ */
-
-const SALLA_MOCK_PIXEL_ID = "CMOCK1234567890";
-const SALLA_MOCK_CATALOG_ID = "CMOCK_CATALOG_001";
-
-const TIKTOK_AGE_BAND_MAP: Record<string, string> = {
-  "18_24": "AGE_18_24",
-  "25_34": "AGE_25_34",
-  "35_44": "AGE_35_44",
-  "45_54": "AGE_45_54",
-  "55_64": "AGE_55_100",
-  "65_PLUS": "AGE_55_100",
-};
-
-function toTikTokAgeGroups(ageMin: number, ageMax: number): string[] {
-  const bands = minMaxToAgeBands(ageMin, ageMax);
-  const groups = new Set<string>();
-  for (const b of bands) {
-    const mapped = TIKTOK_AGE_BAND_MAP[b];
-    if (mapped) groups.add(mapped);
-  }
-  return Array.from(groups);
-}
-
-function toApiDateTime(dateStr: string, end?: boolean): string {
-  if (!dateStr) return "";
-  if (dateStr.includes(" ")) return dateStr;
-  return end ? `${dateStr} 23:59:59` : `${dateStr} 00:00:00`;
-}
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
@@ -136,33 +104,6 @@ const GOAL_LABELS: Record<string, string> = {
   LEAD_GENERATION: "Lead Form Submissions",
   INSTALL: "App Installs",
   IN_APP_EVENT: "In-App Events (AEO)",
-};
-
-/** Maps our internal optimization_goal enum to TikTok Marketing API v1.3 values.
- *  Key difference: API uses "CONVERT" not "CONVERSION". */
-const GOAL_TO_API: Record<string, string> = {
-  CONVERSION: "CONVERT",        // API enum is CONVERT, not CONVERSION
-  VALUE: "VALUE",
-  CLICK: "CLICK",
-  LANDING_PAGE_VIEW: "LANDING_PAGE_VIEW",
-  REACH: "REACH",
-  SHOW: "SHOW",
-  VIDEO_VIEW: "VIDEO_VIEW",
-  FOCUSED_VIEW: "FOCUSED_VIEW",
-  LEAD_GENERATION: "LEAD_GENERATION",
-  INSTALL: "INSTALL",
-  IN_APP_EVENT: "IN_APP_EVENT",
-};
-
-/** Maps our internal optimization_event enum to TikTok API v1.3 PascalCase format.
- *  API uses PascalCase event names, not SCREAMING_SNAKE_CASE. */
-const EVENT_TO_API: Record<string, string> = {
-  COMPLETE_PAYMENT: "CompletePayment",
-  INITIATE_CHECKOUT: "InitiateCheckout",
-  ADD_TO_CART: "AddToCart",
-  VIEW_CONTENT: "ViewContent",
-  ADD_BILLING: "AddPaymentInfo",       // API name is AddPaymentInfo, not AddBilling
-  SUBMIT_FORM: "SubmitForm",           // Lead Gen website form submission
 };
 
 const EVENT_LABELS: Record<string, string> = {
@@ -262,8 +203,34 @@ export function TikTokStepReview() {
       list.push({
         id: "catalog",
         label: "Product catalog connected",
-        ok: !!(objective.catalogId || true), // Salla auto-assigns catalog ID in production
-        detail: "Salla Store Catalog",
+        // Phase 2 fix: previous check `!!(objective.catalogId || true)` was always true.
+        // Real check: a catalog id must be set (Salla auto-fills in production).
+        ok: !!objective.catalogId.trim(),
+        detail: objective.catalogId ? "Salla Store Catalog" : "Missing",
+      });
+
+      // Phase 2 fix: Catalog Listing Ads (CLA) require a product_set_id ALWAYS
+      // (even when mode=ALL, the set represents "all products"). Block launch
+      // if the set is missing for CLA.
+      if (objective.shoppingAdsType === "CATALOG_LISTING_ADS") {
+        list.push({
+          id: "cla_product_set",
+          label: "Product set selected (required for Catalog Listing Ads)",
+          ok: !!objective.productSetId.trim(),
+          detail: objective.productSetId ? "Selected" : "Missing",
+        });
+      }
+    }
+
+    // Phase 2 fix: Lifetime budget requires an end date. Previously
+    // endDateOptional could be true while budgetMode=TOTAL, producing a
+    // lifetime payload with no schedule_end_time (rejected by TikTok).
+    if (budget.budgetMode === "BUDGET_MODE_TOTAL") {
+      list.push({
+        id: "lifetime_end_date",
+        label: "Lifetime budget requires an end date",
+        ok: !!budget.endDate && !budget.endDateOptional,
+        detail: budget.endDate && !budget.endDateOptional ? budget.endDate : "Missing",
       });
     }
 
@@ -287,6 +254,22 @@ export function TikTokStepReview() {
         ok: objective.instantForm.personalInfoFields.length > 0,
         detail: `${objective.instantForm.personalInfoFields.length} field${objective.instantForm.personalInfoFields.length !== 1 ? "s" : ""}`,
       });
+      // Phase 4 fix: Instant Form must be created on TikTok (returns page_id)
+      // before the ad group can reference it. Inline forms never worked — the
+      // ad group requires a resolved page_id from POST /page/lead_gen/create/.
+      list.push({
+        id: "lead_form_saved",
+        label: "Instant Form saved to TikTok",
+        ok: objective.instantForm.createStatus === "saved" && !!objective.instantForm.pageId.trim(),
+        detail:
+          objective.instantForm.createStatus === "saved"
+            ? `Page ID: ${objective.instantForm.pageId}`
+            : objective.instantForm.createStatus === "saving"
+              ? "Saving…"
+              : objective.instantForm.createStatus === "error"
+                ? objective.instantForm.createError || "Save failed"
+                : "Not saved — use \"Save form\" on step 4 before launching",
+      });
     }
 
     // App Promo: App details required
@@ -303,6 +286,19 @@ export function TikTokStepReview() {
         ok: !!objective.appSettings.appDownloadUrl.trim(),
         detail: objective.appSettings.appDownloadUrl ? "Set" : "Missing",
       });
+      // Phase 5 fix: AEO (IN_APP_EVENT) and App VBO (VALUE) require a specific
+      // in-app event + event category. Without them, the payload ships
+      // placeholder <APP_EVENT_ID> / <DEEP_EVENT_CATEGORY> and API rejects.
+      if (budget.optimizationGoal === "IN_APP_EVENT" || budget.optimizationGoal === "VALUE") {
+        list.push({
+          id: "app_event_id",
+          label: "In-app event selected",
+          ok: !!objective.appSettings.appEventId.trim() && !!objective.appSettings.deepExternalAction.trim(),
+          detail: objective.appSettings.appEventId
+            ? `${objective.appSettings.deepExternalAction || "—"} · ${objective.appSettings.appEventId}`
+            : "Missing",
+        });
+      }
     }
 
     // Traffic + Landing Page View requires pixel
@@ -399,194 +395,11 @@ export function TikTokStepReview() {
     return list;
   }, [objective, audience, budget, creative]);
 
-  /* ---- API JSON (aligned to TikTok Marketing API v1.3) ---- */
-  const isSales = !isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo;
-  const isCatalogListing = objective.catalogEnabled && objective.shoppingAdsType === "CATALOG_LISTING_ADS";
-
-  const resolvedPixelId = objective.pixelMode === "salla_managed"
-    ? SALLA_MOCK_PIXEL_ID
-    : objective.pixelId || "";
-  const resolvedCatalogId = objective.catalogId || SALLA_MOCK_CATALOG_ID;
-
-  const hasNonMockInterests = audience.interests.length > 0 && !audience.interests.every((id) => id.startsWith("TT_"));
-
-  const apiJson = useMemo(() => {
-    return {
-      campaign: {
-        advertiser_id: "<ADVERTISER_ID>",
-        campaign_name: objective.campaignName,
-        objective_type: objective.objective,
-        // promotion_type: WEBSITE for standard sales, CATALOG when catalog is enabled
-        ...(isSales && { promotion_type: objective.catalogEnabled ? "CATALOG" : "WEBSITE" }),
-        operation_status: "ENABLE",
-      },
-      adgroup: {
-        advertiser_id: "<ADVERTISER_ID>",
-        campaign_id: "<CAMPAIGN_ID>",
-        adgroup_name: `${objective.campaignName} - Ad Group`,
-        ...(isSales && { promotion_type: objective.catalogEnabled ? "CATALOG" : "WEBSITE" }),
-        // PRODUCT_SALES only supports PLACEMENT_TIKTOK (Pangle/GlobalApp not available for sales).
-        placement_type: isSales ? "PLACEMENT_TYPE_NORMAL" : creative.placementType,
-        ...(isSales && { placements: ["PLACEMENT_TIKTOK"] }),
-        ...(!isSales && creative.placementType === "PLACEMENT_TYPE_NORMAL" && { placements: creative.placements }),
-        budget_mode: budget.budgetMode,
-        budget: budget.budgetMode === "BUDGET_MODE_TOTAL" ? budget.lifetimeAmount : budget.amount,
-        optimization_goal: GOAL_TO_API[budget.optimizationGoal] || budget.optimizationGoal,
-        ...(isSales && { optimization_event: EVENT_TO_API[budget.optimizationEvent] || budget.optimizationEvent }),
-        ...(isAppPromo && {
-          app_id: objective.appSettings.appId || "<APP_ID>",
-          app_type: objective.appSettings.appPlatform,
-          promotion_type: objective.appSettings.appPromotionType,
-          app_download_url: objective.appSettings.appDownloadUrl || "<APP_DOWNLOAD_URL>",
-        }),
-        billing_event: budget.billingEvent,
-        bid_type: budget.bidType,
-        ...(budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "CONVERSION" && { conversion_bid_price: budget.bidAmount }),
-        ...(budget.bidType === "BID_TYPE_CUSTOM" && (budget.optimizationGoal === "VIDEO_VIEW" || budget.optimizationGoal === "FOCUSED_VIEW") && { bid_price: budget.bidAmount }),
-        ...(budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "LEAD_GENERATION" && { conversion_bid_price: budget.bidAmount }),
-        ...(budget.bidType === "BID_TYPE_CUSTOM" && (budget.optimizationGoal === "INSTALL" || budget.optimizationGoal === "IN_APP_EVENT") && { conversion_bid_price: budget.bidAmount }),
-        ...(isLeadGen && { optimization_location: objective.leadOptimizationLocation }),
-        // Lead Gen website form requires SubmitForm as the optimization event
-        ...(isLeadGen && objective.leadOptimizationLocation === "WEBSITE" && { optimization_event: "SubmitForm" }),
-        ...(budget.optimizationGoal === "VALUE" && { deep_bid_type: budget.deepBidType, roas_bid: Number(budget.roasBid) || 1 }),
-        ...(isSales && {
-          click_attribution_window: Number(budget.clickAttributionWindow),
-          view_attribution_window: Number(budget.viewAttributionWindow),
-        }),
-        // Video Views: engaged view attribution (how long after a video view a conversion counts)
-        ...(isVideoViews && { engaged_view_attribution_window: 7 }),
-        ...(isReach && budget.frequencyCap && {
-          frequency: budget.frequencyCap.frequency,
-          frequency_schedule: budget.frequencyCap.schedule,
-        }),
-        pacing: budget.pacing,
-        skip_learning_phase: budget.skipLearningPhase ? 1 : 0,
-        identity_type: creative.identity?.identityType ?? "BC_AUTH_TT",
-        identity_id: creative.identity?.identityId || "<IDENTITY_ID>",
-        ...(creative.identity?.identityType === "BC_AUTH_TT" && {
-          identity_authorized_bc_id: creative.identity?.businessCenterId || "<BC_ID>",
-        }),
-        schedule_start_time: toApiDateTime(budget.startDate),
-        ...(budget.endDate && !budget.endDateOptional && { schedule_end_time: toApiDateTime(budget.endDate, true) }),
-        // Pixel: required for PRODUCT_SALES, optional for TRAFFIC (enables LPV), required for LEAD_GEN website form
-        ...(!isReach && !isVideoViews && !isAppPromo
-          && !(isTraffic && objective.pixelMode === "none")
-          && !(isLeadGen && objective.leadOptimizationLocation === "INSTANT_FORM")
-          && {
-          pixel_id: resolvedPixelId || "<PIXEL_ID>",
-        }),
-        ...(objective.catalogEnabled && {
-          shopping_ads_type: objective.shoppingAdsType,
-          catalog_id: resolvedCatalogId,
-          ...(objective.productSelectionMode === "PRODUCT_SET" && objective.productSetId && { product_set_id: objective.productSetId }),
-          // Specific product IDs (max 20) — sent as product_specific_ids in catalog campaigns
-          ...(objective.productSelectionMode === "SPECIFIC" && objective.specificProductIds.length > 0 && {
-            product_specific_ids: objective.specificProductIds,
-          }),
-          ...(isCatalogListing && { dynamic_format: "DYNAMIC_CREATIVE" }),
-          ...(objective.dynamicFormat && !isCatalogListing && { dynamic_format: "DYNAMIC_CREATIVE" }),
-        }),
-        location_ids: audience.locationIds,
-        age_groups: toTikTokAgeGroups(audience.ageMin, audience.ageMax),
-        gender: audience.gender,
-        languages: audience.languages,
-        ...(hasNonMockInterests && { interest_category_ids: audience.interests }),
-        // API: interest_keyword_ids and purchase_intention_keyword_ids CANNOT coexist (keyword conflict).
-        // Purchase intent takes priority when both are somehow present.
-        ...(audience.purchaseIntentKeywordIds?.length > 0
-          ? { purchase_intention_keyword_ids: audience.purchaseIntentKeywordIds }
-          : audience.interestKeywordIds?.length > 0
-            ? { interest_keyword_ids: audience.interestKeywordIds }
-            : {}),
-        ...(audience.operatingSystems.length > 0 && { operating_systems: audience.operatingSystems }),
-        // Search Placement
-        ...(budget.searchResultEnabled && { search_result_enabled: true }),
-        // Brand Safety
-        ...(creative.brandSafetyType && creative.brandSafetyType !== "NO_BRAND_SAFETY" && {
-          brand_safety_type: creative.brandSafetyType,
-        }),
-        // Content Controls
-        ...(creative.contentControls?.commentDisabled && { comment_disabled: true }),
-        ...(creative.contentControls?.shareDisabled && { share_disabled: true }),
-        ...(creative.contentControls?.videoDownloadDisabled && { video_download_disabled: true }),
-      },
-      ...(isLeadGen && objective.leadOptimizationLocation === "INSTANT_FORM" && {
-        instant_form: {
-          form_name: objective.instantForm.formName || `${objective.campaignName} - Lead Form`,
-          form_type: objective.instantForm.formType,
-          form_template: objective.instantForm.formTemplate,
-          ...(objective.instantForm.headline && { headline: objective.instantForm.headline }),
-          ...(objective.instantForm.description && { description: objective.instantForm.description }),
-          personal_info_fields: objective.instantForm.personalInfoFields,
-          custom_questions: objective.instantForm.questions.map((q) => ({
-            question_type: q.type,
-            question_text: q.questionText,
-            ...(q.options.length > 0 && { options: q.options }),
-            required: q.required,
-          })),
-          privacy: {
-            company_name: objective.instantForm.companyName,
-            privacy_policy_url: objective.instantForm.privacyPolicyUrl,
-          },
-          thank_you_page: {
-            headline: objective.instantForm.thankYouHeadline,
-            description: objective.instantForm.thankYouDescription,
-            button_text: objective.instantForm.thankYouButtonText,
-            ...(objective.instantForm.thankYouUrl && { button_url: objective.instantForm.thankYouUrl }),
-          },
-        },
-      }),
-      ads: isCatalogListing
-        ? []
-        : creative.ads.map((ad) => ({
-          advertiser_id: "<ADVERTISER_ID>",
-          adgroup_id: "<ADGROUP_ID>",
-          creatives: [{
-            ad_name: ad.name,
-            // Map wizard adFormat to TikTok Marketing API v1.3 ad_format enum.
-            // Spark Ads use CUSTOMIZED_USER; multi-image carousels use CAROUSEL_ADS.
-            ad_format: ad.sparkAdEnabled
-              ? "CUSTOMIZED_USER"
-              : ad.adFormat === "CAROUSEL"
-                ? "CAROUSEL_ADS"
-                : ad.adFormat,
-            identity_type: creative.identity?.identityType ?? "BC_AUTH_TT",
-            identity_id: creative.identity?.identityId || "<IDENTITY_ID>",
-            ...(creative.identity?.identityType === "BC_AUTH_TT" && {
-              identity_authorized_bc_id: creative.identity?.businessCenterId || "<BC_ID>",
-            }),
-            ...(creative.identity?.avatarPreviewUrl && { avatar_icon_web_uri: "<UPLOADED_AVATAR_URI>" }),
-            ...(ad.sparkAdEnabled
-              ? { tiktok_item_id: `<RESOLVED_ITEM_ID:${ad.sparkAdAuthCode || "pending"}>` }
-              : {
-                  ad_text: (ad.adText || "").slice(0, 100),
-                  // TikTok display_name is capped at 20 chars.
-                  display_name: (ad.displayName || creative.identity?.displayName || "").slice(0, 20),
-                  call_to_action: ad.callToAction,
-                  ...(ad.landingPageUrl && { landing_page_url: ad.landingPageUrl }),
-                }),
-            ...(ad.adFormat === "SINGLE_VIDEO" && !ad.sparkAdEnabled && ad.assets.length > 0 && { video_id: ad.assets[0].mediaId || "<VIDEO_ID>" }),
-            ...(ad.adFormat === "SINGLE_IMAGE" && ad.assets.length > 0 && { image_ids: [ad.assets[0].mediaId || "<IMAGE_ID>"] }),
-            ...(ad.adFormat === "CAROUSEL" && ad.carouselCards.length > 0 && {
-              image_ids: ad.carouselCards.map((_, i) => `<IMAGE_ID_${i + 1}>`),
-            }),
-            // Honor both library (musicId) and upload (musicFile) selections.
-            ...((ad.musicId || ad.musicFile) && {
-              music_id: ad.musicId || "<UPLOADED_MUSIC_ID>",
-            }),
-            promotional_music_disabled:
-              ad.adFormat === "CAROUSEL"
-                ? false
-                : ad.promotionalMusicDisabled === true,
-            ...(ad.sparkAdEnabled && ad.sparkDuetStatus && { item_duet_status: ad.sparkDuetStatus }),
-            ...(ad.sparkAdEnabled && ad.sparkStitchStatus && { item_stitch_status: ad.sparkStitchStatus }),
-            ...(ad.deeplink && { deeplink: ad.deeplink, deeplink_type: ad.deeplinkType || "NORMAL" }),
-            ...(ad.aigcDisclosureType && ad.aigcDisclosureType !== "NOT_DECLARED" && { aigc_disclosure_type: ad.aigcDisclosureType }),
-            ...(ad.instantProductPageUsed && { instant_product_page_used: true }),
-          }],
-        })),
-    };
-  }, [objective, audience, budget, creative]);
+  /* ---- API JSON (delegated to pure builder in lib/tiktok/api-payload.ts) ---- */
+  const apiJson = useMemo(
+    () => buildTikTokApiPayload(campaign, { mode: "preview" }),
+    [campaign]
+  );
 
   /* ---- Launch handler ---- */
   const handleLaunch = () => {
@@ -774,7 +587,7 @@ export function TikTokStepReview() {
                 )}
                 {isAppPromo && (
                   <>
-                    <ReviewRow label="App Platform" value={objective.appSettings.appPlatform === "IOS" ? "iOS (App Store)" : "Android (Google Play)"} />
+                    <ReviewRow label="App Platform" value={objective.appSettings.appPlatform === "APP_IOS" ? "iOS (App Store)" : "Android (Google Play)"} />
                     <ReviewRow label="App Name" value={objective.appSettings.appName || "Not set"} />
                     <ReviewRow label="TikTok App ID" value={objective.appSettings.appId || "Not set"} warn={!objective.appSettings.appId} />
                     <ReviewRow label="Download URL" value={

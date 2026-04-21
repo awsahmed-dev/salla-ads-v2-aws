@@ -87,6 +87,8 @@ import {
   CalendarDays,
   RefreshCw,
   ArrowRight,
+  Loader2,
+  Save as SaveIcon,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
@@ -102,6 +104,7 @@ import type {
 } from "@/lib/tiktok/campaign-types";
 import {
   OBJECTIVE_CONFIGS,
+  getAllowedPlacements,
   type InstantFormQuestion,
   type InstantFormQuestionType,
   type PersonalInfoField,
@@ -158,6 +161,10 @@ const CTA_OPTIONS: { value: TikTokCTA; label: string }[] = [
   { value: "CONTACT_US", label: "Contact Us" },
   { value: "SUBSCRIBE", label: "Subscribe" },
   { value: "DOWNLOAD", label: "Download" },
+  // Phase 5 fix: INSTALL_NOW is the canonical CTA for App Promotion and is
+  // set as APP_PROMOTION's default in OBJECTIVE_CONFIGS, but was missing
+  // from the dropdown — so merchants couldn't see or re-select it.
+  { value: "INSTALL_NOW", label: "Install Now" },
   { value: "VIEW_NOW", label: "View Now" },
   { value: "APPLY_NOW", label: "Apply Now" },
   { value: "BOOK_NOW", label: "Book Now" },
@@ -165,10 +172,10 @@ const CTA_OPTIONS: { value: TikTokCTA; label: string }[] = [
 ];
 
 const RECOMMENDED_CTAS = CTA_OPTIONS.filter((c) =>
-  ["SHOP_NOW", "BUY_NOW", "ORDER_NOW", "LEARN_MORE", "SIGN_UP"].includes(c.value)
+  ["SHOP_NOW", "BUY_NOW", "ORDER_NOW", "LEARN_MORE", "SIGN_UP", "INSTALL_NOW"].includes(c.value)
 );
 const OTHER_CTAS = CTA_OPTIONS.filter((c) =>
-  !["SHOP_NOW", "BUY_NOW", "ORDER_NOW", "LEARN_MORE", "SIGN_UP"].includes(c.value)
+  !["SHOP_NOW", "BUY_NOW", "ORDER_NOW", "LEARN_MORE", "SIGN_UP", "INSTALL_NOW"].includes(c.value)
 );
 
 const MEDIA_SPECS = {
@@ -2275,6 +2282,61 @@ function InstantFormBuilder() {
 
   const isInstantForm = obj.leadOptimizationLocation === "INSTANT_FORM";
 
+  // Phase 4: Instant Forms must be created separately via TikTok's
+  // POST /page/lead_gen/create/ endpoint, which returns a page_id. The ad
+  // group then references that page_id. This handler simulates the save
+  // (mock page_id). Real integration hits /api/tiktok/lead-form (TODO route).
+  const canSaveForm =
+    !!form.companyName.trim()
+    && !!form.privacyPolicyUrl
+    && form.privacyPolicyUrl.startsWith("https://")
+    && form.personalInfoFields.length > 0;
+
+  const saveForm = async () => {
+    if (!canSaveForm || form.createStatus === "saving") return;
+    updateForm({ createStatus: "saving", createError: "" });
+    try {
+      // TODO(Phase 4 backend): replace with fetch("/api/tiktok/lead-form", ...)
+      // that proxies POST /page/lead_gen/create/ with the BC access token.
+      await new Promise((r) => setTimeout(r, 800));
+      const mockPageId = `form_${Date.now().toString(36)}`;
+      updateForm({
+        pageId: mockPageId,
+        createStatus: "saved",
+        createError: "",
+      });
+    } catch (e) {
+      updateForm({
+        createStatus: "error",
+        createError: e instanceof Error ? e.message : "Form save failed",
+      });
+    }
+  };
+
+  // Editing any form field invalidates the previous save (a new page_id
+  // must be generated because TikTok pages are effectively immutable).
+  const formFingerprint = JSON.stringify({
+    t: form.formTemplate, i: form.formType,
+    h: form.headline, d: form.description,
+    q: form.questions, p: form.personalInfoFields,
+    c: form.companyName, u: form.privacyPolicyUrl,
+    th: form.thankYouHeadline, td: form.thankYouDescription,
+    tb: form.thankYouButtonText, tu: form.thankYouUrl,
+  });
+  const lastSavedFingerprintRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (form.createStatus === "saved") {
+      if (lastSavedFingerprintRef.current === null) {
+        lastSavedFingerprintRef.current = formFingerprint;
+      } else if (lastSavedFingerprintRef.current !== formFingerprint) {
+        updateForm({ createStatus: "unsaved", pageId: "" });
+        lastSavedFingerprintRef.current = null;
+      }
+    } else if (form.createStatus === "unsaved") {
+      lastSavedFingerprintRef.current = null;
+    }
+  }, [formFingerprint, form.createStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="space-y-5">
       {/* ---- Where to collect leads ---- */}
@@ -2757,6 +2819,60 @@ function InstantFormBuilder() {
         </div>
       </SectionCard>
 
+      {/* Phase 4: Save Form to TikTok (produces the page_id referenced by the ad group) */}
+      <SectionCard>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-lg",
+              form.createStatus === "saved" ? "bg-emerald-100 text-emerald-600"
+                : form.createStatus === "error" ? "bg-red-100 text-red-600"
+                : form.createStatus === "saving" ? "bg-primary/10 text-primary"
+                : "bg-muted text-muted-foreground"
+            )}>
+              {form.createStatus === "saving" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : form.createStatus === "saved" ? (
+                <CheckCircle2 className="size-4" />
+              ) : form.createStatus === "error" ? (
+                <AlertCircle className="size-4" />
+              ) : (
+                <SaveIcon className="size-4" />
+              )}
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-foreground">Save Form to TikTok</h4>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {form.createStatus === "saved"
+                  ? <>Saved. Page ID: <span className="font-mono text-foreground">{form.pageId}</span></>
+                  : form.createStatus === "error"
+                    ? <span className="text-red-600">{form.createError || "Save failed. Try again."}</span>
+                    : form.createStatus === "saving"
+                      ? "Creating the form on TikTok…"
+                      : "The ad group references your form by ID — save it before launching the campaign."}
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant={form.createStatus === "saved" ? "outline" : "default"}
+            disabled={!canSaveForm || form.createStatus === "saving"}
+            onClick={saveForm}
+          >
+            {form.createStatus === "saved" ? "Re-save form" : form.createStatus === "saving" ? "Saving…" : "Save form"}
+          </Button>
+        </div>
+        {!canSaveForm && form.createStatus !== "saved" && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <AlertCircle className="mt-0.5 size-3 shrink-0 text-amber-600" />
+            <p className="text-xs text-amber-700">
+              Set the company name, privacy policy URL (https://), and at least one personal info field before saving.
+            </p>
+          </div>
+        )}
+      </SectionCard>
+
       {/* Form Preview Card */}
       <div className="rounded-xl border border-primary/20 bg-primary/[0.02] p-6">
         <h4 className="mb-3 text-sm font-semibold text-foreground">Form Preview Summary</h4>
@@ -2877,7 +2993,7 @@ export function TikTokStepCreative() {
   const isCatalogListing = catalogEnabled && objectiveConfig.shoppingAdsType === "CATALOG_LISTING_ADS";
 
   /* Auto-create a placeholder ad for auto-generated modes; remove empty placeholders when leaving */
-  const needsAutoAd = isCatalogListing || (catalogEnabled && objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING" && objectiveConfig.dynamicFormat);
+  const needsAutoAd = isCatalogListing || (catalogEnabled && objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING_ADS" && objectiveConfig.dynamicFormat);
   const prevNeedsAutoAd = useRef(needsAutoAd);
   useEffect(() => {
     if (needsAutoAd && ads.length === 0) {
@@ -2899,7 +3015,7 @@ export function TikTokStepCreative() {
   const allChecks: { label: string; ok: boolean }[] = [];
   allChecks.push({ label: "Identity: TikTok account linked", ok: identity.linkStatus === "confirmed" && !!identity.identityId });
 
-  const isAutoGenerated = isCatalogListing || (catalogEnabled && objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING" && objectiveConfig.dynamicFormat);
+  const isAutoGenerated = isCatalogListing || (catalogEnabled && objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING_ADS" && objectiveConfig.dynamicFormat);
 
   if (isAutoGenerated) {
     // Auto-generated creatives (Catalog Listing or Video Shopping + Dynamic Format): no manual uploads needed
@@ -3116,57 +3232,71 @@ export function TikTokStepCreative() {
                   </div>
                 )}
 
-                {cr.placementType === "PLACEMENT_TYPE_NORMAL" && (
-                  <div className="mt-4">
-                    <div className="rounded-lg bg-blue-50 px-4 py-3 mb-3">
-                      <p className="text-xs text-blue-700">
-                        Select your placements. TikTok is always required. Toggle Pangle and Global App Bundle on or off.
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-border divide-y divide-border">
-                      {([
-                        { id: "PLACEMENT_TIKTOK" as const, label: "TikTok", desc: "Main TikTok feed (For You page)", required: true },
-                        { id: "PLACEMENT_PANGLE" as const, label: "Pangle", desc: "TikTok Audience Network (third-party apps)", required: false },
-                        { id: "PLACEMENT_GLOBALAPP_BUNDLE" as const, label: "Global App Bundle", desc: "Ads across TikTok-owned apps (CapCut, Fizzo, etc.)", required: false },
-                      ]).map((pos) => {
-                        const isOn = cr.placements?.includes(pos.id) ?? true;
-                        return (
-                          <div key={pos.id} className="flex items-center justify-between px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className={cn(
-                                "flex size-6 shrink-0 items-center justify-center rounded-full",
-                                isOn ? "bg-emerald-100" : "bg-muted"
-                              )}>
-                                {isOn
-                                  ? <CheckCircle2 className="size-3.5 text-emerald-600" />
-                                  : <X className="size-3 text-muted-foreground" />
-                                }
+                {cr.placementType === "PLACEMENT_TYPE_NORMAL" && (() => {
+                  // Phase 6 fix: filter the placement options to the ones the
+                  // active objective actually supports.
+                  const allowedPlacements = new Set(getAllowedPlacements(campaign.objective.objective));
+                  const allPlacements = [
+                    { id: "PLACEMENT_TIKTOK" as const, label: "TikTok", desc: "Main TikTok feed (For You page)", required: true },
+                    { id: "PLACEMENT_PANGLE" as const, label: "Pangle", desc: "TikTok Audience Network (third-party apps)", required: false },
+                    { id: "PLACEMENT_GLOBAL_APP_BUNDLE" as const, label: "Global App Bundle", desc: "Ads across TikTok-owned apps (CapCut, Fizzo, etc.)", required: false },
+                  ];
+                  const hiddenPlacements = allPlacements.filter((p) => !allowedPlacements.has(p.id));
+                  const visiblePlacements = allPlacements.filter((p) => allowedPlacements.has(p.id));
+                  return (
+                    <div className="mt-4">
+                      <div className="rounded-lg bg-blue-50 px-4 py-3 mb-3">
+                        <p className="text-xs text-blue-700">
+                          Select your placements. TikTok is always required.
+                          {visiblePlacements.length > 1 && " Toggle the other placements on or off."}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-border divide-y divide-border">
+                        {visiblePlacements.map((pos) => {
+                          const isOn = cr.placements?.includes(pos.id) ?? true;
+                          return (
+                            <div key={pos.id} className="flex items-center justify-between px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className={cn(
+                                  "flex size-6 shrink-0 items-center justify-center rounded-full",
+                                  isOn ? "bg-emerald-100" : "bg-muted"
+                                )}>
+                                  {isOn
+                                    ? <CheckCircle2 className="size-3.5 text-emerald-600" />
+                                    : <X className="size-3 text-muted-foreground" />
+                                  }
+                                </div>
+                                <div>
+                                  <p className={cn("text-xs font-medium", isOn ? "text-foreground" : "text-muted-foreground")}>{pos.label}</p>
+                                  <p className="text-[11px] text-muted-foreground">{pos.desc}</p>
+                                </div>
                               </div>
-                              <div>
-                                <p className={cn("text-xs font-medium", isOn ? "text-foreground" : "text-muted-foreground")}>{pos.label}</p>
-                                <p className="text-[11px] text-muted-foreground">{pos.desc}</p>
-                              </div>
+                              {pos.required ? (
+                                <span className="text-[10px] font-medium text-muted-foreground">Required</span>
+                              ) : (
+                                <Switch
+                                  checked={isOn}
+                                  onCheckedChange={(checked) => {
+                                    const current = cr.placements ?? ["PLACEMENT_TIKTOK"];
+                                    const next = checked
+                                      ? Array.from(new Set([...current, pos.id]))
+                                      : current.filter((p) => p !== pos.id);
+                                    updateNested("creative", { placements: next });
+                                  }}
+                                />
+                              )}
                             </div>
-                            {pos.required ? (
-                              <span className="text-[10px] font-medium text-muted-foreground">Required</span>
-                            ) : (
-                              <Switch
-                                checked={isOn}
-                                onCheckedChange={(checked) => {
-                                  const current = cr.placements ?? ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBALAPP_BUNDLE"];
-                                  const next = checked
-                                    ? [...current, pos.id]
-                                    : current.filter((p) => p !== pos.id);
-                                  updateNested("creative", { placements: next });
-                                }}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
+                      {hiddenPlacements.length > 0 && (
+                        <p className="mt-2 text-[11px] text-muted-foreground">
+                          {hiddenPlacements.map((p) => p.label).join(", ")} not available for this objective.
+                        </p>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
 
               {/* ── Content Interaction Controls ── */}
@@ -3216,7 +3346,7 @@ export function TikTokStepCreative() {
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {([
                     {
-                      value: "VIDEO_SHOPPING" as const,
+                      value: "VIDEO_SHOPPING_ADS" as const,
                       label: "Video Shopping",
                       desc: "You upload creatives — products attach as interactive cards",
                     },
@@ -3256,7 +3386,7 @@ export function TikTokStepCreative() {
               </SectionCard>
 
               {/* Dynamic Creative Format — only for Video Shopping (Catalog Listing is always dynamic) */}
-              {objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING" && (
+              {objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING_ADS" && (
                 <div className="overflow-hidden rounded-xl border border-border bg-card">
                   <div className="flex items-center justify-between px-5 py-4">
                     <div className="flex-1">
@@ -3318,7 +3448,7 @@ export function TikTokStepCreative() {
                   <div>
                     <p className="text-xs font-semibold text-[#004956]">Recommended Format</p>
                     <p className="mt-0.5 text-xs text-[#004956]/70">
-                      {catalogEnabled && objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING"
+                      {catalogEnabled && objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING_ADS"
                         ? "For Video Shopping, Single Video ads with product demos let users browse and buy directly from the video."
                         : campaign.objective.objective === "PRODUCT_SALES"
                           ? "For Sales campaigns, Single Video ads with product demos perform 2.3x better on TikTok."
@@ -3339,7 +3469,7 @@ export function TikTokStepCreative() {
             <div className="px-5 pb-5">
 
             {/* Auto-generated creatives: Catalog Listing OR Video Shopping with Dynamic Format ON */}
-            {catalogEnabled && (isCatalogListing || (objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING" && objectiveConfig.dynamicFormat)) ? (
+            {catalogEnabled && (isCatalogListing || (objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING_ADS" && objectiveConfig.dynamicFormat)) ? (
               <div className="flex flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card">
                 {/* Header */}
                 <div className="flex items-center gap-3 border-b border-border bg-[#e6fff9]/40 px-5 py-3.5">
@@ -3419,7 +3549,7 @@ export function TikTokStepCreative() {
                 ) : (
                   <div className="flex flex-col gap-3">
                     {/* Video Shopping: catalog product attachment note */}
-                    {catalogEnabled && objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING" && (
+                    {catalogEnabled && objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING_ADS" && (
                       <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/[0.02] px-3 py-2">
                         <Tag className="size-3.5 shrink-0 text-primary" />
                         <p className="text-xs text-muted-foreground">
@@ -3634,7 +3764,7 @@ export function TikTokStepCreative() {
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Platform</span>
                     <span className="font-medium text-foreground">
-                      {campaign.objective.appSettings.appPlatform === "IOS" ? "iOS" : "Android"}
+                      {campaign.objective.appSettings.appPlatform === "APP_IOS" ? "iOS" : "Android"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
