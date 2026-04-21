@@ -55,11 +55,12 @@ describe("PRODUCT_SALES", () => {
     expect(payload.adgroup.billing_event).toBe("OCPM");
   });
 
-  it("value goal emits deep_bid_type + roas_bid", () => {
+  it("value goal emits deep_bid_type + roas_bid + deep_external_action (Phase 2 VBO fix)", () => {
     const campaign = withCampaign((c) => {
       c.objective.objective = "PRODUCT_SALES";
       c.objective.pixelMode = "salla_managed";
       c.budget.optimizationGoal = "VALUE";
+      c.budget.optimizationEvent = "COMPLETE_PAYMENT";
       c.budget.deepBidType = "VO_MIN_ROAS";
       c.budget.roasBid = 2.5;
     });
@@ -67,13 +68,26 @@ describe("PRODUCT_SALES", () => {
     expect(payload.adgroup.optimization_goal).toBe("VALUE");
     expect(payload.adgroup.deep_bid_type).toBe("VO_MIN_ROAS");
     expect(payload.adgroup.roas_bid).toBe(2.5);
+    expect(payload.adgroup.deep_external_action).toBe("CompletePayment");
   });
 
-  it("catalog enabled emits shopping_ads_type + catalog_id", () => {
+  it("click goal does NOT emit optimization_event (Phase 2 goal-gate fix)", () => {
+    const campaign = withCampaign((c) => {
+      c.objective.objective = "PRODUCT_SALES";
+      c.objective.pixelMode = "salla_managed";
+      c.budget.optimizationGoal = "CLICK";
+      c.budget.billingEvent = "CPC";
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    expect(payload.adgroup.optimization_goal).toBe("CLICK");
+    expect(payload.adgroup.optimization_event).toBeUndefined();
+  });
+
+  it("catalog enabled (VSA) uses VIDEO_SHOPPING_ADS and emits catalog_id on campaign + adgroup", () => {
     const campaign = withCampaign((c) => {
       c.objective.objective = "PRODUCT_SALES";
       c.objective.catalogEnabled = true;
-      c.objective.shoppingAdsType = "VIDEO_SHOPPING";
+      c.objective.shoppingAdsType = "VIDEO_SHOPPING_ADS";
       c.objective.catalogId = "CAT_123";
       c.objective.productSelectionMode = "PRODUCT_SET";
       c.objective.productSetId = "SET_456";
@@ -81,10 +95,85 @@ describe("PRODUCT_SALES", () => {
     });
     const payload = buildTikTokApiPayload(campaign);
     expect(payload.campaign.promotion_type).toBe("CATALOG");
-    // NOTE (Phase 2): expect "VIDEO_SHOPPING_ADS" and campaign-level catalog_id after fix
-    expect(payload.adgroup.shopping_ads_type).toBe("VIDEO_SHOPPING");
+    // Phase 2 fix: catalog_id now also emitted at campaign level
+    expect(payload.campaign.catalog_id).toBe("CAT_123");
+    expect(payload.adgroup.shopping_ads_type).toBe("VIDEO_SHOPPING_ADS");
     expect(payload.adgroup.catalog_id).toBe("CAT_123");
     expect(payload.adgroup.product_set_id).toBe("SET_456");
+    // Phase 2 fix: dynamic_format is no longer on the ad group
+    expect(payload.adgroup.dynamic_format).toBeUndefined();
+  });
+
+  it("catalog SPECIFIC mode emits sku_ids (Phase 2: renamed from product_specific_ids)", () => {
+    const campaign = withCampaign((c) => {
+      c.objective.objective = "PRODUCT_SALES";
+      c.objective.catalogEnabled = true;
+      c.objective.catalogId = "CAT_123";
+      c.objective.productSelectionMode = "SPECIFIC";
+      c.objective.specificProductIds = ["SKU_1", "SKU_2"];
+      c.objective.pixelMode = "salla_managed";
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    expect(payload.adgroup.sku_ids).toEqual(["SKU_1", "SKU_2"]);
+    expect(payload.adgroup.product_specific_ids).toBeUndefined();
+  });
+
+  it("Catalog Listing Ads (CLA) always emits a product_set_id (Phase 2 fix)", () => {
+    const campaignAll = withCampaign((c) => {
+      c.objective.objective = "PRODUCT_SALES";
+      c.objective.catalogEnabled = true;
+      c.objective.shoppingAdsType = "CATALOG_LISTING_ADS";
+      c.objective.catalogId = "CAT_123";
+      c.objective.productSelectionMode = "ALL";
+      c.objective.pixelMode = "salla_managed";
+    });
+    const payloadAll = buildTikTokApiPayload(campaignAll);
+    // CLA + mode=ALL falls back to a placeholder; submit-path resolves the
+    // merchant's default product set.
+    expect(payloadAll.adgroup.product_set_id).toBe("<DEFAULT_PRODUCT_SET_ID>");
+
+    const campaignSet = withCampaign((c) => {
+      c.objective.objective = "PRODUCT_SALES";
+      c.objective.catalogEnabled = true;
+      c.objective.shoppingAdsType = "CATALOG_LISTING_ADS";
+      c.objective.catalogId = "CAT_123";
+      c.objective.productSelectionMode = "PRODUCT_SET";
+      c.objective.productSetId = "SET_XYZ";
+      c.objective.pixelMode = "salla_managed";
+    });
+    const payloadSet = buildTikTokApiPayload(campaignSet);
+    expect(payloadSet.adgroup.product_set_id).toBe("SET_XYZ");
+  });
+
+  it("VSA with dynamicFormat emits dynamic_format on creative, not adgroup (Phase 2 fix)", () => {
+    const campaign = withCampaign((c) => {
+      c.objective.objective = "PRODUCT_SALES";
+      c.objective.catalogEnabled = true;
+      c.objective.shoppingAdsType = "VIDEO_SHOPPING_ADS";
+      c.objective.catalogId = "CAT_123";
+      c.objective.dynamicFormat = true;
+      c.objective.pixelMode = "salla_managed";
+      c.creative.ads = [
+        {
+          id: "ad1",
+          name: "Dynamic VSA",
+          adFormat: "SINGLE_VIDEO",
+          assets: [],
+          carouselCards: [],
+          adText: "",
+          displayName: "",
+          callToAction: "SHOP_NOW",
+          landingPageUrl: "",
+          sparkAdEnabled: false,
+          sparkAdAuthCode: "",
+          promotionalMusicDisabled: true,
+        },
+      ];
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    expect(payload.adgroup.dynamic_format).toBeUndefined();
+    const creative = (payload.ads[0] as { creatives: Array<Record<string, unknown>> }).creatives[0];
+    expect(creative.dynamic_format).toBe("DYNAMIC_CREATIVE");
   });
 
   it("sales attribution windows are emitted", () => {

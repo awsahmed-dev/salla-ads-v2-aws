@@ -364,7 +364,10 @@ export function TikTokStepBudget() {
   const frequencyCapLearnMore = useLearnMore();
   const deliveryOptionsLearnMore = useLearnMore();
 
-  const endDateRequired = budget.paymentMethod === "prepaid";
+  // Phase 2 fix: Lifetime (BUDGET_MODE_TOTAL) campaigns REQUIRE an end date —
+  // TikTok rejects lifetime budgets without schedule_end_time.
+  const endDateRequired =
+    budget.paymentMethod === "prepaid" || budget.budgetMode === "BUDGET_MODE_TOTAL";
 
   /* Duration calc */
   const durationDays =
@@ -782,6 +785,9 @@ export function TikTokStepBudget() {
             onBudgetModeChange={(mode) =>
               updateNested("budget", {
                 budgetMode: mode === "lifetime" ? "BUDGET_MODE_TOTAL" : "BUDGET_MODE_DAY",
+                // Phase 2 fix: Lifetime budgets require a concrete end date.
+                // Force-clear the "ongoing" toggle when switching into lifetime.
+                ...(mode === "lifetime" && { endDateOptional: false }),
               })
             }
             amount={budget.budgetMode === "BUDGET_MODE_TOTAL" ? budget.lifetimeAmount : budget.amount}

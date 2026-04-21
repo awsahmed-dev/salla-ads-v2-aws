@@ -170,7 +170,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
       promotionType: enabled ? "CATALOG" : "WEBSITE",
       // Reset catalog fields when disabling
       ...(!enabled && {
-        shoppingAdsType: "VIDEO_SHOPPING" as const,
+        shoppingAdsType: "VIDEO_SHOPPING_ADS" as const,
         productSelectionMode: "ALL" as const,
         productSetId: "",
         specificProductIds: [],
@@ -211,7 +211,7 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
         catalogEnabled: false,
         promotionType: "WEBSITE" as const,
         catalogId: "",
-        shoppingAdsType: "VIDEO_SHOPPING" as const,
+        shoppingAdsType: "VIDEO_SHOPPING_ADS" as const,
         productSelectionMode: "ALL" as const,
         productSetId: "",
         specificProductIds: [],

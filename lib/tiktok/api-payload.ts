@@ -134,12 +134,18 @@ export function buildTikTokApiPayload(
   const hasNonMockInterests =
     audience.interests.length > 0 && !audience.interests.every((id) => id.startsWith("TT_"));
 
+  // Phase 2 fix: for catalog sales, catalog_id is required at the campaign level
+  // (matching promotion_type=CATALOG). Also emitted on the ad group below.
+  const campaignCatalogField =
+    isSales && objective.catalogEnabled ? { catalog_id: resolvedCatalogId } : {};
+
   const payload: TikTokApiPayload = {
     campaign: {
       advertiser_id: advertiserId,
       campaign_name: objective.campaignName,
       objective_type: objective.objective,
       ...(isSales && { promotion_type: objective.catalogEnabled ? "CATALOG" : "WEBSITE" }),
+      ...campaignCatalogField,
       operation_status: "ENABLE",
     },
     adgroup: {
@@ -154,7 +160,11 @@ export function buildTikTokApiPayload(
       budget_mode: budget.budgetMode,
       budget: budget.budgetMode === "BUDGET_MODE_TOTAL" ? budget.lifetimeAmount : budget.amount,
       optimization_goal: GOAL_TO_API[budget.optimizationGoal] || budget.optimizationGoal,
-      ...(isSales && { optimization_event: EVENT_TO_API[budget.optimizationEvent] || budget.optimizationEvent }),
+      // Phase 2 fix: optimization_event is only valid for CONVERT/VALUE goals.
+      // Previously sent for every Sales goal, which broke Sales+CLICK campaigns.
+      ...(isSales
+        && (budget.optimizationGoal === "CONVERSION" || budget.optimizationGoal === "VALUE")
+        && { optimization_event: EVENT_TO_API[budget.optimizationEvent] || budget.optimizationEvent }),
       ...(isAppPromo && {
         app_id: objective.appSettings.appId || "<APP_ID>",
         app_type: objective.appSettings.appPlatform,
@@ -169,7 +179,14 @@ export function buildTikTokApiPayload(
       ...(budget.bidType === "BID_TYPE_CUSTOM" && (budget.optimizationGoal === "INSTALL" || budget.optimizationGoal === "IN_APP_EVENT") && { conversion_bid_price: budget.bidAmount }),
       ...(isLeadGen && { optimization_location: objective.leadOptimizationLocation }),
       ...(isLeadGen && objective.leadOptimizationLocation === "WEBSITE" && { optimization_event: "SubmitForm" }),
-      ...(budget.optimizationGoal === "VALUE" && { deep_bid_type: budget.deepBidType, roas_bid: Number(budget.roasBid) || 1 }),
+      // Phase 2 fix: VBO (Value Optimization) requires deep_external_action —
+      // the deep event whose value is optimized. Previously only deep_bid_type
+      // and roas_bid were emitted, so Sales VBO campaigns rejected.
+      ...(budget.optimizationGoal === "VALUE" && {
+        deep_bid_type: budget.deepBidType,
+        roas_bid: Number(budget.roasBid) || 1,
+        ...(isSales && { deep_external_action: EVENT_TO_API[budget.optimizationEvent] || budget.optimizationEvent }),
+      }),
       ...(isSales && {
         click_attribution_window: Number(budget.clickAttributionWindow),
         view_attribution_window: Number(budget.viewAttributionWindow),
@@ -193,15 +210,23 @@ export function buildTikTokApiPayload(
         && {
         pixel_id: resolvedPixelId || "<PIXEL_ID>",
       }),
+      // Phase 2 fix: catalog block reshape.
+      //  - product_specific_ids was not a real field → use sku_ids (TikTok's
+      //    documented per-SKU targeting field for catalog ads).
+      //  - Catalog Listing Ads (CLA) require product_set_id ALWAYS (even in
+      //    "ALL products" mode). When mode=ALL, fall back to a placeholder that
+      //    the submit-path resolver fills with the merchant's default set.
+      //  - dynamic_format moves to the creative level (see ads[] below).
       ...(objective.catalogEnabled && {
         shopping_ads_type: objective.shoppingAdsType,
         catalog_id: resolvedCatalogId,
-        ...(objective.productSelectionMode === "PRODUCT_SET" && objective.productSetId && { product_set_id: objective.productSetId }),
+        ...((objective.productSelectionMode === "PRODUCT_SET" && objective.productSetId)
+          && { product_set_id: objective.productSetId }),
+        ...(isCatalogListing && objective.productSelectionMode !== "PRODUCT_SET"
+          && { product_set_id: objective.productSetId || "<DEFAULT_PRODUCT_SET_ID>" }),
         ...(objective.productSelectionMode === "SPECIFIC" && objective.specificProductIds.length > 0 && {
-          product_specific_ids: objective.specificProductIds,
+          sku_ids: objective.specificProductIds,
         }),
-        ...(isCatalogListing && { dynamic_format: "DYNAMIC_CREATIVE" }),
-        ...(objective.dynamicFormat && !isCatalogListing && { dynamic_format: "DYNAMIC_CREATIVE" }),
       }),
       location_ids: audience.locationIds,
       age_groups: toTikTokAgeGroups(audience.ageMin, audience.ageMax),
@@ -307,6 +332,10 @@ export function buildTikTokApiPayload(
             ...(isSpark && ad.sparkStitchStatus && { item_stitch_status: ad.sparkStitchStatus }),
             ...(ad.deeplink && { deeplink: ad.deeplink, deeplink_type: ad.deeplinkType || "NORMAL" }),
             ...(ad.aigcDisclosureType && ad.aigcDisclosureType !== "NOT_DECLARED" && { aigc_disclosure_type: ad.aigcDisclosureType }),
+            // Phase 2 fix: dynamic_format is a creative-level field, not adgroup.
+            // Emitted for Video Shopping Ads when the dynamic-creative toggle is on.
+            ...(objective.catalogEnabled && objective.dynamicFormat && !isCatalogListing
+              && { dynamic_format: "DYNAMIC_CREATIVE" }),
             ...(ad.instantProductPageUsed && { instant_product_page_used: true }),
           }],
         };

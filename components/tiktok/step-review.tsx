@@ -203,8 +203,34 @@ export function TikTokStepReview() {
       list.push({
         id: "catalog",
         label: "Product catalog connected",
-        ok: !!(objective.catalogId || true), // Salla auto-assigns catalog ID in production
-        detail: "Salla Store Catalog",
+        // Phase 2 fix: previous check `!!(objective.catalogId || true)` was always true.
+        // Real check: a catalog id must be set (Salla auto-fills in production).
+        ok: !!objective.catalogId.trim(),
+        detail: objective.catalogId ? "Salla Store Catalog" : "Missing",
+      });
+
+      // Phase 2 fix: Catalog Listing Ads (CLA) require a product_set_id ALWAYS
+      // (even when mode=ALL, the set represents "all products"). Block launch
+      // if the set is missing for CLA.
+      if (objective.shoppingAdsType === "CATALOG_LISTING_ADS") {
+        list.push({
+          id: "cla_product_set",
+          label: "Product set selected (required for Catalog Listing Ads)",
+          ok: !!objective.productSetId.trim(),
+          detail: objective.productSetId ? "Selected" : "Missing",
+        });
+      }
+    }
+
+    // Phase 2 fix: Lifetime budget requires an end date. Previously
+    // endDateOptional could be true while budgetMode=TOTAL, producing a
+    // lifetime payload with no schedule_end_time (rejected by TikTok).
+    if (budget.budgetMode === "BUDGET_MODE_TOTAL") {
+      list.push({
+        id: "lifetime_end_date",
+        label: "Lifetime budget requires an end date",
+        ok: !!budget.endDate && !budget.endDateOptional,
+        detail: budget.endDate && !budget.endDateOptional ? budget.endDate : "Missing",
       });
     }
 

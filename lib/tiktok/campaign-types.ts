@@ -294,7 +294,7 @@ export type PixelLinkStatus =
 
 /** Maps to API shopping_ads_type at the ad-group level */
 export type ShoppingAdsType =
-  | "VIDEO_SHOPPING"       // Video Shopping Ads (with catalog)
+  | "VIDEO_SHOPPING_ADS"       // Video Shopping Ads (with catalog)
   | "CATALOG_LISTING_ADS"  // Catalog Listing Ads (dynamic product cards)
   | "PRODUCT_SHOPPING_ADS"; // Product Shopping Ads
 
@@ -644,7 +644,7 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
     pixelLinkStatus: "not_started",
     catalogEnabled: false,
     catalogId: "",
-    shoppingAdsType: "VIDEO_SHOPPING",
+    shoppingAdsType: "VIDEO_SHOPPING_ADS",
     productSelectionMode: "ALL",
     productSetId: "",
     specificProductIds: [],
