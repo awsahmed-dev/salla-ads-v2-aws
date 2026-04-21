@@ -22,8 +22,9 @@ export type OptimizationGoal =
   | "CONVERSION"
   | "VALUE"
   | "CLICK"
-  | "REACH"              // Reach objective: maximize unique users reached
-  | "SHOW"               // Reach objective: maximize impressions (frequency-focused)
+  | "REACH"              // Reach objective: maximize unique users reached.
+                         // (Phase 3: SHOW was removed — TikTok has no such goal; impression
+                         //  capping is controlled via frequency + frequency_schedule.)
   | "LANDING_PAGE_VIEW"  // Traffic objective: higher-quality clicks that load the landing page
   | "VIDEO_VIEW"         // Video Views objective: maximize 2-second video views
   | "FOCUSED_VIEW"       // Video Views objective: maximize 6-second focused views (higher intent)
@@ -142,7 +143,7 @@ export const OBJECTIVE_CONFIGS: Record<string, ObjectiveConfig> = {
     apiObjective: "REACH",
     label: "Reach",
     description: "Show your ad to the maximum number of people",
-    allowedGoals: ["REACH", "SHOW"],
+    allowedGoals: ["REACH"],
     defaultGoal: "REACH",
     pixelRequirement: "none",
     catalogAvailable: false,

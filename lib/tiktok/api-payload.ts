@@ -53,7 +53,8 @@ export const GOAL_TO_API: Record<string, string> = {
   CLICK: "CLICK",
   LANDING_PAGE_VIEW: "LANDING_PAGE_VIEW",
   REACH: "REACH",
-  SHOW: "SHOW",
+  // Phase 3 fix: "SHOW" was never a valid TikTok optimization_goal enum.
+  // Impressions are controlled via frequency + frequency_schedule alone.
   VIDEO_VIEW: "VIDEO_VIEW",
   FOCUSED_VIEW: "FOCUSED_VIEW",
   LEAD_GENERATION: "LEAD_GENERATION",
@@ -175,6 +176,10 @@ export function buildTikTokApiPayload(
       bid_type: budget.bidType,
       ...(budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "CONVERSION" && { conversion_bid_price: budget.bidAmount }),
       ...(budget.bidType === "BID_TYPE_CUSTOM" && (budget.optimizationGoal === "VIDEO_VIEW" || budget.optimizationGoal === "FOCUSED_VIEW") && { bid_price: budget.bidAmount }),
+      // Phase 3 fix: Traffic + CLICK + custom bid had no branch — campaigns
+      // shipped with no bid field at all. Use bid_price (CPC bidding).
+      ...(budget.bidType === "BID_TYPE_CUSTOM" && isTraffic && budget.optimizationGoal === "CLICK" && { bid_price: budget.bidAmount }),
+      ...(budget.bidType === "BID_TYPE_CUSTOM" && isTraffic && budget.optimizationGoal === "LANDING_PAGE_VIEW" && { conversion_bid_price: budget.bidAmount }),
       ...(budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "LEAD_GENERATION" && { conversion_bid_price: budget.bidAmount }),
       ...(budget.bidType === "BID_TYPE_CUSTOM" && (budget.optimizationGoal === "INSTALL" || budget.optimizationGoal === "IN_APP_EVENT") && { conversion_bid_price: budget.bidAmount }),
       ...(isLeadGen && { optimization_location: objective.leadOptimizationLocation }),
@@ -191,7 +196,9 @@ export function buildTikTokApiPayload(
         click_attribution_window: Number(budget.clickAttributionWindow),
         view_attribution_window: Number(budget.viewAttributionWindow),
       }),
-      ...(isVideoViews && { engaged_view_attribution_window: 7 }),
+      // Phase 3 fix: engaged_view_attribution_window is an APP_PROMOTION-only
+      // field. Previously hardcoded for VIDEO_VIEWS, which the API rejects.
+      // App Promotion attribution windows will be wired up in Phase 5.
       ...(isReach && budget.frequencyCap && {
         frequency: budget.frequencyCap.frequency,
         frequency_schedule: budget.frequencyCap.schedule,
@@ -204,8 +211,11 @@ export function buildTikTokApiPayload(
       // ad group. Removed from ad-group level to avoid duplicate/rejected fields.
       schedule_start_time: toApiDateTime(budget.startDate),
       ...(budget.endDate && !budget.endDateOptional && { schedule_end_time: toApiDateTime(budget.endDate, true) }),
+      // Phase 3 fix: pixel_id gate now also excludes TRAFFIC with CLICK goal.
+      // Pixel is only relevant for TRAFFIC when optimizing for Landing Page
+      // View; click-optimization Traffic campaigns don't use a pixel.
       ...(!isReach && !isVideoViews && !isAppPromo
-        && !(isTraffic && objective.pixelMode === "none")
+        && !(isTraffic && budget.optimizationGoal !== "LANDING_PAGE_VIEW")
         && !(isLeadGen && objective.leadOptimizationLocation === "INSTANT_FORM")
         && {
         pixel_id: resolvedPixelId || "<PIXEL_ID>",

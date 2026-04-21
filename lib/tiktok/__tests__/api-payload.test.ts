@@ -217,7 +217,7 @@ describe("REACH", () => {
 /* ------------------------------------------------------------------ */
 
 describe("TRAFFIC", () => {
-  it("click goal without pixelMode none skips pixel but is missing bid_price for custom (pre-fix)", () => {
+  it("click + custom bid now emits bid_price (Phase 3 fix)", () => {
     const campaign = withCampaign((c) => {
       c.objective.objective = "TRAFFIC";
       c.objective.pixelMode = "none";
@@ -231,9 +231,20 @@ describe("TRAFFIC", () => {
     expect(payload.adgroup.optimization_goal).toBe("CLICK");
     expect(payload.adgroup.billing_event).toBe("CPC");
     expect(payload.adgroup.pixel_id).toBeUndefined();
-    // NOTE (Phase 3): after fix, bid_price should be emitted here
-    expect(payload.adgroup.bid_price).toBeUndefined();
+    expect(payload.adgroup.bid_price).toBe(5);
     expect(payload.adgroup.conversion_bid_price).toBeUndefined();
+  });
+
+  it("click goal with pixel configured does NOT emit pixel_id (Phase 3 fix)", () => {
+    const campaign = withCampaign((c) => {
+      c.objective.objective = "TRAFFIC";
+      c.objective.pixelMode = "salla_managed";
+      c.budget.optimizationGoal = "CLICK";
+      c.budget.billingEvent = "CPC";
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    // Pixel is only relevant for TRAFFIC + LPV
+    expect(payload.adgroup.pixel_id).toBeUndefined();
   });
 
   it("landing_page_view emits pixel and LPV goal", () => {
@@ -254,7 +265,7 @@ describe("TRAFFIC", () => {
 /* ------------------------------------------------------------------ */
 
 describe("VIDEO_VIEWS", () => {
-  it("emits VIDEO_VIEW goal with no pixel and (currently) spurious engaged_view_attribution_window", () => {
+  it("emits VIDEO_VIEW goal with no pixel and no engaged_view_attribution_window (Phase 3 fix)", () => {
     const campaign = withCampaign((c) => {
       c.objective.objective = "VIDEO_VIEWS";
       c.budget.optimizationGoal = "VIDEO_VIEW";
@@ -266,8 +277,9 @@ describe("VIDEO_VIEWS", () => {
     expect(payload.adgroup.billing_event).toBe("CPV");
     expect(payload.adgroup.pixel_id).toBeUndefined();
     expect(payload.adgroup.optimization_event).toBeUndefined();
-    // NOTE (Phase 3): after fix, engaged_view_attribution_window should be absent
-    expect(payload.adgroup.engaged_view_attribution_window).toBe(7);
+    // Phase 3 fix: the spurious engaged_view_attribution_window (APP_PROMOTION-only
+    // field) is no longer hardcoded for VIDEO_VIEWS.
+    expect(payload.adgroup.engaged_view_attribution_window).toBeUndefined();
   });
 });
 

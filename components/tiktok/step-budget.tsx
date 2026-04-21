@@ -145,14 +145,9 @@ const ALL_OPTIMIZATION_GOALS: {
     billingLabel: "CPM",
     recommended: true,
   },
-  {
-    value: "SHOW",
-    label: "Impressions (Frequency)",
-    desc: "Maximize total impressions. Users may see your ad multiple times to reinforce your message.",
-    bestFor: "Best for retargeting, limited-time offers, or when repetition drives conversions.",
-    icon: <Repeat className="size-4" />,
-    billingLabel: "CPM",
-  },
+  // Phase 3 fix: "Impressions (Frequency)" mode removed — TikTok has no
+  // "SHOW" optimization_goal. Impression capping is controlled via the
+  // frequency + frequency_schedule fields on REACH campaigns.
   {
     value: "VIDEO_VIEW",
     label: "Video Views (2s)",
@@ -271,7 +266,7 @@ const BID_STRATEGIES: {
     bestFor: "Best for most Salla merchants, especially when starting a new campaign or testing new products.",
     icon: <Zap className="size-4" />,
     recommended: true,
-    supportedGoals: ["CONVERSION", "VALUE", "CLICK", "LANDING_PAGE_VIEW", "REACH", "SHOW", "VIDEO_VIEW", "FOCUSED_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
+    supportedGoals: ["CONVERSION", "VALUE", "CLICK", "LANDING_PAGE_VIEW", "REACH", "VIDEO_VIEW", "FOCUSED_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"],
   },
   {
     value: "COST_CAP",
@@ -488,7 +483,7 @@ export function TikTokStepBudget() {
             onGoalChange={(value) => {
               const billingEvent: BillingEvent =
                 value === "CLICK" ? "CPC"
-                : value === "REACH" || value === "SHOW" ? "CPM"
+                : value === "REACH" ? "CPM"
                 : value === "VIDEO_VIEW" || value === "FOCUSED_VIEW" ? "CPV"
                 : "OCPM";
               const deepBidType = value === "VALUE" ? ("VO_MIN_ROAS" as const) : ("DEFAULT" as const);
@@ -906,7 +901,7 @@ export function TikTokStepBudget() {
           )}
 
               {/* -- Attribution Window -- */}
-              {!isReach && budget.optimizationGoal !== "CLICK" && budget.optimizationGoal !== "SHOW" && (
+              {!isReach && budget.optimizationGoal !== "CLICK" && (
                 <AttributionWindowCard
                   mode="separate"
                   learnMoreTrigger={<LearnMoreTrigger {...attributionWindowLearnMore.triggerProps} />}
@@ -952,8 +947,8 @@ export function TikTokStepBudget() {
               />
 
               {/* -- Skip Learning Phase & Search Ads -- */}
-              {/* Hidden entirely for REACH/SHOW/VIDEO_VIEW/FOCUSED_VIEW where neither option applies */}
-              {!["REACH", "SHOW", "VIDEO_VIEW", "FOCUSED_VIEW"].includes(budget.optimizationGoal) && (
+              {/* Hidden entirely for REACH/VIDEO_VIEW/FOCUSED_VIEW where neither option applies */}
+              {!["REACH", "VIDEO_VIEW", "FOCUSED_VIEW"].includes(budget.optimizationGoal) && (
               <SectionCard>
                 <div className="mb-3 flex items-center gap-2">
                   <Settings2 className="size-4 text-primary" />
@@ -988,8 +983,8 @@ export function TikTokStepBudget() {
                   </>
                 )}
 
-                {/* Search Ads (all goals except REACH, SHOW, VIDEO_VIEW, FOCUSED_VIEW) */}
-                {!["REACH", "SHOW", "VIDEO_VIEW", "FOCUSED_VIEW"].includes(budget.optimizationGoal) && (
+                {/* Search Ads (all goals except REACH, VIDEO_VIEW, FOCUSED_VIEW) */}
+                {!["REACH", "VIDEO_VIEW", "FOCUSED_VIEW"].includes(budget.optimizationGoal) && (
                   <div className={cn("flex items-center justify-between rounded-lg border border-border px-3 py-2.5", ["CONVERSION", "VALUE", "LANDING_PAGE_VIEW", "LEAD_GENERATION", "INSTALL", "IN_APP_EVENT"].includes(budget.optimizationGoal) && "mt-3")}>
                     <div className="flex items-center gap-2">
                       <MousePointerClick className="size-3.5 text-muted-foreground" />
@@ -1004,7 +999,7 @@ export function TikTokStepBudget() {
                     />
                   </div>
                 )}
-                {budget.searchResultEnabled && !["REACH", "SHOW", "VIDEO_VIEW", "FOCUSED_VIEW"].includes(budget.optimizationGoal) && (
+                {budget.searchResultEnabled && !["REACH", "VIDEO_VIEW", "FOCUSED_VIEW"].includes(budget.optimizationGoal) && (
                   <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2">
                     <Sparkles className="mt-0.5 size-3 shrink-0 text-[#004956]" />
                     <p className="text-xs leading-relaxed text-[#004956]/80">
