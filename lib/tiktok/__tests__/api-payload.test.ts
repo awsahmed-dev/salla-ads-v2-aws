@@ -16,7 +16,11 @@
 
 import { describe, expect, it } from "vitest";
 import { buildTikTokApiPayload, PlaceholderLeakError } from "../api-payload";
-import { defaultTikTokCampaign, type TikTokCampaignData } from "../campaign-types";
+import {
+  defaultTikTokCampaign,
+  getAllowedPlacements,
+  type TikTokCampaignData,
+} from "../campaign-types";
 
 /* ------------------------------------------------------------------ */
 /*  Helper: clone + mutate the default campaign                       */
@@ -589,10 +593,32 @@ describe("Cross-cutting Phase 1 fixes", () => {
       c.budget.optimizationGoal = "INSTALL";
       c.budget.billingEvent = "OCPM";
       c.creative.placementType = "PLACEMENT_TYPE_NORMAL";
+      // Phase 6: default is now TikTok-only. App Promotion can opt into all
+      // three placements — set them explicitly to exercise the enum naming.
+      c.creative.placements = ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBAL_APP_BUNDLE"];
     });
     const payload = buildTikTokApiPayload(campaign);
     expect(payload.adgroup.placements).toContain("PLACEMENT_GLOBAL_APP_BUNDLE");
     expect(payload.adgroup.placements).not.toContain("PLACEMENT_GLOBALAPP_BUNDLE");
+  });
+});
+
+describe("Per-objective placements (Phase 6)", () => {
+  it("default placements are TikTok only (Phase 6: no Pangle/GlobalAppBundle by default)", () => {
+    expect(defaultTikTokCampaign.creative.placements).toEqual(["PLACEMENT_TIKTOK"]);
+  });
+
+  it("getAllowedPlacements returns the supported set per objective", () => {
+    expect(getAllowedPlacements("PRODUCT_SALES")).toEqual(["PLACEMENT_TIKTOK"]);
+    expect(getAllowedPlacements("REACH")).toEqual(["PLACEMENT_TIKTOK"]);
+    expect(getAllowedPlacements("VIDEO_VIEWS")).toEqual(["PLACEMENT_TIKTOK"]);
+    expect(getAllowedPlacements("LEAD_GENERATION")).toEqual(["PLACEMENT_TIKTOK"]);
+    expect(getAllowedPlacements("TRAFFIC")).toEqual(["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE"]);
+    expect(getAllowedPlacements("APP_PROMOTION")).toEqual([
+      "PLACEMENT_TIKTOK",
+      "PLACEMENT_PANGLE",
+      "PLACEMENT_GLOBAL_APP_BUNDLE",
+    ]);
   });
 });
 

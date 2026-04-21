@@ -104,6 +104,7 @@ import type {
 } from "@/lib/tiktok/campaign-types";
 import {
   OBJECTIVE_CONFIGS,
+  getAllowedPlacements,
   type InstantFormQuestion,
   type InstantFormQuestionType,
   type PersonalInfoField,
@@ -3231,57 +3232,71 @@ export function TikTokStepCreative() {
                   </div>
                 )}
 
-                {cr.placementType === "PLACEMENT_TYPE_NORMAL" && (
-                  <div className="mt-4">
-                    <div className="rounded-lg bg-blue-50 px-4 py-3 mb-3">
-                      <p className="text-xs text-blue-700">
-                        Select your placements. TikTok is always required. Toggle Pangle and Global App Bundle on or off.
-                      </p>
-                    </div>
-                    <div className="rounded-xl border border-border divide-y divide-border">
-                      {([
-                        { id: "PLACEMENT_TIKTOK" as const, label: "TikTok", desc: "Main TikTok feed (For You page)", required: true },
-                        { id: "PLACEMENT_PANGLE" as const, label: "Pangle", desc: "TikTok Audience Network (third-party apps)", required: false },
-                        { id: "PLACEMENT_GLOBAL_APP_BUNDLE" as const, label: "Global App Bundle", desc: "Ads across TikTok-owned apps (CapCut, Fizzo, etc.)", required: false },
-                      ]).map((pos) => {
-                        const isOn = cr.placements?.includes(pos.id) ?? true;
-                        return (
-                          <div key={pos.id} className="flex items-center justify-between px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className={cn(
-                                "flex size-6 shrink-0 items-center justify-center rounded-full",
-                                isOn ? "bg-emerald-100" : "bg-muted"
-                              )}>
-                                {isOn
-                                  ? <CheckCircle2 className="size-3.5 text-emerald-600" />
-                                  : <X className="size-3 text-muted-foreground" />
-                                }
+                {cr.placementType === "PLACEMENT_TYPE_NORMAL" && (() => {
+                  // Phase 6 fix: filter the placement options to the ones the
+                  // active objective actually supports.
+                  const allowedPlacements = new Set(getAllowedPlacements(campaign.objective.objective));
+                  const allPlacements = [
+                    { id: "PLACEMENT_TIKTOK" as const, label: "TikTok", desc: "Main TikTok feed (For You page)", required: true },
+                    { id: "PLACEMENT_PANGLE" as const, label: "Pangle", desc: "TikTok Audience Network (third-party apps)", required: false },
+                    { id: "PLACEMENT_GLOBAL_APP_BUNDLE" as const, label: "Global App Bundle", desc: "Ads across TikTok-owned apps (CapCut, Fizzo, etc.)", required: false },
+                  ];
+                  const hiddenPlacements = allPlacements.filter((p) => !allowedPlacements.has(p.id));
+                  const visiblePlacements = allPlacements.filter((p) => allowedPlacements.has(p.id));
+                  return (
+                    <div className="mt-4">
+                      <div className="rounded-lg bg-blue-50 px-4 py-3 mb-3">
+                        <p className="text-xs text-blue-700">
+                          Select your placements. TikTok is always required.
+                          {visiblePlacements.length > 1 && " Toggle the other placements on or off."}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-border divide-y divide-border">
+                        {visiblePlacements.map((pos) => {
+                          const isOn = cr.placements?.includes(pos.id) ?? true;
+                          return (
+                            <div key={pos.id} className="flex items-center justify-between px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className={cn(
+                                  "flex size-6 shrink-0 items-center justify-center rounded-full",
+                                  isOn ? "bg-emerald-100" : "bg-muted"
+                                )}>
+                                  {isOn
+                                    ? <CheckCircle2 className="size-3.5 text-emerald-600" />
+                                    : <X className="size-3 text-muted-foreground" />
+                                  }
+                                </div>
+                                <div>
+                                  <p className={cn("text-xs font-medium", isOn ? "text-foreground" : "text-muted-foreground")}>{pos.label}</p>
+                                  <p className="text-[11px] text-muted-foreground">{pos.desc}</p>
+                                </div>
                               </div>
-                              <div>
-                                <p className={cn("text-xs font-medium", isOn ? "text-foreground" : "text-muted-foreground")}>{pos.label}</p>
-                                <p className="text-[11px] text-muted-foreground">{pos.desc}</p>
-                              </div>
+                              {pos.required ? (
+                                <span className="text-[10px] font-medium text-muted-foreground">Required</span>
+                              ) : (
+                                <Switch
+                                  checked={isOn}
+                                  onCheckedChange={(checked) => {
+                                    const current = cr.placements ?? ["PLACEMENT_TIKTOK"];
+                                    const next = checked
+                                      ? Array.from(new Set([...current, pos.id]))
+                                      : current.filter((p) => p !== pos.id);
+                                    updateNested("creative", { placements: next });
+                                  }}
+                                />
+                              )}
                             </div>
-                            {pos.required ? (
-                              <span className="text-[10px] font-medium text-muted-foreground">Required</span>
-                            ) : (
-                              <Switch
-                                checked={isOn}
-                                onCheckedChange={(checked) => {
-                                  const current = cr.placements ?? ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBAL_APP_BUNDLE"];
-                                  const next = checked
-                                    ? [...current, pos.id]
-                                    : current.filter((p) => p !== pos.id);
-                                  updateNested("creative", { placements: next });
-                                }}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
+                      {hiddenPlacements.length > 0 && (
+                        <p className="mt-2 text-[11px] text-muted-foreground">
+                          {hiddenPlacements.map((p) => p.label).join(", ")} not available for this objective.
+                        </p>
+                      )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
 
               {/* ── Content Interaction Controls ── */}

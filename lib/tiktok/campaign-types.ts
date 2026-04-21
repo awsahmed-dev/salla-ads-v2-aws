@@ -638,6 +638,28 @@ export interface IdentitySettings {
 
 export type TikTokPlacement = "PLACEMENT_TIKTOK" | "PLACEMENT_PANGLE" | "PLACEMENT_GLOBAL_APP_BUNDLE";
 
+/** Phase 6: which placements each objective can target. Based on the
+ *  availability notes in TikTok's placement docs.
+ *   - PRODUCT_SALES / REACH / VIDEO_VIEWS / LEAD_GENERATION → TikTok only.
+ *     Pangle/GlobalAppBundle don't support these optimization goals.
+ *   - TRAFFIC → TikTok + Pangle.
+ *   - APP_PROMOTION → TikTok + Pangle + Global App Bundle.
+ */
+export function getAllowedPlacements(objective: TikTokObjective): TikTokPlacement[] {
+  switch (objective) {
+    case "TRAFFIC":
+      return ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE"];
+    case "APP_PROMOTION":
+      return ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBAL_APP_BUNDLE"];
+    case "PRODUCT_SALES":
+    case "REACH":
+    case "VIDEO_VIEWS":
+    case "LEAD_GENERATION":
+    default:
+      return ["PLACEMENT_TIKTOK"];
+  }
+}
+
 export interface CreativeSettings {
   /** All ads in this campaign */
   ads: TikTokAd[];
@@ -761,7 +783,11 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
   creative: {
     ads: [],
     placementType: "PLACEMENT_TYPE_AUTOMATIC",
-    placements: ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBAL_APP_BUNDLE"],
+    // Phase 6 fix: default to TikTok only. Pangle / Global App Bundle are
+    // enabled only for objectives that support them (see getAllowedPlacements).
+    // Previous default shipped Pangle + Global App Bundle for every manual-
+    // placement campaign, which failed for REACH / VIDEO_VIEWS / LEAD_GEN.
+    placements: ["PLACEMENT_TIKTOK"],
     identity: {
       identityType: "BC_AUTH_TT",
       identityId: "",

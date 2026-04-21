@@ -55,7 +55,9 @@ import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
 import {
   OBJECTIVE_CONFIGS,
+  getAllowedPlacements,
   type AppPlatform,
+  type TikTokObjective,
 } from "@/lib/tiktok/campaign-types";
 
 /* ------------------------------------------------------------------ */
@@ -276,8 +278,23 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
     const allowed = new Set(newConfig.allowedAdFormats);
     const currentAds = campaign.creative.ads ?? [];
     const compatibleAds = currentAds.filter((ad) => allowed.has(ad.adFormat));
-    if (compatibleAds.length !== currentAds.length) {
-      updateNested("creative", { ads: compatibleAds });
+
+    // Phase 6 fix: Prune placements that the new objective doesn't support.
+    // REACH / VIDEO_VIEWS / LEAD_GEN don't allow Pangle or Global App Bundle,
+    // and TRAFFIC doesn't allow Global App Bundle. Previously, switching to
+    // these objectives kept the old (unsupported) placements in state.
+    const allowedPlacements = new Set(getAllowedPlacements(value as TikTokObjective));
+    const currentPlacements = campaign.creative.placements ?? [];
+    const prunedPlacements = currentPlacements.filter((p) => allowedPlacements.has(p));
+    const needsPlacementReset = prunedPlacements.length !== currentPlacements.length;
+
+    if (compatibleAds.length !== currentAds.length || needsPlacementReset) {
+      updateNested("creative", {
+        ...(compatibleAds.length !== currentAds.length && { ads: compatibleAds }),
+        ...(needsPlacementReset && {
+          placements: prunedPlacements.length > 0 ? prunedPlacements : ["PLACEMENT_TIKTOK" as const],
+        }),
+      });
     }
   };
 
