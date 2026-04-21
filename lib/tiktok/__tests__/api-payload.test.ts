@@ -255,8 +255,8 @@ describe("APP_PROMOTION", () => {
 /*  Cross-cutting                                                     */
 /* ------------------------------------------------------------------ */
 
-describe("Spark Ads (cross-cutting)", () => {
-  it("pre-fix: sets ad_format=CUSTOMIZED_USER (Phase 1 will change to SINGLE_VIDEO)", () => {
+describe("Spark Ads (Phase 1 fixed)", () => {
+  it("with auth code: ad_format=SINGLE_VIDEO, identity_type=AUTH_CODE, auth_code emitted", () => {
     const campaign = withCampaign((c) => {
       c.creative.ads = [
         {
@@ -277,9 +277,136 @@ describe("Spark Ads (cross-cutting)", () => {
     });
     const payload = buildTikTokApiPayload(campaign);
     const creative = (payload.ads[0] as { creatives: Array<Record<string, unknown>> }).creatives[0];
-    expect(creative.ad_format).toBe("CUSTOMIZED_USER"); // Phase 1: → SINGLE_VIDEO
-    expect(creative.identity_type).toBe("BC_AUTH_TT"); // Phase 1: → AUTH_CODE for sparks
+    expect(creative.ad_format).toBe("SINGLE_VIDEO");
+    expect(creative.identity_type).toBe("AUTH_CODE");
+    expect(creative.auth_code).toBe("AUTH123");
     expect(creative.tiktok_item_id).toMatch(/AUTH123/);
+    // Spark identity carries its own auth — no BC link needed.
+    expect(creative.identity_authorized_bc_id).toBeUndefined();
+  });
+
+  it("without auth code: identity_type=TT_USER (owned-post promotion via BC link)", () => {
+    const campaign = withCampaign((c) => {
+      c.creative.ads = [
+        {
+          id: "ad1",
+          name: "Spark owned",
+          adFormat: "SPARK_AD",
+          assets: [],
+          carouselCards: [],
+          adText: "",
+          displayName: "",
+          callToAction: "SHOP_NOW",
+          landingPageUrl: "",
+          sparkAdEnabled: true,
+          sparkAdAuthCode: "",
+          promotionalMusicDisabled: true,
+        },
+      ];
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    const creative = (payload.ads[0] as { creatives: Array<Record<string, unknown>> }).creatives[0];
+    expect(creative.ad_format).toBe("SINGLE_VIDEO");
+    expect(creative.identity_type).toBe("TT_USER");
+    expect(creative.auth_code).toBeUndefined();
+  });
+});
+
+describe("Cross-cutting Phase 1 fixes", () => {
+  it("non-catalog carousel emits ad_format=CAROUSEL (not CAROUSEL_ADS)", () => {
+    const campaign = withCampaign((c) => {
+      c.objective.objective = "REACH"; // non-catalog objective
+      c.budget.optimizationGoal = "REACH";
+      c.budget.billingEvent = "CPM";
+      c.creative.ads = [
+        {
+          id: "ad1",
+          name: "Carousel",
+          adFormat: "CAROUSEL",
+          assets: [],
+          carouselCards: [
+            { id: "c1", imageUrl: "", headline: "" },
+            { id: "c2", imageUrl: "", headline: "" },
+          ],
+          adText: "",
+          displayName: "",
+          callToAction: "LEARN_MORE",
+          landingPageUrl: "",
+          sparkAdEnabled: false,
+          sparkAdAuthCode: "",
+          promotionalMusicDisabled: false,
+        },
+      ];
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    const creative = (payload.ads[0] as { creatives: Array<Record<string, unknown>> }).creatives[0];
+    expect(creative.ad_format).toBe("CAROUSEL");
+  });
+
+  it("catalog carousel still emits ad_format=CAROUSEL_ADS", () => {
+    const campaign = withCampaign((c) => {
+      c.objective.objective = "PRODUCT_SALES";
+      c.objective.catalogEnabled = true;
+      c.objective.pixelMode = "salla_managed";
+      c.creative.ads = [
+        {
+          id: "ad1",
+          name: "Catalog Carousel",
+          adFormat: "CAROUSEL",
+          assets: [],
+          carouselCards: [
+            { id: "c1", imageUrl: "", headline: "" },
+            { id: "c2", imageUrl: "", headline: "" },
+          ],
+          adText: "",
+          displayName: "",
+          callToAction: "SHOP_NOW",
+          landingPageUrl: "",
+          sparkAdEnabled: false,
+          sparkAdAuthCode: "",
+          promotionalMusicDisabled: false,
+        },
+      ];
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    const creative = (payload.ads[0] as { creatives: Array<Record<string, unknown>> }).creatives[0];
+    expect(creative.ad_format).toBe("CAROUSEL_ADS");
+  });
+
+  it("skip_learning_phase is boolean (not 0/1)", () => {
+    const campaign = withCampaign((c) => {
+      c.budget.skipLearningPhase = true;
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    expect(payload.adgroup.skip_learning_phase).toBe(true);
+
+    const campaign2 = withCampaign((c) => {
+      c.budget.skipLearningPhase = false;
+    });
+    const payload2 = buildTikTokApiPayload(campaign2);
+    expect(payload2.adgroup.skip_learning_phase).toBe(false);
+  });
+
+  it("identity fields are NOT duplicated on the ad group", () => {
+    const campaign = withCampaign(() => {});
+    const payload = buildTikTokApiPayload(campaign);
+    expect(payload.adgroup.identity_type).toBeUndefined();
+    expect(payload.adgroup.identity_id).toBeUndefined();
+    expect(payload.adgroup.identity_authorized_bc_id).toBeUndefined();
+  });
+
+  it("placement enum uses PLACEMENT_GLOBAL_APP_BUNDLE (underscored)", () => {
+    const campaign = withCampaign((c) => {
+      c.objective.objective = "APP_PROMOTION";
+      c.objective.appSettings.appId = "APP_1";
+      c.objective.appSettings.appDownloadUrl = "https://example.com/app";
+      c.budget.optimizationGoal = "INSTALL";
+      c.budget.billingEvent = "OCPM";
+      c.creative.placementType = "PLACEMENT_TYPE_NORMAL";
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    expect(payload.adgroup.placements).toContain("PLACEMENT_GLOBAL_APP_BUNDLE");
+    expect(payload.adgroup.placements).not.toContain("PLACEMENT_GLOBALAPP_BUNDLE");
   });
 });
 

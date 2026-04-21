@@ -3127,7 +3127,7 @@ export function TikTokStepCreative() {
                       {([
                         { id: "PLACEMENT_TIKTOK" as const, label: "TikTok", desc: "Main TikTok feed (For You page)", required: true },
                         { id: "PLACEMENT_PANGLE" as const, label: "Pangle", desc: "TikTok Audience Network (third-party apps)", required: false },
-                        { id: "PLACEMENT_GLOBALAPP_BUNDLE" as const, label: "Global App Bundle", desc: "Ads across TikTok-owned apps (CapCut, Fizzo, etc.)", required: false },
+                        { id: "PLACEMENT_GLOBAL_APP_BUNDLE" as const, label: "Global App Bundle", desc: "Ads across TikTok-owned apps (CapCut, Fizzo, etc.)", required: false },
                       ]).map((pos) => {
                         const isOn = cr.placements?.includes(pos.id) ?? true;
                         return (
@@ -3153,7 +3153,7 @@ export function TikTokStepCreative() {
                               <Switch
                                 checked={isOn}
                                 onCheckedChange={(checked) => {
-                                  const current = cr.placements ?? ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBALAPP_BUNDLE"];
+                                  const current = cr.placements ?? ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBAL_APP_BUNDLE"];
                                   const next = checked
                                     ? [...current, pos.id]
                                     : current.filter((p) => p !== pos.id);

@@ -180,12 +180,11 @@ export function buildTikTokApiPayload(
         frequency_schedule: budget.frequencyCap.schedule,
       }),
       pacing: budget.pacing,
-      skip_learning_phase: budget.skipLearningPhase ? 1 : 0,
-      identity_type: creative.identity?.identityType ?? "BC_AUTH_TT",
-      identity_id: creative.identity?.identityId || "<IDENTITY_ID>",
-      ...(creative.identity?.identityType === "BC_AUTH_TT" && {
-        identity_authorized_bc_id: creative.identity?.businessCenterId || "<BC_ID>",
-      }),
+      // Phase 1 fix: API expects boolean, not 1/0.
+      skip_learning_phase: budget.skipLearningPhase,
+      // Phase 1 fix: identity_type/identity_id/identity_authorized_bc_id
+      // belong on the creative only (see ads[].creatives[] below), not on the
+      // ad group. Removed from ad-group level to avoid duplicate/rejected fields.
       schedule_start_time: toApiDateTime(budget.startDate),
       ...(budget.endDate && !budget.endDateOptional && { schedule_end_time: toApiDateTime(budget.endDate, true) }),
       ...(!isReach && !isVideoViews && !isAppPromo
@@ -251,49 +250,67 @@ export function buildTikTokApiPayload(
     }),
     ads: isCatalogListing
       ? []
-      : creative.ads.map((ad) => ({
-        advertiser_id: advertiserId,
-        adgroup_id: adgroupId,
-        creatives: [{
-          ad_name: ad.name,
-          ad_format: ad.sparkAdEnabled
-            ? "CUSTOMIZED_USER"
-            : ad.adFormat === "CAROUSEL"
-              ? "CAROUSEL_ADS"
-              : ad.adFormat,
-          identity_type: creative.identity?.identityType ?? "BC_AUTH_TT",
-          identity_id: creative.identity?.identityId || "<IDENTITY_ID>",
-          ...(creative.identity?.identityType === "BC_AUTH_TT" && {
-            identity_authorized_bc_id: creative.identity?.businessCenterId || "<BC_ID>",
-          }),
-          ...(creative.identity?.avatarPreviewUrl && { avatar_icon_web_uri: "<UPLOADED_AVATAR_URI>" }),
-          ...(ad.sparkAdEnabled
-            ? { tiktok_item_id: `<RESOLVED_ITEM_ID:${ad.sparkAdAuthCode || "pending"}>` }
-            : {
-                ad_text: (ad.adText || "").slice(0, 100),
-                display_name: (ad.displayName || creative.identity?.displayName || "").slice(0, 20),
-                call_to_action: ad.callToAction,
-                ...(ad.landingPageUrl && { landing_page_url: ad.landingPageUrl }),
-              }),
-          ...(ad.adFormat === "SINGLE_VIDEO" && !ad.sparkAdEnabled && ad.assets.length > 0 && { video_id: ad.assets[0].mediaId || "<VIDEO_ID>" }),
-          ...(ad.adFormat === "SINGLE_IMAGE" && ad.assets.length > 0 && { image_ids: [ad.assets[0].mediaId || "<IMAGE_ID>"] }),
-          ...(ad.adFormat === "CAROUSEL" && ad.carouselCards.length > 0 && {
-            image_ids: ad.carouselCards.map((_, i) => `<IMAGE_ID_${i + 1}>`),
-          }),
-          ...((ad.musicId || ad.musicFile) && {
-            music_id: ad.musicId || "<UPLOADED_MUSIC_ID>",
-          }),
-          promotional_music_disabled:
-            ad.adFormat === "CAROUSEL"
-              ? false
-              : ad.promotionalMusicDisabled === true,
-          ...(ad.sparkAdEnabled && ad.sparkDuetStatus && { item_duet_status: ad.sparkDuetStatus }),
-          ...(ad.sparkAdEnabled && ad.sparkStitchStatus && { item_stitch_status: ad.sparkStitchStatus }),
-          ...(ad.deeplink && { deeplink: ad.deeplink, deeplink_type: ad.deeplinkType || "NORMAL" }),
-          ...(ad.aigcDisclosureType && ad.aigcDisclosureType !== "NOT_DECLARED" && { aigc_disclosure_type: ad.aigcDisclosureType }),
-          ...(ad.instantProductPageUsed && { instant_product_page_used: true }),
-        }],
-      })),
+      : creative.ads.map((ad) => {
+        /* Phase 1 fix: resolve ad_format + identity per-ad.
+         * Spark Ads:
+         *   - ad_format is SINGLE_VIDEO (CUSTOMIZED_USER is an identity_type, not an ad_format).
+         *   - identity_type flips to AUTH_CODE (creator auth-code flow) or TT_USER
+         *     (owned post promoted via BC), overriding campaign-level identity.
+         * Non-catalog carousels use CAROUSEL; CAROUSEL_ADS is reserved for catalog/VSA. */
+        const isSpark = ad.sparkAdEnabled;
+        const sparkIdentityType: "AUTH_CODE" | "TT_USER" = ad.sparkAdAuthCode ? "AUTH_CODE" : "TT_USER";
+        const resolvedIdentityType = isSpark
+          ? sparkIdentityType
+          : (creative.identity?.identityType ?? "BC_AUTH_TT");
+        const adFormat = isSpark
+          ? "SINGLE_VIDEO"
+          : ad.adFormat === "CAROUSEL"
+            ? (objective.catalogEnabled ? "CAROUSEL_ADS" : "CAROUSEL")
+            : ad.adFormat;
+
+        return {
+          advertiser_id: advertiserId,
+          adgroup_id: adgroupId,
+          creatives: [{
+            ad_name: ad.name,
+            ad_format: adFormat,
+            identity_type: resolvedIdentityType,
+            identity_id: creative.identity?.identityId || "<IDENTITY_ID>",
+            // BC link is required only for BC_AUTH_TT identity — Spark AUTH_CODE/TT_USER
+            // carry their own authorization path (auth_code / linked BC post respectively).
+            ...(resolvedIdentityType === "BC_AUTH_TT" && {
+              identity_authorized_bc_id: creative.identity?.businessCenterId || "<BC_ID>",
+            }),
+            ...(isSpark && ad.sparkAdAuthCode && { auth_code: ad.sparkAdAuthCode }),
+            ...(creative.identity?.avatarPreviewUrl && { avatar_icon_web_uri: "<UPLOADED_AVATAR_URI>" }),
+            ...(isSpark
+              ? { tiktok_item_id: `<RESOLVED_ITEM_ID:${ad.sparkAdAuthCode || "pending"}>` }
+              : {
+                  ad_text: (ad.adText || "").slice(0, 100),
+                  display_name: (ad.displayName || creative.identity?.displayName || "").slice(0, 20),
+                  call_to_action: ad.callToAction,
+                  ...(ad.landingPageUrl && { landing_page_url: ad.landingPageUrl }),
+                }),
+            ...(ad.adFormat === "SINGLE_VIDEO" && !isSpark && ad.assets.length > 0 && { video_id: ad.assets[0].mediaId || "<VIDEO_ID>" }),
+            ...(ad.adFormat === "SINGLE_IMAGE" && ad.assets.length > 0 && { image_ids: [ad.assets[0].mediaId || "<IMAGE_ID>"] }),
+            ...(ad.adFormat === "CAROUSEL" && ad.carouselCards.length > 0 && {
+              image_ids: ad.carouselCards.map((_, i) => `<IMAGE_ID_${i + 1}>`),
+            }),
+            ...((ad.musicId || ad.musicFile) && {
+              music_id: ad.musicId || "<UPLOADED_MUSIC_ID>",
+            }),
+            promotional_music_disabled:
+              ad.adFormat === "CAROUSEL"
+                ? false
+                : ad.promotionalMusicDisabled === true,
+            ...(isSpark && ad.sparkDuetStatus && { item_duet_status: ad.sparkDuetStatus }),
+            ...(isSpark && ad.sparkStitchStatus && { item_stitch_status: ad.sparkStitchStatus }),
+            ...(ad.deeplink && { deeplink: ad.deeplink, deeplink_type: ad.deeplinkType || "NORMAL" }),
+            ...(ad.aigcDisclosureType && ad.aigcDisclosureType !== "NOT_DECLARED" && { aigc_disclosure_type: ad.aigcDisclosureType }),
+            ...(ad.instantProductPageUsed && { instant_product_page_used: true }),
+          }],
+        };
+      }),
   };
 
   if (opts.mode === "submit") {

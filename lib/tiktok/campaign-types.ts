@@ -606,7 +606,7 @@ export interface IdentitySettings {
   linkStatus: TikTokAccountLinkStatus;
 }
 
-export type TikTokPlacement = "PLACEMENT_TIKTOK" | "PLACEMENT_PANGLE" | "PLACEMENT_GLOBALAPP_BUNDLE";
+export type TikTokPlacement = "PLACEMENT_TIKTOK" | "PLACEMENT_PANGLE" | "PLACEMENT_GLOBAL_APP_BUNDLE";
 
 export interface CreativeSettings {
   /** All ads in this campaign */
@@ -725,7 +725,7 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
   creative: {
     ads: [],
     placementType: "PLACEMENT_TYPE_AUTOMATIC",
-    placements: ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBALAPP_BUNDLE"],
+    placements: ["PLACEMENT_TIKTOK", "PLACEMENT_PANGLE", "PLACEMENT_GLOBAL_APP_BUNDLE"],
     identity: {
       identityType: "BC_AUTH_TT",
       identityId: "",
