@@ -160,6 +160,10 @@ const CTA_OPTIONS: { value: TikTokCTA; label: string }[] = [
   { value: "CONTACT_US", label: "Contact Us" },
   { value: "SUBSCRIBE", label: "Subscribe" },
   { value: "DOWNLOAD", label: "Download" },
+  // Phase 5 fix: INSTALL_NOW is the canonical CTA for App Promotion and is
+  // set as APP_PROMOTION's default in OBJECTIVE_CONFIGS, but was missing
+  // from the dropdown — so merchants couldn't see or re-select it.
+  { value: "INSTALL_NOW", label: "Install Now" },
   { value: "VIEW_NOW", label: "View Now" },
   { value: "APPLY_NOW", label: "Apply Now" },
   { value: "BOOK_NOW", label: "Book Now" },
@@ -167,10 +171,10 @@ const CTA_OPTIONS: { value: TikTokCTA; label: string }[] = [
 ];
 
 const RECOMMENDED_CTAS = CTA_OPTIONS.filter((c) =>
-  ["SHOP_NOW", "BUY_NOW", "ORDER_NOW", "LEARN_MORE", "SIGN_UP"].includes(c.value)
+  ["SHOP_NOW", "BUY_NOW", "ORDER_NOW", "LEARN_MORE", "SIGN_UP", "INSTALL_NOW"].includes(c.value)
 );
 const OTHER_CTAS = CTA_OPTIONS.filter((c) =>
-  !["SHOP_NOW", "BUY_NOW", "ORDER_NOW", "LEARN_MORE", "SIGN_UP"].includes(c.value)
+  !["SHOP_NOW", "BUY_NOW", "ORDER_NOW", "LEARN_MORE", "SIGN_UP", "INSTALL_NOW"].includes(c.value)
 );
 
 const MEDIA_SPECS = {
@@ -3745,7 +3749,7 @@ export function TikTokStepCreative() {
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Platform</span>
                     <span className="font-medium text-foreground">
-                      {campaign.objective.appSettings.appPlatform === "IOS" ? "iOS" : "Android"}
+                      {campaign.objective.appSettings.appPlatform === "APP_IOS" ? "iOS" : "Android"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">

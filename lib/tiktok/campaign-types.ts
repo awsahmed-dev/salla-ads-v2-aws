@@ -273,11 +273,16 @@ export interface InstantFormConfig {
 
 /* ---- App Promotion: App Settings ---- */
 
-/** Maps to API promotion_type for APP_PROMOTION objective */
+/** Internal mode distinguishing New Installs vs Retargeting audiences.
+ *  Phase 5 note: this is NOT a TikTok API enum. The API's promotion_type
+ *  field for App Promotion takes the platform value (APP_ANDROID / APP_IOS).
+ *  Retargeting is expressed via an audience-targeting rule (custom audience
+ *  of app users), not via a different promotion_type. */
 export type AppPromotionType = "APP_INSTALL" | "APP_RETARGETING";
 
-/** Maps to API app_type -- the mobile platform of the app */
-export type AppPlatform = "IOS" | "ANDROID";
+/** Maps to API app_type AND promotion_type for APP_PROMOTION objective.
+ *  Phase 5 fix: API values are APP_IOS / APP_ANDROID (previously IOS / ANDROID). */
+export type AppPlatform = "APP_IOS" | "APP_ANDROID";
 
 /** App configuration for APP_PROMOTION campaigns */
 export interface AppSettings {
@@ -285,12 +290,25 @@ export interface AppSettings {
   appId: string;
   /** Display name of the app (used in sidebar summary, not an API field) */
   appName: string;
-  /** Maps to API app_type */
+  /** Maps to API app_type (APP_IOS | APP_ANDROID).
+   *  Phase 5 fix: values switched from IOS/ANDROID. */
   appPlatform: AppPlatform;
-  /** Maps to API app_download_url -- App Store or Google Play URL */
+  /** App Store or Google Play URL.
+   *  Phase 5 note: NOT sent on the ad group — the store URL is carried by
+   *  the app_id registered in TikTok Events Manager. Kept here for display
+   *  and pre-launch validation only. */
   appDownloadUrl: string;
-  /** Maps to API promotion_type within APP_PROMOTION */
+  /** Internal mode: New Installs vs Retargeting. Drives audience requirements. */
   appPromotionType: AppPromotionType;
+  /** Phase 5: in-app event id from TikTok Events Manager, required for AEO
+   *  (optimization_goal = IN_APP_EVENT) and App VBO (optimization_goal = VALUE).
+   *  Maps to API app_event_id. */
+  appEventId: string;
+  /** Display label for the selected event (UI only, not an API field). */
+  appEventName: string;
+  /** Phase 5: deep event category, e.g. "PURCHASE", "REGISTRATION", "LEVEL_UP".
+   *  Maps to API deep_external_action. Required for AEO + App VBO. */
+  deepExternalAction: string;
 }
 
 /* ---- Step: Objective ---- */
@@ -665,9 +683,12 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
     appSettings: {
       appId: "",
       appName: "",
-      appPlatform: "ANDROID",
+      appPlatform: "APP_ANDROID",
       appDownloadUrl: "",
       appPromotionType: "APP_INSTALL",
+      appEventId: "",
+      appEventName: "",
+      deepExternalAction: "",
     },
     instantForm: {
       formName: "",

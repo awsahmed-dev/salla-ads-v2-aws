@@ -344,12 +344,12 @@ describe("LEAD_GENERATION (Phase 4 fixed)", () => {
 /*  APP_PROMOTION                                                     */
 /* ------------------------------------------------------------------ */
 
-describe("APP_PROMOTION", () => {
-  it("install goal emits app_id/app_type/promotion_type (pre-fix enum values)", () => {
+describe("APP_PROMOTION (Phase 5 fixed)", () => {
+  it("INSTALL goal: app_type/promotion_type use APP_ANDROID, no app_download_url, attribution windows emitted", () => {
     const campaign = withCampaign((c) => {
       c.objective.objective = "APP_PROMOTION";
       c.objective.appSettings.appId = "APP_123";
-      c.objective.appSettings.appPlatform = "ANDROID";
+      c.objective.appSettings.appPlatform = "APP_ANDROID";
       c.objective.appSettings.appPromotionType = "APP_INSTALL";
       c.objective.appSettings.appDownloadUrl = "https://play.google.com/app/id=xyz";
       c.budget.optimizationGoal = "INSTALL";
@@ -359,12 +359,81 @@ describe("APP_PROMOTION", () => {
     expect(payload.campaign.objective_type).toBe("APP_PROMOTION");
     expect(payload.adgroup.optimization_goal).toBe("INSTALL");
     expect(payload.adgroup.app_id).toBe("APP_123");
-    // NOTE (Phase 5): "ANDROID" → "APP_ANDROID", "APP_INSTALL" → use appPlatform as promotion_type
-    expect(payload.adgroup.app_type).toBe("ANDROID");
-    expect(payload.adgroup.promotion_type).toBe("APP_INSTALL");
+    expect(payload.adgroup.app_type).toBe("APP_ANDROID");
+    // Phase 5 fix: promotion_type for App Promotion now derives from platform
+    expect(payload.adgroup.promotion_type).toBe("APP_ANDROID");
+    // Phase 5 fix: app_download_url removed from ad group
+    expect(payload.adgroup.app_download_url).toBeUndefined();
     expect(payload.adgroup.pixel_id).toBeUndefined();
-    // NOTE (Phase 5): attribution windows should be emitted for App Promo
-    expect(payload.adgroup.click_attribution_window).toBeUndefined();
+    // Phase 5 fix: attribution windows emitted for App Promo
+    expect(payload.adgroup.click_attribution_window).toBe(7);
+    expect(payload.adgroup.view_attribution_window).toBe(1);
+    expect(payload.adgroup.engaged_view_attribution_window).toBe(7);
+  });
+
+  it("IN_APP_EVENT goal emits app_event_id + deep_external_action (Phase 5 AEO fix)", () => {
+    const campaign = withCampaign((c) => {
+      c.objective.objective = "APP_PROMOTION";
+      c.objective.appSettings.appId = "APP_123";
+      c.objective.appSettings.appPlatform = "APP_IOS";
+      c.objective.appSettings.appEventId = "71234567890";
+      c.objective.appSettings.deepExternalAction = "PURCHASE";
+      c.budget.optimizationGoal = "IN_APP_EVENT";
+      c.budget.billingEvent = "OCPM";
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    expect(payload.adgroup.optimization_goal).toBe("IN_APP_EVENT");
+    expect(payload.adgroup.app_event_id).toBe("71234567890");
+    expect(payload.adgroup.deep_external_action).toBe("PURCHASE");
+    expect(payload.adgroup.app_type).toBe("APP_IOS");
+    expect(payload.adgroup.promotion_type).toBe("APP_IOS");
+  });
+
+  it("VALUE goal emits deep_external_action from appSettings (Phase 5 App VBO fix)", () => {
+    const campaign = withCampaign((c) => {
+      c.objective.objective = "APP_PROMOTION";
+      c.objective.appSettings.appId = "APP_123";
+      c.objective.appSettings.appPlatform = "APP_ANDROID";
+      c.objective.appSettings.deepExternalAction = "PURCHASE";
+      c.budget.optimizationGoal = "VALUE";
+      c.budget.deepBidType = "VO_MIN_ROAS";
+      c.budget.roasBid = 3;
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    expect(payload.adgroup.optimization_goal).toBe("VALUE");
+    expect(payload.adgroup.deep_bid_type).toBe("VO_MIN_ROAS");
+    expect(payload.adgroup.roas_bid).toBe(3);
+    expect(payload.adgroup.deep_external_action).toBe("PURCHASE");
+  });
+
+  it("app ad creatives do NOT emit landing_page_url (destination comes from app_id)", () => {
+    const campaign = withCampaign((c) => {
+      c.objective.objective = "APP_PROMOTION";
+      c.objective.appSettings.appId = "APP_123";
+      c.objective.appSettings.appPlatform = "APP_IOS";
+      c.objective.appSettings.appDownloadUrl = "https://apps.apple.com/...";
+      c.budget.optimizationGoal = "INSTALL";
+      c.creative.ads = [
+        {
+          id: "ad1",
+          name: "App ad",
+          adFormat: "SINGLE_VIDEO",
+          assets: [],
+          carouselCards: [],
+          adText: "",
+          displayName: "",
+          callToAction: "INSTALL_NOW",
+          landingPageUrl: "https://apps.apple.com/...",
+          sparkAdEnabled: false,
+          sparkAdAuthCode: "",
+          promotionalMusicDisabled: true,
+        },
+      ];
+    });
+    const payload = buildTikTokApiPayload(campaign);
+    const creative = (payload.ads[0] as { creatives: Array<Record<string, unknown>> }).creatives[0];
+    expect(creative.landing_page_url).toBeUndefined();
+    expect(creative.call_to_action).toBe("INSTALL_NOW");
   });
 });
 

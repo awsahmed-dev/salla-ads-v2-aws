@@ -169,11 +169,25 @@ export function buildTikTokApiPayload(
       ...(isSales
         && (budget.optimizationGoal === "CONVERSION" || budget.optimizationGoal === "VALUE")
         && { optimization_event: EVENT_TO_API[budget.optimizationEvent] || budget.optimizationEvent }),
+      // Phase 5 fix: App Promotion payload reshape.
+      //  - app_type values were IOS/ANDROID → now APP_IOS/APP_ANDROID.
+      //  - promotion_type for App Promotion derives from the PLATFORM
+      //    (APP_IOS / APP_ANDROID), not from APP_INSTALL/APP_RETARGETING.
+      //    Retargeting is expressed via audience targeting (custom audience
+      //    of app users), not via a different promotion_type value.
+      //  - app_download_url removed — the store URL comes from the app_id
+      //    registered in TikTok Events Manager.
       ...(isAppPromo && {
         app_id: objective.appSettings.appId || "<APP_ID>",
         app_type: objective.appSettings.appPlatform,
-        promotion_type: objective.appSettings.appPromotionType,
-        app_download_url: objective.appSettings.appDownloadUrl || "<APP_DOWNLOAD_URL>",
+        promotion_type: objective.appSettings.appPlatform,
+      }),
+      // Phase 5 fix: App Event Optimization (IN_APP_EVENT goal) requires
+      // app_event_id + deep_external_action. Previously neither was emitted,
+      // so AEO campaigns rejected on launch.
+      ...(isAppPromo && budget.optimizationGoal === "IN_APP_EVENT" && {
+        app_event_id: objective.appSettings.appEventId || "<APP_EVENT_ID>",
+        deep_external_action: objective.appSettings.deepExternalAction || "<DEEP_EVENT_CATEGORY>",
       }),
       billing_event: budget.billingEvent,
       bid_type: budget.bidType,
@@ -199,15 +213,22 @@ export function buildTikTokApiPayload(
       // Phase 2 fix: VBO (Value Optimization) requires deep_external_action —
       // the deep event whose value is optimized. Previously only deep_bid_type
       // and roas_bid were emitted, so Sales VBO campaigns rejected.
+      // Phase 5 fix: App VBO also needs deep_external_action, sourced from
+      // AppSettings.deepExternalAction (the selected in-app event category).
       ...(budget.optimizationGoal === "VALUE" && {
         deep_bid_type: budget.deepBidType,
         roas_bid: Number(budget.roasBid) || 1,
         ...(isSales && { deep_external_action: EVENT_TO_API[budget.optimizationEvent] || budget.optimizationEvent }),
+        ...(isAppPromo && { deep_external_action: objective.appSettings.deepExternalAction || "<DEEP_EVENT_CATEGORY>" }),
       }),
-      ...(isSales && {
+      // Phase 5 fix: App Promotion uses the same click/view attribution
+      // windows as Sales, plus an engaged_view_attribution_window for
+      // engaged-view install attribution.
+      ...((isSales || isAppPromo) && {
         click_attribution_window: Number(budget.clickAttributionWindow),
         view_attribution_window: Number(budget.viewAttributionWindow),
       }),
+      ...(isAppPromo && { engaged_view_attribution_window: 7 }),
       // Phase 3 fix: engaged_view_attribution_window is an APP_PROMOTION-only
       // field. Previously hardcoded for VIDEO_VIEWS, which the API rejects.
       // App Promotion attribution windows will be wired up in Phase 5.
@@ -315,7 +336,9 @@ export function buildTikTokApiPayload(
                   ad_text: (ad.adText || "").slice(0, 100),
                   display_name: (ad.displayName || creative.identity?.displayName || "").slice(0, 20),
                   call_to_action: ad.callToAction,
-                  ...(ad.landingPageUrl && { landing_page_url: ad.landingPageUrl }),
+                  // Phase 5 fix: App Promotion creatives derive the destination
+                  // from app_id (set on the ad group), not landing_page_url.
+                  ...(ad.landingPageUrl && !isAppPromo && { landing_page_url: ad.landingPageUrl }),
                 }),
             ...(ad.adFormat === "SINGLE_VIDEO" && !isSpark && ad.assets.length > 0 && { video_id: ad.assets[0].mediaId || "<VIDEO_ID>" }),
             ...(ad.adFormat === "SINGLE_IMAGE" && ad.assets.length > 0 && { image_ids: [ad.assets[0].mediaId || "<IMAGE_ID>"] }),

@@ -406,7 +406,7 @@ export function TikTokStepAudience() {
                       <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5]/40 bg-[#e6fff9]/50 px-3 py-2.5">
                         <Info className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
                         <p className="text-xs leading-relaxed text-[#004956]/80">
-                          <span className="font-medium text-[#004956]">App Install campaigns</span> will automatically target users on <span className="font-medium text-[#004956]">{campaign.objective.appSettings.appPlatform === "IOS" ? "iOS" : "Android"}</span> based on your app platform. You can still select both platforms, but installs will only come from the matching store.
+                          <span className="font-medium text-[#004956]">App Install campaigns</span> will automatically target users on <span className="font-medium text-[#004956]">{campaign.objective.appSettings.appPlatform === "APP_IOS" ? "iOS" : "Android"}</span> based on your app platform. You can still select both platforms, but installs will only come from the matching store.
                         </p>
                       </div>
                     ) : undefined

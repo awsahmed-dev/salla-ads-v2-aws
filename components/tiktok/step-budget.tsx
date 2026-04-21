@@ -631,6 +631,56 @@ export function TikTokStepBudget() {
 
 
           {/* ======================================================= */}
+          {/* Phase 5: In-App Event (AEO + App VBO)                   */}
+          {/* Required when IN_APP_EVENT goal or VALUE goal on App.   */}
+          {/* Maps to app_event_id + deep_external_action on adgroup. */}
+          {/* TODO(Phase 5 backend): replace free-text inputs with a  */}
+          {/* dropdown populated from /app/event/list/ for the app.   */}
+          {/* ======================================================= */}
+          {isAppPromo && (budget.optimizationGoal === "IN_APP_EVENT" || budget.optimizationGoal === "VALUE") && (
+            <SectionCard>
+              <div className="mb-3 flex items-center gap-2">
+                <Target className="size-4 text-primary" />
+                <Label className="text-sm font-semibold text-foreground">In-App Event</Label>
+                <InfoTip text="The in-app event TikTok will optimize for. The event id comes from your app registration in TikTok Events Manager. Maps to app_event_id and deep_external_action on the ad group." />
+              </div>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Select the event in your app TikTok should optimize for (e.g. Purchase, Subscribe, Level Up). The app must send this event via the TikTok SDK or an MMP integration.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Event ID <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    placeholder="e.g. 7123456789012345678"
+                    value={campaign.objective.appSettings.appEventId}
+                    onChange={(e) => updateNested("objective", {
+                      appSettings: { ...campaign.objective.appSettings, appEventId: e.target.value },
+                    })}
+                    className="h-9 font-mono text-sm"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">From TikTok Events Manager → your app.</p>
+                </div>
+                <div>
+                  <Label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Event Category <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    placeholder="PURCHASE, REGISTRATION, LEVEL_UP, …"
+                    value={campaign.objective.appSettings.deepExternalAction}
+                    onChange={(e) => updateNested("objective", {
+                      appSettings: { ...campaign.objective.appSettings, deepExternalAction: e.target.value.toUpperCase() },
+                    })}
+                    className="h-9 text-sm uppercase"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">Maps to deep_external_action.</p>
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ======================================================= */}
           {/* SECTION 2b: ROAS Target (APP_PROMOTION + VALUE only)    */}
           {/* ConversionEventCard is hidden for App Promo, so we need */}
           {/* a standalone ROAS input for the VO_MIN_ROAS deep bid.   */}

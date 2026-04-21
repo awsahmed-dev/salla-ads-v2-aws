@@ -286,6 +286,19 @@ export function TikTokStepReview() {
         ok: !!objective.appSettings.appDownloadUrl.trim(),
         detail: objective.appSettings.appDownloadUrl ? "Set" : "Missing",
       });
+      // Phase 5 fix: AEO (IN_APP_EVENT) and App VBO (VALUE) require a specific
+      // in-app event + event category. Without them, the payload ships
+      // placeholder <APP_EVENT_ID> / <DEEP_EVENT_CATEGORY> and API rejects.
+      if (budget.optimizationGoal === "IN_APP_EVENT" || budget.optimizationGoal === "VALUE") {
+        list.push({
+          id: "app_event_id",
+          label: "In-app event selected",
+          ok: !!objective.appSettings.appEventId.trim() && !!objective.appSettings.deepExternalAction.trim(),
+          detail: objective.appSettings.appEventId
+            ? `${objective.appSettings.deepExternalAction || "—"} · ${objective.appSettings.appEventId}`
+            : "Missing",
+        });
+      }
     }
 
     // Traffic + Landing Page View requires pixel
@@ -574,7 +587,7 @@ export function TikTokStepReview() {
                 )}
                 {isAppPromo && (
                   <>
-                    <ReviewRow label="App Platform" value={objective.appSettings.appPlatform === "IOS" ? "iOS (App Store)" : "Android (Google Play)"} />
+                    <ReviewRow label="App Platform" value={objective.appSettings.appPlatform === "APP_IOS" ? "iOS (App Store)" : "Android (Google Play)"} />
                     <ReviewRow label="App Name" value={objective.appSettings.appName || "Not set"} />
                     <ReviewRow label="TikTok App ID" value={objective.appSettings.appId || "Not set"} warn={!objective.appSettings.appId} />
                     <ReviewRow label="Download URL" value={

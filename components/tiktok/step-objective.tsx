@@ -245,9 +245,12 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
         appSettings: {
           appId: "",
           appName: "",
-          appPlatform: "ANDROID" as const,
+          appPlatform: "APP_ANDROID" as const,
           appDownloadUrl: "",
           appPromotionType: "APP_INSTALL" as const,
+          appEventId: "",
+          appEventName: "",
+          deepExternalAction: "",
         },
       }),
     });
@@ -1714,8 +1717,8 @@ function AppPromotionSection() {
             <Label className="mb-1.5 block text-xs font-medium text-muted-foreground">App Platform</Label>
             <div className="grid grid-cols-2 gap-3">
               {([
-                { value: "ANDROID" as AppPlatform, label: "Android", desc: "Google Play Store" },
-                { value: "IOS" as AppPlatform, label: "iOS", desc: "Apple App Store" },
+                { value: "APP_ANDROID" as AppPlatform, label: "Android", desc: "Google Play Store" },
+                { value: "APP_IOS" as AppPlatform, label: "iOS", desc: "Apple App Store" },
               ]).map((platform) => {
                 const selected = app.appPlatform === platform.value;
                 return (
@@ -1753,7 +1756,7 @@ function AppPromotionSection() {
               App Download URL <span className="text-destructive">*</span>
             </Label>
             <Input
-              placeholder={app.appPlatform === "IOS"
+              placeholder={app.appPlatform === "APP_IOS"
                 ? "https://apps.apple.com/app/your-app/id123456789"
                 : "https://play.google.com/store/apps/details?id=com.example.app"
               }
@@ -1762,7 +1765,7 @@ function AppPromotionSection() {
               className="h-10 text-sm"
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              The direct link to your app in the {app.appPlatform === "IOS" ? "Apple App Store" : "Google Play Store"}.
+              The direct link to your app in the {app.appPlatform === "APP_IOS" ? "Apple App Store" : "Google Play Store"}.
             </p>
           </div>
 
