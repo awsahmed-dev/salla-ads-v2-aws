@@ -27,6 +27,8 @@ import {
   Loader2,
   Zap,
   GraduationCap,
+  AlertTriangle,
+  PauseCircle,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -224,8 +226,9 @@ export function AudienceDetailSheet({
                   </Badge>
                 )}
                 {audience.status === "too_small" && (
-                  <Badge variant="outline" className="rounded-full border-red-200 bg-red-50 px-1.5 py-0 text-[9px] font-semibold text-red-700">
-                    Too small
+                  <Badge variant="outline" className="rounded-full border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
+                    <AlertTriangle className="mr-1 size-2.5" />
+                    Won't activate
                   </Badge>
                 )}
                 {audience.confidence !== undefined && (
@@ -263,16 +266,22 @@ export function AudienceDetailSheet({
               </Button>
             ) : (
               <>
-                {/* Primary: Create Campaign — opens Ad Management with this audience pre-selected. */}
+                {/* Primary: Create Campaign — disabled when the audience is below
+                    the universal 1,000-customer minimum. The banner below the
+                    action row explains exactly why. */}
                 <Button
                   size="sm"
                   onClick={() => onCreateCampaign?.(audience)}
-                  className="h-9 gap-1.5 bg-[#a4ffe5] text-[#004956] hover:bg-[#8fffd8]"
+                  disabled={audience.status === "too_small"}
+                  title={audience.status === "too_small" ? "Below 1,000 customers — can't activate as audience. Build a Lookalike instead." : undefined}
+                  className="h-9 gap-1.5 bg-[#a4ffe5] text-[#004956] hover:bg-[#8fffd8] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 >
                   <Zap className="size-3.5" />
                   Create Campaign
                 </Button>
-                {/* Secondary: Build Lookalike — only if seed size is large enough. */}
+                {/* Secondary: Build Lookalike — even small lists can seed a
+                    lookalike (Meta accepts 100+), so this stays enabled when
+                    Create Campaign is not. */}
                 <Button
                   size="sm"
                   variant="outline"
@@ -287,12 +296,21 @@ export function AudienceDetailSheet({
               </>
             )}
           </div>
-          <p className="mt-2 flex items-center gap-1.5 text-[10px] italic text-muted-foreground">
-            <CheckCircle2 className="size-3 text-emerald-500" />
-            <span>
-              Auto-synced to your connected platforms. Last refreshed {formatDate(audience.updatedAt)}.
-            </span>
-          </p>
+          {audience.status === "too_small" ? (
+            <p className="mt-2 flex items-center gap-1.5 text-[10px] italic text-red-600">
+              <PauseCircle className="size-3" />
+              <span>
+                Holding locally — won't push to ad platforms until this passes 1,000 customers.
+              </span>
+            </p>
+          ) : (
+            <p className="mt-2 flex items-center gap-1.5 text-[10px] italic text-muted-foreground">
+              <CheckCircle2 className="size-3 text-emerald-500" />
+              <span>
+                Auto-synced to your connected platforms. Last refreshed {formatDate(audience.updatedAt)}.
+              </span>
+            </p>
+          )}
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
@@ -347,11 +365,53 @@ export function AudienceDetailSheet({
             );
           })()}
 
-          {/* Status-specific notes — only when there's actually a problem */}
+          {/* Prominent "won't activate" banner — the single most important
+              piece of information when an audience is too small. Replaces the
+              small grey tip that was easy to miss. */}
           {audience.status === "too_small" && (
-            <SallaTip kind="note" title="Why is this list disabled?" compact>
-              This audience has fewer than 1,000 matched customers — most ad platforms won't activate it. Either widen the filters, or use it as a seed for a Lookalike audience instead.
-            </SallaTip>
+            <div className="rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-white p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-600" />
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-bold text-red-900">This list won't push to ad platforms yet</h3>
+                  <p className="mt-1 text-[11px] leading-snug text-red-800">
+                    <strong>{audience.size.toLocaleString()}</strong> customers — Meta, Google, Snap, TikTok and YouTube each
+                    require at least <strong>1,000</strong> matched customers before they'll activate an audience.
+                  </p>
+                  {/* Progress to threshold */}
+                  <div className="mt-3">
+                    <div className="mb-1 flex items-baseline justify-between text-[10px] font-semibold text-red-700">
+                      <span>{audience.size.toLocaleString()} now</span>
+                      <span>{(1000 - audience.size).toLocaleString()} more needed</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-red-100">
+                      <div
+                        className="h-full rounded-full bg-red-500 transition-all"
+                        style={{ width: `${Math.min(100, (audience.size / 1000) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* What to do now */}
+                  <div className="mt-3">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-red-900">What you can do now</p>
+                    <ul className="mt-1 space-y-1 text-[11px] leading-snug text-red-900">
+                      <li className="flex gap-1.5">
+                        <span className="mt-0.5 inline-flex size-3.5 shrink-0 items-center justify-center rounded-full bg-red-200 text-[9px] font-bold">1</span>
+                        <span><strong>Build a Lookalike</strong> — Meta accepts seeds as small as 100. Use the button above to find similar new customers on Meta.</span>
+                      </li>
+                      <li className="flex gap-1.5">
+                        <span className="mt-0.5 inline-flex size-3.5 shrink-0 items-center justify-center rounded-full bg-red-200 text-[9px] font-bold">2</span>
+                        <span><strong>Widen the filters</strong> — relax the criteria to grow the list past 1,000.</span>
+                      </li>
+                      <li className="flex gap-1.5">
+                        <span className="mt-0.5 inline-flex size-3.5 shrink-0 items-center justify-center rounded-full bg-red-200 text-[9px] font-bold">3</span>
+                        <span><strong>Wait</strong> — auto-sync starts the moment it grows past the threshold.</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
           {audience.status === "stale" && (
             <SallaTip kind="note" compact>
@@ -425,28 +485,43 @@ export function AudienceDetailSheet({
             </div>
           )}
 
-          {/* Platform matches — the killer panel */}
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <Target className="size-4 text-[#004956]" />
-              <h3 className="text-sm font-bold text-foreground">Platform Match</h3>
-              <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-                {(avgMatch * 100).toFixed(0)}% avg
-              </Badge>
-              <Info className="size-3 text-muted-foreground" />
+          {/* Platform matches — collapsed to a "paused" state when too small,
+              so we don't show misleading sync progress bars and "Synced 2h ago"
+              pills for an audience that isn't actually pushing anywhere. */}
+          {audience.status === "too_small" ? (
+            <div className="rounded-xl border border-border bg-muted/20 p-4">
+              <div className="mb-1.5 flex items-center gap-2">
+                <PauseCircle className="size-4 text-muted-foreground" />
+                <h3 className="text-sm font-bold text-muted-foreground">Platform Match · paused</h3>
+              </div>
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                We won't compute or push platform matches for this list until it has at least 1,000 customers.
+                The 5-platform breakdown reappears here automatically once it grows past the threshold.
+              </p>
             </div>
-            <p className="mb-3 text-[11px] text-muted-foreground">
-              Your {formatNumber(audience.size)} customers matched to each ad platform's user base. Low match rates mean the platform has fewer identifiers (email/phone) for these users.
-            </p>
-            <div className="space-y-2">
-              {audience.platformMatches.map((m) => (
-                <MatchRow key={m.platform} match={m} totalSize={audience.size} />
-              ))}
+          ) : (
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <Target className="size-4 text-[#004956]" />
+                <h3 className="text-sm font-bold text-foreground">Platform Match</h3>
+                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
+                  {(avgMatch * 100).toFixed(0)}% avg
+                </Badge>
+                <Info className="size-3 text-muted-foreground" />
+              </div>
+              <p className="mb-3 text-[11px] text-muted-foreground">
+                Your {formatNumber(audience.size)} customers matched to each ad platform's user base. Low match rates mean the platform has fewer identifiers (email/phone) for these users.
+              </p>
+              <div className="space-y-2">
+                {audience.platformMatches.map((m) => (
+                  <MatchRow key={m.platform} match={m} totalSize={audience.size} />
+                ))}
+              </div>
+              <SallaTip className="mt-3" compact>
+                <strong>60% or higher</strong> is a healthy match rate. Below 30% usually means we don't have enough email or phone numbers for these customers — collect both at checkout to lift it.
+              </SallaTip>
             </div>
-            <SallaTip className="mt-3" compact>
-              <strong>60% or higher</strong> is a healthy match rate. Below 30% usually means we don't have enough email or phone numbers for these customers — collect both at checkout to lift it.
-            </SallaTip>
-          </div>
+          )}
 
           {/* Compact footer — created date + ID only. No tags, no use-cases
               (already covered by the recommended-action card), no activity log. */}
