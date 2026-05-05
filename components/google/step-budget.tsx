@@ -28,6 +28,7 @@ import {
   CreditCard,
   ShoppingCart,
   Clock,
+  Info,
   AlertCircle,
   Gauge,
   ArrowUpRight,
@@ -323,12 +324,12 @@ export function GoogleStepBudget() {
     }
   }, [budget.conversionGoal, conversionGoalsForObjective, defaultConversionGoal, updateNested]);
 
+  // PMax only supports MAXIMIZE_CONVERSIONS and MAXIMIZE_CONVERSION_VALUE.
+  // Optional CPA/ROAS targets are configured as sub-settings, not separate strategies.
   const effectiveBiddingStrategy: BiddingStrategy =
-    isPMax && budget.biddingStrategy === "TARGET_CPA"
+    isPMax && budget.biddingStrategy !== "MAXIMIZE_CONVERSIONS" && budget.biddingStrategy !== "MAXIMIZE_CONVERSION_VALUE"
       ? "MAXIMIZE_CONVERSIONS"
-      : isPMax && budget.biddingStrategy === "TARGET_ROAS"
-        ? "MAXIMIZE_CONVERSION_VALUE"
-        : budget.biddingStrategy;
+      : budget.biddingStrategy;
 
   /* Filter bidding strategies by objective */
   const availableStrategies = BIDDING_STRATEGIES.filter(
@@ -547,8 +548,14 @@ export function GoogleStepBudget() {
             {/* PMax optional CPA target toggle */}
             {isPMax && effectiveBiddingStrategy === "MAXIMIZE_CONVERSIONS" && (
               <div className="mt-4 space-y-3">
+                <div className="flex items-start gap-2.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                  <Info className="mt-0.5 size-3.5 shrink-0 text-blue-600" />
+                  <p className="text-[11px] leading-relaxed text-blue-700">
+                    Google will auto-bid for the most conversions. You can optionally set a CPA target to cap cost per result.
+                  </p>
+                </div>
                 <div>
-                  <p className="text-xs font-semibold text-foreground">Target CPA</p>
+                  <p className="text-xs font-semibold text-foreground">Target CPA (optional)</p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
                     Let Google optimize freely, or set a cost-per-acquisition target to guide spend.
                   </p>
@@ -615,8 +622,14 @@ export function GoogleStepBudget() {
             {/* PMax optional ROAS target toggle */}
             {isPMax && effectiveBiddingStrategy === "MAXIMIZE_CONVERSION_VALUE" && (
               <div className="mt-4 space-y-3">
+                <div className="flex items-start gap-2.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                  <Info className="mt-0.5 size-3.5 shrink-0 text-blue-600" />
+                  <p className="text-[11px] leading-relaxed text-blue-700">
+                    Google will auto-bid to maximize total revenue. You can optionally set a ROAS target to balance volume and profitability.
+                  </p>
+                </div>
                 <div>
-                  <p className="text-xs font-semibold text-foreground">Target ROAS</p>
+                  <p className="text-xs font-semibold text-foreground">Target ROAS (optional)</p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
                     Let Google maximize total revenue, or set a return-on-ad-spend target to balance volume and profitability.
                   </p>

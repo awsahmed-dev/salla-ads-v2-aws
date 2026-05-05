@@ -58,6 +58,7 @@ function toDescriptionPinEnum(pos: number | null): string | null {
 export function buildGoogleCampaignPayloadV23(campaign: GoogleCampaignData) {
   const { objective, audience, budget, creative } = campaign;
   const isPMax = objective.objective === "PERFORMANCE_MAX";
+  const isRetailPMax = isPMax && objective.feedEnabled;
   const isDemandGen = objective.objective === "DEMAND_GEN";
   const isSearch = objective.objective === "SEARCH";
   const isShopping = objective.objective === "SHOPPING";
@@ -141,13 +142,13 @@ export function buildGoogleCampaignPayloadV23(campaign: GoogleCampaignData) {
             brand_guidelines_enabled: budget.brandGuidelinesEnabled,
           }
         : {}),
-      ...(isShopping
+      ...(isShopping || isRetailPMax
         ? {
             shopping_setting: {
-              merchant_id: objective.shoppingSettings.merchantId || objective.merchantCenterId,
-              campaign_priority: objective.shoppingSettings.campaignPriority,
-              feed_label: objective.shoppingSettings.feedLabel || undefined,
-              enable_local: objective.shoppingSettings.enableLocal,
+              merchant_id: objective.shoppingSettings?.merchantId || objective.merchantCenterId,
+              ...(isShopping ? { campaign_priority: objective.shoppingSettings.campaignPriority } : {}),
+              feed_label: objective.shoppingSettings?.feedLabel || objective.feedId || undefined,
+              enable_local: objective.shoppingSettings?.enableLocal ?? false,
             },
           }
         : {}),
@@ -199,13 +200,16 @@ export function buildGoogleCampaignPayloadV23(campaign: GoogleCampaignData) {
         descriptions: ag.descriptions.map((d) => d.text).filter(Boolean),
         images: ag.images.map((i) => i.url).filter(Boolean),
         landscape_logos: ag.landscapeLogos?.map((l) => l.url).filter(Boolean) ?? [],
-        videos: ag.videos.map((v) => v.url).filter(Boolean),
+        videos: ag.videos.map((v) => v.url || v.youtubeUrl).filter(Boolean),
         search_themes: ag.searchThemes?.filter(Boolean) ?? [],
         audience_signals: ag.audienceSignals?.filter(Boolean) ?? [],
         ...(useCampaignBrandAssets ? {} : {
           business_name: ag.businessName,
           logos: ag.logos.map((l) => l.url).filter(Boolean),
         }),
+        ...(isRetailPMax && creative.productGroupRoot
+          ? { listing_group_filters: creative.productGroupRoot }
+          : {}),
       };
     });
     if (budget.brandGuidelinesEnabled) {

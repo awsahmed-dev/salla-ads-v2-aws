@@ -19,7 +19,6 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +48,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Image as ImageIcon,
+  Info,
   Video,
   Type,
   Globe,
@@ -97,6 +97,7 @@ import {
   ShieldCheck,
   Shield,
   Bot,
+  Check,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/section-card";
 import { ObjectiveExplainer } from "@/components/shared/objective-explainer";
@@ -4791,6 +4792,7 @@ export function GoogleStepCreative() {
     shopping: 0,
   });
   const [showYoutubeConnect, setShowYoutubeConnect] = useState(false);
+  const [showImageSheet, setShowImageSheet] = useState(false);
   const [youtubeUrlDraft, setYoutubeUrlDraft] = useState("");
   const [videoInputMode, setVideoInputMode] = useState<"upload" | "url">("upload");
   const [linkType, setLinkType] = useState<"store" | "product" | "category" | "custom">("store");
@@ -4810,6 +4812,8 @@ export function GoogleStepCreative() {
   const [showGoogleAi, setShowGoogleAi] = useState(false);
   const [termInput, setTermInput] = useState("");
   const [msgInput, setMsgInput] = useState("");
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (key: string) => setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
 
   const isSearch = campaign.objective.objective === "SEARCH";
   const isDisplay = campaign.objective.objective === "DISPLAY";
@@ -5415,6 +5419,7 @@ export function GoogleStepCreative() {
                 </SectionCard>
               )}
 
+              {/* ── Section: Product Listing Groups (Retail) ── */}
               {isRetailPMax && (
                 <SectionCard>
                   <div className="flex flex-wrap items-start gap-3">
@@ -5461,10 +5466,10 @@ export function GoogleStepCreative() {
                         type="button"
                         onClick={() => setRetailListingMode(option.key)}
                         className={cn(
-                          "rounded-md border px-3 py-1 text-[11px] font-medium transition-colors",
+                          "rounded-full border px-3.5 py-1.5 text-[11px] font-medium transition-all",
                           retailListingMode === option.key
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-background text-muted-foreground hover:text-foreground"
+                            ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956] shadow-sm"
+                            : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-[#a4ffe5]/50"
                         )}
                       >
                         {option.label}
@@ -5483,7 +5488,7 @@ export function GoogleStepCreative() {
                           placeholder="Search categories"
                           value={listingCategorySearch}
                           onChange={(e) => setListingCategorySearch(e.target.value)}
-                          className="h-8 w-full text-xs sm:w-64"
+                          className="h-10 w-full text-sm sm:w-64"
                         />
                         {retailListingValues.length > 0 && (
                           <Badge variant="secondary" className="rounded-full px-2 py-0 text-[10px]">
@@ -5538,12 +5543,12 @@ export function GoogleStepCreative() {
                               setListingValueDraft("");
                             }
                           }}
-                          className="h-8 w-full text-xs sm:w-72"
+                          className="h-10 w-full text-sm sm:w-72"
                         />
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-8 text-xs"
+                          className="h-10 text-sm"
                           onClick={() => {
                             addRetailListingValues(listingValueDraft);
                             setListingValueDraft("");
@@ -5586,54 +5591,45 @@ export function GoogleStepCreative() {
               )}
 
               {/* ---- Group Name & Final URL ---- */}
-              <SectionCard>
-                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2">
-                  <span className="text-xs font-semibold text-foreground">Basics status</span>
-                  <span className="text-[10px] text-muted-foreground">{basicsStatusText}</span>
-                  <div
-                    className="ml-auto flex items-center gap-1"
-                    title={basicsChecks
-                      .map((c) => `${c.ok ? "✓" : "○"} ${c.label}${c.required ? "" : " (optional)"}`)
-                      .join(", ")}
-                  >
-                    {basicsChecks.map((check) => (
-                      <div
-                        key={check.label}
-                        className={cn(
-                          "size-1.5 rounded-full",
-                          check.ok
-                            ? "bg-emerald-400"
-                            : check.required
-                              ? "bg-amber-400"
-                              : "bg-muted-foreground/25"
-                        )}
-                      />
-                    ))}
+              <SectionCard className="rounded-xl">
+                <button type="button" onClick={() => toggleSection("basics")}
+                  className="flex w-full items-center justify-between text-left">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="size-4 text-primary" />
+                    <Label className="text-sm font-bold text-foreground">Group Name & URL</Label>
+                    <div className="flex items-center gap-1 ml-1">
+                      {basicsChecks.map((check) => (
+                        <div key={check.label} className={cn("size-1.5 rounded-full", check.ok ? "bg-emerald-400" : check.required ? "bg-amber-400" : "bg-muted-foreground/25")} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div className="grid gap-4">
+                  <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", !collapsedSections.basics && "rotate-180")} />
+                </button>
+
+                {!collapsedSections.basics && (
+                <div className="mt-4 space-y-4">
                   <div>
-                    <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                      <Building2 className="size-3 text-muted-foreground" />
+                    <Label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-foreground">
                       Business Name {requireBusinessName && <span className="text-destructive">*</span>}
                       <InfoTip text="Up to 25 characters. Required when brand guidelines are disabled. When enabled, this is used as a campaign-level brand asset." />
                     </Label>
-                    <Input
-                      placeholder="Your store name"
-                      maxLength={25}
-                      value={currentGroup.businessName}
-                      onChange={(e) => updateGroup(currentGroup.id, { businessName: e.target.value.slice(0, 25) })}
-                      className="h-9 text-sm"
-                    />
-                    <p className="mt-1 text-right text-[10px] text-muted-foreground">{currentGroup.businessName.length}/25</p>
+                    <div className="relative">
+                      <Input
+                        placeholder="Your store name"
+                        maxLength={25}
+                        value={currentGroup.businessName}
+                        onChange={(e) => updateGroup(currentGroup.id, { businessName: e.target.value.slice(0, 25) })}
+                        className="h-10 pr-14 text-sm"
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{currentGroup.businessName.length}/25</span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="mt-4">
-                  <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                <div>
+                  <div className="rounded-xl border border-border bg-card px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Link2 className="size-3.5 text-primary" />
-                      <Label className="text-xs font-semibold text-foreground">Target link type</Label>
+                      <Label className="text-sm font-medium text-foreground">Target link type</Label>
                       <InfoTip text="Choose what the ad should link to. We auto-fill the landing page based on your selection." />
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -5671,10 +5667,10 @@ export function GoogleStepCreative() {
                             }
                           }}
                           className={cn(
-                            "rounded-md border px-3 py-1 text-[11px] font-medium transition-colors",
+                            "rounded-full border px-3.5 py-1.5 text-[11px] font-medium transition-all",
                             linkType === option.key
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-background text-muted-foreground hover:text-foreground"
+                              ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956] shadow-sm"
+                              : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-[#a4ffe5]/50"
                           )}
                         >
                           {option.label}
@@ -5754,8 +5750,7 @@ export function GoogleStepCreative() {
 
                   {linkType === "custom" && (
                     <div className="mt-3">
-                      <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                        <Link2 className="size-3 text-muted-foreground" />
+                      <Label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-foreground">
                         Final URL <span className="text-destructive">*</span>
                         <InfoTip text="The landing page for this asset group. Maps to AssetGroup.final_urls." />
                       </Label>
@@ -5776,7 +5771,7 @@ export function GoogleStepCreative() {
                             displayPath2: suggestion.path2,
                           });
                         }}
-                        className="h-9 text-sm"
+                        className="h-10 text-sm"
                       />
                       <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
                         <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">UTM on</Badge>
@@ -5787,15 +5782,15 @@ export function GoogleStepCreative() {
 
                   <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr,0.6fr]">
                     <div>
-                      <Label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                        <MousePointerClick className="size-3 text-muted-foreground" />
+                      <Label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-foreground">
                         Call to action
+                        <InfoTip text="The text shown on your ad button. 'Shop Now' and 'Learn More' typically perform best." />
                       </Label>
                       <Select
                         value={currentGroup.callToAction}
                         onValueChange={(value) => updateGroup(currentGroup.id, { callToAction: value })}
                       >
-                        <SelectTrigger className="h-9 text-xs">
+                        <SelectTrigger className="h-10 text-sm">
                           <SelectValue placeholder="Select a CTA" />
                         </SelectTrigger>
                         <SelectContent>
@@ -5821,7 +5816,7 @@ export function GoogleStepCreative() {
                     {showUrlAdvanced && (
                       <div className="mt-2 grid gap-2 sm:grid-cols-2">
                         <div>
-                          <Label className="mb-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <Label className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
                             Display Path 1 (Search only)
                             <InfoTip text="Optional. Appears only in Search placements as the display URL path (does not change the landing page)." />
                           </Label>
@@ -5830,11 +5825,11 @@ export function GoogleStepCreative() {
                             maxLength={15}
                             value={currentGroup.displayPath1}
                             onChange={(e) => updateGroup(currentGroup.id, { displayPath1: e.target.value.slice(0, 15) })}
-                            className="h-8 text-xs"
+                            className="h-10 text-sm"
                           />
                         </div>
                         <div>
-                          <Label className="mb-1 flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <Label className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
                             Display Path 2 (Search only)
                             <InfoTip text="Optional. Appears only in Search placements as the display URL path (does not change the landing page)." />
                           </Label>
@@ -5843,7 +5838,7 @@ export function GoogleStepCreative() {
                             maxLength={15}
                             value={currentGroup.displayPath2}
                             onChange={(e) => updateGroup(currentGroup.id, { displayPath2: e.target.value.slice(0, 15) })}
-                            className="h-8 text-xs"
+                            className="h-10 text-sm"
                           />
                         </div>
                       </div>
@@ -5975,606 +5970,729 @@ export function GoogleStepCreative() {
                     </div>
                   </SheetContent>
                 </Sheet>
+                </div>
+                )}
               </SectionCard>
 
-              <SectionCard>
-                <div className="mb-2 flex items-center gap-2">
-                  <Type className="size-4 text-primary" />
-                  <Label className="text-sm font-semibold text-foreground">Text assets</Label>
-                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Required</Badge>
-                  <InfoTip text="Provide enough text variety for Google AI. Minimums: 3 headlines, 1 long headline, 2 descriptions." />
-                </div>
-                <p className="mb-4 text-xs text-muted-foreground">
-                  Keep your messaging short, clear, and varied. Google mixes these across placements.
-                </p>
-                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-2">
-                  <span className="text-xs font-semibold text-foreground">Text status</span>
-                  <span className="text-[10px] text-muted-foreground">{textStatusText}</span>
-                  <div
-                    className="ml-auto flex items-center gap-1"
-                    title={textChecks.map((c) => `${c.ok ? "✓" : "○"} ${c.label}`).join(", ")}
-                  >
-                    {textChecks.map((check) => (
-                      <div
-                        key={check.label}
-                        className={cn(
-                          "size-1.5 rounded-full",
-                          check.ok
-                            ? "bg-emerald-400"
-                            : check.required
-                              ? "bg-amber-400"
-                              : "bg-muted-foreground/25"
-                        )}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Generate from Store Data — Pattern B (unified) */}
-                <div className="mb-5 rounded-xl border border-primary/20 bg-gradient-to-r from-primary/[0.04] to-primary/[0.08] p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Sparkles className="size-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Generate from Store Data</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          Auto-fill headlines, descriptions, and business name from your store&apos;s products and categories.
-                        </p>
-                      </div>
+              {/* ── Section: Text Assets ── */}
+              <SectionCard className="rounded-xl">
+                <button type="button" onClick={() => toggleSection("text")}
+                  className="flex w-full items-center justify-between text-left">
+                  <div className="flex items-center gap-2">
+                    <Type className="size-4 text-primary" />
+                    <Label className="text-sm font-bold text-foreground">Text Assets</Label>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Required</Badge>
+                    <div className="flex items-center gap-1 ml-1">
+                      {textChecks.map((check) => (
+                        <div key={check.label} className={cn("size-1.5 rounded-full", check.ok ? "bg-emerald-400" : check.required ? "bg-amber-400" : "bg-muted-foreground/25")} />
+                      ))}
                     </div>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="shrink-0 gap-1.5"
-                      onClick={async () => {
-                        try {
-                          const { getStoreSnapshot, generateHeadlines, generateDescriptions } = await import("@/lib/google/search-ai-generator");
-                          const snapshot = await getStoreSnapshot();
-                          const aiHeadlines = generateHeadlines(snapshot);
-                          const aiDescriptions = generateDescriptions(snapshot);
+                  </div>
+                  <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", !collapsedSections.text && "rotate-180")} />
+                </button>
 
-                          // Expand to max 15 headlines and fill all
-                          const maxHeadlines = 15;
-                          const existingHeadlines = currentGroup.headlines.filter(h => h.text?.trim());
-                          const newHeadlines: typeof currentGroup.headlines = [];
-                          let aiHIdx = 0;
-                          for (let i = 0; i < maxHeadlines; i++) {
-                            if (i < existingHeadlines.length) {
-                              newHeadlines.push(existingHeadlines[i]);
-                            } else {
-                              while (aiHIdx < aiHeadlines.length && existingHeadlines.some(h => h.text?.toLowerCase() === aiHeadlines[aiHIdx].text.toLowerCase())) aiHIdx++;
-                              if (aiHIdx < aiHeadlines.length) {
-                                newHeadlines.push({ id: `h-gen-${Date.now()}-${i}`, type: "HEADLINE" as const, text: aiHeadlines[aiHIdx].text });
-                                aiHIdx++;
-                              } else {
-                                newHeadlines.push({ id: `h-empty-${Date.now()}-${i}`, type: "HEADLINE" as const, text: "" });
+                {!collapsedSections.text && (
+                  <div className="mt-4 space-y-5">
+                    <p className="text-xs text-muted-foreground">
+                      Keep your messaging short, clear, and varied. Google mixes these across placements.
+                    </p>
+
+                    {/* Consolidated Generate Bar */}
+                    <div className="flex items-center gap-3 rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/30 px-4 py-3">
+                      <div className="flex size-8 items-center justify-center rounded-lg bg-[#e6fff9]">
+                        <Sparkles className="size-4 text-[#004956]" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-foreground">Auto-generate from store</p>
+                        <p className="text-[10px] text-muted-foreground">Fill all text fields from your store&apos;s products and categories</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 gap-1.5 border-[#a4ffe5] bg-[#e6fff9] text-[#004956] hover:bg-[#d0fff2]"
+                        onClick={async () => {
+                          try {
+                            const { getStoreSnapshot, generateHeadlines, generateDescriptions } = await import("@/lib/google/search-ai-generator");
+                            const snapshot = await getStoreSnapshot();
+                            const aiHeadlines = generateHeadlines(snapshot);
+                            const aiDescriptions = generateDescriptions(snapshot);
+                            const maxHeadlines = 15;
+                            const existingHeadlines = currentGroup.headlines.filter(h => h.text?.trim());
+                            const newHeadlines: typeof currentGroup.headlines = [];
+                            let aiHIdx = 0;
+                            for (let i = 0; i < maxHeadlines; i++) {
+                              if (i < existingHeadlines.length) { newHeadlines.push(existingHeadlines[i]); }
+                              else {
+                                while (aiHIdx < aiHeadlines.length && existingHeadlines.some(h => h.text?.toLowerCase() === aiHeadlines[aiHIdx].text.toLowerCase())) aiHIdx++;
+                                if (aiHIdx < aiHeadlines.length) { newHeadlines.push({ id: `h-gen-${Date.now()}-${i}`, type: "HEADLINE" as const, text: aiHeadlines[aiHIdx].text }); aiHIdx++; }
+                                else { newHeadlines.push({ id: `h-empty-${Date.now()}-${i}`, type: "HEADLINE" as const, text: "" }); }
                               }
                             }
-                          }
-
-                          // Expand to max 5 long headlines and fill all
-                          const maxLongHeadlines = 5;
-                          const existingLongHeadlines = currentGroup.longHeadlines.filter(h => h.text?.trim());
-                          const newLongHeadlines: typeof currentGroup.longHeadlines = [];
-                          let aiLHIdx = 0;
-                          const longHeadlineSuggestions = [
-                            `Shop ${snapshot.categories[0] ?? "Products"} from ${snapshot.store.name}. Free shipping & secure checkout.`,
-                            ...aiDescriptions.map(d => d.text),
-                          ];
-                          for (let i = 0; i < maxLongHeadlines; i++) {
-                            if (i < existingLongHeadlines.length) {
-                              newLongHeadlines.push(existingLongHeadlines[i]);
-                            } else if (aiLHIdx < longHeadlineSuggestions.length) {
-                              newLongHeadlines.push({ id: `lh-gen-${Date.now()}-${i}`, type: "LONG_HEADLINE" as const, text: longHeadlineSuggestions[aiLHIdx].slice(0, 90) });
-                              aiLHIdx++;
-                            } else {
-                              newLongHeadlines.push({ id: `lh-empty-${Date.now()}-${i}`, type: "LONG_HEADLINE" as const, text: "" });
+                            const maxLongHeadlines = 5;
+                            const existingLongHeadlines = currentGroup.longHeadlines.filter(h => h.text?.trim());
+                            const newLongHeadlines: typeof currentGroup.longHeadlines = [];
+                            let aiLHIdx = 0;
+                            const longHeadlineSuggestions = [`Shop ${snapshot.categories[0] ?? "Products"} from ${snapshot.store.name}. Free shipping & secure checkout.`, ...aiDescriptions.map(d => d.text)];
+                            for (let i = 0; i < maxLongHeadlines; i++) {
+                              if (i < existingLongHeadlines.length) { newLongHeadlines.push(existingLongHeadlines[i]); }
+                              else if (aiLHIdx < longHeadlineSuggestions.length) { newLongHeadlines.push({ id: `lh-gen-${Date.now()}-${i}`, type: "LONG_HEADLINE" as const, text: longHeadlineSuggestions[aiLHIdx].slice(0, 90) }); aiLHIdx++; }
+                              else { newLongHeadlines.push({ id: `lh-empty-${Date.now()}-${i}`, type: "LONG_HEADLINE" as const, text: "" }); }
                             }
-                          }
-
-                          // Expand to max 5 descriptions and fill all
-                          const maxDescriptions = 5;
-                          const existingDescriptions = currentGroup.descriptions.filter(d => d.text?.trim());
-                          const newDescriptions: typeof currentGroup.descriptions = [];
-                          let aiDIdx = 0;
-                          for (let i = 0; i < maxDescriptions; i++) {
-                            if (i < existingDescriptions.length) {
-                              newDescriptions.push(existingDescriptions[i]);
-                            } else {
-                              while (aiDIdx < aiDescriptions.length && existingDescriptions.some(d => d.text?.toLowerCase() === aiDescriptions[aiDIdx].text.toLowerCase())) aiDIdx++;
-                              if (aiDIdx < aiDescriptions.length) {
-                                newDescriptions.push({ id: `d-gen-${Date.now()}-${i}`, type: "DESCRIPTION" as const, text: aiDescriptions[aiDIdx].text });
-                                aiDIdx++;
-                              } else {
-                                newDescriptions.push({ id: `d-empty-${Date.now()}-${i}`, type: "DESCRIPTION" as const, text: "" });
+                            const maxDescriptions = 5;
+                            const existingDescriptions = currentGroup.descriptions.filter(d => d.text?.trim());
+                            const newDescriptions: typeof currentGroup.descriptions = [];
+                            let aiDIdx = 0;
+                            for (let i = 0; i < maxDescriptions; i++) {
+                              if (i < existingDescriptions.length) { newDescriptions.push(existingDescriptions[i]); }
+                              else {
+                                while (aiDIdx < aiDescriptions.length && existingDescriptions.some(d => d.text?.toLowerCase() === aiDescriptions[aiDIdx].text.toLowerCase())) aiDIdx++;
+                                if (aiDIdx < aiDescriptions.length) { newDescriptions.push({ id: `d-gen-${Date.now()}-${i}`, type: "DESCRIPTION" as const, text: aiDescriptions[aiDIdx].text }); aiDIdx++; }
+                                else { newDescriptions.push({ id: `d-empty-${Date.now()}-${i}`, type: "DESCRIPTION" as const, text: "" }); }
                               }
                             }
-                          }
-
-                          updateGroup(currentGroup.id, {
-                            headlines: newHeadlines,
-                            longHeadlines: newLongHeadlines,
-                            descriptions: newDescriptions,
-                            businessName: currentGroup.businessName?.trim() ? currentGroup.businessName : snapshot.store.name.slice(0, 25),
-                            finalUrl: currentGroup.finalUrl?.trim() ? currentGroup.finalUrl : (snapshot.store.domain.startsWith("http") ? snapshot.store.domain : `https://${snapshot.store.domain}`),
-                          });
-                        } catch { /* silent fail */ }
-                      }}
-                    >
-                      <Sparkles className="size-4" /> Generate
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Headlines */}
-                <div>
-                  <div className="mb-1 flex items-center gap-2">
-                    <Label className="text-xs font-semibold text-foreground">Headlines</Label>
-                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-                      {filledHeadlines}/{ASSET_LIMITS.headlines.max} (min {ASSET_LIMITS.headlines.min})
-                    </Badge>
-                    <InfoTip text={`Up to ${ASSET_LIMITS.headlines.max} headlines, ${ASSET_LIMITS.headlines.charLimit} chars each.`} />
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 gap-1 text-[10px] text-primary"
-                      onClick={async () => {
-                        const { generateHeadlines, getStoreSnapshot } = await import("@/lib/google/search-ai-generator");
-                        const snapshot = await getStoreSnapshot();
-                        const suggestions = generateHeadlines(snapshot);
-                        const existing = currentGroup.headlines.filter(h => h.text?.trim()).map(h => h.text!.toLowerCase());
-                        const newHeadlines = [...currentGroup.headlines];
-                        let suggIdx = 0;
-                        for (let i = 0; i < newHeadlines.length && suggIdx < suggestions.length; i++) {
-                          if (!newHeadlines[i].text?.trim()) {
-                            while (suggIdx < suggestions.length && existing.includes(suggestions[suggIdx].text.toLowerCase())) suggIdx++;
-                            if (suggIdx < suggestions.length) {
-                              newHeadlines[i] = { ...newHeadlines[i], text: suggestions[suggIdx].text };
-                              existing.push(suggestions[suggIdx].text.toLowerCase());
-                              suggIdx++;
-                            }
-                          }
-                        }
-                        updateGroup(currentGroup.id, { headlines: newHeadlines });
-                      }}
-                    >
-                      <Sparkles className="size-3" /> Fill empty slots
-                    </Button>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {currentGroup.headlines.map((h, idx) => (
-                      <div key={h.id} className="flex items-center gap-2">
-                        <span className="w-5 text-right text-[10px] text-muted-foreground">{idx + 1}</span>
-                        <div className="relative flex-1">
-                          <Input
-                            placeholder={`Headline ${idx + 1}`}
-                            maxLength={ASSET_LIMITS.headlines.charLimit}
-                            value={h.text ?? ""}
-                            onChange={(e) => updateTextAsset("headlines", h.id, e.target.value)}
-                            className={cn("h-9 pr-12 text-sm", (h.text?.length ?? 0) > 25 && "border-amber-300")}
-                          />
-                          <span className={cn(
-                            "absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tabular-nums",
-                            (h.text?.length ?? 0) > 25 ? "text-amber-500" : "text-muted-foreground"
-                          )}>
-                            {h.text?.length ?? 0}/{ASSET_LIMITS.headlines.charLimit}
-                          </span>
-                        </div>
-                        {currentGroup.headlines.length > ASSET_LIMITS.headlines.min && (
-                          <button type="button" onClick={() => removeTextAsset("headlines", h.id)} className="p-1 text-muted-foreground hover:text-destructive">
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {currentGroup.headlines.length < ASSET_LIMITS.headlines.max && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 gap-1 text-xs"
-                      onClick={() => addTextAsset("headlines", "HEADLINE")}
-                    >
-                      <Plus className="size-3" />
-                      Add Headline ({currentGroup.headlines.length}/{ASSET_LIMITS.headlines.max})
-                    </Button>
-                  )}
-                </div>
-
-                {/* Headline Diversity */}
-                {(() => {
-                  const filled = (currentGroup.headlines?.filter(h => h.text?.trim()) ?? []).map(h => ({ text: h.text ?? "" }));
-                  if (filled.length < 3) return null;
-                  const diversity = scoreHeadlineDiversity(filled, currentGroup.businessName || campaign.objective.campaignName.split(" - ")[0] || "Store");
-                  const colorMap = { poor: "text-red-600 bg-red-50 border-red-200", average: "text-amber-600 bg-amber-50 border-amber-200", good: "text-emerald-600 bg-emerald-50 border-emerald-200", excellent: "text-primary bg-primary/5 border-primary/20" };
-                  return (
-                    <div className={`mt-3 rounded-lg border p-3 ${colorMap[diversity.score]}`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold">Headline diversity: {diversity.score.charAt(0).toUpperCase() + diversity.score.slice(1)}</span>
-                        <span className="text-[10px]">{diversity.total}/15 headlines</span>
-                      </div>
-                      <div className="flex gap-3 text-[10px]">
-                        <span>Brand: {diversity.brand}</span>
-                        <span>Product: {diversity.product}</span>
-                        <span>Benefit: {diversity.benefit}</span>
-                        <span>CTA: {diversity.cta}</span>
-                      </div>
-                      <p className="mt-1 text-[10px]">{diversity.suggestion}</p>
+                            updateGroup(currentGroup.id, {
+                              headlines: newHeadlines, longHeadlines: newLongHeadlines, descriptions: newDescriptions,
+                              businessName: currentGroup.businessName?.trim() ? currentGroup.businessName : snapshot.store.name.slice(0, 25),
+                              finalUrl: currentGroup.finalUrl?.trim() ? currentGroup.finalUrl : (snapshot.store.domain.startsWith("http") ? snapshot.store.domain : `https://${snapshot.store.domain}`),
+                            });
+                          } catch { /* silent fail */ }
+                        }}
+                      >
+                        <Sparkles className="size-3.5" /> Generate All
+                      </Button>
                     </div>
-                  );
-                })()}
 
-                {/* Long headlines */}
-                <div className="mt-4 border-t border-border pt-4">
-                  <div className="mb-1 flex items-center gap-2">
-                    <Label className="text-xs font-semibold text-foreground">Long headlines</Label>
-                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-                      {filledLongHeadlines}/{ASSET_LIMITS.longHeadlines.max} (min {ASSET_LIMITS.longHeadlines.min})
-                    </Badge>
-                    <InfoTip text={`Up to ${ASSET_LIMITS.longHeadlines.max} long headlines, ${ASSET_LIMITS.longHeadlines.charLimit} chars each.`} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {currentGroup.longHeadlines.map((h, idx) => (
-                      <div key={h.id} className="flex items-center gap-2">
-                        <span className="w-5 text-right text-[10px] text-muted-foreground">{idx + 1}</span>
-                        <div className="relative flex-1">
-                          <Input
-                            placeholder={`Long Headline ${idx + 1}`}
-                            maxLength={ASSET_LIMITS.longHeadlines.charLimit}
-                            value={h.text ?? ""}
-                            onChange={(e) => updateTextAsset("longHeadlines", h.id, e.target.value)}
-                            className="h-9 pr-12 text-sm"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground">
-                            {h.text?.length ?? 0}/{ASSET_LIMITS.longHeadlines.charLimit}
-                          </span>
-                        </div>
-                        {currentGroup.longHeadlines.length > ASSET_LIMITS.longHeadlines.min && (
-                          <button type="button" onClick={() => removeTextAsset("longHeadlines", h.id)} className="p-1 text-muted-foreground hover:text-destructive">
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        )}
+                    {/* Headlines */}
+                    <div>
+                      <div className="mb-2 flex items-center gap-2">
+                        <Label className="text-sm font-medium text-foreground">Headlines</Label>
+                        <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
+                          {filledHeadlines}/{ASSET_LIMITS.headlines.max} (min {ASSET_LIMITS.headlines.min})
+                        </Badge>
+                        <InfoTip text={`Up to ${ASSET_LIMITS.headlines.max} headlines, ${ASSET_LIMITS.headlines.charLimit} chars each.`} />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="ml-auto h-7 gap-1 text-[10px] text-[#004956] hover:bg-[#e6fff9]"
+                          onClick={async () => {
+                            try {
+                              const { getStoreSnapshot, generateHeadlines } = await import("@/lib/google/search-ai-generator");
+                              const snapshot = await getStoreSnapshot();
+                              const suggestions = generateHeadlines(snapshot);
+                              const maxH = ASSET_LIMITS.headlines.max;
+                              const existing = currentGroup.headlines.filter(h => h.text?.trim());
+                              const newHeadlines: typeof currentGroup.headlines = [];
+                              let aiIdx = 0;
+                              for (let i = 0; i < maxH; i++) {
+                                if (i < existing.length) { newHeadlines.push(existing[i]); }
+                                else {
+                                  while (aiIdx < suggestions.length && existing.some(h => h.text?.toLowerCase() === suggestions[aiIdx].text.toLowerCase())) aiIdx++;
+                                  if (aiIdx < suggestions.length) { newHeadlines.push({ id: `h-fill-${Date.now()}-${i}`, type: "HEADLINE" as const, text: suggestions[aiIdx].text }); aiIdx++; }
+                                  else { newHeadlines.push({ id: `h-empty-${Date.now()}-${i}`, type: "HEADLINE" as const, text: "" }); }
+                                }
+                              }
+                              updateGroup(currentGroup.id, { headlines: newHeadlines });
+                            } catch { /* silent */ }
+                          }}
+                        >
+                          <Sparkles className="size-3" /> Fill
+                        </Button>
                       </div>
-                    ))}
-                  </div>
-                  {currentGroup.longHeadlines.length < ASSET_LIMITS.longHeadlines.max && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 gap-1 text-xs"
-                      onClick={() => addTextAsset("longHeadlines", "LONG_HEADLINE")}
-                    >
-                      <Plus className="size-3" />
-                      Add Long Headline
-                    </Button>
-                  )}
-                </div>
-
-                {/* Descriptions */}
-                <div className="mt-4 border-t border-border pt-4">
-                  <div className="mb-1 flex items-center gap-2">
-                    <Label className="text-xs font-semibold text-foreground">Descriptions</Label>
-                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-                      {filledDescriptions}/{ASSET_LIMITS.descriptions.max} (min {ASSET_LIMITS.descriptions.min})
-                    </Badge>
-                    <InfoTip text={`Up to ${ASSET_LIMITS.descriptions.max} descriptions, ${ASSET_LIMITS.descriptions.charLimit} chars each.`} />
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 gap-1 text-[10px] text-primary"
-                      onClick={async () => {
-                        const { generateDescriptions, getStoreSnapshot } = await import("@/lib/google/search-ai-generator");
-                        const snapshot = await getStoreSnapshot();
-                        const suggestions = generateDescriptions(snapshot);
-                        const existing = currentGroup.descriptions.filter(d => d.text?.trim()).map(d => d.text!.toLowerCase());
-                        const newDescriptions = [...currentGroup.descriptions];
-                        let suggIdx = 0;
-                        for (let i = 0; i < newDescriptions.length && suggIdx < suggestions.length; i++) {
-                          if (!newDescriptions[i].text?.trim()) {
-                            while (suggIdx < suggestions.length && existing.includes(suggestions[suggIdx].text.toLowerCase())) suggIdx++;
-                            if (suggIdx < suggestions.length) {
-                              newDescriptions[i] = { ...newDescriptions[i], text: suggestions[suggIdx].text };
-                              existing.push(suggestions[suggIdx].text.toLowerCase());
-                              suggIdx++;
-                            }
-                          }
-                        }
-                        updateGroup(currentGroup.id, { descriptions: newDescriptions });
-                      }}
-                    >
-                      <Sparkles className="size-3" /> Fill empty slots
-                    </Button>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {currentGroup.descriptions.map((d, idx) => (
-                      <div key={d.id} className="flex items-start gap-2">
-                        <span className="mt-2.5 w-5 text-right text-[10px] text-muted-foreground">{idx + 1}</span>
-                        <div className="relative flex-1">
-                          <Textarea
-                            placeholder={`Description ${idx + 1}`}
-                            maxLength={ASSET_LIMITS.descriptions.charLimit}
-                            value={d.text ?? ""}
-                            onChange={(e) => updateTextAsset("descriptions", d.id, e.target.value)}
-                            className="min-h-[60px] text-sm"
-                            rows={2}
-                          />
-                          <span className="absolute bottom-2 right-3 text-[10px] tabular-nums text-muted-foreground">
-                            {d.text?.length ?? 0}/{ASSET_LIMITS.descriptions.charLimit}
-                          </span>
-                        </div>
-                        {currentGroup.descriptions.length > ASSET_LIMITS.descriptions.min && (
-                          <button type="button" onClick={() => removeTextAsset("descriptions", d.id)} className="mt-2 p-1 text-muted-foreground hover:text-destructive">
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        )}
+                      <div className="flex flex-col gap-2">
+                        {currentGroup.headlines.map((h, idx) => (
+                          <div key={h.id} className="flex items-center gap-2">
+                            <span className="w-5 text-right text-[10px] text-muted-foreground">{idx + 1}</span>
+                            <div className="relative flex-1">
+                              <Input
+                                placeholder={`Headline ${idx + 1}`}
+                                maxLength={ASSET_LIMITS.headlines.charLimit}
+                                value={h.text ?? ""}
+                                onChange={(e) => updateTextAsset("headlines", h.id, e.target.value)}
+                                className={cn("h-10 pr-20 text-sm", (h.text?.length ?? 0) > 25 && "border-amber-400")}
+                              />
+                              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                                {h.text?.trim() && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="rounded-full p-0.5 text-amber-400 transition-colors hover:bg-amber-50 hover:text-amber-500"
+                                        onClick={async () => {
+                                          try {
+                                            const { getStoreSnapshot, generateHeadlines } = await import("@/lib/google/search-ai-generator");
+                                            const snapshot = await getStoreSnapshot();
+                                            const suggestions = generateHeadlines(snapshot);
+                                            const current = h.text?.toLowerCase() ?? "";
+                                            const alt = suggestions.find(s => s.text.toLowerCase() !== current);
+                                            if (alt) updateTextAsset("headlines", h.id, alt.text);
+                                          } catch { /* silent */ }
+                                        }}
+                                      >
+                                        <Sparkles className="size-3" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top"><p className="text-xs">Rephrase</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                                <span className={cn(
+                                  "text-[10px] tabular-nums",
+                                  (h.text?.length ?? 0) > 25 ? "text-amber-500" : "text-muted-foreground"
+                                )}>
+                                  {h.text?.length ?? 0}/{ASSET_LIMITS.headlines.charLimit}
+                                </span>
+                              </div>
+                            </div>
+                            {currentGroup.headlines.length > ASSET_LIMITS.headlines.min && (
+                              <button type="button" onClick={() => removeTextAsset("headlines", h.id)} className="p-1 text-muted-foreground hover:text-destructive">
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  {currentGroup.descriptions.length < ASSET_LIMITS.descriptions.max && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 gap-1 text-xs"
-                      onClick={() => addTextAsset("descriptions", "DESCRIPTION")}
-                    >
-                      <Plus className="size-3" />
-                      Add Description
-                    </Button>
-                  )}
-                </div>
-              </SectionCard>
+                      {currentGroup.headlines.length < ASSET_LIMITS.headlines.max && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-3 gap-1 text-xs"
+                          onClick={() => addTextAsset("headlines", "HEADLINE")}
+                        >
+                          <Plus className="size-3" />
+                          Add Headline ({currentGroup.headlines.length}/{ASSET_LIMITS.headlines.max})
+                        </Button>
+                      )}
+                    </div>
 
-              <SectionCard>
-                <div className="mb-2 flex items-center gap-2">
-                  <ImageIcon className="size-4 text-primary" />
-                  <Label className="text-sm font-semibold text-foreground">Media assets</Label>
-                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-                    {isRetailPMax ? "Optional in retail" : "Required + optional"}
-                  </Badge>
-                  <InfoTip text="Standard PMax requires 1 landscape + 1 square image. Logos are required when brand guidelines are off. Videos and CTA are optional." />
-                </div>
-                <p className="mb-3 text-xs text-muted-foreground">
-                  {isRetailPMax
-                    ? "Retail PMax uses your product feed. Add images, logos, and videos to improve coverage."
-                    : "Provide required image types and logos, then optional videos and CTA for stronger reach."}
-                </p>
-                {isRetailPMax && retailAssetsLinked && (
-                  <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
-                    <AlertTriangle className="mt-0.5 size-3.5" />
-                    <span>
-                      When you add assets in Retail PMax, the full asset requirements apply (images, logos, and text).
-                    </span>
+                    {/* Headline Diversity */}
+                    {(() => {
+                      const filled = (currentGroup.headlines?.filter(h => h.text?.trim()) ?? []).map(h => ({ text: h.text ?? "" }));
+                      if (filled.length < 3) return null;
+                      const diversity = scoreHeadlineDiversity(filled, currentGroup.businessName || campaign.objective.campaignName.split(" - ")[0] || "Store");
+                      const colorMap = { poor: "text-red-600 bg-red-50 border-red-200", average: "text-amber-600 bg-amber-50 border-amber-200", good: "text-emerald-600 bg-emerald-50 border-emerald-200", excellent: "text-primary bg-primary/5 border-primary/20" };
+                      return (
+                        <div className={`rounded-lg border p-3 ${colorMap[diversity.score]}`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-semibold">Headline diversity: {diversity.score.charAt(0).toUpperCase() + diversity.score.slice(1)}</span>
+                            <span className="text-[10px]">{diversity.total}/15 headlines</span>
+                          </div>
+                          <div className="flex gap-3 text-[10px]">
+                            <span>Brand: {diversity.brand}</span>
+                            <span>Product: {diversity.product}</span>
+                            <span>Benefit: {diversity.benefit}</span>
+                            <span>CTA: {diversity.cta}</span>
+                          </div>
+                          <p className="mt-1 text-[10px]">{diversity.suggestion}</p>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Long headlines */}
+                    <div className="border-t border-border pt-4">
+                      <div className="mb-2 flex items-center gap-2">
+                        <Label className="text-sm font-medium text-foreground">Long Headlines</Label>
+                        <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
+                          {filledLongHeadlines}/{ASSET_LIMITS.longHeadlines.max} (min {ASSET_LIMITS.longHeadlines.min})
+                        </Badge>
+                        <InfoTip text={`Up to ${ASSET_LIMITS.longHeadlines.max} long headlines, ${ASSET_LIMITS.longHeadlines.charLimit} chars each.`} />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="ml-auto h-7 gap-1 text-[10px] text-[#004956] hover:bg-[#e6fff9]"
+                          onClick={async () => {
+                            try {
+                              const { getStoreSnapshot, generateDescriptions } = await import("@/lib/google/search-ai-generator");
+                              const snapshot = await getStoreSnapshot();
+                              const suggestions = generateDescriptions(snapshot);
+                              const extra = [`Shop ${snapshot.categories[0] ?? "Products"} from ${snapshot.store.name}. Free shipping & secure checkout.`];
+                              const allSuggestions = [...extra, ...suggestions.map(s => s.text)];
+                              const maxLH = ASSET_LIMITS.longHeadlines.max;
+                              const existing = currentGroup.longHeadlines.filter(h => h.text?.trim());
+                              const newLongHeadlines: typeof currentGroup.longHeadlines = [];
+                              let aiIdx = 0;
+                              for (let i = 0; i < maxLH; i++) {
+                                if (i < existing.length) { newLongHeadlines.push(existing[i]); }
+                                else if (aiIdx < allSuggestions.length) { newLongHeadlines.push({ id: `lh-fill-${Date.now()}-${i}`, type: "LONG_HEADLINE" as const, text: allSuggestions[aiIdx].slice(0, 90) }); aiIdx++; }
+                                else { newLongHeadlines.push({ id: `lh-empty-${Date.now()}-${i}`, type: "LONG_HEADLINE" as const, text: "" }); }
+                              }
+                              updateGroup(currentGroup.id, { longHeadlines: newLongHeadlines });
+                            } catch { /* silent */ }
+                          }}
+                        >
+                          <Sparkles className="size-3" /> Fill
+                        </Button>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {currentGroup.longHeadlines.map((h, idx) => (
+                          <div key={h.id} className="flex items-center gap-2">
+                            <span className="w-5 text-right text-[10px] text-muted-foreground">{idx + 1}</span>
+                            <div className="relative flex-1">
+                              <Input
+                                placeholder={`Long Headline ${idx + 1}`}
+                                maxLength={ASSET_LIMITS.longHeadlines.charLimit}
+                                value={h.text ?? ""}
+                                onChange={(e) => updateTextAsset("longHeadlines", h.id, e.target.value)}
+                                className="h-10 pr-20 text-sm"
+                              />
+                              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                                {h.text?.trim() && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="rounded-full p-0.5 text-amber-400 transition-colors hover:bg-amber-50 hover:text-amber-500"
+                                        onClick={async () => {
+                                          try {
+                                            const { getStoreSnapshot, generateDescriptions } = await import("@/lib/google/search-ai-generator");
+                                            const snapshot = await getStoreSnapshot();
+                                            const suggestions = generateDescriptions(snapshot);
+                                            const current = h.text?.toLowerCase() ?? "";
+                                            const alt = suggestions.find(s => s.text.toLowerCase() !== current);
+                                            if (alt) updateTextAsset("longHeadlines", h.id, alt.text.slice(0, 90));
+                                          } catch { /* silent */ }
+                                        }}
+                                      >
+                                        <Sparkles className="size-3" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top"><p className="text-xs">Rephrase</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                                <span className="text-[10px] tabular-nums text-muted-foreground">
+                                  {h.text?.length ?? 0}/{ASSET_LIMITS.longHeadlines.charLimit}
+                                </span>
+                              </div>
+                            </div>
+                            {currentGroup.longHeadlines.length > ASSET_LIMITS.longHeadlines.min && (
+                              <button type="button" onClick={() => removeTextAsset("longHeadlines", h.id)} className="p-1 text-muted-foreground hover:text-destructive">
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {currentGroup.longHeadlines.length < ASSET_LIMITS.longHeadlines.max && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-3 gap-1 text-xs"
+                          onClick={() => addTextAsset("longHeadlines", "LONG_HEADLINE")}
+                        >
+                          <Plus className="size-3" />
+                          Add Long Headline
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Descriptions */}
+                    <div className="border-t border-border pt-4">
+                      <div className="mb-2 flex items-center gap-2">
+                        <Label className="text-sm font-medium text-foreground">Descriptions</Label>
+                        <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
+                          {filledDescriptions}/{ASSET_LIMITS.descriptions.max} (min {ASSET_LIMITS.descriptions.min})
+                        </Badge>
+                        <InfoTip text={`Up to ${ASSET_LIMITS.descriptions.max} descriptions, ${ASSET_LIMITS.descriptions.charLimit} chars each.`} />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="ml-auto h-7 gap-1 text-[10px] text-[#004956] hover:bg-[#e6fff9]"
+                          onClick={async () => {
+                            try {
+                              const { getStoreSnapshot, generateDescriptions } = await import("@/lib/google/search-ai-generator");
+                              const snapshot = await getStoreSnapshot();
+                              const suggestions = generateDescriptions(snapshot);
+                              const maxD = ASSET_LIMITS.descriptions.max;
+                              const existing = currentGroup.descriptions.filter(d => d.text?.trim());
+                              const newDescriptions: typeof currentGroup.descriptions = [];
+                              let aiIdx = 0;
+                              for (let i = 0; i < maxD; i++) {
+                                if (i < existing.length) { newDescriptions.push(existing[i]); }
+                                else {
+                                  while (aiIdx < suggestions.length && existing.some(d => d.text?.toLowerCase() === suggestions[aiIdx].text.toLowerCase())) aiIdx++;
+                                  if (aiIdx < suggestions.length) { newDescriptions.push({ id: `d-fill-${Date.now()}-${i}`, type: "DESCRIPTION" as const, text: suggestions[aiIdx].text }); aiIdx++; }
+                                  else { newDescriptions.push({ id: `d-empty-${Date.now()}-${i}`, type: "DESCRIPTION" as const, text: "" }); }
+                                }
+                              }
+                              updateGroup(currentGroup.id, { descriptions: newDescriptions });
+                            } catch { /* silent */ }
+                          }}
+                        >
+                          <Sparkles className="size-3" /> Fill
+                        </Button>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {currentGroup.descriptions.map((d, idx) => (
+                          <div key={d.id} className="flex items-start gap-2">
+                            <span className="mt-2.5 w-5 text-right text-[10px] text-muted-foreground">{idx + 1}</span>
+                            <div className="relative flex-1">
+                              <Textarea
+                                placeholder={`Description ${idx + 1}`}
+                                maxLength={ASSET_LIMITS.descriptions.charLimit}
+                                value={d.text ?? ""}
+                                onChange={(e) => updateTextAsset("descriptions", d.id, e.target.value)}
+                                className="min-h-[60px] resize-none pr-20 text-sm"
+                                rows={2}
+                              />
+                              <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
+                                {d.text?.trim() && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="rounded-full p-0.5 text-amber-400 transition-colors hover:bg-amber-50 hover:text-amber-500"
+                                        onClick={async () => {
+                                          try {
+                                            const { getStoreSnapshot, generateDescriptions } = await import("@/lib/google/search-ai-generator");
+                                            const snapshot = await getStoreSnapshot();
+                                            const suggestions = generateDescriptions(snapshot);
+                                            const current = d.text?.toLowerCase() ?? "";
+                                            const alt = suggestions.find(s => s.text.toLowerCase() !== current);
+                                            if (alt) updateTextAsset("descriptions", d.id, alt.text);
+                                          } catch { /* silent */ }
+                                        }}
+                                      >
+                                        <Sparkles className="size-3" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top"><p className="text-xs">Rephrase</p></TooltipContent>
+                                  </Tooltip>
+                                )}
+                                <span className="text-[10px] tabular-nums text-muted-foreground">
+                                  {d.text?.length ?? 0}/{ASSET_LIMITS.descriptions.charLimit}
+                                </span>
+                              </div>
+                            </div>
+                            {currentGroup.descriptions.length > ASSET_LIMITS.descriptions.min && (
+                              <button type="button" onClick={() => removeTextAsset("descriptions", d.id)} className="mt-2 p-1 text-muted-foreground hover:text-destructive">
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {currentGroup.descriptions.length < ASSET_LIMITS.descriptions.max && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-3 gap-1 text-xs"
+                          onClick={() => addTextAsset("descriptions", "DESCRIPTION")}
+                        >
+                          <Plus className="size-3" />
+                          Add Description
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
+              </SectionCard>
 
-                {/* Images — Grid Layout */}
-                <div className="mb-6">
-                  <div className="mb-3 flex items-center justify-between">
-                    <Label className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                      <ImageIcon className="size-4 text-primary" /> Images
-                      <InfoTip text="Upload landscape (1.91:1), square (1:1), and portrait (4:5) images. Google tests combinations across Search, Display, YouTube, Discover, Gmail, and Maps." />
-                    </Label>
-                    <div className="flex items-center gap-2 text-[10px]">
-                      <span className={pmaxLandscapeCount > 0 ? "text-emerald-600" : "text-amber-600"}>
-                        Landscape: {pmaxLandscapeCount}
-                      </span>
-                      <span className="text-muted-foreground">·</span>
-                      <span className={pmaxSquareCount > 0 ? "text-emerald-600" : "text-amber-600"}>
-                        Square: {pmaxSquareCount}
-                      </span>
-                      <span className="text-muted-foreground">·</span>
-                      <span className="text-muted-foreground">
-                        Portrait: {pmaxPortraitCount}
-                      </span>
+              <SectionCard className="rounded-xl">
+                <button type="button" onClick={() => toggleSection("media")}
+                  className="flex w-full items-center justify-between text-left">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="size-4 text-primary" />
+                    <Label className="text-sm font-bold text-foreground">Media Assets</Label>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
+                      {isRetailPMax ? "Optional" : "Required"}
+                    </Badge>
+                    <div className="ml-1 flex items-center gap-1.5 text-[10px]">
+                      <span className={pmaxLandscapeCount > 0 ? "text-emerald-600" : "text-amber-600"}>L:{pmaxLandscapeCount}</span>
+                      <span className={pmaxSquareCount > 0 ? "text-emerald-600" : "text-amber-600"}>S:{pmaxSquareCount}</span>
+                      <span className="text-muted-foreground">P:{pmaxPortraitCount}</span>
                     </div>
                   </div>
+                  <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", !collapsedSections.media && "rotate-180")} />
+                </button>
 
-                  <div className="grid grid-cols-3 gap-3">
-                    {/* Landscape (1.91:1) — Required */}
-                    <div className="rounded-lg border border-border bg-muted/10 p-3">
-                      <div className="mb-1 flex items-center justify-between">
-                        <p className="text-[10px] font-semibold text-foreground">Landscape (1.91:1)</p>
-                        <Badge variant="destructive" className="h-4 px-1 text-[8px]">Required</Badge>
+                {!collapsedSections.media && (
+                  <div className="mt-4 space-y-5">
+                    <p className="text-xs text-muted-foreground">
+                      {isRetailPMax
+                        ? "Retail PMax uses your product feed. Add images, logos, and videos to improve coverage."
+                        : "Provide required image types and logos, then optional videos and CTA for stronger reach."}
+                    </p>
+                    {isRetailPMax && retailAssetsLinked && (
+                      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[11px] text-amber-700">
+                        <AlertTriangle className="mt-0.5 size-3.5" />
+                        <span>When you add assets in Retail PMax, the full asset requirements apply (images, logos, and text).</span>
                       </div>
-                      <p className="mb-2 text-[9px] text-muted-foreground">Min 600x314 · Rec 1200x628</p>
-                      <UploadZone
-                        accept="image/png,image/jpeg,image/gif"
-                        label="Upload landscape"
-                        sublabel="JPG/PNG · 1.91:1 ratio"
-                        onFile={(file) => addImageUpload("LANDSCAPE", file)}
-                        compact
-                        libraryContext={"IMAGE_LANDSCAPE" as "IMAGE"}
-                      />
-                      {landscapeImages.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {landscapeImages.map((img) => (
-                            <div key={img.id} className="group relative size-12 overflow-hidden rounded border border-border bg-muted">
-                              {(img.url || img.file) && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={getPreviewUrl(img) ?? ""} alt="" className="size-full object-cover" crossOrigin="anonymous" />
+                    )}
+
+                    {/* Images — Unified Upload with Thumbnail Gallery */}
+                    <div>
+                      <div className="mb-3 flex items-center gap-2">
+                        <Label className="text-sm font-medium text-foreground">Images</Label>
+                        <InfoTip text="Upload landscape (1.91:1), square (1:1), and portrait (4:5) images. Google tests combinations across Search, Display, YouTube, Discover, Gmail, and Maps." />
+                      </div>
+
+                      {/* Add Images button + ratio status chips */}
+                      <div className="flex items-center gap-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs"
+                          onClick={() => setShowImageSheet(true)}
+                        >
+                          <Plus className="size-3.5" /> Add Images
+                        </Button>
+                        <div className="flex flex-wrap gap-1.5">
+                          {([
+                            { key: "LANDSCAPE", label: "L 1.91:1", count: pmaxLandscapeCount, required: true },
+                            { key: "SQUARE", label: "S 1:1", count: pmaxSquareCount, required: true },
+                            { key: "PORTRAIT", label: "P 4:5", count: pmaxPortraitCount, required: false },
+                          ] as const).map((type) => (
+                            <button
+                              key={type.key}
+                              type="button"
+                              onClick={() => setShowImageSheet(true)}
+                              className={cn(
+                                "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium transition-all",
+                                type.count > 0
+                                  ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956]"
+                                  : type.required
+                                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                                    : "border-border bg-muted/10 text-muted-foreground"
                               )}
-                              <button type="button" onClick={() => removeImageAsset("images", img.id)}
-                                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                                <X className="size-3 text-white" />
-                              </button>
-                            </div>
+                            >
+                              {type.label}
+                              <span className="font-bold">{type.count}</span>
+                            </button>
                           ))}
                         </div>
-                      )}
-                      <p className="mt-1 text-[9px] text-muted-foreground">{pmaxLandscapeCount} added</p>
-                    </div>
-
-                    {/* Square (1:1) — Required */}
-                    <div className="rounded-lg border border-border bg-muted/10 p-3">
-                      <div className="mb-1 flex items-center justify-between">
-                        <p className="text-[10px] font-semibold text-foreground">Square (1:1)</p>
-                        <Badge variant="destructive" className="h-4 px-1 text-[8px]">Required</Badge>
                       </div>
-                      <p className="mb-2 text-[9px] text-muted-foreground">Min 300x300 · Rec 1200x1200</p>
-                      <UploadZone
-                        accept="image/png,image/jpeg,image/gif"
-                        label="Upload square"
-                        sublabel="JPG/PNG · 1:1 ratio"
-                        onFile={(file) => addImageUpload("SQUARE", file)}
-                        compact
-                        libraryContext={"IMAGE_SQUARE" as "IMAGE"}
-                      />
-                      {squareImages.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {squareImages.map((img) => (
-                            <div key={img.id} className="group relative size-12 overflow-hidden rounded border border-border bg-muted">
-                              {(img.url || img.file) && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={getPreviewUrl(img) ?? ""} alt="" className="size-full object-cover" crossOrigin="anonymous" />
+
+                      {/* Image upload Sheet */}
+                      <Sheet open={showImageSheet} onOpenChange={setShowImageSheet}>
+                        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
+                          <SheetHeader className="border-b border-border px-5 pb-3 pt-5">
+                            <SheetTitle className="text-base font-semibold">Add Images</SheetTitle>
+                            <SheetDescription className="text-xs text-muted-foreground">
+                              Upload images in all three ratios. Google tests combinations across Search, Display, YouTube, Discover, Gmail, and Maps.
+                            </SheetDescription>
+                          </SheetHeader>
+                          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+                            {/* Landscape */}
+                            <div className="rounded-xl border border-border bg-muted/10 p-4">
+                              <div className="mb-3 flex items-center gap-2">
+                                <span className="text-sm font-semibold text-foreground">Landscape</span>
+                                <span className="text-[10px] text-muted-foreground">1.91:1 · Rec 1200×628</span>
+                                <Badge variant={pmaxLandscapeCount > 0 ? "secondary" : "destructive"} className="ml-auto rounded-full px-1.5 py-0 text-[9px]">
+                                  {pmaxLandscapeCount > 0 ? `${pmaxLandscapeCount} added` : "Required"}
+                                </Badge>
+                              </div>
+                              <UploadZone
+                                accept="image/png,image/jpeg,image/gif"
+                                label="Upload landscape image"
+                                sublabel="Min 600×314 · Max 5120×2700"
+                                onFile={(file) => addImageUpload("LANDSCAPE", file)}
+                                compact
+                                libraryContext={"IMAGE_LANDSCAPE" as "IMAGE"}
+                              />
+                              {currentGroup.images.filter(img => img.pmaxImageType === "LANDSCAPE").length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {currentGroup.images.filter(img => img.pmaxImageType === "LANDSCAPE").map((img) => (
+                                    <div key={img.id} className="group relative size-16 overflow-hidden rounded-lg border border-border bg-muted shadow-sm">
+                                      {(img.url || img.file) && (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={getPreviewUrl(img) ?? ""} alt="" className="size-full object-cover" crossOrigin="anonymous" />
+                                      )}
+                                      <button type="button" onClick={() => removeImageAsset("images", img.id)}
+                                        className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                                        <X className="size-4 text-white" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
                               )}
-                              <button type="button" onClick={() => removeImageAsset("images", img.id)}
-                                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                                <X className="size-3 text-white" />
-                              </button>
                             </div>
-                          ))}
+
+                            {/* Square */}
+                            <div className="rounded-xl border border-border bg-muted/10 p-4">
+                              <div className="mb-3 flex items-center gap-2">
+                                <span className="text-sm font-semibold text-foreground">Square</span>
+                                <span className="text-[10px] text-muted-foreground">1:1 · Rec 1200×1200</span>
+                                <Badge variant={pmaxSquareCount > 0 ? "secondary" : "destructive"} className="ml-auto rounded-full px-1.5 py-0 text-[9px]">
+                                  {pmaxSquareCount > 0 ? `${pmaxSquareCount} added` : "Required"}
+                                </Badge>
+                              </div>
+                              <UploadZone
+                                accept="image/png,image/jpeg,image/gif"
+                                label="Upload square image"
+                                sublabel="Min 300×300 · Max 5120×5120"
+                                onFile={(file) => addImageUpload("SQUARE", file)}
+                                compact
+                                libraryContext={"IMAGE_SQUARE" as "IMAGE"}
+                              />
+                              {currentGroup.images.filter(img => (img.pmaxImageType ?? "PORTRAIT") === "SQUARE").length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {currentGroup.images.filter(img => (img.pmaxImageType ?? "PORTRAIT") === "SQUARE").map((img) => (
+                                    <div key={img.id} className="group relative size-16 overflow-hidden rounded-lg border border-border bg-muted shadow-sm">
+                                      {(img.url || img.file) && (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={getPreviewUrl(img) ?? ""} alt="" className="size-full object-cover" crossOrigin="anonymous" />
+                                      )}
+                                      <button type="button" onClick={() => removeImageAsset("images", img.id)}
+                                        className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                                        <X className="size-4 text-white" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Portrait */}
+                            <div className="rounded-xl border border-border bg-muted/10 p-4">
+                              <div className="mb-3 flex items-center gap-2">
+                                <span className="text-sm font-semibold text-foreground">Portrait</span>
+                                <span className="text-[10px] text-muted-foreground">4:5 · Rec 960×1200</span>
+                                <Badge variant="outline" className="ml-auto rounded-full px-1.5 py-0 text-[9px]">
+                                  {pmaxPortraitCount > 0 ? `${pmaxPortraitCount} added` : "Optional"}
+                                </Badge>
+                              </div>
+                              <UploadZone
+                                accept="image/png,image/jpeg,image/gif"
+                                label="Upload portrait image"
+                                sublabel="Min 480×600 · Max 5120×6400"
+                                onFile={(file) => addImageUpload("PORTRAIT", file)}
+                                compact
+                                libraryContext={"IMAGE_PORTRAIT" as "IMAGE"}
+                              />
+                              {currentGroup.images.filter(img => img.pmaxImageType === "PORTRAIT").length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {currentGroup.images.filter(img => img.pmaxImageType === "PORTRAIT").map((img) => (
+                                    <div key={img.id} className="group relative size-16 overflow-hidden rounded-lg border border-border bg-muted shadow-sm">
+                                      {(img.url || img.file) && (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={getPreviewUrl(img) ?? ""} alt="" className="size-full object-cover" crossOrigin="anonymous" />
+                                      )}
+                                      <button type="button" onClick={() => removeImageAsset("images", img.id)}
+                                        className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                                        <X className="size-4 text-white" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </SheetContent>
+                      </Sheet>
+
+                      {/* Unified Thumbnail Gallery */}
+                      {currentGroup.images.length > 0 && (
+                        <div className="mt-3 rounded-xl border border-border bg-muted/5 p-3">
+                          <div className="flex flex-wrap gap-2">
+                            {currentGroup.images.map((img) => {
+                              const imgType = img.pmaxImageType ?? "PORTRAIT";
+                              const typeLabel = imgType === "LANDSCAPE" ? "L" : imgType === "SQUARE" ? "S" : "P";
+                              return (
+                                <div key={img.id} className="group relative size-14 overflow-hidden rounded-lg border border-border bg-muted shadow-sm">
+                                  {(img.url || img.file) && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={getPreviewUrl(img) ?? ""} alt="" className="size-full object-cover" crossOrigin="anonymous" />
+                                  )}
+                                  <div className="absolute left-0.5 top-0.5 rounded bg-black/60 px-1 py-0.5 text-[8px] font-bold text-white">
+                                    {typeLabel}
+                                  </div>
+                                  <button type="button" onClick={() => removeImageAsset("images", img.id)}
+                                    className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                                    <X className="size-4 text-white" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
-                      <p className="mt-1 text-[9px] text-muted-foreground">{pmaxSquareCount} added</p>
                     </div>
 
-                    {/* Portrait (4:5) — Optional */}
-                    <div className="rounded-lg border border-border bg-muted/10 p-3">
-                      <div className="mb-1 flex items-center justify-between">
-                        <p className="text-[10px] font-semibold text-foreground">Portrait (4:5)</p>
-                        <span className="text-[8px] text-muted-foreground">Optional</span>
+                    {/* Logos */}
+                    <div className="border-t border-border pt-4">
+                      <div className="mb-3 flex items-center gap-2">
+                        <Label className="text-sm font-medium text-foreground">Logos</Label>
+                        <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Required</Badge>
+                        <InfoTip text="Upload your store logo in square (1:1) and optional landscape (4:1) formats. Square logos are required." />
+                        <span className="ml-auto text-[10px] text-muted-foreground">
+                          Square: {logoSquareCount}/{ASSET_LIMITS.logos.max} · Landscape: {logoLandscapeCount}
+                        </span>
                       </div>
-                      <p className="mb-2 text-[9px] text-muted-foreground">Min 480x600 · Rec 960x1200</p>
-                      <UploadZone
-                        accept="image/png,image/jpeg,image/gif"
-                        label="Upload portrait"
-                        sublabel="JPG/PNG · 4:5 ratio"
-                        onFile={(file) => addImageUpload("PORTRAIT", file)}
-                        compact
-                        libraryContext={"IMAGE_PORTRAIT" as "IMAGE"}
-                      />
-                      {portraitImages.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {portraitImages.map((img) => (
-                            <div key={img.id} className="group relative size-12 overflow-hidden rounded border border-border bg-muted">
-                              {(img.url || img.file) && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={getPreviewUrl(img) ?? ""} alt="" className="size-full object-cover" crossOrigin="anonymous" />
-                              )}
-                              <button type="button" onClick={() => removeImageAsset("images", img.id)}
-                                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                                <X className="size-3 text-white" />
-                              </button>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-xl border border-border bg-muted/10 p-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="text-[10px] font-semibold text-foreground">Square (1:1)</span>
+                            {logoSquareCount === 0 && <Badge variant="destructive" className="h-4 px-1 text-[8px]">Required</Badge>}
+                          </div>
+                          <UploadZone
+                            accept="image/png,image/jpeg"
+                            label="Upload square logo"
+                            sublabel="Rec 1200×1200"
+                            onFile={(file) => addLogoUpload("SQUARE", file)}
+                            compact
+                            libraryContext={"LOGO_SQUARE" as "IMAGE"}
+                          />
+                          {logoUploadError && (
+                            <div className="mt-2 flex items-center gap-1.5 text-[10px] text-destructive">
+                              <AlertTriangle className="size-3.5" /><span>{logoUploadError}</span>
                             </div>
-                          ))}
+                          )}
+                          {squareLogos.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {squareLogos.map((logo) => (
+                                <div key={logo.id} className="group relative size-10 overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+                                  {(logo.url || logo.file) && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={getPreviewUrl(logo) ?? ""} alt="" className="size-full object-contain" crossOrigin="anonymous" />
+                                  )}
+                                  <button type="button" onClick={() => removeImageAsset("logos", logo.id)}
+                                    className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                                    <X className="size-3 text-white" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <p className="mt-1 text-[9px] text-muted-foreground">{pmaxPortraitCount} added</p>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Logos — Grid Layout */}
-                <div className="mb-6">
-                  <div className="mb-3 flex items-center justify-between">
-                    <Label className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                      Logos
-                      <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Required</Badge>
-                      <InfoTip text="Upload your store logo in square (1:1) and optional landscape (4:1) formats. Square logos are required. Tip: avoid white logos on transparent backgrounds." />
-                    </Label>
-                    <div className="flex items-center gap-2 text-[10px]">
-                      <span className={logoSquareCount > 0 ? "text-emerald-600" : "text-amber-600"}>
-                        Square: {logoSquareCount}/{ASSET_LIMITS.logos.max}
-                      </span>
-                      <span className="text-muted-foreground">·</span>
-                      <span className="text-muted-foreground">
-                        Landscape: {logoLandscapeCount}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Square Logo (1:1) — Required */}
-                    <div className="rounded-lg border border-border bg-muted/10 p-3">
-                      <div className="mb-1 flex items-center justify-between">
-                        <p className="text-[10px] font-semibold text-foreground">Square Logo (1:1)</p>
-                        <Badge variant="destructive" className="h-4 px-1 text-[8px]">Required</Badge>
+                        <div className="rounded-xl border border-border bg-muted/10 p-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="text-[10px] font-semibold text-foreground">Landscape (4:1)</span>
+                            <span className="text-[8px] text-muted-foreground">Optional</span>
+                          </div>
+                          <UploadZone
+                            accept="image/png,image/jpeg"
+                            label="Upload landscape logo"
+                            sublabel="Rec 1200×300"
+                            onFile={(file) => addLogoUpload("LANDSCAPE", file)}
+                            compact
+                            libraryContext={"LOGO_LANDSCAPE" as "IMAGE"}
+                          />
+                          {currentGroup.logos.filter((l) => (l.pmaxImageType ?? "SQUARE") === "LANDSCAPE").length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {currentGroup.logos.filter((l) => (l.pmaxImageType ?? "SQUARE") === "LANDSCAPE").map((logo) => (
+                                <div key={logo.id} className="group relative h-8 w-16 overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+                                  {(logo.url || logo.file) && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={getPreviewUrl(logo) ?? ""} alt="" className="size-full object-contain" crossOrigin="anonymous" />
+                                  )}
+                                  <button type="button" onClick={() => removeImageAsset("logos", logo.id)}
+                                    className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+                                    <X className="size-3 text-white" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <p className="mb-2 text-[9px] text-muted-foreground">Min 128x128 · Rec 1200x1200</p>
-                      <UploadZone
-                        accept="image/png,image/jpeg"
-                        label="Upload square logo"
-                        sublabel="PNG/JPG · 1:1 ratio"
-                        onFile={(file) => addLogoUpload("SQUARE", file)}
-                        compact
-                        libraryContext={"LOGO_SQUARE" as "IMAGE"}
-                      />
-                      {logoUploadError && (
-                        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-destructive">
-                          <AlertTriangle className="size-3.5" />
-                          <span>{logoUploadError}</span>
-                        </div>
-                      )}
-                      {squareLogos.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {squareLogos.map((logo) => (
-                            <div key={logo.id} className="group relative size-10 overflow-hidden rounded border border-border bg-white">
-                              {(logo.url || logo.file) && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={getPreviewUrl(logo) ?? ""} alt="" className="size-full object-contain" crossOrigin="anonymous" />
-                              )}
-                              <button type="button" onClick={() => removeImageAsset("logos", logo.id)}
-                                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                                <X className="size-3 text-white" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
-
-                    {/* Landscape Logo (4:1) — Optional */}
-                    <div className="rounded-lg border border-border bg-muted/10 p-3">
-                      <div className="mb-1 flex items-center justify-between">
-                        <p className="text-[10px] font-semibold text-foreground">Landscape Logo (4:1)</p>
-                        <span className="text-[8px] text-muted-foreground">Optional</span>
-                      </div>
-                      <p className="mb-2 text-[9px] text-muted-foreground">Min 512x128 · Rec 1200x300</p>
-                      <UploadZone
-                        accept="image/png,image/jpeg"
-                        label="Upload landscape logo"
-                        sublabel="PNG/JPG · 4:1 ratio"
-                        onFile={(file) => addLogoUpload("LANDSCAPE", file)}
-                        compact
-                        libraryContext={"LOGO_LANDSCAPE" as "IMAGE"}
-                      />
-                      {currentGroup.logos.filter((l) => (l.pmaxImageType ?? "SQUARE") === "LANDSCAPE").length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {currentGroup.logos.filter((l) => (l.pmaxImageType ?? "SQUARE") === "LANDSCAPE").map((logo) => (
-                            <div key={logo.id} className="group relative h-8 w-16 overflow-hidden rounded border border-border bg-white">
-                              {(logo.url || logo.file) && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={getPreviewUrl(logo) ?? ""} alt="" className="size-full object-contain" crossOrigin="anonymous" />
-                              )}
-                              <button type="button" onClick={() => removeImageAsset("logos", logo.id)}
-                                className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                                <X className="size-3 text-white" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
 
                 {/* YouTube videos */}
                 <div className="mt-4 border-t border-border pt-4">
                   <div className="mb-2 flex items-center gap-2">
                     <Video className="size-3.5 text-primary" />
-                    <Label className="text-xs font-semibold text-foreground">YouTube videos</Label>
+                    <Label className="text-sm font-medium text-foreground">YouTube Videos</Label>
                     <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">
                       {currentGroup.videos.length}/{ASSET_LIMITS.videos.max} (optional)
                     </Badge>
@@ -6594,9 +6712,9 @@ export function GoogleStepCreative() {
                         type="button"
                         onClick={() => setVideoInputMode(mode)}
                         className={cn(
-                          "flex-1 rounded-md border px-2 py-1 text-[10px] font-medium transition-colors",
+                          "flex-1 rounded-full border px-2.5 py-1 text-[10px] font-medium transition-all",
                           videoInputMode === mode
-                            ? "border-primary bg-primary text-primary-foreground"
+                            ? "border-[#a4ffe5] bg-[#e6fff9] text-[#004956] shadow-sm"
                             : "border-transparent text-muted-foreground hover:text-foreground"
                         )}
                       >
@@ -6624,72 +6742,26 @@ export function GoogleStepCreative() {
                       <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
                         <div className="mb-2 flex items-center gap-2">
                           <Youtube className="size-3.5 text-primary" />
-                          <p className="text-xs font-semibold text-foreground">Upload destination</p>
-                          <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">For uploads</Badge>
-                          {youtubeUploadDestination === "BRAND" && (
-                            <Badge variant={youtubeChannelConnected ? "secondary" : "outline"} className="rounded-full px-1.5 py-0 text-[9px]">
-                              {youtubeChannelConnected ? "Channel connected" : "No channel"}
-                            </Badge>
-                          )}
+                          <p className="text-xs font-semibold text-foreground">Upload to your YouTube channel</p>
+                          <span className="text-[10px] text-muted-foreground">Optional</span>
                         </div>
-                        <RadioGroup
-                          value={youtubeUploadDestination}
-                          onValueChange={(value) =>
-                            updateNested("creative", {
-                              youtubeUploadDestination: value as "GOOGLE_MANAGED" | "BRAND",
-                            })
-                          }
-                          className="flex flex-col gap-2"
-                        >
-                          <label className="flex items-start gap-2 rounded-md border border-border bg-background px-2 py-2 text-[11px]">
-                            <RadioGroupItem value="GOOGLE_MANAGED" className="mt-0.5" />
-                            <span>
-                              <span className="block font-medium text-foreground">Google-managed channel (recommended)</span>
-                              <span className="block text-muted-foreground">No channel connection required. Videos are uploaded as Unlisted.</span>
-                            </span>
-                          </label>
-                          <label className="flex items-start gap-2 rounded-md border border-border bg-background px-2 py-2 text-[11px]">
-                            <RadioGroupItem value="BRAND" className="mt-0.5" />
-                            <span>
-                              <span className="block font-medium text-foreground">Your YouTube channel</span>
-                              <span className="block text-muted-foreground">Connect a brand channel so uploads appear in your own library.</span>
-                            </span>
-                          </label>
-                        </RadioGroup>
-
-                        {youtubeUploadDestination === "BRAND" && (
-                          <div className="mt-2 flex flex-col gap-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-8 text-xs"
-                                onClick={() => setShowYoutubeConnect(true)}
-                              >
-                                Connect YouTube (OAuth)
-                              </Button>
-                              <span className="text-[10px] text-muted-foreground">
-                                Recommended for real ownership. Use manual entry for the prototype.
-                              </span>
-                            </div>
-                            <Input
-                              placeholder="YouTube channel ID (UC...)"
-                              value={youtubeChannelId}
-                              onChange={(e) => updateNested("creative", { youtubeChannelId: e.target.value })}
-                              className="h-8 text-xs"
-                            />
-                            <Input
-                              placeholder="Channel name (optional)"
-                              value={youtubeChannelName}
-                              onChange={(e) => updateNested("creative", { youtubeChannelName: e.target.value })}
-                              className="h-8 text-xs"
-                            />
-                            <p className="text-[10px] text-muted-foreground">
-                              Uploads default to Unlisted. We can switch to Public after verification.
-                            </p>
-                          </div>
-                        )}
+                        <p className="mb-3 text-[11px] text-muted-foreground">
+                          By default, uploaded videos go to a Google-managed channel as Unlisted. Enter your channel details below to have them appear in your own library instead.
+                        </p>
+                        <div className="flex flex-col gap-2">
+                          <Input
+                            placeholder="YouTube channel ID (UC...)"
+                            value={youtubeChannelId}
+                            onChange={(e) => updateNested("creative", { youtubeChannelId: e.target.value })}
+                            className="h-10 text-sm"
+                          />
+                          <Input
+                            placeholder="Channel name (optional)"
+                            value={youtubeChannelName}
+                            onChange={(e) => updateNested("creative", { youtubeChannelName: e.target.value })}
+                            className="h-10 text-sm"
+                          />
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -6709,9 +6781,9 @@ export function GoogleStepCreative() {
                               addVideoUrl();
                             }
                           }}
-                          className="h-8 text-xs"
+                          className="h-10 text-sm"
                         />
-                        <Button size="sm" className="h-8 text-xs" onClick={addVideoUrl} disabled={!youtubeUrlDraft.trim()}>
+                        <Button size="sm" className="h-10 text-sm" onClick={addVideoUrl} disabled={!youtubeUrlDraft.trim()}>
                           Add URL
                         </Button>
                       </div>
@@ -6778,97 +6850,114 @@ export function GoogleStepCreative() {
                       })}
                     </div>
                   )}
-                </div>
+                    </div>
+                  </div>
+                )}
               </SectionCard>
 
-              {/* Search Themes (per asset group) */}
-              <SectionCard>
-                <div className="mb-3 flex items-center justify-between">
+              {/* ── Section: Search Themes ── */}
+              <SectionCard className="rounded-xl">
+                <button type="button" onClick={() => toggleSection("themes")}
+                  className="flex w-full items-center justify-between text-left">
                   <div className="flex items-center gap-2">
                     <Search className="size-4 text-primary" />
-                    <Label className="text-sm font-semibold text-foreground">Search Themes</Label>
+                    <Label className="text-sm font-bold text-foreground">Search Themes</Label>
                     <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">{(currentGroup?.searchThemes ?? []).length}/25</Badge>
                     <InfoTip text="Search themes tell Google what queries matter for this asset group. Use specific product/category terms. Up to 25 per group." />
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 gap-1 text-xs text-primary"
-                    onClick={async () => {
-                      try {
-                        const { getStoreSnapshot, generateSearchThemes } = await import("@/lib/google/search-ai-generator");
-                        const snapshot = await getStoreSnapshot();
-                        const themes = generateSearchThemes(snapshot);
-                        const existing = new Set((currentGroup?.searchThemes ?? []).map(t => t.toLowerCase()));
-                        const newThemes = themes.filter(t => !existing.has(t.toLowerCase()));
-                        updateGroup(currentGroup.id, {
-                          searchThemes: [...(currentGroup.searchThemes ?? []), ...newThemes].slice(0, 25),
-                        });
-                      } catch { /* silent */ }
-                    }}
-                  >
-                    <Sparkles className="size-3" /> Auto-fill
-                  </Button>
-                </div>
-                <div className="mb-3 flex gap-2">
-                  <Input
-                    placeholder="e.g. buy perfume online, oud collection"
-                    value={themeInput ?? ""}
-                    onChange={(e) => setThemeInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && themeInput?.trim()) {
-                        e.preventDefault();
-                        const existing = currentGroup?.searchThemes ?? [];
-                        if (existing.length < 25 && !existing.includes(themeInput.trim())) {
-                          updateGroup(currentGroup.id, {
-                            searchThemes: [...existing, themeInput.trim()],
-                          });
-                          setThemeInput("");
-                        }
-                      }
-                    }}
-                    className="h-9 flex-1 text-sm"
-                  />
-                  <Button size="sm" variant="outline" className="h-9 gap-1 text-xs"
-                    disabled={!(themeInput?.trim()) || (currentGroup?.searchThemes ?? []).length >= 25}
-                    onClick={() => {
-                      const existing = currentGroup?.searchThemes ?? [];
-                      if (themeInput?.trim() && existing.length < 25 && !existing.includes(themeInput.trim())) {
-                        updateGroup(currentGroup.id, {
-                          searchThemes: [...existing, themeInput.trim()],
-                        });
-                        setThemeInput("");
-                      }
-                    }}
-                  >
-                    <Plus className="size-3" /> Add
-                  </Button>
-                </div>
-                {(currentGroup?.searchThemes ?? []).length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {(currentGroup?.searchThemes ?? []).map((t) => (
-                      <span key={t} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary">
-                        {t}
-                        <button type="button" onClick={() => updateGroup(currentGroup.id, {
-                          searchThemes: (currentGroup.searchThemes ?? []).filter(s => s !== t),
-                        })} className="text-primary/60 hover:text-primary">
-                          <X className="size-3" />
-                        </button>
-                      </span>
-                    ))}
+                  <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", !collapsedSections.themes && "rotate-180")} />
+                </button>
+
+                {!collapsedSections.themes && (
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5">
+                      <Info className="mt-0.5 size-3.5 shrink-0 text-blue-600" />
+                      <p className="text-[11px] leading-relaxed text-blue-700">
+                        Search themes guide Google&apos;s AI to find the right audience. Add specific product or category terms your ideal customer would search for.
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-end">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 gap-1 text-xs text-[#004956] hover:bg-[#e6fff9]"
+                        onClick={async () => {
+                          try {
+                            const { getStoreSnapshot, generateSearchThemes } = await import("@/lib/google/search-ai-generator");
+                            const snapshot = await getStoreSnapshot();
+                            const themes = generateSearchThemes(snapshot);
+                            const existing = new Set((currentGroup?.searchThemes ?? []).map(t => t.toLowerCase()));
+                            const newThemes = themes.filter(t => !existing.has(t.toLowerCase()));
+                            updateGroup(currentGroup.id, {
+                              searchThemes: [...(currentGroup.searchThemes ?? []), ...newThemes].slice(0, 25),
+                            });
+                          } catch { /* silent */ }
+                        }}
+                      >
+                        <Sparkles className="size-3" /> Auto-fill from Store
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="e.g. buy perfume online, oud collection"
+                        value={themeInput ?? ""}
+                        onChange={(e) => setThemeInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && themeInput?.trim()) {
+                            e.preventDefault();
+                            const existing = currentGroup?.searchThemes ?? [];
+                            if (existing.length < 25 && !existing.includes(themeInput.trim())) {
+                              updateGroup(currentGroup.id, {
+                                searchThemes: [...existing, themeInput.trim()],
+                              });
+                              setThemeInput("");
+                            }
+                          }
+                        }}
+                        className="h-10 flex-1 text-sm"
+                      />
+                      <Button size="sm" variant="outline" className="h-10 gap-1 text-sm"
+                        disabled={!(themeInput?.trim()) || (currentGroup?.searchThemes ?? []).length >= 25}
+                        onClick={() => {
+                          const existing = currentGroup?.searchThemes ?? [];
+                          if (themeInput?.trim() && existing.length < 25 && !existing.includes(themeInput.trim())) {
+                            updateGroup(currentGroup.id, {
+                              searchThemes: [...existing, themeInput.trim()],
+                            });
+                            setThemeInput("");
+                          }
+                        }}
+                      >
+                        <Plus className="size-3" /> Add
+                      </Button>
+                    </div>
+                    {(currentGroup?.searchThemes ?? []).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(currentGroup?.searchThemes ?? []).map((t) => (
+                          <span key={t} className="inline-flex items-center gap-1 rounded-full border border-[#a4ffe5] bg-[#e6fff9] px-2.5 py-1 text-[10px] font-medium text-[#004956]">
+                            {t}
+                            <button type="button" onClick={() => updateGroup(currentGroup.id, {
+                              searchThemes: (currentGroup.searchThemes ?? []).filter(s => s !== t),
+                            })} className="text-[#004956]/60 hover:text-[#004956]">
+                              <X className="size-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[10px] text-muted-foreground">{(currentGroup?.searchThemes ?? []).length}/25 themes · Press Enter to add</p>
                   </div>
                 )}
-                <p className="mt-2 text-[10px] text-muted-foreground">{(currentGroup?.searchThemes ?? []).length}/25 themes · Press Enter to add</p>
               </SectionCard>
 
               {/* Google AI Settings */}
               {isPMax && (
-                <SectionCard>
+                <SectionCard className="rounded-xl">
                   <button type="button" onClick={() => setShowGoogleAi(!showGoogleAi)}
                     className="flex w-full items-center justify-between text-left">
                     <div className="flex items-center gap-2">
                       <Sparkles className="size-4 text-primary" />
-                      <Label className="text-sm font-semibold text-foreground">Google AI Settings</Label>
+                      <Label className="text-sm font-bold text-foreground">Google AI Settings</Label>
                       <InfoTip text="Control how Google AI generates and enhances your campaign assets. These settings affect all ad placements across Search, Display, YouTube, Discover, Gmail, and Maps." />
                     </div>
                     <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", showGoogleAi && "rotate-180")} />
@@ -6940,16 +7029,16 @@ export function GoogleStepCreative() {
                         <p className="mb-3 text-[11px] text-muted-foreground">Guide AI-written copy with brand safety rules.</p>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <Label className="mb-1 text-[10px] text-muted-foreground">Term exclusions</Label>
+                            <Label className="mb-1 text-xs font-medium text-muted-foreground">Term exclusions</Label>
                             <div className="flex gap-1.5">
-                              <Input placeholder="e.g. free" className="h-8 text-xs" value={termInput} onChange={(e) => setTermInput(e.target.value)} onKeyDown={(e) => {
+                              <Input placeholder="e.g. free" className="h-10 text-sm" value={termInput} onChange={(e) => setTermInput(e.target.value)} onKeyDown={(e) => {
                                 if (e.key === "Enter" && termInput.trim()) {
                                   e.preventDefault();
                                   updateNested("budget", { textGuidelines: { ...budget.textGuidelines, termExclusions: [...budget.textGuidelines.termExclusions, termInput.trim()] } });
                                   setTermInput("");
                                 }
                               }} />
-                              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
+                              <Button size="sm" variant="outline" className="h-10 text-sm" onClick={() => {
                                 if (termInput.trim()) {
                                   updateNested("budget", { textGuidelines: { ...budget.textGuidelines, termExclusions: [...budget.textGuidelines.termExclusions, termInput.trim()] } });
                                   setTermInput("");
@@ -6967,16 +7056,16 @@ export function GoogleStepCreative() {
                             )}
                           </div>
                           <div>
-                            <Label className="mb-1 text-[10px] text-muted-foreground">Messaging restrictions</Label>
+                            <Label className="mb-1 text-xs font-medium text-muted-foreground">Messaging restrictions</Label>
                             <div className="flex gap-1.5">
-                              <Input placeholder="e.g. avoid superlatives" className="h-8 text-xs" value={msgInput} onChange={(e) => setMsgInput(e.target.value)} onKeyDown={(e) => {
+                              <Input placeholder="e.g. avoid superlatives" className="h-10 text-sm" value={msgInput} onChange={(e) => setMsgInput(e.target.value)} onKeyDown={(e) => {
                                 if (e.key === "Enter" && msgInput.trim()) {
                                   e.preventDefault();
                                   updateNested("budget", { textGuidelines: { ...budget.textGuidelines, messagingRestrictions: [...budget.textGuidelines.messagingRestrictions, msgInput.trim()] } });
                                   setMsgInput("");
                                 }
                               }} />
-                              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
+                              <Button size="sm" variant="outline" className="h-10 text-sm" onClick={() => {
                                 if (msgInput.trim()) {
                                   updateNested("budget", { textGuidelines: { ...budget.textGuidelines, messagingRestrictions: [...budget.textGuidelines.messagingRestrictions, msgInput.trim()] } });
                                   setMsgInput("");

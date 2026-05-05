@@ -1080,10 +1080,11 @@ export function GoogleStepAudience() {
                 <div className="mb-1 flex items-center gap-2">
                   <Search className="size-4 text-primary" />
                   <Label className="text-sm font-semibold text-foreground">Search Themes</Label>
+                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">Broad reach</Badge>
                   <InfoTip text="Search themes help PMax find the right audience across all channels. Add up to 25 phrases your ideal customer would search." />
                 </div>
                 <p className="mb-3 text-xs text-muted-foreground">
-                  Add phrases your ideal customer searches for — Google uses these to find the right audience across all channels.
+                  Broad keywords that describe your products or category. Google uses these to find relevant audiences across Search, Display, YouTube, and more.
                 </p>
                 <div className="flex gap-2">
                   <Input placeholder="e.g. buy abayas online" value={themeInput} onChange={(e) => setThemeInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSearchTheme())} className="h-9 flex-1 text-sm" />
@@ -1120,10 +1121,11 @@ export function GoogleStepAudience() {
                 <div className="mb-1 flex items-center gap-2">
                   <Target className="size-4 text-primary" />
                   <Label className="text-sm font-semibold text-foreground">Custom Segments</Label>
+                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">High intent</Badge>
                   <InfoTip text="Add intent phrases and similar sites to guide who PMax should learn from first. Google can still expand beyond them." />
                 </div>
                 <p className="mb-4 text-xs text-muted-foreground">
-                  Optional — guide Google&apos;s AI with phrases and sites that signal your best customers.
+                  Specific phrases people search right before buying, and competitor sites they visit. Stronger targeting signal than Search Themes.
                 </p>
                 <div className="mb-4 flex items-start gap-3 rounded-xl border border-[#a4ffe5]/40 bg-[#e6fff9]/40 px-4 py-3">
                   <Sparkles className="mt-0.5 size-4 shrink-0 text-[#004956]" />

@@ -61,6 +61,7 @@ const PRIMARY_TABS = [
 const SECONDARY_TABS = [
   { label: "Dashboard", href: "/" },
   { label: "Ad Management", href: "/ad-management" },
+  { label: "Audience Manager", href: "/audience-manager" },
   { label: "Media Library", href: "" },
   { label: "Invoices", href: "" },
   { label: "Settings", href: "" },
