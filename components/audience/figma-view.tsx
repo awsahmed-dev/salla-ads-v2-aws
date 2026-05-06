@@ -57,8 +57,6 @@ interface Props {
   cartAbandoners: Audience | undefined;
   neverPurchased: Audience | undefined;
   nextSeason: NextSeason | null;
-  smartCombos: Audience[];
-  patterns: Audience[];
   aiChat: Audience[];
   onSelectAudience: (a: Audience) => void;
   onOpenChat: () => void;
@@ -94,7 +92,7 @@ const TABS = [
     label: "AI Studio",
     icon: Brain,
     title: "AI Studio",
-    description: "Smart combinations, behavioral patterns, and chat-built audiences — all derived from your real store data.",
+    description: "Audiences you built by describing them in plain language. Smart pre-built suggestions are on the AI team's roadmap.",
   },
   {
     id: "channels",
@@ -158,8 +156,6 @@ export function FigmaAudienceManager({
   cartAbandoners,
   neverPurchased,
   nextSeason,
-  smartCombos,
-  patterns,
   aiChat,
   onSelectAudience,
   onOpenChat,
@@ -293,7 +289,7 @@ export function FigmaAudienceManager({
                   )}
                   {tab.id === "ai" && (
                     <Badge className="h-4 rounded-full bg-violet-100 px-1.5 text-[9px] text-violet-700">
-                      {smartCombos.length + patterns.length + aiChat.length}
+                      {aiChat.length}
                     </Badge>
                   )}
                 </button>
@@ -339,10 +335,9 @@ export function FigmaAudienceManager({
                   <Brain className="size-4" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-bold text-foreground">Smart audiences from your real data</p>
+                  <p className="text-sm font-bold text-foreground">AI Chat audiences</p>
                   <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                    Combinations of RFDM × customer fields, behavioral patterns from your order history, and chat-built lists.
-                    No fake ML — every audience references columns the data team actually exposes.
+                    Describe an audience in plain language — AI builds the filter, shows the size, you save it.
                   </p>
                 </div>
                 <Button
@@ -354,9 +349,8 @@ export function FigmaAudienceManager({
                   Build with chat
                 </Button>
               </div>
-              {/* One unified library scoped to AI sources — single search, no triple stack */}
               <AudienceLibrary
-                audiences={[...smartCombos, ...patterns, ...aiChat]}
+                audiences={aiChat}
                 onSelectAudience={onSelectAudience}
                 merchantTier={profile.tier}
               />

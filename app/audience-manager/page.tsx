@@ -244,7 +244,6 @@ export default function AudienceManagerPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatPrefill, setChatPrefill] = useState("");
   const [commandInput, setCommandInput] = useState("");
-  const [aiFilter, setAiFilter] = useState<"all" | "smart" | "patterns" | "chat">("all");
 
   const totalLtv = useMemo(() => customers.reduce((a, c) => a + c.totalSpend, 0), [customers]);
   // Scale LTV to merchant tier
@@ -262,9 +261,8 @@ export default function AudienceManagerPage() {
     0
   );
 
-  // AI Studio groupings — three real, distinct categories
-  const smartCombos = audiences.filter((a) => a.source === "ai_predicted");
-  const patterns = audiences.filter((a) => a.source === "ai_discovered");
+  // AI Studio is now just chat-built audiences — Smart Combinations and Patterns
+  // were moved to the AI team's roadmap.
   const aiChat = audiences.filter((a) => a.source === "ai_chat");
 
   const findAud = (needle: string) => audiences.find((a) => a.name.includes(needle));
@@ -527,8 +525,10 @@ export default function AudienceManagerPage() {
                 id: insight.id,
                 urgency: insight.urgency,
                 source: aud?.source === "rfdm" ? "from RFDM"
-                      : aud?.source === "pixel" ? "from pixel"
-                      : aud?.source === "conversion" ? "from conversions"
+                      : aud?.source === "salla_segment" ? "from Salla store"
+                      : aud?.source === "website_event" ? "from website pixel"
+                      : aud?.source === "ad_engagement" ? "from ad engagement"
+                      : aud?.source === "lookalike" ? "from lookalike"
                       : "from your data",
                 headline: insight.headline,
                 why: insight.why,
@@ -551,8 +551,6 @@ export default function AudienceManagerPage() {
                 cartAbandoners={cartAbandon7d}
                 neverPurchased={neverPurchased}
                 nextSeason={nextSeason}
-                smartCombos={smartCombos}
-                patterns={patterns}
                 aiChat={aiChat}
                 onSelectAudience={setDetail}
                 onOpenChat={() => setChatOpen(true)}
@@ -770,7 +768,7 @@ export default function AudienceManagerPage() {
               <Brain className="size-3.5" />
               AI Studio
               <Badge className="h-4 rounded-full bg-violet-100 px-1.5 text-[9px] text-violet-700">
-                {smartCombos.length + patterns.length + aiChat.length}
+                {aiChat.length}
               </Badge>
             </TabsTrigger>
             <TabsTrigger
@@ -872,9 +870,7 @@ export default function AudienceManagerPage() {
                 </Button>
               </div>
               <SallaTip className="mt-3 bg-white/60">
-                Use <strong>Smart Combinations</strong> when you already know what you want (e.g. high-value buyers in UAE).
-                Use <strong>Patterns</strong> to discover customer behaviors you didn't know about.
-                Use <strong>Chat</strong> when you can describe it in a sentence but don't want to click through filters.
+                Describe an audience in plain language — AI builds the filter, shows the size, you save it. Smart pre-built suggestions are on the AI team's roadmap.
               </SallaTip>
             </div>
 
@@ -902,63 +898,26 @@ export default function AudienceManagerPage() {
               </div>
             </div>
 
-            {/* One unified AI library — sub-filter via segmented control */}
-            <div>
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-0.5 rounded-full border border-border bg-white p-0.5">
-                  {(["all", "smart", "patterns", "chat"] as const).map((k) => {
-                    const count = k === "all" ? smartCombos.length + patterns.length + aiChat.length
-                                : k === "smart" ? smartCombos.length
-                                : k === "patterns" ? patterns.length
-                                : aiChat.length;
-                    return (
-                      <button
-                        key={k}
-                        type="button"
-                        onClick={() => setAiFilter(k)}
-                        className={cn(
-                          "flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-medium capitalize transition-all",
-                          aiFilter === k ? "bg-[#004956] text-white" : "text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        {k === "all" ? "All AI" : k === "smart" ? "Smart Combinations" : k === "patterns" ? "Patterns" : "From Chat"}
-                        <span className={cn("text-[10px] tabular-nums", aiFilter === k ? "text-white/70" : "opacity-60")}>{count}</span>
-                      </button>
-                    );
-                  })}
+            {/* One unified AI library — only chat-built audiences for now */}
+            {aiChat.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => setChatOpen(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-violet-200 bg-violet-50/30 p-8 text-center transition-colors hover:border-violet-400 hover:bg-violet-50"
+              >
+                <Wand2 className="size-5 text-violet-500" />
+                <div>
+                  <p className="text-sm font-semibold text-foreground">No chat audiences yet</p>
+                  <p className="text-[11px] text-muted-foreground">Use the bar above to describe one</p>
                 </div>
-                <span className="text-[11px] text-muted-foreground">
-                  {aiFilter === "smart"     ? "RFDM segments × customer fields — pre-built combinations we recommend"
-                 : aiFilter === "patterns" ? "Recurring behaviors found in your order history"
-                 : aiFilter === "chat"     ? "Audiences you built by describing them in plain language"
-                 : "All AI-generated audiences in one list"}
-                </span>
-              </div>
-              {aiFilter === "chat" && aiChat.length === 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setChatOpen(true)}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-violet-200 bg-violet-50/30 p-8 text-center transition-colors hover:border-violet-400 hover:bg-violet-50"
-                >
-                  <Wand2 className="size-5 text-violet-500" />
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">No chat audiences yet</p>
-                    <p className="text-[11px] text-muted-foreground">Use the bar above to describe one</p>
-                  </div>
-                </button>
-              ) : (
-                <AudienceLibrary
-                  audiences={
-                    aiFilter === "smart"    ? smartCombos
-                  : aiFilter === "patterns" ? patterns
-                  : aiFilter === "chat"     ? aiChat
-                  : [...smartCombos, ...patterns, ...aiChat]
-                  }
-                  onSelectAudience={setDetail}
-                  merchantTier={tier}
-                />
-              )}
-            </div>
+              </button>
+            ) : (
+              <AudienceLibrary
+                audiences={aiChat}
+                onSelectAudience={setDetail}
+                merchantTier={tier}
+              />
+            )}
           </TabsContent>
 
           {/* CHANNEL SYNC — connection status only. Sync runs automatically in the background. */}

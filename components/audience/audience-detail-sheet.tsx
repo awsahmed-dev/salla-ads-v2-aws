@@ -161,10 +161,18 @@ export function AudienceDetailSheet({
   // Default lookalike target: highest-priority platform that supports min seed size
   const lookalikeTarget = recommendedPlatforms.find((p) => audience.size >= PLATFORM_API_SPECS[p].lookalikeMinSeedSize) ?? "meta";
   const lookalikeCheck = canBuildLookalike(audience.size, lookalikeTarget);
-  // Audiences where lookalike is genuinely useful — driving the educational tip.
-  const lookalikeMakesSense =
-    audience.source === "rfdm" &&
-    ["champions", "loyal", "active", "explorers"].includes(audience.rfdmKey ?? "");
+  // Show the lookalike education whenever Build Lookalike is a real action
+  // for this audience (i.e. it's not a blocklist and meets the platform seed
+  // minimum). Universal — no per-segment branching.
+  const lookalikeMakesSense = audience.source !== "blocklist" && lookalikeCheck.ok;
+  // Cohort sources (rfdm, salla_segment, website_event, ad_engagement) genuinely
+  // shift in/out — show 2-week change with up/down. Cumulative sources only grow,
+  // so we relabel and hide the negative case.
+  const isCohort =
+    audience.source === "rfdm" ||
+    audience.source === "salla_segment" ||
+    audience.source === "website_event" ||
+    audience.source === "ad_engagement";
 
   async function handleLookalike() {
     if (!audience || !lookalikeCheck.ok) return;
@@ -195,19 +203,14 @@ export function AudienceDetailSheet({
   const connectedCount = audience.platformMatches.filter((m) => m.status === "synced").length;
 
   const sourceLabel: Record<typeof audience.source, string> = {
-    rfdm: "RFDM Segment",
-    ai_predicted: "AI · Predicted",
-    ai_discovered: "AI · Discovered Cluster",
-    ai_chat: "AI · Chat-generated",
-    pixel: "Pixel Event",
-    conversion: "Conversion Event",
-    csv: "CSV Upload",
-    meta_import: "Imported from Meta",
-    google_import: "Imported from Google",
-    snap_import: "Imported from Snapchat",
-    tiktok_import: "Imported from TikTok",
-    lookalike: "Lookalike",
-    blocklist: "Blocklist / Exclusion",
+    rfdm:           "RFDM Segment",
+    salla_segment:  "Store Segment",
+    website_event:  "Website Event",
+    ad_engagement:  audience.originPlatform ? `Ad Engagement · ${audience.originPlatform}` : "Ad Engagement",
+    lookalike:      "Lookalike",
+    custom_list:    "Custom List",
+    ai_chat:        "AI · Chat-generated",
+    blocklist:      "Blocklist / Exclusion",
   };
 
   return (
@@ -314,53 +317,31 @@ export function AudienceDetailSheet({
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-          {/* Recommended Action — clearer, action-first layout.
-              Headline = what to do. Body = one sentence on platforms + why.
-              Footer = the benchmark to watch. */}
+          {/* Universal 4-level recommendation. Same structure for every audience —
+              merchant gets used to it after seeing it twice. No platform pills,
+              no per-segment text. */}
           {audience.healthHint && (() => {
             const hint = audience.healthHint;
             const tone = {
-              needs_campaign: { bg: "from-amber-50 to-white",   border: "border-amber-200",   icon: ShieldAlert, iconColor: "text-amber-600",   label: "Needs a campaign", labelBg: "bg-amber-100 text-amber-700" },
-              watch:          { bg: "from-blue-50 to-white",    border: "border-blue-200",    icon: Activity,    iconColor: "text-blue-600",    label: "Watch this list",  labelBg: "bg-blue-100 text-blue-700" },
-              healthy:        { bg: "from-emerald-50 to-white", border: "border-emerald-200", icon: Heart,       iconColor: "text-emerald-600", label: "Healthy",           labelBg: "bg-emerald-100 text-emerald-700" },
-              low_priority:   { bg: "from-slate-50 to-white",   border: "border-slate-200",   icon: Info,        iconColor: "text-slate-500",   label: "Low priority",      labelBg: "bg-slate-100 text-slate-600" },
+              perfect: { bg: "from-emerald-50 to-white", border: "border-emerald-200", icon: CheckCircle2, iconColor: "text-emerald-600", label: "Performing well", labelBg: "bg-emerald-100 text-emerald-700" },
+              good:    { bg: "from-teal-50 to-white",    border: "border-teal-200",    icon: Heart,        iconColor: "text-teal-600",    label: "Ready to use",   labelBg: "bg-teal-100 text-teal-700" },
+              warning: { bg: "from-amber-50 to-white",   border: "border-amber-200",   icon: Activity,     iconColor: "text-amber-600",   label: "Needs attention", labelBg: "bg-amber-100 text-amber-700" },
+              danger:  { bg: "from-red-50 to-white",     border: "border-red-200",     icon: ShieldAlert,  iconColor: "text-red-600",     label: "Won't activate", labelBg: "bg-red-100 text-red-700" },
             }[hint.level];
             const HintIcon = tone.icon;
             return (
-              <div className={cn("rounded-xl border bg-gradient-to-br p-4", tone.border, tone.bg)}>
+              <div className={cn("rounded-xl border bg-gradient-to-br p-3.5", tone.border, tone.bg)}>
                 <div className="flex items-center gap-2">
-                  <HintIcon className={cn("size-4 shrink-0", tone.iconColor)} />
+                  <HintIcon className={cn("size-3.5 shrink-0", tone.iconColor)} />
                   <span className={cn("inline-flex rounded-full px-1.5 py-0 text-[9px] font-bold uppercase tracking-wide", tone.labelBg)}>
                     {tone.label}
                   </span>
                 </div>
-                <p className="mt-2 text-sm font-bold leading-snug text-foreground">{hint.reason}</p>
-
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <span className="mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[9px] font-bold text-white">1</span>
-                    <div className="flex-1">
-                      <p className="text-[12px] font-semibold leading-snug text-foreground">Do this</p>
-                      <p className="text-[11px] leading-snug text-muted-foreground">{hint.action}</p>
-                      <div className="mt-1 flex flex-wrap items-center gap-1">
-                        {hint.platforms.map((p) => (
-                          <span key={p} className="rounded-full border border-border bg-white px-1.5 py-0 text-[9px] font-medium uppercase text-foreground">
-                            {p === "dv360" ? "YouTube" : p}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  {hint.target && (
-                    <div className="flex items-start gap-2">
-                      <span className="mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-[#004956] text-[9px] font-bold text-white">2</span>
-                      <div className="flex-1">
-                        <p className="text-[12px] font-semibold leading-snug text-foreground">Watch this number</p>
-                        <p className="text-[11px] leading-snug text-muted-foreground">{hint.target}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <p className="mt-1.5 text-[13px] font-bold leading-snug text-foreground">{hint.reason}</p>
+                <p className="mt-1 text-[11px] leading-snug text-foreground/80">{hint.action}</p>
+                {hint.target && (
+                  <p className="mt-2 text-[10px] italic text-muted-foreground">→ {hint.target}</p>
+                )}
               </div>
             );
           })()}
@@ -423,42 +404,36 @@ export function AudienceDetailSheet({
               is actually useful. Teaches the merchant what a lookalike does (and doesn't)
               before they click the button. */}
           {lookalikeMakesSense && (
-            <div className="rounded-xl border border-[#a4ffe5] bg-[#e6fff9]/60 p-3">
-              <div className="flex items-start gap-2">
-                <GraduationCap className="mt-0.5 size-4 shrink-0 text-[#004956]" />
-                <div>
-                  <p className="text-xs font-bold text-[#004956]">How a lookalike works</p>
-                  <p className="mt-0.5 text-[11px] leading-snug text-foreground/80">
-                    Building a lookalike from <strong>{audience.name}</strong> finds <em>new</em> people on Meta who behave like this group. Important: those new people don't enter your store as <strong>{audience.name}</strong> — they start as <strong>New customers</strong> and progress through RFDM as they buy. Use this to find people likely to <em>grow into</em> your best segment, not to replicate it instantly.
-                  </p>
-                </div>
-              </div>
+            <div className="flex items-start gap-2 rounded-xl border border-[#a4ffe5] bg-[#e6fff9]/60 p-2.5">
+              <GraduationCap className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+              <p className="text-[11px] leading-snug text-foreground/80">
+                <strong>About lookalikes:</strong> finds similar new buyers, doesn't replicate this list. New people enter as "New" and grow through RFDM.
+              </p>
             </div>
           )}
 
-          {/* Stats row — 30d change shown only for RFDM segments (those actually
-              fluctuate biweekly as customers move between segments). Pixel events,
-              conversions, imports, lookalikes, CSV are one-time or always-up;
-              showing a delta there is misleading. */}
-          <div className={cn("grid gap-2", audience.source === "rfdm" ? "grid-cols-3" : "grid-cols-2")}>
+          {/* Stats row — cohort sources (rfdm/salla_segment/website_event/ad_engagement)
+              genuinely shift biweekly, so we show "2-week change" with up/down arrows.
+              Cumulative sources (lookalike/custom_list/ai_chat) only grow — we relabel
+              to "Growth" and only show the positive movement. */}
+          <div className="grid grid-cols-3 gap-2">
             <div className="rounded-xl border border-border bg-white p-3">
               <p className="text-[10px] font-medium uppercase text-muted-foreground">Total size</p>
               <p className="mt-0.5 text-lg font-bold tabular-nums text-foreground">{formatNumber(audience.size)}</p>
             </div>
-            {audience.source === "rfdm" && (
-              <div className="rounded-xl border border-border bg-white p-3">
-                <p className="text-[10px] font-medium uppercase text-muted-foreground">2-week change</p>
-                <p
-                  className={cn(
-                    "mt-0.5 inline-flex items-center gap-0.5 text-lg font-bold tabular-nums",
-                    audience.growth30d >= 0 ? "text-emerald-600" : "text-red-500"
-                  )}
-                >
+            <div className="rounded-xl border border-border bg-white p-3">
+              <p className="text-[10px] font-medium uppercase text-muted-foreground">{isCohort ? "2-week change" : "Growth"}</p>
+              {isCohort ? (
+                <p className={cn("mt-0.5 inline-flex items-center gap-0.5 text-lg font-bold tabular-nums", audience.growth30d >= 0 ? "text-emerald-600" : "text-red-500")}>
                   {audience.growth30d >= 0 ? <ArrowUpRight className="size-4" /> : <ArrowDownRight className="size-4" />}
                   {Math.abs(audience.growth30d).toFixed(1)}%
                 </p>
-              </div>
-            )}
+              ) : (
+                <p className="mt-0.5 inline-flex items-center gap-0.5 text-lg font-bold tabular-nums text-emerald-600">
+                  {audience.growth30d > 0 ? <><ArrowUpRight className="size-4" />{audience.growth30d.toFixed(1)}%</> : "—"}
+                </p>
+              )}
+            </div>
             <div className="rounded-xl border border-border bg-white p-3">
               <p className="text-[10px] font-medium uppercase text-muted-foreground">Connected</p>
               <p className="mt-0.5 text-lg font-bold tabular-nums text-foreground">
@@ -473,8 +448,7 @@ export function AudienceDetailSheet({
               <div className="flex items-start gap-2">
                 <Sparkles className="mt-0.5 size-4 shrink-0 text-violet-500" />
                 <div>
-                  <p className="text-xs font-semibold text-violet-900">Why this audience</p>
-                  <p className="mt-0.5 text-[11px] leading-snug text-violet-700">{audience.aiRationale}</p>
+                  <p className="text-[11px] leading-snug text-violet-800">{audience.aiRationale}</p>
                   {audience.prompt && (
                     <p className="mt-1.5 rounded-md bg-white/60 px-2 py-1 text-[10px] italic text-violet-700">
                       "{audience.prompt}"
@@ -509,16 +483,13 @@ export function AudienceDetailSheet({
                 </Badge>
                 <Info className="size-3 text-muted-foreground" />
               </div>
-              <p className="mb-3 text-[11px] text-muted-foreground">
-                Your {formatNumber(audience.size)} customers matched to each ad platform's user base. Low match rates mean the platform has fewer identifiers (email/phone) for these users.
-              </p>
               <div className="space-y-2">
                 {audience.platformMatches.map((m) => (
                   <MatchRow key={m.platform} match={m} totalSize={audience.size} />
                 ))}
               </div>
               <SallaTip className="mt-3" compact>
-                <strong>60% or higher</strong> is a healthy match rate. Below 30% usually means we don't have enough email or phone numbers for these customers — collect both at checkout to lift it.
+                <strong>60%+</strong> is healthy. Low rates = collect more emails/phones at checkout.
               </SallaTip>
             </div>
           )}

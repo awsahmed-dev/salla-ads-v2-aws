@@ -498,20 +498,28 @@ export function buildMarimekkoData(
 /*  Unified Audience model — one type to rule all list sources      */
 /* ──────────────────────────────────────────────────────────────── */
 
+/**
+ * Audience sources — locked to what the dev team and platforms actually
+ * support. No "imports from platform X" because those CSVs aren't
+ * portable across platforms and would just duplicate website_event /
+ * ad_engagement.
+ */
 export type AudienceSource =
-  | "rfdm"            // RFDM-derived segment
-  | "ai_predicted"    // ML prediction (churn, CLV forecast, next purchase)
-  | "ai_discovered"   // auto-discovered behavioral cluster
-  | "ai_chat"         // generated from natural-language prompt
-  | "pixel"           // pixel event-based (visits, adds-to-cart)
-  | "conversion"      // conversion-event list
-  | "csv"             // uploaded customer list
-  | "meta_import"     // imported from Meta Ads Manager
-  | "google_import"   // imported from Google customer match
-  | "snap_import"     // imported from Snap Audience Manager
-  | "tiktok_import"   // imported from TikTok Ads Manager
-  | "lookalike"       // lookalike/similar audience
-  | "blocklist";      // suppression list
+  | "rfdm"            // RFDM cohort segment, recomputed every 2 weeks
+  | "salla_segment"   // Salla store-side merchant-built segment (e.g. "added to cart 7d ago")
+  | "website_event"   // Salla pixel events on the merchant's site (works on all ad platforms)
+  | "ad_engagement"   // Per-platform engagement (Meta video viewers, TikTok ad clickers, etc.) — locked to its origin platform
+  | "lookalike"       // Lookalike / similar audience
+  | "custom_list"     // CSV/text upload, synced to all platforms
+  | "ai_chat"         // Generated from natural-language prompt
+  | "blocklist";      // Suppression list (used as exclusion)
+
+/** Membership behavior — drives which health signals make sense for the source. */
+export function isCohortSource(source: AudienceSource): boolean {
+  // Cohort sources: members shift in and out as the underlying rules re-evaluate.
+  // For these, a -10% change in 30d is a real signal that needs attention.
+  return source === "rfdm" || source === "salla_segment" || source === "website_event" || source === "ad_engagement";
+}
 
 export type AudienceStatus = "ready" | "syncing" | "stale" | "too_small" | "error";
 
@@ -529,29 +537,34 @@ export interface PlatformMatch {
 export type UseCase = "retarget" | "winback" | "acquire" | "loyalty" | "suppress" | "seasonal" | "lookalike";
 
 /**
- * A small "what should I do with this list" signal.
- * Computed from segment + growth + size — never invented.
+ * Universal 4-level health signal applied to every audience.
+ * No per-segment, no per-source case-by-case. Triggered by
+ * generic signals: size, growth, status, source category.
  *
- *   - "needs_campaign"  → list is in a state that warrants action (At Risk
- *                          growing, Cart abandoners large, etc.)
- *   - "watch"           → trending the wrong way; prepare a campaign
- *   - "healthy"         → keep doing what you're doing
- *   - "low_priority"    → don't spend on this
+ *   - perfect → growing AND large AND high match
+ *   - good    → ready to use
+ *   - warning → small / stale / slipping
+ *   - danger  → won't activate (below 1k or sync error)
  */
-export type HealthLevel = "needs_campaign" | "watch" | "healthy" | "low_priority";
+export type HealthLevel = "perfect" | "good" | "warning" | "danger";
+
+/** Which trigger fired — drives the 1-line reason. */
+export type HealthTrigger =
+  | "perfect_cohort"     // cohort: large + growing + high match
+  | "perfect_cumulative" // cumulative: large + high match
+  | "good"               // ready to use
+  | "small"              // 1k–5k, limited delivery
+  | "stale"              // hasn't refreshed in 14+ days
+  | "slipping"           // cohort only: -10%+ in 30d
+  | "too_small"          // < 1k — won't activate
+  | "sync_error";        // status === error
 
 export interface HealthHint {
   level: HealthLevel;
-  /** One sentence: why this list is in this state. */
-  reason: string;
-  /** One sentence: what to do, with concrete platforms. */
-  action: string;
-  /** Short benchmark — "Keep this above X" / "below Y" */
-  target?: string;
-  /** Suggested ad platforms to launch on (in priority order) */
-  platforms: AdPlatform[];
-  /** Suggested objective name for the campaign wizard */
-  objective: "RETARGETING" | "WINBACK" | "ACQUISITION" | "LOYALTY" | "LOOKALIKE" | "SUPPRESS";
+  trigger: HealthTrigger;
+  reason: string;        // 1-line, signal-driven
+  action: string;        // 1-line, universal per level
+  target?: string;       // 1-line benchmark
 }
 
 export interface Audience {
@@ -574,198 +587,67 @@ export interface Audience {
   prompt?: string;
   /** Human-readable "why" for AI sources — shown in detail drawer */
   aiRationale?: string;
+  /** For ad_engagement: the platform that owns this list. Locked to its origin. */
+  originPlatform?: AdPlatform;
   /** What action this list needs (computed from real fields). */
   healthHint?: HealthHint;
 }
 
 /**
- * Compute a HealthHint for any audience from its real fields.
- * Logic stays grounded in: rfdmKey, growth30d, size, source.
+ * Universal 4-level evaluator. Same rules for every audience —
+ * no segment switch, no per-source branches. Inputs are signals
+ * that exist on every audience.
  */
-export function deriveHealthHint(a: Pick<Audience, "rfdmKey" | "source" | "size" | "growth30d">): HealthHint {
-  // RFDM segment-driven recommendations — match the data team's segment names.
-  if (a.source === "rfdm" && a.rfdmKey) {
-    switch (a.rfdmKey) {
-      case "champions":
-        return {
-          level: a.growth30d < 0 ? "watch" : "healthy",
-          reason: a.growth30d < 0
-            ? `Champions shrunk ${Math.abs(a.growth30d).toFixed(1)}% in 30 days — your top customers are slipping.`
-            : `Champions grew ${a.growth30d.toFixed(1)}% in 30 days — your top customers are healthy.`,
-          action: "Reward them with a VIP loyalty campaign, and use this list as a lookalike-1% seed for acquisition on Meta & Snap.",
-          target: "Aim to keep this above 3% of total customers.",
-          platforms: ["meta", "snapchat", "google"],
-          objective: "LOYALTY",
-        };
-      case "loyal":
-        return {
-          level: "healthy",
-          reason: `Steady repeat buyers — your most reliable revenue base.`,
-          action: "Launch new-collection retargeting and build a 1% lookalike for acquisition.",
-          target: "Aim to keep this above 5% of total customers.",
-          platforms: ["meta", "google"],
-          objective: "LOYALTY",
-        };
-      case "active":
-        return {
-          level: a.growth30d < -5 ? "watch" : "healthy",
-          reason: `Recently engaged customers — the bulk of your near-term revenue.`,
-          action: "Run post-purchase upsells and category cross-sell on Meta + TikTok.",
-          target: "Aim to keep this above 15% of total customers.",
-          platforms: ["meta", "tiktok"],
-          objective: "RETARGETING",
-        };
-      case "explorers":
-        return {
-          level: "healthy",
-          reason: `Customers who buy across many categories — your richest signal for product launches.`,
-          action: "Use as a 1% lookalike seed on Meta when you launch a new category.",
-          platforms: ["meta", "snapchat"],
-          objective: "LOOKALIKE",
-        };
-      case "new":
-        return {
-          level: "needs_campaign",
-          reason: `First-time buyers — you have a 30-day window before they go cold.`,
-          action: "Trigger a second-purchase nurture on Meta with a small incentive.",
-          target: "Convert at least 25% to a second purchase within 60 days.",
-          platforms: ["meta", "snapchat"],
-          objective: "RETARGETING",
-        };
-      case "promising":
-        return {
-          level: "watch",
-          reason: `Recent low-value buyers — basket size is the lever to pull.`,
-          action: "Show bestseller carousels on Meta + TikTok to lift average order value.",
-          platforms: ["meta", "tiktok"],
-          objective: "RETARGETING",
-        };
-      case "needs_attention":
-        return {
-          level: "needs_campaign",
-          reason: `Average customers slipping — avg_days_from_last_order is climbing.`,
-          action: "Send category-specific offers within 30 days before they cool off.",
-          target: "Keep this below 10% of total customers.",
-          platforms: ["meta", "google"],
-          objective: "RETARGETING",
-        };
-      case "almost_lost":
-        return {
-          level: "needs_campaign",
-          reason: `On the edge of being lost — this week is the time to act.`,
-          action: "Send a personalized win-back offer on Meta + Snap. Higher-value creative works best.",
-          target: "Recover at least 10% within 30 days.",
-          platforms: ["meta", "snapchat"],
-          objective: "WINBACK",
-        };
-      case "at_risk":
-        return {
-          level: "needs_campaign",
-          reason: `${a.growth30d > 0 ? `Growing ${a.growth30d.toFixed(1)}% in 30 days — ` : ""}previously valuable buyers gone quiet. Highest expected ROAS for win-back.`,
-          action: "Personalized win-back campaign on Meta + Snap. Test free shipping or a comeback discount.",
-          target: "Keep this below 15% of buyers (typical recovery: 8–15%).",
-          platforms: ["meta", "snapchat", "google"],
-          objective: "WINBACK",
-        };
-      case "previously_loyal":
-        return {
-          level: "needs_campaign",
-          reason: `Top spenders who haven't ordered in 90+ days — small list, big revenue impact if recovered.`,
-          action: "Concierge-style outreach + exclusive offer. Treat as VIP — don't lose them.",
-          target: "Reactivate at least 1 in 5.",
-          platforms: ["meta", "google"],
-          objective: "WINBACK",
-        };
-      case "dormant":
-        return {
-          level: "low_priority",
-          reason: `Long-inactive low-value customers — low expected return on ad spend.`,
-          action: "Use only as a soft lookalike seed. Don't run direct campaigns.",
-          platforms: ["meta"],
-          objective: "LOOKALIKE",
-        };
-      case "never_purchased":
-        return {
-          level: "needs_campaign",
-          reason: `Half your customer DB has never ordered — biggest acquisition opportunity.`,
-          action: "Run a first-purchase campaign with a welcome offer on Meta + TikTok.",
-          target: "Aim to convert at least 5% in the next 90 days.",
-          platforms: ["meta", "tiktok", "snapchat"],
-          objective: "ACQUISITION",
-        };
-    }
-  }
+export function deriveHealthHint(a: Pick<Audience, "source" | "size" | "growth30d" | "status">): HealthHint {
+  const cohort = isCohortSource(a.source);
+  // Generic action templates per level — single source of truth.
+  const actions: Record<HealthLevel, { action: string; target?: string }> = {
+    perfect: {
+      action: "Use it as targeting in Ad Management. Build a Lookalike to expand reach.",
+      target: "Keep an eye on size and match rate.",
+    },
+    good: {
+      action: "Use it as targeting in Ad Management.",
+      target: "Refresh once a month.",
+    },
+    warning: {
+      action: "Activate now or grow it. Build a Lookalike to extend reach.",
+      target: "Keep size above 5,000 for steady delivery.",
+    },
+    danger: {
+      action: "Build a Lookalike (Meta accepts 100+), widen the filters, or wait for growth.",
+      target: "Min audience size is 1,000 across platforms.",
+    },
+  };
+  const make = (level: HealthLevel, trigger: HealthTrigger, reason: string): HealthHint => ({
+    level,
+    trigger,
+    reason,
+    action: actions[level].action,
+    target: actions[level].target,
+  });
 
-  // Source-driven defaults for non-RFDM lists
-  switch (a.source) {
-    case "ai_chat":
-    case "ai_predicted":
-      return {
-        level: "needs_campaign",
-        reason: "Smart segment — built for a specific use case. Activate to see the lift.",
-        action: "Launch a targeted campaign on the matching platforms.",
-        platforms: ["meta", "snapchat", "google"],
-        objective: "RETARGETING",
-      };
-    case "ai_discovered":
-      return {
-        level: "watch",
-        reason: "Behavioral pattern — needs a creative built for this audience to convert well.",
-        action: "Test a short campaign with creative tailored to this pattern. Compare ROAS vs. your generic retargeting.",
-        platforms: ["snapchat", "tiktok", "meta"],
-        objective: "RETARGETING",
-      };
-    case "pixel":
-      return {
-        level: a.size > 5000 ? "needs_campaign" : "watch",
-        reason: "Pixel-based retargeting pool — typically your highest-conversion audience.",
-        action: "Run short-form video retargeting on Meta + Snap. Refresh the creative every 2 weeks.",
-        target: "Keep matched size above 1,000 per platform.",
-        platforms: ["meta", "snapchat", "tiktok"],
-        objective: "RETARGETING",
-      };
-    case "conversion":
-      return {
-        level: "healthy",
-        reason: "Past converters — exclude from acquisition, use as lookalike seed.",
-        action: "Suppress from acquisition campaigns. Build a lookalike-1% on Meta for new customers.",
-        platforms: ["meta", "google"],
-        objective: "LOOKALIKE",
-      };
-    case "lookalike":
-      return {
-        level: "healthy",
-        reason: "Lookalike audience — your acquisition workhorse.",
-        action: "Pair with bestseller creative on Meta + Snap. Test 1% vs 3% to find the right balance of reach vs. quality.",
-        platforms: ["meta", "snapchat"],
-        objective: "ACQUISITION",
-      };
-    case "blocklist":
-      return {
-        level: "low_priority",
-        reason: "Exclusion list — used to protect campaign performance.",
-        action: "Add this as an exclusion on every acquisition campaign.",
-        platforms: ["meta", "google", "snapchat", "tiktok"],
-        objective: "SUPPRESS",
-      };
-    case "csv":
-      return {
-        level: "watch",
-        reason: "Manually uploaded list — won't auto-refresh.",
-        action: "Activate as a custom audience. Re-upload monthly to keep it fresh.",
-        platforms: ["meta", "google", "snapchat"],
-        objective: "RETARGETING",
-      };
-    default:
-      return {
-        level: "watch",
-        reason: "Imported audience from another platform.",
-        action: "Use as a retargeting source. Watch the size — imports go stale fast.",
-        platforms: ["meta", "snapchat"],
-        objective: "RETARGETING",
-      };
+  // ── Danger first (these block activation entirely) ──
+  if (a.status === "error") return make("danger", "sync_error", "Sync error — needs fixing.");
+  if (a.status === "too_small" || a.size < 1000) {
+    return make("danger", "too_small", "Below 1,000 — won't activate on ad platforms.");
   }
+  // ── Warning ──
+  if (a.status === "stale") return make("warning", "stale", "Hasn't refreshed in 14+ days.");
+  if (a.size < 5000) return make("warning", "small", "Small audience — limited delivery.");
+  if (cohort && a.growth30d <= -10) {
+    return make("warning", "slipping", "Customers are leaving this segment.");
+  }
+  // ── Perfect — only if all positive signals line up ──
+  if (a.size >= 5000 && (cohort ? a.growth30d >= 5 : true)) {
+    return cohort
+      ? make("perfect", "perfect_cohort", "Strong list — growing with high match rate.")
+      : make("perfect", "perfect_cumulative", "Strong list — large and high match rate.");
+  }
+  // ── Good — anything else healthy ──
+  return make("good", "good", "Healthy list, ready to activate.");
 }
+
 
 /* ──────────────────────────────────────────────────────────────── */
 /*  Platform match model                                             */
@@ -929,108 +811,32 @@ export function generateMockAudiences(profile: MerchantProfile): Audience[] {
     });
   }
 
-  // ── SMART COMBINATIONS — real filter combos, no imaginary ML ──
-  // Each one references actual fields exposed by the dev team:
-  // segment, total_spending, avg_days_from_last_order, total_orders, country, payment.
-  const combos: Array<{ name: string; desc: string; size: number; rationale: string; uc: UseCase[] }> = [
-    {
-      name: "VIPs at Risk",
-      desc: "At Risk segment + total_spending in top 25%",
-      size: Math.round(buyerTotal * 0.024),
-      rationale: "Filters: segment IN (At Risk, Previously Loyal) AND total_spending ≥ p75. Highest expected ROAS for win-back.",
-      uc: ["winback"],
-    },
-    {
-      name: "Champions in UAE",
-      desc: "Champions segment + country = AE — premium GCC pool",
-      size: Math.round(buyerTotal * 0.005),
-      rationale: "Filters: segment = Champions AND country = AE. Use as a Meta lookalike seed for UAE expansion.",
-      uc: ["lookalike", "loyalty"],
-    },
-    {
-      name: "Almost Lost — high spenders",
-      desc: "Almost Lost + total_spending ≥ 1,000 SAR",
-      size: Math.round(buyerTotal * 0.018),
-      rationale: "Filters: segment = Almost Lost AND total_spending ≥ 1000. They're worth a personalized offer right now.",
-      uc: ["winback"],
-    },
-    {
-      name: "New customers near 2nd-purchase",
-      desc: "New segment + avg_days_from_last_order between 28 and 45",
-      size: Math.round(buyerTotal * 0.022),
-      rationale: "Filters: segment = New AND avg_days_from_last_order BETWEEN 28 AND 45. Standard Salla second-purchase window.",
-      uc: ["retarget"],
-    },
-    {
-      name: "Cart Abandoners — 7 days",
-      desc: "Pixel: AddToCart in last 7d AND no Purchase event",
-      size: Math.round(buyerTotal * 0.015),
-      rationale: "Built from your pixel events. Hot retargeting pool — short-form video ads work best here.",
-      uc: ["retarget"],
-    },
-    {
-      name: "Explorers ready for new launch",
-      desc: "Explorers segment with R-score ≥ 4 (recent activity)",
-      size: Math.round(buyerTotal * 0.040),
-      rationale: "Filters: segment = Explorers AND recency_score ≥ 4. Best lookalike seed when you launch a new category.",
-      uc: ["lookalike", "loyalty"],
-    },
+  // ── SALLA STORE SEGMENTS — merchant-built in store admin (rule-based) ──
+  // These come from the store's own segment builder ("added to cart 7d ago",
+  // "purchased in last 2 days", "male audience", etc.). Cohort-like.
+  const sallaSegments: Array<{ name: string; desc: string; share: number }> = [
+    { name: "Added to cart — 7 days", desc: "Visitors who added items to cart in the last 7 days", share: 0.025 },
+    { name: "Purchased — last 2 days", desc: "Customers with an order in the last 48 hours", share: 0.012 },
+    { name: "High AOV buyers (≥ 500 SAR)", desc: "Average order value in the top quintile", share: 0.06 },
+    { name: "Male audience — KSA", desc: "Male customers shipping to Saudi Arabia", share: 0.18 },
+    { name: "Female audience — KSA", desc: "Female customers shipping to Saudi Arabia", share: 0.22 },
+    { name: "GCC cross-border buyers", desc: "Orders shipping to UAE, Kuwait, Bahrain, or Oman", share: 0.04 },
   ];
-  combos.forEach((p, i) => add({
-    id: `combo_${i}`,
-    name: p.name,
-    description: p.desc,
-    source: "ai_predicted",   // kept for backward compat; UI labels it "Smart Combination"
-    size: p.size,
-    growth30d: Math.round((rand() * 40 - 5) * 10) / 10,
-    aiRationale: p.rationale,
-    useCases: p.uc,
-    tags: ["smart", "combo"],
-    updatedDaysAgo: Math.floor(rand() * 2),
-  }));
-
-  // ── PATTERNS — observable patterns in the order data, not models ──
-  const patterns: Array<{ name: string; desc: string; size: number; rationale: string }> = [
-    {
-      name: "Late-night weekend shoppers",
-      desc: "Customers whose orders cluster Thu–Fri, 10pm–2am",
-      size: Math.round(buyerTotal * 0.050),
-      rationale: "Pattern from order timestamps in your data. Different from your daytime base — needs different creative.",
-    },
-    {
-      name: "Ramadan-only buyers",
-      desc: "Customers active only during Ramadan windows (last 2 years)",
-      size: Math.round(buyerTotal * 0.040),
-      rationale: "Historical seasonality from total_orders by month. Pre-activate 10 days before Ramadan.",
-    },
-    {
-      name: "Mada-only buyers",
-      desc: "Every order paid with Mada — local payment preference",
-      size: Math.round(buyerTotal * 0.070),
-      rationale: "Filters: payment_method = Mada on 100% of orders. Optimize for local trust signals + Arabic creative.",
-    },
-    {
-      name: "COD repeat buyers (3+ orders)",
-      desc: "Customers who completed 3+ COD orders successfully",
-      size: Math.round(buyerTotal * 0.030),
-      rationale: "Filters: payment = COD AND total_orders ≥ 3. High trust signal — they convert reliably.",
-    },
-  ];
-  patterns.forEach((d, i) => add({
-    id: `pattern_${i}`,
-    name: d.name,
-    description: d.desc,
-    source: "ai_discovered",  // kept; UI labels it "Pattern"
-    size: d.size,
+  sallaSegments.forEach((s, i) => add({
+    id: `salla_seg_${i}`,
+    name: s.name,
+    description: s.desc,
+    source: "salla_segment",
+    size: Math.round(total * s.share),
     growth30d: Math.round((rand() * 30 - 10) * 10) / 10,
-    aiRationale: d.rationale,
-    useCases: ["acquire", "retarget"],
-    tags: ["pattern"],
-    updatedDaysAgo: Math.floor(rand() * 7),
+    useCases: ["retarget", "acquire"],
+    tags: ["salla", "store-segment"],
+    updatedDaysAgo: Math.floor(rand() * 3),
   }));
 
-  // ── PIXEL event lists ──
-  const pixelLists: Array<{ name: string; desc: string; share: number; days?: number }> = [
+  // ── WEBSITE EVENTS — Salla pixel firing on the merchant's site.
+  //    These work on every connected ad platform (the data is ours). ──
+  const webEvents: Array<{ name: string; desc: string; share: number; days: number }> = [
     { name: "Website visitors — 30 days", desc: "Anyone who loaded any page", share: 0.35, days: 30 },
     { name: "Website visitors — 7 days", desc: "Recent visitors — highest conversion potential", share: 0.12, days: 7 },
     { name: "Product viewers — 30 days", desc: "Viewed a product detail page", share: 0.22, days: 30 },
@@ -1040,37 +846,40 @@ export function generateMockAudiences(profile: MerchantProfile): Audience[] {
     { name: "Purchasers — 90 days", desc: "Completed checkout in last 90 days", share: 0.07, days: 90 },
     { name: "Purchasers — 180 days", desc: "All recent buyers", share: 0.14, days: 180 },
   ];
-  pixelLists.forEach((l, i) => add({
-    id: `pixel_${i}`,
+  webEvents.forEach((l, i) => add({
+    id: `web_event_${i}`,
     name: l.name,
     description: l.desc,
-    source: l.name.includes("Purchasers") ? "conversion" : "pixel",
+    source: "website_event",
     size: Math.round(total * l.share),
-    growth30d: Math.round((rand() * 40 - 10) * 10) / 10,
+    growth30d: Math.round((rand() * 30) * 10) / 10, // pixel events only grow on average; keep ≥ 0
     useCases: l.name.includes("Purchasers") ? ["loyalty", "suppress"] : ["retarget"],
     tags: ["pixel", `${l.days}d`],
     updatedDaysAgo: 0,
   }));
 
-  // ── Platform imports (one per platform, sometimes more) ──
-  const imports: Array<{ source: AudienceSource; name: string; size: number; desc: string }> = [
-    { source: "meta_import", name: "Meta Custom Audience — Engagers 180d", size: Math.round(total * 0.31), desc: "Imported from Meta Ads Manager · Instagram engagers" },
-    { source: "meta_import", name: "Meta — Video 75% viewers", size: Math.round(total * 0.09), desc: "Imported · People who watched 75% of your videos" },
-    { source: "google_import", name: "Google Customer Match — Buyers", size: Math.round(total * 0.18), desc: "Imported from Google Ads · Previous converters" },
-    { source: "snap_import", name: "Snap — Story viewers 90d", size: Math.round(total * 0.21), desc: "Imported from Snap Audience Manager" },
-    { source: "tiktok_import", name: "TikTok — Video engagers 30d", size: Math.round(total * 0.14), desc: "Imported from TikTok Ads Manager" },
-    { source: "tiktok_import", name: "TikTok — Ad clickers 30d", size: Math.round(total * 0.03), desc: "Imported · Recent ad clickers" },
+  // ── AD ENGAGEMENT — per-platform engagement audiences.
+  //    Each list is locked to its origin platform (Meta data stays on Meta,
+  //    TikTok stays on TikTok). The platform's own pixel/SDK collects them. ──
+  const engagementLists: Array<{ platform: AdPlatform; name: string; desc: string; share: number }> = [
+    { platform: "meta",     name: "Meta — Page engagers (180d)", desc: "Engaged with your Facebook or Instagram page", share: 0.31 },
+    { platform: "meta",     name: "Meta — Video 75% viewers",     desc: "Watched 75%+ of your videos",                share: 0.09 },
+    { platform: "tiktok",   name: "TikTok — Video engagers (30d)",desc: "Watched, liked, or commented on your videos", share: 0.14 },
+    { platform: "tiktok",   name: "TikTok — Ad clickers (30d)",   desc: "Clicked your ads in the last 30 days",        share: 0.03 },
+    { platform: "snapchat", name: "Snap — Story viewers (90d)",   desc: "Viewed your stories or ads",                   share: 0.21 },
+    { platform: "google",   name: "Google — YouTube viewers",      desc: "Watched your YouTube video ads",               share: 0.18 },
   ];
-  imports.forEach((imp, i) => add({
-    id: `import_${i}`,
-    name: imp.name,
-    description: imp.desc,
-    source: imp.source,
-    size: imp.size,
-    growth30d: Math.round((rand() * 30 - 5) * 10) / 10,
+  engagementLists.forEach((e, i) => add({
+    id: `engage_${i}`,
+    name: e.name,
+    description: e.desc,
+    source: "ad_engagement",
+    size: Math.round(total * e.share),
+    growth30d: Math.round((rand() * 25) * 10) / 10, // engagement lists also only grow
     useCases: ["retarget"],
-    tags: ["imported", imp.source.replace("_import", "")],
-    updatedDaysAgo: Math.floor(rand() * 5),
+    tags: ["engagement", e.platform],
+    originPlatform: e.platform,
+    updatedDaysAgo: Math.floor(rand() * 3),
   }));
 
   // ── Lookalikes ──
@@ -1091,20 +900,20 @@ export function generateMockAudiences(profile: MerchantProfile): Audience[] {
     updatedDaysAgo: Math.floor(rand() * 3),
   }));
 
-  // ── CSV uploads ──
+  // ── Custom lists (CSV / file upload, sync to all platforms) ──
   [
     { name: "VIP wholesale buyers", size: 124, desc: "Manually uploaded CSV — B2B partners" },
     { name: "Event attendees — Ramadan Expo", size: 2_340, desc: "Offline event opt-ins" },
     { name: "SMS subscribers", size: Math.round(total * 0.38), desc: "Marketing SMS opt-ins" },
   ].forEach((u, i) => add({
-    id: `csv_${i}`,
+    id: `custom_${i}`,
     name: u.name,
     description: u.desc,
-    source: "csv",
+    source: "custom_list",
     size: u.size,
-    growth30d: Math.round((rand() * 10) * 10) / 10,
+    growth30d: Math.round((rand() * 5) * 10) / 10, // CSV only grows when re-uploaded
     useCases: ["acquire", "retarget"],
-    tags: ["csv", "offline"],
+    tags: ["custom_list", "offline"],
     updatedDaysAgo: Math.floor(rand() * 10 + 1),
   }));
 
@@ -1119,7 +928,7 @@ export function generateMockAudiences(profile: MerchantProfile): Audience[] {
     description: b.desc,
     source: "blocklist",
     size: b.size,
-    growth30d: Math.round((rand() * 20) * 10) / 10,
+    growth30d: Math.round((rand() * 10) * 10) / 10,
     useCases: ["suppress"],
     tags: ["exclusion"],
     updatedDaysAgo: Math.floor(rand() * 5),

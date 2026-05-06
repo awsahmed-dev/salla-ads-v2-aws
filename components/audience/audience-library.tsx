@@ -44,19 +44,14 @@ type SortKey = "name" | "size" | "updated" | "growth";
 type SortDir = "asc" | "desc";
 
 const SOURCE_META: Record<AudienceSource, { label: string; icon: React.ComponentType<{ className?: string }>; color: string; group: string }> = {
-  rfdm:          { label: "RFDM",         icon: Crown,      color: "bg-emerald-50 text-emerald-700",   group: "RFDM" },
-  ai_predicted:  { label: "Predicted",    icon: TrendingUp, color: "bg-violet-50 text-violet-700",     group: "AI" },
-  ai_discovered: { label: "Discovered",   icon: Sparkles,   color: "bg-violet-50 text-violet-700",     group: "AI" },
-  ai_chat:       { label: "AI Chat",      icon: Wand2,      color: "bg-violet-50 text-violet-700",     group: "AI" },
-  pixel:         { label: "Pixel",        icon: Target,     color: "bg-blue-50 text-blue-700",         group: "Pixel" },
-  conversion:    { label: "Conversion",   icon: ShoppingCart,color: "bg-blue-50 text-blue-700",        group: "Pixel" },
-  csv:           { label: "CSV",          icon: Database,   color: "bg-amber-50 text-amber-700",       group: "Uploads" },
-  meta_import:   { label: "Meta",         icon: Cloud,      color: "bg-blue-50 text-blue-700",         group: "Imports" },
-  google_import: { label: "Google",       icon: Cloud,      color: "bg-blue-50 text-blue-700",         group: "Imports" },
-  snap_import:   { label: "Snap",         icon: Cloud,      color: "bg-yellow-50 text-yellow-700",     group: "Imports" },
-  tiktok_import: { label: "TikTok",       icon: Cloud,      color: "bg-slate-100 text-slate-700",      group: "Imports" },
-  lookalike:     { label: "Lookalike",    icon: Share2,     color: "bg-teal-50 text-teal-700",         group: "Lookalikes" },
-  blocklist:     { label: "Blocklist",    icon: Shield,     color: "bg-red-50 text-red-700",           group: "Exclusions" },
+  rfdm:           { label: "RFDM",            icon: Crown,        color: "bg-emerald-50 text-emerald-700", group: "RFDM" },
+  salla_segment:  { label: "Store Segment",   icon: Database,     color: "bg-emerald-50 text-emerald-700", group: "Store" },
+  website_event:  { label: "Website Event",   icon: Target,       color: "bg-blue-50 text-blue-700",       group: "Website Events" },
+  ad_engagement:  { label: "Ad Engagement",   icon: ShoppingCart, color: "bg-amber-50 text-amber-700",     group: "Ad Engagement" },
+  lookalike:      { label: "Lookalike",       icon: Share2,       color: "bg-teal-50 text-teal-700",       group: "Lookalikes" },
+  custom_list:    { label: "Custom List",     icon: Cloud,        color: "bg-slate-100 text-slate-700",    group: "Custom Lists" },
+  ai_chat:        { label: "AI Chat",         icon: Wand2,        color: "bg-violet-50 text-violet-700",   group: "AI" },
+  blocklist:      { label: "Blocklist",       icon: Shield,       color: "bg-red-50 text-red-700",         group: "Exclusions" },
 };
 
 const PLATFORM_DOT: Record<AdPlatform, { label: string; color: string }> = {
@@ -118,21 +113,23 @@ const SAVED_VIEWS = [
   { id: "all",         label: "All",             filter: () => true },
   { id: "ready",       label: "Ready to activate", filter: (a: Audience) => a.status === "ready" && a.size >= 1000 },
   { id: "ai",          label: "AI-powered",      filter: (a: Audience) => a.source.startsWith("ai_") },
-  { id: "pixel",       label: "Pixel & events",  filter: (a: Audience) => a.source === "pixel" || a.source === "conversion" },
-  { id: "imports",     label: "Imported",        filter: (a: Audience) => a.source.endsWith("_import") },
+  { id: "events",      label: "Website events",  filter: (a: Audience) => a.source === "website_event" },
+  { id: "engagement",  label: "Ad engagement",   filter: (a: Audience) => a.source === "ad_engagement" },
   { id: "lookalikes",  label: "Lookalikes",      filter: (a: Audience) => a.source === "lookalike" },
+  { id: "custom",      label: "Custom lists",    filter: (a: Audience) => a.source === "custom_list" },
   { id: "exclusions",  label: "Exclusions",      filter: (a: Audience) => a.source === "blocklist" },
   { id: "attention",   label: "Needs attention", filter: (a: Audience) => a.status === "stale" || a.status === "too_small" || a.status === "error" },
 ];
 
 const SOURCE_FILTER_GROUPS: Array<{ label: string; sources: AudienceSource[] }> = [
-  { label: "RFDM", sources: ["rfdm"] },
-  { label: "AI", sources: ["ai_predicted", "ai_discovered", "ai_chat"] },
-  { label: "Pixel & Events", sources: ["pixel", "conversion"] },
-  { label: "Imports", sources: ["meta_import", "google_import", "snap_import", "tiktok_import"] },
-  { label: "Uploads", sources: ["csv"] },
-  { label: "Lookalikes", sources: ["lookalike"] },
-  { label: "Exclusions", sources: ["blocklist"] },
+  { label: "RFDM",           sources: ["rfdm"] },
+  { label: "Store",          sources: ["salla_segment"] },
+  { label: "Website Events", sources: ["website_event"] },
+  { label: "Ad Engagement",  sources: ["ad_engagement"] },
+  { label: "Lookalikes",     sources: ["lookalike"] },
+  { label: "Custom Lists",   sources: ["custom_list"] },
+  { label: "AI",             sources: ["ai_chat"] },
+  { label: "Exclusions",     sources: ["blocklist"] },
 ];
 
 /* ────────────────────────────────────────────────────────── */

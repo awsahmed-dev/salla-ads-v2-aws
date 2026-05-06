@@ -332,7 +332,7 @@ export function ComfyAudienceManager({
                 {otherCount}
               </Badge>
               <span className="hidden text-[11px] text-muted-foreground sm:inline">
-                · pixel events, imports, lookalikes, smart combinations, AI chat, exclusions
+                · website events, ad engagement, lookalikes, custom lists, AI chat, exclusions
               </span>
             </div>
             <ChevronRight className={cn("size-4 text-muted-foreground transition-transform", showOther && "rotate-90")} />
