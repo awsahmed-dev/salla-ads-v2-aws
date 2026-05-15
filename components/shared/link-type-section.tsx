@@ -43,6 +43,11 @@ export interface LinkTypeSectionProps {
   storeUrl?: string;
   /** Show CTA column (default: true) */
   showCta?: boolean;
+  /** Show the URL / Link-Type pills column (default: true).
+   *  Set to false for ad surfaces where the destination is locked
+   *  upstream (e.g. TikTok Catalog Listing Ads pull product URLs
+   *  from the catalog feed — there is no per-ad landing URL). */
+  showUrl?: boolean;
   /** Extra description below Link type label */
   subtitle?: string;
 }
@@ -69,6 +74,7 @@ export function LinkTypeSection({
   optional = false,
   storeUrl = "https://store.salla.sa",
   showCta = true,
+  showUrl = true,
   subtitle,
 }: LinkTypeSectionProps) {
   const [linkType, setLinkType] = useState<LinkType>(() => {
@@ -102,31 +108,34 @@ export function LinkTypeSection({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Link type pills */}
-      <div className="flex flex-col gap-2">
-        <Label className="text-sm font-medium text-foreground">Link type</Label>
-        {subtitle && <p className="text-[11px] text-muted-foreground">{subtitle}</p>}
-        <div className="flex flex-wrap gap-2">
-          {PILL_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => handlePillClick(opt.value)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg border px-4 py-2 text-xs font-medium transition-colors",
-                linkType === opt.value
-                  ? "border-primary/60 bg-primary/[0.06] text-primary"
-                  : "border-border bg-white text-foreground hover:border-primary/30"
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
+      {/* Link type pills — hidden when the destination is upstream-locked */}
+      {showUrl && (
+        <div className="flex flex-col gap-2">
+          <Label className="text-sm font-medium text-foreground">Link type</Label>
+          {subtitle && <p className="text-[11px] text-muted-foreground">{subtitle}</p>}
+          <div className="flex flex-wrap gap-2">
+            {PILL_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handlePillClick(opt.value)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg border px-4 py-2 text-xs font-medium transition-colors",
+                  linkType === opt.value
+                    ? "border-primary/60 bg-primary/[0.06] text-primary"
+                    : "border-border bg-white text-foreground hover:border-primary/30"
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Link + CTA row */}
-      <div className={cn("grid gap-4", showCta ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
+      <div className={cn("grid gap-4", showCta && showUrl ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
+        {showUrl && (
         <div className="flex flex-col gap-2">
           <Label className="text-sm font-medium text-foreground">Link</Label>
           {linkType === "store" ? (
@@ -180,6 +189,7 @@ export function LinkTypeSection({
             <p className="text-[10px] text-red-600">URL must start with https://</p>
           )}
         </div>
+        )}
 
         {showCta && (
           <div className="flex flex-col gap-2">

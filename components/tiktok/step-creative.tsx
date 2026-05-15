@@ -1885,59 +1885,16 @@ function CatalogProductSelection({
         )}
       </SectionCard>
 
-      {/* Template Options (Catalog Listing only) */}
-      {isCatalogListing && (
-        <SectionCard>
-          <div className="mb-1 flex items-center gap-2">
-            <Tag className="size-4 text-primary" />
-            <Label className="text-sm font-semibold text-foreground">Template Options</Label>
-            <InfoTip text="Configure how product information is displayed on auto-generated catalog ads." />
-          </div>
-          <p className="mb-4 text-xs text-muted-foreground">
-            Customize how your catalog products appear in the auto-generated creatives.
-          </p>
-
-          <div className="rounded-lg border border-border bg-muted/10 p-3">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs text-foreground">Show product price</Label>
-                <Switch defaultChecked />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label className="text-xs text-foreground">Show sale/discount badge</Label>
-                <Switch defaultChecked />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label className="text-xs text-foreground">Show free shipping tag</Label>
-                <Switch />
-              </div>
-              <div className="h-px bg-border" />
-              <div>
-                <Label className="mb-1.5 text-xs text-foreground">Caption text</Label>
-                <Select defaultValue="product_name_price">
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="product_name">Product name only</SelectItem>
-                    <SelectItem value="product_name_price">Product name + price</SelectItem>
-                    <SelectItem value="custom">Custom caption</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-1.5 text-xs text-foreground">Product landing page</Label>
-                <Select defaultValue="product_page">
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="product_page">Individual product page</SelectItem>
-                    <SelectItem value="store_home">Store homepage</SelectItem>
-                    <SelectItem value="custom_url">Custom URL</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        </SectionCard>
-      )}
+      {/* The old "Template Options" card lived here and offered four switches +
+          a "Product landing page" dropdown. All five controls were uncontrolled
+          (defaultChecked / defaultValue), none flowed into api-payload.ts, and
+          the TikTok Marketing API does not accept per-ad overrides for any of
+          them in CATALOG_LISTING_ADS:
+            • price / sale-badge / shipping tags → controlled by the catalog feed
+            • caption text → auto-generated from feed
+            • product landing page → locked to feed's `link` column
+          We removed the entire card to avoid implying overrides that TikTok
+          will silently ignore. */}
 
       {/* ══════════════════════════════════════════════════════════════════ */}
       {/*  Product Selection Sheet (matches Snapchat DynamicAdConfig)      */}
@@ -3153,11 +3110,15 @@ export function TikTokStepCreative() {
                   Defines the type of content your ads appear next to. This doesn&apos;t change your ad—it controls its environment.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
+                  {/* Ordered least → most restrictive so merchants read it as a
+                      severity scale. All four values are real TikTok API
+                      brand_safety_type enums (NO_BRAND_SAFETY, EXPANDED_INVENTORY,
+                      STANDARD_INVENTORY, LIMITED_INVENTORY). */}
                   {([
-                    { value: "NO_BRAND_SAFETY" as const, label: "Full Inventory", desc: "Ads can appear next to all TikTok content for maximum reach.", tradeoff: "Lower brand safety, larger audience" },
-                    { value: "STANDARD_INVENTORY" as const, label: "Standard Inventory", desc: "Appropriate for most brands. Recommended.", tradeoff: "Balanced safety and reach", recommended: true },
-                    { value: "LIMITED_INVENTORY" as const, label: "Limited Inventory", desc: "Most restrictive. No mature themes.", tradeoff: "Greater safety, smaller audience" },
-                    { value: "EXPANDED_INVENTORY" as const, label: "Expanded Inventory", desc: "Exclude only explicitly inappropriate content.", tradeoff: "Broad reach, minimal filtering" },
+                    { value: "NO_BRAND_SAFETY" as const,   label: "Full Inventory",     desc: "Ads can appear next to all TikTok content for maximum reach.", tradeoff: "Largest audience · minimal filtering" },
+                    { value: "EXPANDED_INVENTORY" as const, label: "Expanded Inventory", desc: "Excludes only explicitly inappropriate content.",              tradeoff: "Broad reach · light filtering" },
+                    { value: "STANDARD_INVENTORY" as const, label: "Standard Inventory", desc: "Appropriate for most brands.",                                  tradeoff: "Balanced safety and reach", recommended: true },
+                    { value: "LIMITED_INVENTORY" as const,  label: "Limited Inventory",  desc: "Strictest — excludes any content with mature themes.",         tradeoff: "Greatest safety · smaller audience" },
                   ]).map((opt) => {
                     const selected = cr.brandSafetyType === opt.value;
                     return (
@@ -3468,7 +3429,16 @@ export function TikTokStepCreative() {
             </div>
             <div className="px-5 pb-5">
 
-            {/* Auto-generated creatives: Catalog Listing OR Video Shopping with Dynamic Format ON */}
+            {/* Auto-generated creatives — CLA and VSA-with-dynamic-format share
+                the same card shell but their destination model is different:
+
+                  • CLA → no ad-level creative, no landing_page_url. Product
+                    destinations come from the catalog feed. We hide the URL
+                    selector entirely and show only the CTA + a feed note.
+
+                  • VSA + dynamic_format → real video creative with its own
+                    CTA destination. We keep the URL selector but rename it
+                    so merchants don't confuse it with product card links. */}
             {catalogEnabled && (isCatalogListing || (objectiveConfig.shoppingAdsType === "VIDEO_SHOPPING_ADS" && objectiveConfig.dynamicFormat)) ? (
               <div className="flex flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card">
                 {/* Header */}
@@ -3484,7 +3454,7 @@ export function TikTokStepCreative() {
                   </div>
                 </div>
 
-                {/* Link Type + CTA */}
+                {/* CTA + (conditional) Video CTA destination */}
                 <div className="px-5 py-4">
                   <LinkTypeSection
                     url={ads[0]?.landingPageUrl || ""}
@@ -3501,7 +3471,21 @@ export function TikTokStepCreative() {
                     }}
                     recommendedCtas={RECOMMENDED_CTAS}
                     otherCtas={OTHER_CTAS}
+                    showUrl={!isCatalogListing}
+                    subtitle={!isCatalogListing
+                      ? "Where users go when they tap the CTA on your video. Product cards always link to each product's catalog URL automatically."
+                      : undefined}
                   />
+
+                  {/* CLA-only: explain where product destinations come from */}
+                  {isCatalogListing && (
+                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9]/60 p-2.5">
+                      <Info className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                      <p className="text-[11px] leading-snug text-foreground/80">
+                        <strong className="text-[#004956]">Where do clicks go?</strong> Product destinations are pulled from your Salla catalog feed — each product links to its own product page automatically. TikTok doesn't allow overriding these per ad. To change them, edit the products in your Salla store.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
