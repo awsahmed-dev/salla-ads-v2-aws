@@ -295,8 +295,36 @@ export function buildTikTokApiPayload(
     // /page/lead_gen/create/ (see app/api/tiktok/lead-form/route.ts — TODO)
     // which returns a page_id. That page_id is then referenced on the ad
     // group (see adgroup.page_id above).
+    // CLA creative payload (Catalog Listing Ads).
+    // TikTok auto-generates the *visual* (video/carousel composed from catalog
+    // items), but the *caption* (ad_text), display_name, and call_to_action
+    // are merchant-provided text fields. landing_page_url is NOT sent — every
+    // product card pulls its URL from the catalog feed's `link` column.
     ads: isCatalogListing
-      ? []
+      ? (() => {
+          const claAd = creative.ads[0]; // single auto-ad created upstream
+          if (!claAd) return [];
+          const resolvedIdentityType = creative.identity?.identityType ?? "BC_AUTH_TT";
+          return [{
+            advertiser_id: advertiserId,
+            adgroup_id: adgroupId,
+            creatives: [{
+              ad_name: claAd.name,
+              // CATALOG_LISTING_ADS is the ad_format marker for CLA creatives.
+              ad_format: "CATALOG_LISTING_ADS",
+              identity_type: resolvedIdentityType,
+              identity_id: creative.identity?.identityId || "<IDENTITY_ID>",
+              ...(resolvedIdentityType === "BC_AUTH_TT" && {
+                identity_authorized_bc_id: creative.identity?.businessCenterId || "<BC_ID>",
+              }),
+              // Required merchant-provided text.
+              ad_text: (claAd.adText || "").slice(0, 100),
+              display_name: (claAd.displayName || creative.identity?.displayName || "").slice(0, 20),
+              call_to_action: claAd.callToAction,
+              // No landing_page_url — destinations come from catalog feed.
+            }],
+          }];
+        })()
       : creative.ads.map((ad) => {
         /* Phase 1 fix: resolve ad_format + identity per-ad.
          * Spark Ads:

@@ -189,6 +189,25 @@ const MEDIA_SPECS = {
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Small inline "Fill with AI" button — same visual treatment everywhere it's
+ * used so merchants recognize the pattern. Generates a one-shot pre-fill into
+ * the target input. Wired to a static contextual string today; backend swap
+ * point is the onFill callback.
+ */
+function AiFillButton({ onFill, label = "Fill with AI" }: { onFill: () => void; label?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onFill}
+      className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-50 to-[#e6fff9] px-2 py-0.5 text-[10px] font-semibold text-[#004956] transition-all hover:from-violet-100 hover:to-[#a4ffe5]/40"
+    >
+      <Sparkles className="size-2.5 text-violet-500" />
+      {label}
+    </button>
+  );
+}
+
 function CharCounter({ current, max }: { current: number; max: number }) {
   const over = current > max;
   return <span className={cn("text-xs tabular-nums", over ? "font-medium text-destructive" : "text-muted-foreground")}>{current}/{max}</span>;
@@ -1215,14 +1234,20 @@ function AdPanel({
               <div className="border-t border-border px-6 py-5">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
-                    <Label className="text-sm font-medium text-foreground">Display Name</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium text-foreground">Display Name</Label>
+                      <AiFillButton onFill={() => onUpdate({ ...ad, displayName: "Salla Store" })} />
+                    </div>
                     <div className="relative">
                       <Input placeholder="Your brand" value={ad.displayName} maxLength={20} onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })} className={cn("h-10 pr-14 text-sm", ad.displayName.length >= 20 && "border-amber-400")} />
                       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.displayName.length}/20</span>
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Label className="text-sm font-medium text-foreground">Ad Caption <span className="text-destructive">*</span></Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium text-foreground">Ad Caption <span className="text-destructive">*</span></Label>
+                      <AiFillButton onFill={() => onUpdate({ ...ad, adText: "Discover quality products at unbeatable prices. Shop now and enjoy fast shipping across the Kingdom." })} />
+                    </div>
                     <div className="relative">
                       <Input placeholder="Write a short caption..." value={ad.adText} maxLength={100} onChange={(e) => onUpdate({ ...ad, adText: e.target.value.slice(0, 100) })} className={cn("h-10 pr-14 text-sm", ad.adText.length >= 100 && "border-amber-400")} />
                       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.adText.length}/100</span>
@@ -1385,7 +1410,10 @@ function AdPanel({
               <div className="border-t border-border px-6 py-5">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
-                    <Label className="text-sm font-medium text-foreground">Display Name</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium text-foreground">Display Name</Label>
+                      <AiFillButton onFill={() => onUpdate({ ...ad, displayName: "Salla Store" })} />
+                    </div>
                     <div className="relative">
                       <Input
                         placeholder="Your brand"
@@ -1398,9 +1426,12 @@ function AdPanel({
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Label className="text-sm font-medium text-foreground">
-                      Ad Caption <span className="text-destructive">*</span>
-                    </Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium text-foreground">
+                        Ad Caption <span className="text-destructive">*</span>
+                      </Label>
+                      <AiFillButton onFill={() => onUpdate({ ...ad, adText: "Discover quality products at unbeatable prices. Shop now and enjoy fast shipping across the Kingdom." })} />
+                    </div>
                     <div className="relative">
                       <Input
                         placeholder="Write a short caption..."
@@ -1578,14 +1609,20 @@ function AdPanel({
               <div className="border-t border-border px-6 py-5">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-2">
-                    <Label className="text-sm font-medium text-foreground">Display Name</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium text-foreground">Display Name</Label>
+                      <AiFillButton onFill={() => onUpdate({ ...ad, displayName: "Salla Store" })} />
+                    </div>
                     <div className="relative">
                       <Input placeholder="Your brand" value={ad.displayName} maxLength={20} onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })} className={cn("h-10 pr-14 text-sm", ad.displayName.length >= 20 && "border-amber-400")} />
                       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.displayName.length}/20</span>
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Label className="text-sm font-medium text-foreground">Ad Caption <span className="text-destructive">*</span></Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium text-foreground">Ad Caption <span className="text-destructive">*</span></Label>
+                      <AiFillButton onFill={() => onUpdate({ ...ad, adText: "Discover quality products at unbeatable prices. Shop now and enjoy fast shipping across the Kingdom." })} />
+                    </div>
                     <div className="relative">
                       <Input placeholder="Write a short caption..." value={ad.adText} maxLength={100} onChange={(e) => onUpdate({ ...ad, adText: e.target.value.slice(0, 100) })} className={cn("h-10 pr-14 text-sm", ad.adText.length >= 100 && "border-amber-400")} />
                       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.adText.length}/100</span>
@@ -2978,6 +3015,11 @@ export function TikTokStepCreative() {
     // Auto-generated creatives (Catalog Listing or Video Shopping + Dynamic Format): no manual uploads needed
     allChecks.push({ label: "Catalog connected", ok: !!campaign.objective.catalogId });
     allChecks.push({ label: "Products selected", ok: objectiveConfig.productSelectionMode !== "SPECIFIC" || objectiveConfig.specificProductIds.length > 0 });
+    if (isCatalogListing && ads[0]) {
+      // CLA still requires merchant-provided caption text (ad_text). TikTok
+      // auto-generates the visual only — the caption above it is your job.
+      allChecks.push({ label: "Caption text", ok: ads[0].adText.trim().length > 0 });
+    }
   } else {
     // Video Shopping or non-catalog: need manual ad uploads
     allChecks.push({ label: "At least 1 ad created", ok: ads.length > 0 });
@@ -3309,12 +3351,12 @@ export function TikTokStepCreative() {
                     {
                       value: "VIDEO_SHOPPING_ADS" as const,
                       label: "Video Shopping",
-                      desc: "You upload creatives — products attach as interactive cards",
+                      desc: "Creative + Catalog. You upload videos/images; products attach as interactive cards.",
                     },
                     {
                       value: "CATALOG_LISTING_ADS" as const,
                       label: "Catalog Listing",
-                      desc: "TikTok auto-generates ads from your catalog products",
+                      desc: "Catalog only. TikTok auto-generates the visual from your product images — you provide the caption and CTA.",
                     },
                   ]).map((sat) => {
                     const sel = objectiveConfig.shoppingAdsType === sat.value;
@@ -3359,7 +3401,7 @@ export function TikTokStepCreative() {
                       </div>
                       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                         {objectiveConfig.dynamicFormat
-                          ? "TikTok AI will auto-generate and test Catalog Video, Single Video, and Carousel formats from your products. No manual ad upload needed."
+                          ? "You still upload at least one base video; TikTok then auto-rotates product variations within it across viewers. Works fine with image-only catalogs."
                           : "You upload your own video/image creatives. Products from your catalog are attached as interactive cards below your ad."}
                       </p>
                     </div>
@@ -3369,11 +3411,17 @@ export function TikTokStepCreative() {
                     />
                   </div>
                   {objectiveConfig.dynamicFormat && (
-                    <div className="border-t border-border bg-[#e6fff9]/40 px-5 py-3">
+                    <div className="border-t border-border bg-[#e6fff9]/40 px-5 py-3 flex flex-col gap-2">
                       <div className="flex items-start gap-2">
                         <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
                         <p className="text-[11px] leading-relaxed text-[#004956]/80">
-                          TikTok will automatically create and A/B test multiple ad formats using your catalog products. You only need to select products below — no creative upload required.
+                          TikTok will A/B test multiple product variations inside your uploaded video. You still upload at least one base video — TikTok mixes in product cards from your catalog (image-only catalogs are fully supported).
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-2 py-1.5">
+                        <Info className="mt-0.5 size-3 shrink-0 text-amber-600" />
+                        <p className="text-[10px] leading-snug text-amber-800">
+                          <strong>No video to upload?</strong> Switch to <strong>Catalog Listing</strong> above — TikTok auto-generates the entire video from your product images, no merchant video required.
                         </p>
                       </div>
                     </div>
@@ -3449,13 +3497,77 @@ export function TikTokStepCreative() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#004956]">Auto-Generated Catalog Creatives</p>
                     <p className="mt-0.5 text-[11px] text-[#004956]/60">
-                      TikTok generates Catalog Video, Carousel &amp; Single Product ads from your catalog.
+                      {isCatalogListing
+                        ? "TikTok generates the video from your catalog images. You provide the caption text and CTA below."
+                        : "TikTok rotates product variations inside the video you upload."}
                     </p>
                   </div>
                 </div>
 
-                {/* CTA + (conditional) Video CTA destination */}
-                <div className="px-5 py-4">
+                <div className="px-5 py-4 flex flex-col gap-4">
+                  {/* CLA-only: merchant-provided text inputs.
+                      TikTok auto-generates the *visual* from the catalog, but
+                      ad_text (required) and display_name (optional) are still
+                      merchant inputs sent to the API. */}
+                  {isCatalogListing && (() => {
+                    const claAd = ads[0];
+                    if (!claAd) return null;
+                    return (
+                      <div className="flex flex-col gap-3">
+                        {/* Display name */}
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs font-semibold text-foreground">
+                              Display name <span className="text-muted-foreground font-normal">(optional)</span>
+                            </Label>
+                            <AiFillButton
+                              onFill={() => updateAd(claAd.id, { ...claAd, displayName: "Salla Store" })}
+                              label="Fill with AI"
+                            />
+                          </div>
+                          <div className="relative">
+                            <Input
+                              placeholder="Your brand"
+                              value={claAd.displayName}
+                              maxLength={20}
+                              onChange={(e) => updateAd(claAd.id, { ...claAd, displayName: e.target.value.slice(0, 20) })}
+                              className={cn("h-10 pr-14 text-sm", claAd.displayName.length >= 20 && "border-amber-400")}
+                            />
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">
+                              {claAd.displayName.length}/20
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Ad text (caption) — TikTok requires this for CLA */}
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs font-semibold text-foreground">
+                              Caption text <span className="text-destructive">*</span>
+                            </Label>
+                            <AiFillButton
+                              onFill={() => updateAd(claAd.id, { ...claAd, adText: "Discover quality products at unbeatable prices. Shop now and enjoy fast shipping across the Kingdom." })}
+                              label="Fill with AI"
+                            />
+                          </div>
+                          <div className="relative">
+                            <Input
+                              placeholder="Write a short caption that appears above the auto-generated ad..."
+                              value={claAd.adText}
+                              maxLength={100}
+                              onChange={(e) => updateAd(claAd.id, { ...claAd, adText: e.target.value.slice(0, 100) })}
+                              className={cn("h-10 pr-14 text-sm", claAd.adText.length >= 100 && "border-amber-400")}
+                            />
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">
+                              {claAd.adText.length}/100
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* CTA + (conditional) Video CTA destination */}
                   <LinkTypeSection
                     url={ads[0]?.landingPageUrl || ""}
                     onUrlChange={(url) => {
@@ -3479,7 +3591,7 @@ export function TikTokStepCreative() {
 
                   {/* CLA-only: explain where product destinations come from */}
                   {isCatalogListing && (
-                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9]/60 p-2.5">
+                    <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9]/60 p-2.5">
                       <Info className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
                       <p className="text-[11px] leading-snug text-foreground/80">
                         <strong className="text-[#004956]">Where do clicks go?</strong> Product destinations are pulled from your Salla catalog feed — each product links to its own product page automatically. TikTok doesn't allow overriding these per ad. To change them, edit the products in your Salla store.
