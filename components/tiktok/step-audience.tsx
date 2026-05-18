@@ -40,6 +40,8 @@ import { SallaSmartFeaturesCard } from "@/components/shared/salla-smart-features
 import { CustomAudiencesCard } from "@/components/shared/custom-audiences-card";
 import { DeviceTargetingCard } from "@/components/shared/device-targeting-card";
 import { LegacyInterestTargetingCard as InterestTargetingCard } from "@/components/shared/interest-targeting-card";
+import { AudienceSignalsPicker } from "@/components/tiktok/audience-signals-picker";
+import { SearchKeywordsTable } from "@/components/tiktok/search-keywords-table";
 import { TargetingSummaryCard } from "@/components/shared/targeting-summary-card";
 import { AudienceReadinessChecklist } from "@/components/shared/audience-readiness-checklist";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
@@ -100,7 +102,10 @@ export function TikTokStepAudience() {
   // baseline location/language as the only inputs and finds the audience
   // itself. Custom = full manual controls (the classic flow).
   const sp = campaign.objective.smartPlus;
-  const smartTargetingAuto = sp.enabled && sp.smartTargeting === "AUTO";
+  // Search Ads mode replaces interest signals with merchant-typed keywords.
+  // Demographics / Interests / Custom audiences all hide when ON because
+  // Search targeting is intent-based, not demographic-based.
+  const searchAdsOn = campaign.objective.searchAdsEnabled === true && isSales;
 
   /* Readiness checklist */
   const hasLocation = (aud.locationIds?.length ?? 0) > 0 || (aud.cities?.length ?? 0) > 0;
@@ -123,10 +128,12 @@ export function TikTokStepAudience() {
         {/* LEFT COLUMN                                                   */}
         {/* ============================================================ */}
         <div className="flex flex-1 flex-col gap-5">
-          {/* ---- Smart+ Audience mode header ---- */}
+          {/* Smart+ status note — implicit ON for Sales / Lead Gen / App Promo.
+              No toggle. Every field below shows by default with AI-recommended
+              chips inline. This mirrors TikTok's 2026 unified experience. */}
           {sp.enabled && (isSales || isAppPromo || isLeadGen) && (
             <SectionCard>
-              <div className="flex flex-wrap items-start gap-3">
+              <div className="flex items-start gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#004956]">
                   <Sparkles className="size-4 text-[#a4ffe5]" />
                 </div>
@@ -134,27 +141,15 @@ export function TikTokStepAudience() {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <p className="text-sm font-bold text-foreground">Audience targeting</p>
                     <Badge className="rounded-full bg-[#e6fff9] px-2 py-0 text-[10px] font-bold text-[#004956] hover:bg-[#e6fff9]">Smart+</Badge>
+                    {searchAdsOn && (
+                      <Badge className="rounded-full bg-amber-100 px-2 py-0 text-[10px] font-bold text-amber-800 hover:bg-amber-100">Search Ads mode</Badge>
+                    )}
                   </div>
                   <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                    {smartTargetingAuto
-                      ? "TikTok finds your audience from your conversion signal. You only set Location and Language — everything else is automatic."
-                      : "You control every targeting parameter manually: age, gender, interests, keywords, custom audiences, devices."}
+                    {searchAdsOn
+                      ? "Search Ads is on — targeting is driven by keywords below, not by interests or demographics. Smart+ still optimizes delivery within your keyword pool."
+                      : "Smart+ optimizes delivery using your signals below. Every field has an AI-recommended default — fill what matters, leave the rest for TikTok to figure out."}
                   </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-0.5 rounded-full border border-border bg-white p-0.5">
-                  {(["AUTO", "CUSTOM"] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => updateNested("objective", { smartPlus: { ...sp, smartTargeting: mode } })}
-                      className={cn(
-                        "rounded-full px-3 py-1 text-[11px] font-medium capitalize transition-all",
-                        sp.smartTargeting === mode ? "bg-[#004956] text-white" : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {mode === "AUTO" ? "Automatic" : "Manual"}
-                    </button>
-                  ))}
                 </div>
               </div>
             </SectionCard>
@@ -186,65 +181,16 @@ export function TikTokStepAudience() {
 
           </SectionCard>
 
-          {/* ---- 2. Smart+ Auto Banner (when smartTargeting === AUTO) ---- */}
-          {smartTargetingAuto && (
-            <SectionCard>
-              <div className="flex items-start gap-3 rounded-xl border border-[#a4ffe5] bg-gradient-to-br from-[#e6fff9] to-white p-4">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#004956]">
-                  <Sparkles className="size-4 text-[#a4ffe5]" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-bold text-[#004956]">Smart Targeting · Auto</p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-foreground/80">
-                    TikTok will find your audience automatically using signals from your conversion event and product catalog. You only need to set <strong>Location</strong> above and <strong>Language</strong> below — age, gender, interests, and keywords are handled by TikTok's optimizer.
-                  </p>
-                  <p className="mt-2 text-[10px] italic text-muted-foreground">
-                    Switch <strong>Targeting</strong> to <strong>Custom</strong> on the Objective step to control these manually.
-                  </p>
-                </div>
-              </div>
-              {/* Slim Language picker — Smart+ baseline minimum. */}
-              <div className="mt-4 flex flex-col gap-2">
-                <Label className="text-sm font-medium text-foreground">
-                  Language {aud.locationIds.length > 1 && <span className="text-destructive">*</span>}
-                </Label>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { code: "ar", label: "Arabic" },
-                    { code: "en", label: "English" },
-                  ].map((lang) => {
-                    const selected = aud.languages.includes(lang.code);
-                    return (
-                      <button
-                        key={lang.code}
-                        type="button"
-                        onClick={() => {
-                          const next = selected
-                            ? aud.languages.filter((c) => c !== lang.code)
-                            : [...aud.languages, lang.code];
-                          updateNested("audience", { languages: next });
-                        }}
-                        className={cn(
-                          "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
-                          selected
-                            ? "border-[#004956] bg-[#004956] text-white"
-                            : "border-border bg-white text-foreground hover:border-[#a4ffe5]"
-                        )}
-                      >
-                        {lang.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {aud.languages.length === 0 && aud.locationIds.length > 1 && (
-                  <p className="text-[10px] text-red-600">Language is required when targeting more than one country.</p>
-                )}
-              </div>
-            </SectionCard>
+          {/* ---- Search Ads · keyword table (replaces interests + demographics when ON) ---- */}
+          {searchAdsOn && (
+            <SearchKeywordsTable
+              keywords={campaign.objective.searchKeywords ?? []}
+              onChange={(next) => updateNested("objective", { searchKeywords: next })}
+            />
           )}
 
-          {/* ---- 2. Demographics (full controls, only when smartTargeting === CUSTOM) ---- */}
-          {!smartTargetingAuto && (
+          {/* ---- 2. Demographics (always shown for non-Search; hidden in Search Ads mode) ---- */}
+          {!searchAdsOn && (
           <DemographicsCard
             languageCodes={aud.languages}
             onLanguagesChange={(codes) => updateNested("audience", { languages: codes })}
@@ -263,183 +209,25 @@ export function TikTokStepAudience() {
           />
           )}
 
-          {/* ---- 3+ Interests / Keywords / Advanced — all hidden in Smart+ Auto ---- */}
-          {!smartTargetingAuto && (
+          {/* ---- 3. Audience signals — unified picker. Replaces the old
+              free-text Interest Keywords + Purchase Intent inputs and the
+              separate Interest Categories card. Sources from TikTok's
+              predefined catalog (mock today, real API later). Hidden in
+              Search Ads mode — keywords replace interests there. ---- */}
+          {!searchAdsOn && (
           <>
-          <InterestTargetingCard
-            options={INTERESTS}
-            value={aud.interests}
-            onChange={(ids) => updateNested("audience", { interests: ids })}
-            accent="primary"
+          <AudienceSignalsPicker
+            interestCategoryIds={aud.interests}
+            interestKeywordIds={aud.interestKeywordIds}
+            shoppingIntentIds={aud.purchaseIntentKeywordIds}
+            onChange={(next) => updateNested("audience", {
+              interests: next.interestCategoryIds,
+              interestKeywordIds: next.interestKeywordIds,
+              purchaseIntentKeywordIds: next.shoppingIntentIds,
+            })}
+            storeCategory="FASHION" /* TODO: derive from Salla store profile when wired */
           />
 
-          {/* ---- 4. Interest Keywords (granular keyword-level targeting) ---- */}
-          <SectionCard>
-            <Label className="mb-1 flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Search className="size-4 text-primary" />
-              Interest Keywords
-              <Badge variant="outline" className="rounded-full px-2 text-[10px] font-medium text-muted-foreground">Optional</Badge>
-              <InfoTip text="Target users interested in specific topics or products. More granular than interest categories. Cannot be combined with Purchase Intent Keywords." />
-              <LearnMoreTrigger {...keywordsLearnMore.triggerProps} label="Learn more" />
-            </Label>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Add specific keywords to target users with precise interests. These are more granular than category-level interest targeting.
-            </p>
-            {aud.purchaseIntentKeywordIds.length > 0 && (
-              <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
-                <AlertCircle className="size-3.5 shrink-0 text-amber-500" />
-                <p className="text-[11px] text-amber-700">Cannot be used together with Purchase Intent Keywords. Adding interest keywords will clear purchase intent keywords.</p>
-              </div>
-            )}
-            <div className="flex gap-2">
-              <Input
-                placeholder="e.g. skincare routine, running shoes, home decor..."
-                value={interestKeywordInput}
-                onChange={(e) => setInterestKeywordInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && interestKeywordInput.trim()) {
-                    e.preventDefault();
-                    const kw = interestKeywordInput.trim();
-                    if (!aud.interestKeywordIds.includes(kw)) {
-                      updateNested("audience", {
-                        interestKeywordIds: [...aud.interestKeywordIds, kw],
-                        purchaseIntentKeywordIds: [], // API conflict: cannot combine both
-                      });
-                    }
-                    setInterestKeywordInput("");
-                  }
-                }}
-                className="h-9 text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const kw = interestKeywordInput.trim();
-                  if (kw && !aud.interestKeywordIds.includes(kw)) {
-                    updateNested("audience", {
-                      interestKeywordIds: [...aud.interestKeywordIds, kw],
-                      purchaseIntentKeywordIds: [], // API conflict: cannot combine both
-                    });
-                  }
-                  setInterestKeywordInput("");
-                }}
-                disabled={!interestKeywordInput.trim()}
-                className="flex h-9 items-center gap-1 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40"
-              >
-                <Plus className="size-3" />
-                Add
-              </button>
-            </div>
-            {aud.interestKeywordIds.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {aud.interestKeywordIds.map((kw) => (
-                  <Badge key={kw} variant="secondary" className="gap-1 rounded-full px-2.5 py-1 text-xs">
-                    {kw}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateNested("audience", {
-                          interestKeywordIds: aud.interestKeywordIds.filter((k) => k !== kw),
-                        })
-                      }
-                      className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
-                    >
-                      <X className="size-2.5" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
-            <p className="mt-2 text-[10px] text-muted-foreground">
-              In production, keywords are resolved to TikTok interest keyword IDs via the Interest Keyword API.
-            </p>
-          </SectionCard>
-
-          {/* ---- 5. Purchase Intent Keywords (e-commerce specific) ---- */}
-          {/* API only supports purchase_intention_keyword_ids for PRODUCT_SALES and APP_PROMOTION */}
-          {(isSales || isAppPromo) && (
-            <SectionCard>
-              <Label className="mb-1 flex items-center gap-2 text-sm font-semibold text-foreground">
-                <ShoppingCart className="size-4 text-primary" />
-                Purchase Intent Keywords
-                <Badge variant="outline" className="rounded-full px-2 text-[10px] font-medium text-primary">
-                  E-commerce
-                </Badge>
-                <InfoTip text="Target users actively searching for or engaging with specific product categories on TikTok. Highly effective for driving sales. Cannot be combined with Interest Keywords." />
-              </Label>
-              <p className="mb-3 text-xs text-muted-foreground">
-                Reach users who are actively looking to buy. These keywords target shopping intent signals, not just interest.
-              </p>
-              {aud.interestKeywordIds.length > 0 && (
-                <div className="mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
-                  <AlertCircle className="size-3.5 shrink-0 text-amber-500" />
-                  <p className="text-[11px] text-amber-700">Cannot be used together with Interest Keywords. Adding purchase intent keywords will clear interest keywords.</p>
-                </div>
-              )}
-              <div className="flex gap-2">
-                <Input
-                  placeholder="e.g. buy perfume, abaya online, gaming laptop..."
-                  value={purchaseIntentInput}
-                  onChange={(e) => setPurchaseIntentInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && purchaseIntentInput.trim()) {
-                      e.preventDefault();
-                      const kw = purchaseIntentInput.trim();
-                      if (!aud.purchaseIntentKeywordIds.includes(kw)) {
-                        updateNested("audience", {
-                          purchaseIntentKeywordIds: [...aud.purchaseIntentKeywordIds, kw],
-                          interestKeywordIds: [], // API conflict: cannot combine both
-                        });
-                      }
-                      setPurchaseIntentInput("");
-                    }
-                  }}
-                  className="h-9 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const kw = purchaseIntentInput.trim();
-                    if (kw && !aud.purchaseIntentKeywordIds.includes(kw)) {
-                      updateNested("audience", {
-                        purchaseIntentKeywordIds: [...aud.purchaseIntentKeywordIds, kw],
-                        interestKeywordIds: [], // API conflict: cannot combine both
-                      });
-                    }
-                    setPurchaseIntentInput("");
-                  }}
-                  disabled={!purchaseIntentInput.trim()}
-                  className="flex h-9 items-center gap-1 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40"
-                >
-                  <Plus className="size-3" />
-                  Add
-                </button>
-              </div>
-              {aud.purchaseIntentKeywordIds.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {aud.purchaseIntentKeywordIds.map((kw) => (
-                    <Badge key={kw} variant="secondary" className="gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs text-primary">
-                      {kw}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateNested("audience", {
-                            purchaseIntentKeywordIds: aud.purchaseIntentKeywordIds.filter((k) => k !== kw),
-                          })
-                        }
-                        className="ml-0.5 rounded-full p-0.5 hover:bg-primary/20"
-                      >
-                        <X className="size-2.5" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-              <p className="mt-2 text-[10px] text-muted-foreground">
-                In production, keywords are resolved to TikTok purchase intent keyword IDs via the Keyword API.
-              </p>
-            </SectionCard>
-          )}
 
           {/* ---- 6. Salla Smart Features (shared) ---- */}
           <SallaSmartFeaturesCard

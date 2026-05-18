@@ -133,10 +133,9 @@ export function buildTikTokApiPayload(
   // /campaign/create/ for /smart_plus/campaign/create/.
   const sp = objective.smartPlus;
   const smartPlusEnabled = sp.enabled && (isSales || isLeadGen || isAppPromo);
-  const smartTargetingAuto = smartPlusEnabled && sp.smartTargeting === "AUTO";
-  const smartBudgetAuto = smartPlusEnabled && sp.smartBudget === "AUTO";
-  const smartPlacementAuto = smartPlusEnabled && sp.smartPlacement === "AUTO";
-  const smartCreativeAuto = smartPlusEnabled && sp.smartCreative === "AUTO";
+  // Search Ads (Sales-only) — at the API level this is triggered at the
+  // ad-group level via search_result_enabled + search_keywords[].
+  const searchAdsOn = isSales && objective.searchAdsEnabled === true;
 
   const advertiserId = opts.advertiserId || "<ADVERTISER_ID>";
   const campaignId = opts.campaignId || "<CAMPAIGN_ID>";
@@ -166,15 +165,13 @@ export function buildTikTokApiPayload(
       ...(isSales && { promotion_type: objective.catalogEnabled ? "CATALOG" : "WEBSITE" }),
       ...campaignCatalogField,
       operation_status: "ENABLE",
-      // Upgraded Smart+ module flags. Field names track TikTok's documented
-      // smart_plus/campaign/create payload — exact runtime names will be
-      // confirmed in the BC sandbox. The values themselves are stable.
+      // Upgraded Smart+ — every Sales / Lead Gen / App Promo campaign
+      // routes through /smart_plus/campaign/create/ via the _endpoint
+      // hint above. The campaign object itself only carries the
+      // smart_plus_campaign marker; per-module Auto/Custom is gone
+      // because the upgraded UX exposes every field directly.
       ...(smartPlusEnabled && {
         smart_plus_campaign: true,
-        smart_targeting_enabled: smartTargetingAuto,
-        smart_budget_enabled: smartBudgetAuto,
-        smart_placement_enabled: smartPlacementAuto,
-        smart_creative_enabled: smartCreativeAuto,
       }),
     },
     adgroup: {
@@ -300,14 +297,26 @@ export function buildTikTokApiPayload(
       age_groups: toTikTokAgeGroups(audience.ageMin, audience.ageMax),
       gender: audience.gender,
       languages: audience.languages,
-      ...(hasNonMockInterests && { interest_category_ids: audience.interests }),
-      ...(audience.purchaseIntentKeywordIds?.length > 0
+      // Interest-based targeting — suppressed entirely in Search Ads mode
+      // because search-keyword intent is the targeting signal there.
+      ...(!searchAdsOn && hasNonMockInterests && { interest_category_ids: audience.interests }),
+      ...(!searchAdsOn && audience.purchaseIntentKeywordIds?.length > 0
         ? { purchase_intention_keyword_ids: audience.purchaseIntentKeywordIds }
-        : audience.interestKeywordIds?.length > 0
+        : !searchAdsOn && audience.interestKeywordIds?.length > 0
           ? { interest_keyword_ids: audience.interestKeywordIds }
           : {}),
       ...(audience.operatingSystems.length > 0 && { operating_systems: audience.operatingSystems }),
-      ...(budget.searchResultEnabled && { search_result_enabled: true }),
+      // Search Ads — search_result_enabled + search_keywords[] on the ad
+      // group. Without these two, the campaign delivers in-feed instead.
+      ...((searchAdsOn || budget.searchResultEnabled) && { search_result_enabled: true }),
+      ...(searchAdsOn && objective.searchKeywords?.length > 0 && {
+        search_keywords: objective.searchKeywords.map((k) => ({
+          keyword: k.keyword,
+          match_type: k.matchType,
+          is_negative: k.isExclusion,
+          ...(k.bid !== undefined && { keyword_bid: k.bid, keyword_bid_type: "CUSTOM" }),
+        })),
+      }),
       ...(creative.brandSafetyType && creative.brandSafetyType !== "NO_BRAND_SAFETY" && {
         brand_safety_type: creative.brandSafetyType,
       }),

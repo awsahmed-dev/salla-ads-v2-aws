@@ -476,38 +476,24 @@ export function TikTokStepBudget() {
         {/* ============= LEFT COLUMN ============= */}
         <div className="flex flex-1 flex-col gap-5">
 
-          {/* ---- Smart+ Budget mode header ---- */}
+          {/* ---- Smart+ Budget status note ──
+              No Auto/Manual toggle. All budget fields show by default with
+              AI-recommended defaults. The merchant picks Campaign-level
+              vs. Ad-group-level allocation via the radio in Section 3. */}
           {smartBudgetEligible && (
             <SectionCard>
-              <div className="flex flex-wrap items-start gap-3">
+              <div className="flex items-start gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#004956]">
                   <Sparkles className="size-4 text-[#a4ffe5]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <p className="text-sm font-bold text-foreground">Budget & schedule</p>
+                    <p className="text-sm font-bold text-foreground">Budget &amp; schedule</p>
                     <Badge className="rounded-full bg-[#e6fff9] px-2 py-0 text-[10px] font-bold text-[#004956] hover:bg-[#e6fff9]">Smart+</Badge>
                   </div>
                   <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                    {sp.smartBudget === "AUTO"
-                      ? "One campaign budget. TikTok distributes it across ad groups for the best delivery (budget_optimize_on)."
-                      : "You set a separate budget per ad group and control distribution manually."}
+                    Smart+ recommends pacing automatically. Salla best practice: <strong>20× your target CPA</strong> as daily budget — gives TikTok enough data to learn within 7 days. Pick Campaign-level distribution to let TikTok shift spend between ad groups; pick Ad-group-level to cap spend per group.
                   </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-0.5 rounded-full border border-border bg-white p-0.5">
-                  {(["AUTO", "CUSTOM"] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => updateNested("objective", { smartPlus: { ...sp, smartBudget: mode } })}
-                      className={cn(
-                        "rounded-full px-3 py-1 text-[11px] font-medium capitalize transition-all",
-                        sp.smartBudget === mode ? "bg-[#004956] text-white" : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {mode === "AUTO" ? "Automatic" : "Manual"}
-                    </button>
-                  ))}
                 </div>
               </div>
             </SectionCard>

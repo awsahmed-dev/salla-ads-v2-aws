@@ -331,31 +331,40 @@ export type ShoppingAdsType =
 /** How products are selected from the catalog */
 export type ProductSelectionMode = "ALL" | "PRODUCT_SET" | "SPECIFIC";
 
-/* ---- Smart+ (upgraded) module toggles ---------------------------- */
-/**
- * Upgraded Smart+ has 4 independently-toggleable automation modules
- * per TikTok's Jan 2026 launch. Each can be "Auto" (TikTok decides) or
- * "Custom" (merchant decides).
- *
- * Only valid for SALES / LEAD_GENERATION / APP_PROMOTION objectives.
- * Traffic / Reach / Video Views still use the classic create endpoint
- * (POST /open_api/v1.3/campaign/create/).
- *
- * When enabled, the campaign payload swaps to:
+/* ---- Smart+ (upgraded) — implicit for Sales / Lead Gen / App Promo. ---
+ * No Auto/Manual toggles. The merchant sees every field by default with
+ * AI-recommended defaults marked inline. This matches TikTok's 2026
+ * unified experience (no parent gate, just smart defaults + per-field
+ * override). When enabled, the campaign payload swaps to:
  *   POST /open_api/v1.3/smart_plus/campaign/create/
  */
-export type SmartPlusModuleMode = "AUTO" | "CUSTOM";
 export interface SmartPlusSettings {
-  /** Master toggle. Default ON for Sales / Lead Gen / App Promo. */
+  /** Implicit ON for Sales / Lead Gen / App Promo. Auto-flipped OFF for
+   *  Traffic / Reach / Video Views (not in the upgrade scope yet). */
   enabled: boolean;
-  /** Audience targeting automation. AUTO = location + language only. */
-  smartTargeting: SmartPlusModuleMode;
-  /** Budget automation. AUTO = campaign-level budget, TikTok distributes. */
-  smartBudget: SmartPlusModuleMode;
-  /** Placement automation. AUTO = TikTok picks placements. */
-  smartPlacement: SmartPlusModuleMode;
-  /** Creative automation. AUTO = dynamic_format + smart rotation. */
-  smartCreative: SmartPlusModuleMode;
+}
+
+/* ---- Search Ads (within Sales) ----
+ * TikTok's Search Ads have a dedicated campaign creation flow in Ads
+ * Manager. At the API level, they're triggered at the ad-group level via
+ * search_result_enabled: true + search_keywords[].
+ *
+ * When toggled ON in the Sales objective config, the whole campaign
+ * morphs:
+ *   - Audience targeting → location + language only (intent supplants
+ *     interest)
+ *   - Creative formats restricted to Spark Ad + Carousel Image
+ *   - New Search Keywords table replaces the Audience signals picker
+ *   - Placement locked to Search Result Page
+ */
+export type SearchKeywordMatchType = "BROAD" | "PHRASE" | "EXACT";
+export interface SearchKeyword {
+  keyword: string;
+  matchType: SearchKeywordMatchType;
+  /** When true, this keyword is a negative (exclusion) keyword. */
+  isExclusion: boolean;
+  /** Optional per-keyword bid override; otherwise FOLLOW_ADGROUP. */
+  bid?: number;
 }
 
 export interface ObjectiveSettings {
@@ -363,8 +372,16 @@ export interface ObjectiveSettings {
   objective: TikTokObjective;
   /** Website or Catalog-based product sales */
   promotionType: PromotionType;
-  /** Upgraded Smart+ module toggles. Only meaningful for Sales / Lead Gen / App Promo. */
+  /** Upgraded Smart+ — implicit ON for Sales / Lead Gen / App Promo. */
   smartPlus: SmartPlusSettings;
+  /** Search Ads mode (Sales only). Toggling ON turns the whole campaign
+   *  into a Search Ads campaign: targeting becomes intent-based, creative
+   *  is Spark/Carousel only, placement is locked to Search Result Page. */
+  searchAdsEnabled: boolean;
+  /** Search Ads keywords. Free-text (merchant types), with per-keyword
+   *  match type + include/exclude + optional bid. Maps to search_keywords
+   *  array on the ad group. Empty when searchAdsEnabled = false. */
+  searchKeywords: SearchKeyword[];
   /** Campaign Budget Optimization. Maps to API budget_optimize_on.
    *  When enabled, campaign budget is distributed across all ad groups automatically. */
   budgetOptimizeOn: boolean;
@@ -732,13 +749,9 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
     // Step-objective.tsx flips `enabled: false` automatically if a merchant
     // picks Traffic / Reach / Video Views (Smart+ isn't in the upgraded
     // experience for those yet).
-    smartPlus: {
-      enabled: true,
-      smartTargeting: "AUTO",
-      smartBudget: "AUTO",
-      smartPlacement: "AUTO",
-      smartCreative: "AUTO",
-    },
+    smartPlus: { enabled: true },
+    searchAdsEnabled: false,
+    searchKeywords: [],
     budgetOptimizeOn: false,
     pixelMode: "none",
     pixelId: "",
