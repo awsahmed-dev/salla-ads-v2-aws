@@ -106,6 +106,12 @@ export function TikTokStepAudience() {
   // Demographics / Interests / Custom audiences all hide when ON because
   // Search targeting is intent-based, not demographic-based.
   const searchAdsOn = campaign.objective.searchAdsEnabled === true && isSales;
+  // Upgraded Smart+ Sales — per TikTok's help docs the *supported* targeting
+  // is just Location + Language + (limited Gender) + exclusion audiences.
+  // Age range, interest categories/keywords, custom-audience include, OS
+  // are not in the Smart+ Web API scope — TikTok auto-targets those from
+  // the conversion signal. We hide them in Smart+ Sales (non-Search).
+  const smartPlusSalesActive = sp.enabled && isSales && !searchAdsOn;
 
   /* Readiness checklist */
   const hasLocation = (aud.locationIds?.length ?? 0) > 0 || (aud.cities?.length ?? 0) > 0;
@@ -189,8 +195,100 @@ export function TikTokStepAudience() {
             />
           )}
 
-          {/* ---- 2. Demographics (always shown for non-Search; hidden in Search Ads mode) ---- */}
-          {!searchAdsOn && (
+          {/* ---- 2. Demographics ----
+              Smart+ Sales: TikTok's Web Campaigns docs list ONLY Location +
+              Language + (limited) Gender + exclusion audiences. Age range,
+              interest categories/keywords, custom-audience include, OS are
+              not in the Smart+ Web API scope — TikTok auto-targets those.
+              So Smart+ Sales gets a slim Language + Gender card with an
+              "AI auto-targets the rest" note. Classic Sales / other
+              objectives get the full DemographicsCard. */}
+          {!searchAdsOn && smartPlusSalesActive && (
+            <SectionCard>
+              <div className="flex flex-col gap-4">
+                {/* Languages (required when multi-country) */}
+                <div className="flex flex-col gap-2">
+                  <Label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    Languages
+                    {aud.locationIds.length > 1 && <span className="text-destructive">*</span>}
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { code: "ar", label: "Arabic" },
+                      { code: "en", label: "English" },
+                    ].map((lang) => {
+                      const selected = aud.languages.includes(lang.code);
+                      return (
+                        <button
+                          key={lang.code}
+                          type="button"
+                          onClick={() => {
+                            const next = selected
+                              ? aud.languages.filter((c) => c !== lang.code)
+                              : [...aud.languages, lang.code];
+                            updateNested("audience", { languages: next });
+                          }}
+                          className={cn(
+                            "rounded-full border px-4 py-2 text-xs font-medium transition-all",
+                            selected
+                              ? "border-[#004956] bg-[#004956] text-white"
+                              : "border-border bg-white text-foreground hover:border-[#a4ffe5]"
+                          )}
+                        >
+                          {lang.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Gender (with limited-availability note per TikTok docs) */}
+                <div className="flex flex-col gap-2">
+                  <Label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    Gender
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px] font-medium text-muted-foreground">
+                      Limited availability
+                    </Badge>
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: "ALL",   label: "All",    value: "GENDER_UNLIMITED" as const },
+                      { id: "MALE",  label: "Male",   value: "GENDER_MALE" as const },
+                      { id: "FEMALE",label: "Female", value: "GENDER_FEMALE" as const },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => updateNested("audience", { gender: opt.value })}
+                        className={cn(
+                          "rounded-full border px-4 py-2 text-xs font-medium transition-all",
+                          aud.gender === opt.value
+                            ? "border-[#004956] bg-[#004956] text-white"
+                            : "border-border bg-white text-foreground hover:border-[#a4ffe5]"
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] italic text-muted-foreground">
+                    Gender targeting has limited availability in Smart+ Sales. Leave as <strong>All</strong> for best delivery.
+                  </p>
+                </div>
+
+                {/* AI-handles-the-rest note */}
+                <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9]/60 p-2.5">
+                  <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                  <p className="text-[11px] leading-snug text-foreground/80">
+                    <strong className="text-[#004956]">Age, interests, keywords, and devices are auto-targeted</strong> by Smart+ from your conversion event. These fields aren't exposed by TikTok's Smart+ Web Campaigns API — adding them wouldn't change delivery.
+                  </p>
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Classic mode (non-Smart+ Sales or other objectives): full demographics */}
+          {!searchAdsOn && !smartPlusSalesActive && (
           <DemographicsCard
             languageCodes={aud.languages}
             onLanguagesChange={(codes) => updateNested("audience", { languages: codes })}
@@ -209,12 +307,14 @@ export function TikTokStepAudience() {
           />
           )}
 
-          {/* ---- 3. Audience signals — unified picker. Replaces the old
-              free-text Interest Keywords + Purchase Intent inputs and the
-              separate Interest Categories card. Sources from TikTok's
-              predefined catalog (mock today, real API later). Hidden in
-              Search Ads mode — keywords replace interests there. ---- */}
-          {!searchAdsOn && (
+          {/* ---- 3. Audience signals — unified picker. ----
+              Hidden in two cases:
+                • Smart+ Sales — TikTok's Smart+ Web API doesn't accept
+                  interest_category_ids / interest_keyword_ids /
+                  purchase_intention_keyword_ids. The picker would feed
+                  fields TikTok ignores.
+                • Search Ads — replaced by the keyword table above. */}
+          {!searchAdsOn && !smartPlusSalesActive && (
           <>
           <AudienceSignalsPicker
             interestCategoryIds={aud.interests}
@@ -227,8 +327,15 @@ export function TikTokStepAudience() {
             })}
             storeCategory="FASHION" /* TODO: derive from Salla store profile when wired */
           />
+          </>
+          )}
 
-
+          {/* ---- 4. Salla Smart Features (Salla-side, NOT TikTok API)
+              Lookalike audiences + recent-purchaser exclusion are Salla
+              platform features. They appear regardless of Smart+ vs
+              classic — they're not TikTok-API-gated. ---- */}
+          {!searchAdsOn && (
+          <>
           {/* ---- 6. Salla Smart Features (shared) ---- */}
           <SallaSmartFeaturesCard
             learnMoreTrigger={<LearnMoreTrigger {...sallaSmartLearnMore.triggerProps} />}
@@ -253,6 +360,12 @@ export function TikTokStepAudience() {
           />
 
           {/* ---- 5. Advanced Targeting (collapsible) ---- */}
+          {/* Advanced (Custom Audiences + Device Targeting) — hidden in Smart+
+              Sales. Neither field is in the Smart+ Web API scope: custom_
+              audience_ids include is unsupported (only exclusion is), and
+              operating_systems isn't listed. Both are valid in classic
+              non-Smart+ flow and other objectives. */}
+          {!smartPlusSalesActive && (
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
             <CollapsibleTrigger asChild>
               <button
@@ -346,6 +459,7 @@ export function TikTokStepAudience() {
                 </SectionCard>
             </CollapsibleContent>
           </Collapsible>
+          )}
           </>
           )}
 

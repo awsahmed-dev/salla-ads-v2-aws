@@ -3193,19 +3193,31 @@ export function TikTokStepCreative() {
   const isVideoViews = campaign.objective.objective === "VIDEO_VIEWS";
   const isLeadGen = campaign.objective.objective === "LEAD_GENERATION";
   const isAppPromo = campaign.objective.objective === "APP_PROMOTION";
-  // Narrow allowed formats when VSA + dynamic_format is on. TikTok's
-  // dynamic_format=DYNAMIC_CREATIVE only accepts a video (Single Video or
-  // Spark Ad) as the base creative — it then auto-rotates between Catalog
-  // Video / Single Video / Carousel format *presentations* at delivery time.
-  // Image and Carousel inputs don't apply because TikTok generates those
-  // variations from the video itself.
+  // Narrow allowed formats. Three rules in priority order:
+  //   1) VSA + dynamic_format → Single Video + Spark only (TikTok auto-
+  //      rotates the format presentations from the merchant video).
+  //   2) Search Ads → Spark + Carousel Image (per Search Ads docs).
+  //   3) Smart+ Sales (non-Search, non-VSA-dynamic) → Single Video + Spark
+  //      only. Smart+ Web Campaigns docs don't list Single Image or
+  //      Carousel as supported creative formats.
+  // Otherwise: full set from apiConfig.allowedAdFormats.
   const rawAllowedFormats = apiConfig.allowedAdFormats;
   const isVsaDynamic = campaign.objective.catalogEnabled
     && campaign.objective.shoppingAdsType === "VIDEO_SHOPPING_ADS"
     && campaign.objective.dynamicFormat;
-  const allowedFormats: TikTokAdFormat[] = isVsaDynamic
-    ? rawAllowedFormats.filter((f) => f === "SINGLE_VIDEO" || f === "SPARK_AD")
-    : rawAllowedFormats;
+  const searchAdsOn = campaign.objective.searchAdsEnabled === true
+    && campaign.objective.objective === "PRODUCT_SALES";
+  const smartPlusSalesActive = campaign.objective.smartPlus.enabled
+    && campaign.objective.objective === "PRODUCT_SALES"
+    && !searchAdsOn;
+  const allowedFormats: TikTokAdFormat[] =
+    isVsaDynamic
+      ? rawAllowedFormats.filter((f) => f === "SINGLE_VIDEO" || f === "SPARK_AD")
+    : searchAdsOn
+      ? rawAllowedFormats.filter((f) => f === "SPARK_AD" || f === "CAROUSEL")
+    : smartPlusSalesActive
+      ? rawAllowedFormats.filter((f) => f === "SINGLE_VIDEO" || f === "SPARK_AD")
+      : rawAllowedFormats;
   const [activeAdIdx, setActiveAdIdx] = useState(0);
   const [placementExpanded, setPlacementExpanded] = useState(false);
 

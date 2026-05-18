@@ -467,6 +467,47 @@ export function TikTokStepReview() {
           <div className="flex-1 overflow-y-auto">
             <div className={cn("mx-auto w-full max-w-3xl space-y-5 px-8 py-10", WIZARD_FOOTER_PADDING_BOTTOM)}>
 
+              {/* Campaign type context — Smart+ / Search Ads / classic.
+                  Tells the merchant which endpoint will be called and what
+                  the campaign's targeting model is BEFORE they hit submit. */}
+              {(() => {
+                const sp = campaign.objective.smartPlus?.enabled === true;
+                const isSales = campaign.objective.objective === "PRODUCT_SALES";
+                const searchAds = campaign.objective.searchAdsEnabled === true && isSales;
+                const catalogOn = campaign.objective.catalogEnabled === true;
+
+                let label = "Classic in-feed campaign";
+                let endpoint = "/open_api/v1.3/campaign/create/";
+                let badgeBg = "bg-slate-100 text-slate-700";
+                let body = "Manual targeting and creative — TikTok's classic Ads Manager flow.";
+
+                if (searchAds) {
+                  label = "Search Ads campaign";
+                  endpoint = "/open_api/v1.3/campaign/create/ · ad-group search_result_enabled + search_keywords";
+                  badgeBg = "bg-amber-100 text-amber-800";
+                  body = "Targeting is driven by your keywords on TikTok's Search Result Page. Creative restricted to Spark / Carousel Image.";
+                } else if (sp && (isSales || campaign.objective.objective === "LEAD_GENERATION" || campaign.objective.objective === "APP_PROMOTION")) {
+                  label = catalogOn
+                    ? `Smart+ Sales · Catalog (${campaign.objective.shoppingAdsType === "CATALOG_LISTING_ADS" ? "Catalog Listing" : "Video Shopping"})`
+                    : "Smart+ Sales · Web";
+                  endpoint = "/open_api/v1.3/smart_plus/campaign/create/";
+                  badgeBg = "bg-[#e6fff9] text-[#004956]";
+                  body = "TikTok auto-targets age, interests, keywords, and devices from your conversion signal. You set the KPIs, creative, and Location/Language.";
+                }
+
+                return (
+                  <div className="mb-6 rounded-2xl border border-border bg-card p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", badgeBg)}>
+                        {label}
+                      </span>
+                      <code className="text-[10px] font-mono text-muted-foreground">{endpoint}</code>
+                    </div>
+                    <p className="mt-2 text-[11px] leading-snug text-muted-foreground">{body}</p>
+                  </div>
+                );
+              })()}
+
               <div className="mb-6">
                 <h1 className="text-balance text-2xl font-bold tracking-tight text-foreground">
                   Review your campaign

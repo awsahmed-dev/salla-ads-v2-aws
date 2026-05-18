@@ -58,6 +58,7 @@ import {
 } from "lucide-react";
 import { FrequencyCapCard } from "@/components/shared/frequency-cap-card";
 import { BudgetDurationCard } from "@/components/shared/budget-duration-card";
+import { DaypartingCard } from "@/components/tiktok/dayparting-card";
 import { PerformanceBoostCard } from "@/components/shared/performance-boost-card";
 import { SectionCard } from "@/components/shared/section-card";
 import { InfoTip } from "@/components/shared/info-tip";
@@ -883,6 +884,17 @@ export function TikTokStepBudget() {
             onAutoIncreaseChange={(ai) => updateNested("budget", { autoIncrease: ai })}
             onBulkUpdate={(updates) => updateNested("budget", updates)}
             showSmartStart={true}
+          />
+
+          {/* ======================================================= */}
+          {/* SECTION 4b: Dayparting (TikTok API: schedule_type +      */}
+          {/* dayparting). Map of 168 hour slots (Mon-Sun × 24h).      */}
+          {/* ======================================================= */}
+          <DaypartingCard
+            scheduleType={budget.scheduleType ?? "ALL_DAY"}
+            dayparting={budget.dayparting ?? ""}
+            onScheduleTypeChange={(t) => updateNested("budget", { scheduleType: t })}
+            onDaypartingChange={(mask) => updateNested("budget", { dayparting: mask })}
           />
 
           {/* ======================================================= */}

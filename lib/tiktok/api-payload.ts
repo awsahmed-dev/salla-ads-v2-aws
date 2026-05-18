@@ -266,6 +266,13 @@ export function buildTikTokApiPayload(
       // ad group. Removed from ad-group level to avoid duplicate/rejected fields.
       schedule_start_time: toApiDateTime(budget.startDate),
       ...(budget.endDate && !budget.endDateOptional && { schedule_end_time: toApiDateTime(budget.endDate, true) }),
+      // Dayparting — when CUSTOM, emit schedule_type=SCHEDULE_CUSTOMIZE +
+      // the 168-char dayparting binary mask. ALL_DAY relies on TikTok's
+      // default schedule (start/end inclusive, no hour restriction).
+      ...(budget.scheduleType === "CUSTOM" && budget.dayparting && {
+        schedule_type: "SCHEDULE_CUSTOMIZE",
+        dayparting: budget.dayparting,
+      }),
       // Phase 3 fix: pixel_id gate now also excludes TRAFFIC with CLICK goal.
       // Pixel is only relevant for TRAFFIC when optimizing for Landing Page
       // View; click-optimization Traffic campaigns don't use a pixel.
@@ -294,18 +301,27 @@ export function buildTikTokApiPayload(
         }),
       }),
       location_ids: audience.locationIds,
-      age_groups: toTikTokAgeGroups(audience.ageMin, audience.ageMax),
+      // Age groups + interest fields — suppressed in BOTH Smart+ Sales
+      // (TikTok auto-targets these) AND Search Ads mode (keywords replace
+      // demographics). Available in classic non-Smart+ Sales and other
+      // objectives.
+      ...(!(smartPlusEnabled && isSales) && !searchAdsOn
+        && { age_groups: toTikTokAgeGroups(audience.ageMin, audience.ageMax) }),
       gender: audience.gender,
       languages: audience.languages,
-      // Interest-based targeting — suppressed entirely in Search Ads mode
-      // because search-keyword intent is the targeting signal there.
-      ...(!searchAdsOn && hasNonMockInterests && { interest_category_ids: audience.interests }),
-      ...(!searchAdsOn && audience.purchaseIntentKeywordIds?.length > 0
+      // Interest-based targeting — suppressed in Smart+ Sales (not in the
+      // Smart+ Web API scope) and in Search Ads mode (keywords replace).
+      ...(!searchAdsOn && !(smartPlusEnabled && isSales) && hasNonMockInterests
+        && { interest_category_ids: audience.interests }),
+      ...(!searchAdsOn && !(smartPlusEnabled && isSales) && audience.purchaseIntentKeywordIds?.length > 0
         ? { purchase_intention_keyword_ids: audience.purchaseIntentKeywordIds }
-        : !searchAdsOn && audience.interestKeywordIds?.length > 0
+        : !searchAdsOn && !(smartPlusEnabled && isSales) && audience.interestKeywordIds?.length > 0
           ? { interest_keyword_ids: audience.interestKeywordIds }
           : {}),
-      ...(audience.operatingSystems.length > 0 && { operating_systems: audience.operatingSystems }),
+      // OS targeting — suppressed in Smart+ Sales (not in the Smart+ Web
+      // API scope per TikTok docs). Available in classic / non-Sales.
+      ...(!(smartPlusEnabled && isSales) && audience.operatingSystems.length > 0
+        && { operating_systems: audience.operatingSystems }),
       // Search Ads — search_result_enabled + search_keywords[] on the ad
       // group. Without these two, the campaign delivers in-feed instead.
       ...((searchAdsOn || budget.searchResultEnabled) && { search_result_enabled: true }),

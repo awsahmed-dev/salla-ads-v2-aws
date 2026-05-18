@@ -460,6 +460,17 @@ export interface AudienceSettings {
 export interface BudgetSettings {
   /** Daily or Lifetime budget. Maps to API budget_mode. */
   budgetMode: BudgetMode;
+  /**
+   * Ad scheduling. Maps to API schedule_type:
+   *   ALL_DAY → SCHEDULE_FROM_NOW or SCHEDULE_START_END (always-on)
+   *   CUSTOM  → SCHEDULE_CUSTOMIZE + a 168-char dayparting mask
+   *             ("1" = active, "0" = paused) representing each hour of the
+   *             week starting Monday 00:00. Hours 0-23 = Mon, 24-47 = Tue,
+   *             etc.
+   */
+  scheduleType: "ALL_DAY" | "CUSTOM";
+  /** 168-char binary mask. Empty string = all-day default. */
+  dayparting: string;
   /** Daily budget in SAR (when budgetMode is BUDGET_MODE_DAY) */
   amount: number;
   /** Total/lifetime budget in SAR (when budgetMode is BUDGET_MODE_TOTAL).
@@ -815,6 +826,8 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
   },
   budget: {
     budgetMode: "BUDGET_MODE_DAY",
+    scheduleType: "ALL_DAY",
+    dayparting: "",
     amount: 200,
     lifetimeAmount: 0,
     optimizationGoal: "CONVERSION",
