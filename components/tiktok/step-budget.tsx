@@ -339,7 +339,12 @@ export function TikTokStepBudget() {
   const isVideoViews = campaign.objective.objective === "VIDEO_VIEWS";
   const isLeadGen = campaign.objective.objective === "LEAD_GENERATION";
   const isAppPromo = campaign.objective.objective === "APP_PROMOTION";
+  const isSales = campaign.objective.objective === "PRODUCT_SALES";
   const hasPixel = campaign.objective.pixelMode !== "none";
+  // Smart+ budget mode — when AUTO, one campaign budget that TikTok
+  // distributes across ad groups (sets budget_optimize_on=true on the API).
+  const sp = campaign.objective.smartPlus;
+  const smartBudgetEligible = sp.enabled && (isSales || isLeadGen || isAppPromo);
 
 
   /* Auto-increase from campaign context (fallback for old drafts) */
@@ -470,6 +475,43 @@ export function TikTokStepBudget() {
       <div className={cn("flex flex-col gap-6 lg:flex-row", WIZARD_FOOTER_PADDING_BOTTOM)}>
         {/* ============= LEFT COLUMN ============= */}
         <div className="flex flex-1 flex-col gap-5">
+
+          {/* ---- Smart+ Budget mode header ---- */}
+          {smartBudgetEligible && (
+            <SectionCard>
+              <div className="flex flex-wrap items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#004956]">
+                  <Sparkles className="size-4 text-[#a4ffe5]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="text-sm font-bold text-foreground">Budget & schedule</p>
+                    <Badge className="rounded-full bg-[#e6fff9] px-2 py-0 text-[10px] font-bold text-[#004956] hover:bg-[#e6fff9]">Smart+</Badge>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    {sp.smartBudget === "AUTO"
+                      ? "One campaign budget. TikTok distributes it across ad groups for the best delivery (budget_optimize_on)."
+                      : "You set a separate budget per ad group and control distribution manually."}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5 rounded-full border border-border bg-white p-0.5">
+                  {(["AUTO", "CUSTOM"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => updateNested("objective", { smartPlus: { ...sp, smartBudget: mode } })}
+                      className={cn(
+                        "rounded-full px-3 py-1 text-[11px] font-medium capitalize transition-all",
+                        sp.smartBudget === mode ? "bg-[#004956] text-white" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {mode === "AUTO" ? "Automatic" : "Manual"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </SectionCard>
+          )}
 
           {/* ======================================================= */}
           {/* SECTION 1: Optimization Goal                             */}

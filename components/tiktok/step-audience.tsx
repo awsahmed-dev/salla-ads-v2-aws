@@ -123,6 +123,43 @@ export function TikTokStepAudience() {
         {/* LEFT COLUMN                                                   */}
         {/* ============================================================ */}
         <div className="flex flex-1 flex-col gap-5">
+          {/* ---- Smart+ Audience mode header ---- */}
+          {sp.enabled && (isSales || isAppPromo || isLeadGen) && (
+            <SectionCard>
+              <div className="flex flex-wrap items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#004956]">
+                  <Sparkles className="size-4 text-[#a4ffe5]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="text-sm font-bold text-foreground">Audience targeting</p>
+                    <Badge className="rounded-full bg-[#e6fff9] px-2 py-0 text-[10px] font-bold text-[#004956] hover:bg-[#e6fff9]">Smart+</Badge>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    {smartTargetingAuto
+                      ? "TikTok finds your audience from your conversion signal. You only set Location and Language — everything else is automatic."
+                      : "You control every targeting parameter manually: age, gender, interests, keywords, custom audiences, devices."}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-0.5 rounded-full border border-border bg-white p-0.5">
+                  {(["AUTO", "CUSTOM"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => updateNested("objective", { smartPlus: { ...sp, smartTargeting: mode } })}
+                      className={cn(
+                        "rounded-full px-3 py-1 text-[11px] font-medium capitalize transition-all",
+                        sp.smartTargeting === mode ? "bg-[#004956] text-white" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {mode === "AUTO" ? "Automatic" : "Manual"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
           {/* ---- 1. Location (shared component — same UX as all platforms; maps to locationIds + cities) ---- */}
           <SectionCard>
             <LocationSelector

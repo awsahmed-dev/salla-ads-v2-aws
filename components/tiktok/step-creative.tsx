@@ -208,6 +208,300 @@ function AiFillButton({ onFill, label = "Fill with AI" }: { onFill: () => void; 
   );
 }
 
+/**
+ * Smart+ Recommendation Usage panel — right-rail scorecard that mirrors
+ * TikTok's upgraded Smart+ ad creation experience. Each check is a row
+ * with a status dot; failing rows surface an inline action.
+ *
+ *   ● green  = passed
+ *   ◐ amber  = partial (e.g. has 1 creative, recommended 3+)
+ *   ○ gray   = pending (not yet configured)
+ *
+ * The composite score is a weighted average across 5 modules and drives
+ * the merchant's mental model of "how done is this campaign".
+ */
+function SmartPlusRecommendationCard({
+  catalogConnected,
+  catalogRequired,
+  pixelConnected,
+  pixelRequired,
+  hasBudget,
+  hasAudience,
+  creativeCount,
+  captionCount,
+  onNavigateToBudget,
+}: {
+  catalogConnected: boolean;
+  catalogRequired: boolean;
+  pixelConnected: boolean;
+  pixelRequired: boolean;
+  hasBudget: boolean;
+  hasAudience: boolean;
+  creativeCount: number;
+  captionCount: number;
+  onNavigateToBudget: () => void;
+}) {
+  type Row = {
+    key: string;
+    label: string;
+    state: "pass" | "partial" | "pending";
+    action?: { label: string; onClick?: () => void };
+  };
+
+  const rows: Row[] = [
+    {
+      key: "catalog",
+      label: catalogRequired ? "Catalog" : "Catalog (optional)",
+      state: catalogRequired ? (catalogConnected ? "pass" : "pending") : "pass",
+    },
+    {
+      key: "optimization",
+      label: "Optimization and bidding",
+      state: pixelRequired ? (pixelConnected ? "pass" : "pending") : "pass",
+    },
+    {
+      key: "budget",
+      label: "Budget and schedule",
+      state: hasBudget ? "pass" : "pending",
+    },
+    {
+      key: "audience",
+      label: "Audience targeting",
+      state: hasAudience ? "pass" : "pending",
+    },
+    {
+      key: "placements",
+      label: "Placements",
+      state: "pass", // Smart+ defaults handle this; only goes pending in Manual + empty
+    },
+    {
+      key: "creatives",
+      label: "Creative assets",
+      state: creativeCount >= 3 ? "pass" : creativeCount >= 1 ? "partial" : "pending",
+      action: creativeCount > 0 && creativeCount < 3
+        ? { label: `Add ${3 - creativeCount} more creative${3 - creativeCount > 1 ? "s" : ""}` }
+        : undefined,
+    },
+    {
+      key: "captions",
+      label: "Caption variations",
+      state: captionCount >= 3 ? "pass" : captionCount >= 1 ? "partial" : "pending",
+      action: captionCount > 0 && captionCount < 5
+        ? { label: `Add ${5 - captionCount} more caption${5 - captionCount > 1 ? "s" : ""}` }
+        : undefined,
+    },
+  ];
+
+  const passed = rows.filter((r) => r.state === "pass").length;
+  const partial = rows.filter((r) => r.state === "partial").length;
+  const score = Math.round(((passed + partial * 0.5) / rows.length) * 100);
+  const ringColor = score >= 80 ? "#10b981" : score >= 50 ? "#f59e0b" : "#ef4444";
+
+  return (
+    <SectionCard className="p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Sparkles className="size-4 text-violet-500" />
+        <Label className="text-sm font-bold text-foreground">Recommendation usage</Label>
+        <InfoTip text="Smart+ scorecard. Higher score = TikTok has more signal to optimize delivery. Aim for 80%+ before launching." />
+      </div>
+
+      {/* Score ring + summary */}
+      <div className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3">
+        <div className="relative size-14 shrink-0">
+          <svg viewBox="0 0 56 56" className="size-full -rotate-90">
+            <circle cx="28" cy="28" r="24" fill="none" stroke="#e5e7eb" strokeWidth="4" />
+            <circle
+              cx="28"
+              cy="28"
+              r="24"
+              fill="none"
+              stroke={ringColor}
+              strokeWidth="4"
+              strokeDasharray={`${(score / 100) * 150.8} 150.8`}
+              strokeLinecap="round"
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-sm font-bold tabular-nums text-foreground">{score}</span>
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-foreground">
+            {score >= 80
+              ? "Ad group is fully optimized"
+              : score >= 50
+                ? "Ad group is partially optimized"
+                : "Ad group needs more setup"}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            For best results, apply all recommendations.
+          </p>
+        </div>
+      </div>
+
+      {/* Per-row check list */}
+      <div className="flex flex-col gap-1.5">
+        {rows.map((r) => (
+          <div key={r.key} className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/20">
+            <span
+              className={cn(
+                "size-4 shrink-0 rounded-full",
+                r.state === "pass" && "bg-emerald-500",
+                r.state === "partial" && "bg-amber-400",
+                r.state === "pending" && "bg-slate-300"
+              )}
+              aria-label={r.state}
+            />
+            <span className="flex-1 text-xs text-foreground">{r.label}</span>
+            {r.action && (
+              <button
+                type="button"
+                onClick={r.action.onClick}
+                className="text-[10px] font-semibold text-[#004956] hover:underline"
+              >
+                {r.action.label}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Budget nudge — surfaces when Smart+ thinks current budget is low.
+          Pure prompt today; in production this would reference a TikTok
+          API budget-recommendation field. */}
+      {hasBudget && (
+        <button
+          type="button"
+          onClick={onNavigateToBudget}
+          className="mt-3 flex w-full items-start gap-2 rounded-lg border border-violet-200 bg-gradient-to-r from-violet-50 to-white p-2.5 text-left transition-colors hover:from-violet-100"
+        >
+          <Plus className="mt-0.5 size-3.5 shrink-0 text-violet-600" />
+          <div className="flex-1">
+            <p className="text-[11px] font-semibold text-foreground">Increase budget for full delivery</p>
+            <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+              Smart+ Sales performs best at 20× your target CPA. Click to review.
+            </p>
+          </div>
+        </button>
+      )}
+    </SectionCard>
+  );
+}
+
+/**
+ * Multi-caption A/B test field — matches TikTok's upgraded Smart+ ad
+ * creation flow (the "Enter text for your ad" stack in the screenshot).
+ * Up to 5 captions; the first is the primary `ad_text`, the rest are
+ * sent as the `ad_texts` array on the creative payload.
+ *
+ * Each row has its own AI Fill button. TikTok's Smart+ creative engine
+ * picks the highest-performing caption per impression.
+ */
+function MultiCaptionInputs({
+  primary,
+  variations,
+  onPrimaryChange,
+  onVariationsChange,
+}: {
+  primary: string;
+  variations: string[];
+  onPrimaryChange: (v: string) => void;
+  onVariationsChange: (v: string[]) => void;
+}) {
+  // Up to 4 extra variations (5 captions total). 100 chars each.
+  const MAX_EXTRAS = 4;
+
+  // Always render exactly 5 slots: index 0 = primary, 1..4 = variations.
+  // Empty trailing variations stay invisible; an "Add text" button reveals one more.
+  const visibleExtras = Math.max(1, variations.filter((v, i) => v !== "" || i < variations.length).length);
+  const totalRows = Math.min(MAX_EXTRAS + 1, 1 + Math.max(visibleExtras, variations.length || 1));
+
+  const captions: string[] = [primary, ...variations];
+  while (captions.length < totalRows) captions.push("");
+
+  const fillTexts = [
+    "Discover quality products at unbeatable prices. Shop now and enjoy fast shipping across the Kingdom.",
+    "Limited-time offer — free delivery on orders over 200 SAR. Browse the full collection today.",
+    "New arrivals just dropped. Find your next favorite piece before it's gone.",
+    "Trusted by thousands of customers. Mada, Apple Pay, and COD accepted.",
+    "Eid is around the corner. Get your gifts delivered in 24 hours across major cities.",
+  ];
+
+  const updateCaption = (idx: number, val: string) => {
+    if (idx === 0) {
+      onPrimaryChange(val);
+    } else {
+      const next = [...variations];
+      while (next.length < idx) next.push("");
+      next[idx - 1] = val;
+      onVariationsChange(next);
+    }
+  };
+  const removeCaption = (idx: number) => {
+    if (idx === 0) {
+      // The primary cannot be deleted — clear instead.
+      onPrimaryChange("");
+      return;
+    }
+    const next = variations.filter((_, i) => i !== idx - 1);
+    onVariationsChange(next);
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <Label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+          Text <span className="text-destructive">*</span>
+          <InfoTip text="Add up to 5 captions. TikTok's Smart+ creative engine picks the highest-performing variant per impression." />
+        </Label>
+        <span className="text-[10px] text-muted-foreground">{captions.filter((c) => c.trim()).length} of 5</span>
+      </div>
+
+      {captions.map((cap, idx) => (
+        <div key={idx} className="flex items-center gap-1.5">
+          <div className="relative flex-1">
+            <Input
+              placeholder={idx === 0 ? "Enter text for your ad" : "Add another caption variation"}
+              value={cap}
+              maxLength={100}
+              onChange={(e) => updateCaption(idx, e.target.value.slice(0, 100))}
+              className={cn("h-10 pr-24 text-sm", cap.length >= 100 && "border-amber-400")}
+            />
+            <div className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1">
+              <AiFillButton
+                onFill={() => updateCaption(idx, fillTexts[idx % fillTexts.length])}
+                label="AI"
+              />
+              <span className="text-[10px] tabular-nums text-muted-foreground">{cap.length}/100</span>
+              {idx > 0 && (
+                <button
+                  type="button"
+                  onClick={() => removeCaption(idx)}
+                  title="Remove caption"
+                  className="rounded p-0.5 text-muted-foreground hover:text-red-600"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {totalRows < MAX_EXTRAS + 1 && (
+        <button
+          type="button"
+          onClick={() => onVariationsChange([...variations, ""])}
+          className="flex items-center gap-1.5 text-[11px] font-medium text-[#004956] transition-colors hover:text-[#003a44]"
+        >
+          <Plus className="size-3" />
+          Add text
+        </button>
+      )}
+    </div>
+  );
+}
+
 function CharCounter({ current, max }: { current: number; max: number }) {
   const over = current > max;
   return <span className={cn("text-xs tabular-nums", over ? "font-medium text-destructive" : "text-muted-foreground")}>{current}/{max}</span>;
@@ -221,6 +515,8 @@ function makeDefaultAd(format: TikTokAdFormat, index: number, defaultCTA: TikTok
     assets: [],
     carouselCards: [],
     adText: "",
+    adTextVariations: [],
+    onlyShowAsAds: true,
     displayName: "",
     callToAction: defaultCTA,
     landingPageUrl: "",
@@ -1230,30 +1526,24 @@ function AdPanel({
                 </div>
               </div>
 
-              {/* ── Ad Copy ── */}
-              <div className="border-t border-border px-6 py-5">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium text-foreground">Display Name</Label>
-                      <AiFillButton onFill={() => onUpdate({ ...ad, displayName: "Salla Store" })} />
-                    </div>
-                    <div className="relative">
-                      <Input placeholder="Your brand" value={ad.displayName} maxLength={20} onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })} className={cn("h-10 pr-14 text-sm", ad.displayName.length >= 20 && "border-amber-400")} />
-                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.displayName.length}/20</span>
-                    </div>
+              {/* ── Ad Copy — Smart+ multi-caption A/B testing ── */}
+              <div className="border-t border-border px-6 py-5 flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium text-foreground">Display Name</Label>
+                    <AiFillButton onFill={() => onUpdate({ ...ad, displayName: "Salla Store" })} />
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium text-foreground">Ad Caption <span className="text-destructive">*</span></Label>
-                      <AiFillButton onFill={() => onUpdate({ ...ad, adText: "Discover quality products at unbeatable prices. Shop now and enjoy fast shipping across the Kingdom." })} />
-                    </div>
-                    <div className="relative">
-                      <Input placeholder="Write a short caption..." value={ad.adText} maxLength={100} onChange={(e) => onUpdate({ ...ad, adText: e.target.value.slice(0, 100) })} className={cn("h-10 pr-14 text-sm", ad.adText.length >= 100 && "border-amber-400")} />
-                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.adText.length}/100</span>
-                    </div>
+                  <div className="relative">
+                    <Input placeholder="Your brand" value={ad.displayName} maxLength={20} onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })} className={cn("h-10 pr-14 text-sm", ad.displayName.length >= 20 && "border-amber-400")} />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.displayName.length}/20</span>
                   </div>
                 </div>
+                <MultiCaptionInputs
+                  primary={ad.adText}
+                  variations={ad.adTextVariations ?? []}
+                  onPrimaryChange={(v) => onUpdate({ ...ad, adText: v })}
+                  onVariationsChange={(v) => onUpdate({ ...ad, adTextVariations: v })}
+                />
               </div>
 
               {/* ── Advanced Options ── */}
@@ -1406,44 +1696,30 @@ function AdPanel({
                 </div>
               </div>
 
-              {/* ── Section 3: Ad Copy ── */}
-              <div className="border-t border-border px-6 py-5">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium text-foreground">Display Name</Label>
-                      <AiFillButton onFill={() => onUpdate({ ...ad, displayName: "Salla Store" })} />
-                    </div>
-                    <div className="relative">
-                      <Input
-                        placeholder="Your brand"
-                        value={ad.displayName}
-                        maxLength={20}
-                        onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })}
-                        className={cn("h-10 pr-14 text-sm", ad.displayName.length >= 20 && "border-amber-400")}
-                      />
-                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.displayName.length}/20</span>
-                    </div>
+              {/* ── Section 3: Ad Copy — Smart+ multi-caption ── */}
+              <div className="border-t border-border px-6 py-5 flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium text-foreground">Display Name</Label>
+                    <AiFillButton onFill={() => onUpdate({ ...ad, displayName: "Salla Store" })} />
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium text-foreground">
-                        Ad Caption <span className="text-destructive">*</span>
-                      </Label>
-                      <AiFillButton onFill={() => onUpdate({ ...ad, adText: "Discover quality products at unbeatable prices. Shop now and enjoy fast shipping across the Kingdom." })} />
-                    </div>
-                    <div className="relative">
-                      <Input
-                        placeholder="Write a short caption..."
-                        value={ad.adText}
-                        maxLength={100}
-                        onChange={(e) => onUpdate({ ...ad, adText: e.target.value.slice(0, 100) })}
-                        className={cn("h-10 pr-14 text-sm", ad.adText.length >= 100 && "border-amber-400")}
-                      />
-                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.adText.length}/100</span>
-                    </div>
+                  <div className="relative">
+                    <Input
+                      placeholder="Your brand"
+                      value={ad.displayName}
+                      maxLength={20}
+                      onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })}
+                      className={cn("h-10 pr-14 text-sm", ad.displayName.length >= 20 && "border-amber-400")}
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.displayName.length}/20</span>
                   </div>
                 </div>
+                <MultiCaptionInputs
+                  primary={ad.adText}
+                  variations={ad.adTextVariations ?? []}
+                  onPrimaryChange={(v) => onUpdate({ ...ad, adText: v })}
+                  onVariationsChange={(v) => onUpdate({ ...ad, adTextVariations: v })}
+                />
               </div>
 
               {/* ── Advanced Options ── */}
@@ -1605,30 +1881,24 @@ function AdPanel({
                 </div>
               </div>
 
-              {/* ── Section 3: Ad Copy ── */}
-              <div className="border-t border-border px-6 py-5">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium text-foreground">Display Name</Label>
-                      <AiFillButton onFill={() => onUpdate({ ...ad, displayName: "Salla Store" })} />
-                    </div>
-                    <div className="relative">
-                      <Input placeholder="Your brand" value={ad.displayName} maxLength={20} onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })} className={cn("h-10 pr-14 text-sm", ad.displayName.length >= 20 && "border-amber-400")} />
-                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.displayName.length}/20</span>
-                    </div>
+              {/* ── Section 3: Ad Copy — Smart+ multi-caption (Carousel) ── */}
+              <div className="border-t border-border px-6 py-5 flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium text-foreground">Display Name</Label>
+                    <AiFillButton onFill={() => onUpdate({ ...ad, displayName: "Salla Store" })} />
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium text-foreground">Ad Caption <span className="text-destructive">*</span></Label>
-                      <AiFillButton onFill={() => onUpdate({ ...ad, adText: "Discover quality products at unbeatable prices. Shop now and enjoy fast shipping across the Kingdom." })} />
-                    </div>
-                    <div className="relative">
-                      <Input placeholder="Write a short caption..." value={ad.adText} maxLength={100} onChange={(e) => onUpdate({ ...ad, adText: e.target.value.slice(0, 100) })} className={cn("h-10 pr-14 text-sm", ad.adText.length >= 100 && "border-amber-400")} />
-                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.adText.length}/100</span>
-                    </div>
+                  <div className="relative">
+                    <Input placeholder="Your brand" value={ad.displayName} maxLength={20} onChange={(e) => onUpdate({ ...ad, displayName: e.target.value.slice(0, 20) })} className={cn("h-10 pr-14 text-sm", ad.displayName.length >= 20 && "border-amber-400")} />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-muted-foreground">{ad.displayName.length}/20</span>
                   </div>
                 </div>
+                <MultiCaptionInputs
+                  primary={ad.adText}
+                  variations={ad.adTextVariations ?? []}
+                  onPrimaryChange={(v) => onUpdate({ ...ad, adText: v })}
+                  onVariationsChange={(v) => onUpdate({ ...ad, adTextVariations: v })}
+                />
               </div>
 
               {/* ── Advanced Options ── */}
@@ -3139,6 +3409,37 @@ export function TikTokStepCreative() {
                 </div>
               </div>
             )}
+
+            {/* Custom-identity deprecation note + Only-show-as-ads toggle.
+                Matches TikTok's upgraded Smart+ ad creation flow exactly:
+                merchants can no longer use a "custom identity" (brand name
+                only); a real TikTok account is required for ad delivery.
+                Only-show-as-ads ON means ads run as in-feed only, not on
+                the creator's public profile. */}
+            {ads[0] && (
+              <div className="border-t border-border px-6 py-4 flex flex-col gap-3">
+                <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9]/60 p-3">
+                  <Info className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                  <p className="text-[11px] leading-snug text-foreground/80">
+                    <strong className="text-[#004956]">Custom identity is no longer supported.</strong> Using a TikTok account maximizes ad engagement and helps people find and engage with your brand.
+                  </p>
+                </div>
+                <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/30">
+                  <input
+                    type="checkbox"
+                    checked={ads[0].onlyShowAsAds !== false}
+                    onChange={(e) => updateAd(ads[0].id, { ...ads[0], onlyShowAsAds: e.target.checked })}
+                    className="mt-0.5 size-4 cursor-pointer accent-[#004956]"
+                  />
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-foreground">Only show as ads</p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                      Publish your posts as ads only. Otherwise, they will appear on your TikTok profile for anyone to see and engage with.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
           </div>
 
           {/* ---- Ad Placement & Brand Safety (merged, collapsible) ---- */}
@@ -3787,6 +4088,25 @@ export function TikTokStepCreative() {
               identityDisplayName={identity.displayName}
               identityAvatarUrl={identity.avatarPreviewUrl}
             />
+
+            {/* ---- 1.5 RECOMMENDATION USAGE (Smart+ scoring) ----
+                Matches TikTok's upgraded Smart+ ad creation right rail.
+                Score is a weighted sum of 5 health checks. Each row shows
+                a status dot + label; failing rows surface an inline action
+                (e.g. "Add 5 more creatives", "Increase budget"). */}
+            {campaign.objective.smartPlus.enabled && (
+              <SmartPlusRecommendationCard
+                catalogConnected={!!campaign.objective.catalogId && campaign.objective.catalogEnabled}
+                catalogRequired={campaign.objective.catalogEnabled}
+                pixelConnected={!!campaign.objective.pixelId || campaign.objective.pixelMode !== "none"}
+                pixelRequired={campaign.objective.objective === "PRODUCT_SALES" || campaign.objective.objective === "TRAFFIC"}
+                hasBudget={campaign.budget.amount > 0 || campaign.budget.lifetimeAmount > 0}
+                hasAudience={(campaign.audience.locationIds?.length ?? 0) > 0}
+                creativeCount={ads.reduce((sum, a) => sum + (a.adFormat === "CAROUSEL" ? a.carouselCards.length : a.assets.length), 0)}
+                captionCount={(ads[0]?.adText ? 1 : 0) + (ads[0]?.adTextVariations?.filter((v) => v.trim()).length ?? 0)}
+                onNavigateToBudget={() => setStep(2)}
+              />
+            )}
 
             {/* ---- 2. CAMPAIGN READINESS ---- */}
             <TikTokCampaignReadiness

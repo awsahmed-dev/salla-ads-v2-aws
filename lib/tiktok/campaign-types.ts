@@ -562,8 +562,18 @@ export interface TikTokAd {
   assets: CreativeAsset[];
   /** Carousel cards (only for CAROUSEL format, 2-35 standard, 2-20 VSA). Maps to image_ids + carousel_image_index. */
   carouselCards: CarouselCard[];
-  /** Ad text / caption (max 100 chars). Maps to API ad_text. */
+  /** Ad text / caption (max 100 chars). Maps to API ad_text. The first
+   *  caption is required; additional variants live in adTextVariations
+   *  and are sent as `ad_texts` (Smart+ multi-text A/B test, up to 5). */
   adText: string;
+  /** Additional caption variations for Smart+ multi-text rotation.
+   *  TikTok's upgraded Smart+ allows up to 5 ad text variants total
+   *  (including adText). Empty array = single-caption ad. */
+  adTextVariations: string[];
+  /** When true, ads only show as in-feed ads — they do not appear on the
+   *  creator's TikTok profile. Maps to API show_only_as_ads. Default true
+   *  for Smart+ Sales (most merchants don't want public profile posts). */
+  onlyShowAsAds: boolean;
   /** Display name / brand name (max 20 chars). Maps to API display_name. */
   displayName: string;
   /** CTA button. Maps to API call_to_action. */

@@ -387,11 +387,22 @@ export function buildTikTokApiPayload(
               ? { tiktok_item_id: `<RESOLVED_ITEM_ID:${ad.sparkAdAuthCode || "pending"}>` }
               : {
                   ad_text: (ad.adText || "").slice(0, 100),
+                  // Smart+ multi-caption A/B: collect non-empty variations
+                  // into ad_texts. TikTok rotates through them per impression
+                  // and picks the highest-performing one.
+                  ...(ad.adTextVariations && ad.adTextVariations.filter((v) => v.trim()).length > 0 && {
+                    ad_texts: [
+                      (ad.adText || "").slice(0, 100),
+                      ...ad.adTextVariations.filter((v) => v.trim()).map((v) => v.slice(0, 100)),
+                    ],
+                  }),
                   display_name: (ad.displayName || creative.identity?.displayName || "").slice(0, 20),
                   call_to_action: ad.callToAction,
                   // Phase 5 fix: App Promotion creatives derive the destination
                   // from app_id (set on the ad group), not landing_page_url.
                   ...(ad.landingPageUrl && !isAppPromo && { landing_page_url: ad.landingPageUrl }),
+                  // Only-show-as-ads (default true). Maps to API show_only_as_ads.
+                  ...(ad.onlyShowAsAds !== false && { show_only_as_ads: true }),
                 }),
             ...(ad.adFormat === "SINGLE_VIDEO" && !isSpark && ad.assets.length > 0 && { video_id: ad.assets[0].mediaId || "<VIDEO_ID>" }),
             ...(ad.adFormat === "SINGLE_IMAGE" && ad.assets.length > 0 && { image_ids: [ad.assets[0].mediaId || "<IMAGE_ID>"] }),

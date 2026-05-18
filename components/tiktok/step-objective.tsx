@@ -561,13 +561,14 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
               </div>
 
-              {/* ── Upgraded Smart+ Panel ──
-                  TikTok's 2026 unified experience. Available for Sales /
-                  Lead Gen / App Promo only — the toggle below the panel
-                  doesn't render for Traffic / Reach / Video Views.
+              {/* ── Upgraded Smart+ status note ──
+                  Smart+ is the default for Sales / Lead Gen / App Promo —
+                  no master toggle. Each subsequent step (Audience, Budget,
+                  Design) presents its own Auto/Manual choice inline,
+                  matching TikTok's 2026 unified experience.
                   Reference: https://ads.tiktok.com/help/article/about-updates-to-smart-plus */}
               {(obj.objective === "PRODUCT_SALES" || obj.objective === "LEAD_GENERATION" || obj.objective === "APP_PROMOTION") && (
-                <SmartPlusPanel />
+                <SmartPlusStatusNote />
               )}
 
               {/* ── Salla Product Catalog ── */}
@@ -1850,14 +1851,43 @@ function AppPromotionSection() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   Upgraded Smart+ Panel
+   Smart+ status note (Objective step)
    ──────────────────────────────────────────────────────────────────────
-   Master toggle + 4 module sub-toggles. Each module = Auto | Custom.
-   When the master toggle is off, the campaign falls back to the classic
-   create_ad path. Salla-merchant best-practice default: ALL four modules
-   on AUTO.
+   Just an inline informational badge that tells merchants this campaign
+   is running on the upgraded Smart+ unified experience. Per-module
+   choices live inside Audience / Budget / Design steps instead.
    ════════════════════════════════════════════════════════════════════ */
-function SmartPlusPanel() {
+function SmartPlusStatusNote() {
+  const { campaign } = useTikTokCampaign();
+  const objective = campaign.objective.objective;
+  const objLabel = objective === "PRODUCT_SALES" ? "Sales"
+                 : objective === "LEAD_GENERATION" ? "Lead Generation"
+                 : "App Promotion";
+  return (
+    <div className="border-t border-border">
+      <div className="px-4 sm:px-8 py-5">
+        <div className="flex items-start gap-3 rounded-xl border border-[#a4ffe5] bg-gradient-to-br from-[#e6fff9] via-white to-[#e6fff9]/40 p-4">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#004956]">
+            <Sparkles className="size-4 text-[#a4ffe5]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className="text-sm font-bold text-[#004956]">Smart+ {objLabel}</p>
+              <Badge className="rounded-full bg-[#a4ffe5] px-2 py-0 text-[10px] font-bold text-[#004956] hover:bg-[#a4ffe5]">Upgraded 2026</Badge>
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-foreground/80">
+              This campaign runs on TikTok's upgraded Smart+ experience. You'll choose Auto or Manual for each step (Audience, Budget, Design) — TikTok handles whatever you leave on Auto.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Legacy panel removed in favor of the inline status note above plus
+   per-step mode toggles. Kept here for one rev so reviewers can diff. */
+function _Unused_SmartPlusPanel() {
   const { campaign, updateNested } = useTikTokCampaign();
   const sp = campaign.objective.smartPlus;
   const objective = campaign.objective.objective;
