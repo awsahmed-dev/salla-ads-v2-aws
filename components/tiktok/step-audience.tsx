@@ -95,6 +95,12 @@ export function TikTokStepAudience() {
   const customAudiencesLearnMore = useLearnMore();
   const keywordsLearnMore = useLearnMore();
   const isSales = campaign.objective.objective === "PRODUCT_SALES";
+  // Smart+ targeting mode — when AUTO, hide everything except Location and
+  // Language. TikTok's upgraded Smart+ uses your conversion signal + the
+  // baseline location/language as the only inputs and finds the audience
+  // itself. Custom = full manual controls (the classic flow).
+  const sp = campaign.objective.smartPlus;
+  const smartTargetingAuto = sp.enabled && sp.smartTargeting === "AUTO";
 
   /* Readiness checklist */
   const hasLocation = (aud.locationIds?.length ?? 0) > 0 || (aud.cities?.length ?? 0) > 0;
@@ -143,7 +149,65 @@ export function TikTokStepAudience() {
 
           </SectionCard>
 
-          {/* ---- 2. Demographics (shared: English/Arabic, Male/Female, age bands) ---- */}
+          {/* ---- 2. Smart+ Auto Banner (when smartTargeting === AUTO) ---- */}
+          {smartTargetingAuto && (
+            <SectionCard>
+              <div className="flex items-start gap-3 rounded-xl border border-[#a4ffe5] bg-gradient-to-br from-[#e6fff9] to-white p-4">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#004956]">
+                  <Sparkles className="size-4 text-[#a4ffe5]" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-[#004956]">Smart Targeting · Auto</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-foreground/80">
+                    TikTok will find your audience automatically using signals from your conversion event and product catalog. You only need to set <strong>Location</strong> above and <strong>Language</strong> below — age, gender, interests, and keywords are handled by TikTok's optimizer.
+                  </p>
+                  <p className="mt-2 text-[10px] italic text-muted-foreground">
+                    Switch <strong>Targeting</strong> to <strong>Custom</strong> on the Objective step to control these manually.
+                  </p>
+                </div>
+              </div>
+              {/* Slim Language picker — Smart+ baseline minimum. */}
+              <div className="mt-4 flex flex-col gap-2">
+                <Label className="text-sm font-medium text-foreground">
+                  Language {aud.locationIds.length > 1 && <span className="text-destructive">*</span>}
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { code: "ar", label: "Arabic" },
+                    { code: "en", label: "English" },
+                  ].map((lang) => {
+                    const selected = aud.languages.includes(lang.code);
+                    return (
+                      <button
+                        key={lang.code}
+                        type="button"
+                        onClick={() => {
+                          const next = selected
+                            ? aud.languages.filter((c) => c !== lang.code)
+                            : [...aud.languages, lang.code];
+                          updateNested("audience", { languages: next });
+                        }}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+                          selected
+                            ? "border-[#004956] bg-[#004956] text-white"
+                            : "border-border bg-white text-foreground hover:border-[#a4ffe5]"
+                        )}
+                      >
+                        {lang.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {aud.languages.length === 0 && aud.locationIds.length > 1 && (
+                  <p className="text-[10px] text-red-600">Language is required when targeting more than one country.</p>
+                )}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ---- 2. Demographics (full controls, only when smartTargeting === CUSTOM) ---- */}
+          {!smartTargetingAuto && (
           <DemographicsCard
             languageCodes={aud.languages}
             onLanguagesChange={(codes) => updateNested("audience", { languages: codes })}
@@ -160,8 +224,11 @@ export function TikTokStepAudience() {
             accent="primary"
             languageRequired={aud.locationIds.length > 1}
           />
+          )}
 
-          {/* ---- 3. Interests (unified) ---- */}
+          {/* ---- 3+ Interests / Keywords / Advanced — all hidden in Smart+ Auto ---- */}
+          {!smartTargetingAuto && (
+          <>
           <InterestTargetingCard
             options={INTERESTS}
             value={aud.interests}
@@ -454,6 +521,8 @@ export function TikTokStepAudience() {
                 </SectionCard>
             </CollapsibleContent>
           </Collapsible>
+          </>
+          )}
 
         </div>
 

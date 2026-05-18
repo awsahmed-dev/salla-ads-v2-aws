@@ -331,11 +331,40 @@ export type ShoppingAdsType =
 /** How products are selected from the catalog */
 export type ProductSelectionMode = "ALL" | "PRODUCT_SET" | "SPECIFIC";
 
+/* ---- Smart+ (upgraded) module toggles ---------------------------- */
+/**
+ * Upgraded Smart+ has 4 independently-toggleable automation modules
+ * per TikTok's Jan 2026 launch. Each can be "Auto" (TikTok decides) or
+ * "Custom" (merchant decides).
+ *
+ * Only valid for SALES / LEAD_GENERATION / APP_PROMOTION objectives.
+ * Traffic / Reach / Video Views still use the classic create endpoint
+ * (POST /open_api/v1.3/campaign/create/).
+ *
+ * When enabled, the campaign payload swaps to:
+ *   POST /open_api/v1.3/smart_plus/campaign/create/
+ */
+export type SmartPlusModuleMode = "AUTO" | "CUSTOM";
+export interface SmartPlusSettings {
+  /** Master toggle. Default ON for Sales / Lead Gen / App Promo. */
+  enabled: boolean;
+  /** Audience targeting automation. AUTO = location + language only. */
+  smartTargeting: SmartPlusModuleMode;
+  /** Budget automation. AUTO = campaign-level budget, TikTok distributes. */
+  smartBudget: SmartPlusModuleMode;
+  /** Placement automation. AUTO = TikTok picks placements. */
+  smartPlacement: SmartPlusModuleMode;
+  /** Creative automation. AUTO = dynamic_format + smart rotation. */
+  smartCreative: SmartPlusModuleMode;
+}
+
 export interface ObjectiveSettings {
   campaignName: string;
   objective: TikTokObjective;
   /** Website or Catalog-based product sales */
   promotionType: PromotionType;
+  /** Upgraded Smart+ module toggles. Only meaningful for Sales / Lead Gen / App Promo. */
+  smartPlus: SmartPlusSettings;
   /** Campaign Budget Optimization. Maps to API budget_optimize_on.
    *  When enabled, campaign budget is distributed across all ad groups automatically. */
   budgetOptimizeOn: boolean;
@@ -689,6 +718,17 @@ export const defaultTikTokCampaign: TikTokCampaignData = {
     campaignName: "",
     objective: "PRODUCT_SALES",
     promotionType: "WEBSITE",
+    // Smart+ ON by default — applies only to Sales/Lead Gen/App Promo.
+    // Step-objective.tsx flips `enabled: false` automatically if a merchant
+    // picks Traffic / Reach / Video Views (Smart+ isn't in the upgraded
+    // experience for those yet).
+    smartPlus: {
+      enabled: true,
+      smartTargeting: "AUTO",
+      smartBudget: "AUTO",
+      smartPlacement: "AUTO",
+      smartCreative: "AUTO",
+    },
     budgetOptimizeOn: false,
     pixelMode: "none",
     pixelId: "",

@@ -80,6 +80,10 @@ export const EVENT_TO_API: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 
 export type TikTokApiPayload = {
+  /** Endpoint hint for the submit layer. When "smart_plus" the campaign
+   *  POST goes to /open_api/v1.3/smart_plus/campaign/create/ instead of the
+   *  classic /open_api/v1.3/campaign/create/. Stripped before sending. */
+  _endpoint?: "classic" | "smart_plus";
   campaign: Record<string, unknown>;
   adgroup: Record<string, unknown>;
   instant_form?: Record<string, unknown>;
@@ -124,6 +128,16 @@ export function buildTikTokApiPayload(
   const isSales = !isReach && !isTraffic && !isVideoViews && !isLeadGen && !isAppPromo;
   const isCatalogListing = objective.catalogEnabled && objective.shoppingAdsType === "CATALOG_LISTING_ADS";
 
+  // Upgraded Smart+ — only valid for Sales / Lead Gen / App Promo per
+  // TikTok docs. The submit layer reads `_endpoint: "smart_plus"` to swap
+  // /campaign/create/ for /smart_plus/campaign/create/.
+  const sp = objective.smartPlus;
+  const smartPlusEnabled = sp.enabled && (isSales || isLeadGen || isAppPromo);
+  const smartTargetingAuto = smartPlusEnabled && sp.smartTargeting === "AUTO";
+  const smartBudgetAuto = smartPlusEnabled && sp.smartBudget === "AUTO";
+  const smartPlacementAuto = smartPlusEnabled && sp.smartPlacement === "AUTO";
+  const smartCreativeAuto = smartPlusEnabled && sp.smartCreative === "AUTO";
+
   const advertiserId = opts.advertiserId || "<ADVERTISER_ID>";
   const campaignId = opts.campaignId || "<CAMPAIGN_ID>";
   const adgroupId = opts.adgroupId || "<ADGROUP_ID>";
@@ -144,6 +158,7 @@ export function buildTikTokApiPayload(
     isSales && objective.catalogEnabled ? { catalog_id: resolvedCatalogId } : {};
 
   const payload: TikTokApiPayload = {
+    _endpoint: smartPlusEnabled ? "smart_plus" : "classic",
     campaign: {
       advertiser_id: advertiserId,
       campaign_name: objective.campaignName,
@@ -151,6 +166,16 @@ export function buildTikTokApiPayload(
       ...(isSales && { promotion_type: objective.catalogEnabled ? "CATALOG" : "WEBSITE" }),
       ...campaignCatalogField,
       operation_status: "ENABLE",
+      // Upgraded Smart+ module flags. Field names track TikTok's documented
+      // smart_plus/campaign/create payload — exact runtime names will be
+      // confirmed in the BC sandbox. The values themselves are stable.
+      ...(smartPlusEnabled && {
+        smart_plus_campaign: true,
+        smart_targeting_enabled: smartTargetingAuto,
+        smart_budget_enabled: smartBudgetAuto,
+        smart_placement_enabled: smartPlacementAuto,
+        smart_creative_enabled: smartCreativeAuto,
+      }),
     },
     adgroup: {
       advertiser_id: advertiserId,

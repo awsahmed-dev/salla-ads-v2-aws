@@ -242,6 +242,17 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
           createError: "",
         },
       }),
+      // Smart+ (upgraded) is only available for Sales / Lead Gen / App Promo.
+      // Auto-disable when moving to Traffic / Reach / Video Views — those
+      // objectives are not yet part of the upgraded Smart+ unified experience
+      // and must use the classic create_ad path. We preserve module choices
+      // so re-enabling restores the merchant's previous setup.
+      smartPlus: {
+        ...obj.smartPlus,
+        enabled: (value === "PRODUCT_SALES" || value === "LEAD_GENERATION" || value === "APP_PROMOTION")
+          ? obj.smartPlus.enabled
+          : false,
+      },
       // Reset App Promo settings when leaving App Promotion
       ...(leavingAppPromo && {
         appSettings: {
@@ -549,6 +560,15 @@ export function TikTokStepObjective({ onCancel }: { onCancel?: () => void }) {
                   </span>
                 </div>
               </div>
+
+              {/* ── Upgraded Smart+ Panel ──
+                  TikTok's 2026 unified experience. Available for Sales /
+                  Lead Gen / App Promo only — the toggle below the panel
+                  doesn't render for Traffic / Reach / Video Views.
+                  Reference: https://ads.tiktok.com/help/article/about-updates-to-smart-plus */}
+              {(obj.objective === "PRODUCT_SALES" || obj.objective === "LEAD_GENERATION" || obj.objective === "APP_PROMOTION") && (
+                <SmartPlusPanel />
+              )}
 
               {/* ── Salla Product Catalog ── */}
               {config.catalogAvailable && (
@@ -1826,6 +1846,149 @@ function AppPromotionSection() {
         </div>
       </div>
     </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   Upgraded Smart+ Panel
+   ──────────────────────────────────────────────────────────────────────
+   Master toggle + 4 module sub-toggles. Each module = Auto | Custom.
+   When the master toggle is off, the campaign falls back to the classic
+   create_ad path. Salla-merchant best-practice default: ALL four modules
+   on AUTO.
+   ════════════════════════════════════════════════════════════════════ */
+function SmartPlusPanel() {
+  const { campaign, updateNested } = useTikTokCampaign();
+  const sp = campaign.objective.smartPlus;
+  const objective = campaign.objective.objective;
+
+  const setMaster = (enabled: boolean) =>
+    updateNested("objective", { smartPlus: { ...sp, enabled } });
+  const setModule = (
+    key: "smartTargeting" | "smartBudget" | "smartPlacement" | "smartCreative",
+    mode: "AUTO" | "CUSTOM",
+  ) => updateNested("objective", { smartPlus: { ...sp, [key]: mode } });
+
+  const modules: Array<{
+    key: "smartTargeting" | "smartBudget" | "smartPlacement" | "smartCreative";
+    label: string;
+    autoDesc: string;
+    customDesc: string;
+  }> = [
+    {
+      key: "smartTargeting",
+      label: "Targeting",
+      autoDesc: "TikTok finds your audience automatically from conversion signals. You only set location and language.",
+      customDesc: "You define age, gender, interests, keywords, and audience lists yourself.",
+    },
+    {
+      key: "smartBudget",
+      label: "Budget",
+      autoDesc: "One campaign budget. TikTok distributes it across ad groups for best results.",
+      customDesc: "You set a separate budget per ad group and control distribution.",
+    },
+    {
+      key: "smartPlacement",
+      label: "Placements",
+      autoDesc: "TikTok picks placements across TikTok, Pangle, and partner apps for best delivery.",
+      customDesc: "You choose which placements to include and configure brand safety.",
+    },
+    {
+      key: "smartCreative",
+      label: "Creative",
+      autoDesc: "TikTok rotates between Catalog Video, Single Video, and Carousel format variations automatically.",
+      customDesc: "You pick the format and control each ad's video, image, caption, and CTA manually.",
+    },
+  ];
+
+  const objLabel = objective === "PRODUCT_SALES" ? "Sales"
+                 : objective === "LEAD_GENERATION" ? "Lead Generation"
+                 : "App Promotion";
+
+  return (
+    <div className="border-t border-border">
+      <div className="px-4 sm:px-8 py-5">
+        {/* Master header */}
+        <div className="rounded-2xl border-2 border-[#a4ffe5] bg-gradient-to-br from-[#e6fff9] via-white to-[#e6fff9]/40 p-5">
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#004956]">
+              <Sparkles className="size-5 text-[#a4ffe5]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-base font-bold text-[#004956]">Smart+ {objLabel}</p>
+                <Badge className="rounded-full bg-[#004956] px-2 py-0 text-[10px] font-bold text-white hover:bg-[#004956]">
+                  Recommended
+                </Badge>
+                <Badge className="rounded-full bg-[#a4ffe5] px-2 py-0 text-[10px] font-bold text-[#004956] hover:bg-[#a4ffe5]">
+                  Upgraded 2026
+                </Badge>
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-foreground/80">
+                TikTok's AI handles targeting, budget allocation, placements, and creative rotation — fine-tune any module below or leave it on Auto. Smart+ campaigns show 10–15% lower CPA on average for catalog-driven Sales.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={cn("text-xs font-semibold", sp.enabled ? "text-[#004956]" : "text-muted-foreground")}>
+                {sp.enabled ? "On" : "Off"}
+              </span>
+              <Switch checked={sp.enabled} onCheckedChange={setMaster} />
+            </div>
+          </div>
+
+          {/* Module toggles — visible only when master is ON */}
+          {sp.enabled && (
+            <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
+              {modules.map((m) => {
+                const mode = sp[m.key];
+                const isAuto = mode === "AUTO";
+                return (
+                  <div
+                    key={m.key}
+                    className={cn(
+                      "rounded-xl border bg-white p-3 transition-colors",
+                      isAuto ? "border-[#a4ffe5]" : "border-border"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-foreground">{m.label}</p>
+                      <div className="flex items-center gap-0.5 rounded-full border border-border bg-white p-0.5">
+                        {(["AUTO", "CUSTOM"] as const).map((opt) => (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => setModule(m.key, opt)}
+                            className={cn(
+                              "rounded-full px-2.5 py-0.5 text-[10px] font-medium capitalize transition-all",
+                              mode === opt ? "bg-[#004956] text-white" : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {opt === "AUTO" ? "Auto" : "Custom"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                      {isAuto ? m.autoDesc : m.customDesc}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Off-state note */}
+          {!sp.enabled && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5">
+              <Sparkles className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+              <p className="text-[11px] leading-snug text-amber-800">
+                Smart+ is off — your campaign will use the classic Ads Manager flow. You'll configure targeting, budget, placements, and creative manually in the next steps.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
