@@ -19,6 +19,35 @@ import type { TikTokCampaignData } from "./campaign-types";
 export const SALLA_MOCK_PIXEL_ID = "CMOCK1234567890";
 export const SALLA_MOCK_CATALOG_ID = "CMOCK_CATALOG_001";
 
+/**
+ * Salla's TikTok Marketing API partner identifier. Emitted as
+ * `open_api_partner` on every Smart+ campaign body so TikTok-side
+ * analytics attribute the campaign to the Salla integration. Real
+ * value is provisioned by TikTok during onboarding; this placeholder
+ * resolves at submit-time.
+ */
+export const SALLA_PARTNER_ID = "SALLA_E_COMMERCE";
+
+/**
+ * Generate a request_id (deduplication token). TikTok requires a
+ * unique token per submit attempt on every body: campaign, ad-group,
+ * and ad. Format is a short UUID-like string; TikTok docs accept any
+ * unique string up to 64 chars.
+ *
+ * In preview mode we use a stable seed so the JSON-view panel doesn't
+ * thrash on every re-render. In submit mode we generate a fresh one
+ * per call to ensure each retry has a unique token.
+ */
+export function generateRequestId(seed?: string): string {
+  if (seed) return `salla_${seed}`;
+  // crypto.randomUUID() is universally available in modern runtimes;
+  // fall back to a timestamp+random combo if it's missing.
+  const cryptoUuid = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  return `salla_${cryptoUuid}`;
+}
+
 /* ---- Age band mapping (Salla demographics -> TikTok API enum) ---- */
 const TIKTOK_AGE_BAND_MAP: Record<string, string> = {
   "18_24": "AGE_18_24",
@@ -132,10 +161,13 @@ export function buildTikTokApiPayload(
   // TikTok docs. The submit layer reads `_endpoint: "smart_plus"` to swap
   // /campaign/create/ for /smart_plus/campaign/create/.
   const sp = objective.smartPlus;
-  const smartPlusEnabled = sp.enabled && (isSales || isLeadGen || isAppPromo);
   // Search Ads (Sales-only) — at the API level this is triggered at the
   // ad-group level via search_result_enabled + search_keywords[].
+  // CRITICAL: Smart+ does NOT include Search inventory. When Search Ads
+  // is enabled, the campaign must route through the classic
+  // /campaign/create/ endpoint regardless of the Smart+ master flag.
   const searchAdsOn = isSales && objective.searchAdsEnabled === true;
+  const smartPlusEnabled = sp.enabled && (isSales || isLeadGen || isAppPromo) && !searchAdsOn;
 
   const advertiserId = opts.advertiserId || "<ADVERTISER_ID>";
   const campaignId = opts.campaignId || "<CAMPAIGN_ID>";
@@ -151,33 +183,61 @@ export function buildTikTokApiPayload(
   const hasNonMockInterests =
     audience.interests.length > 0 && !audience.interests.every((id) => id.startsWith("TT_"));
 
-  // Phase 2 fix: for catalog sales, catalog_id is required at the campaign level
-  // (matching promotion_type=CATALOG). Also emitted on the ad group below.
-  const campaignCatalogField =
-    isSales && objective.catalogEnabled ? { catalog_id: resolvedCatalogId } : {};
+  // Generate stable request_ids. In preview mode the seed locks the IDs
+  // so the JSON panel doesn't shimmer on every keystroke; in submit mode
+  // we want fresh UUIDs so retries don't collide with TikTok's de-dup.
+  const reqIdSeed = opts.mode === "preview" ? `preview_${objective.campaignName || "draft"}` : undefined;
+  const campaignRequestId = generateRequestId(reqIdSeed && `c_${reqIdSeed}`);
+  const adgroupRequestId = generateRequestId(reqIdSeed && `ag_${reqIdSeed}`);
 
   const payload: TikTokApiPayload = {
+    // Search Ads forces classic endpoint regardless of Smart+ master.
+    // Smart+ Web docs don't include Search Result Page inventory.
     _endpoint: smartPlusEnabled ? "smart_plus" : "classic",
-    campaign: {
+    campaign: smartPlusEnabled ? {
+      // ── SmartPlusCampaignCreateBody (23-field spec) ─────────────────
       advertiser_id: advertiserId,
       campaign_name: objective.campaignName,
       objective_type: objective.objective,
-      ...(isSales && { promotion_type: objective.catalogEnabled ? "CATALOG" : "WEBSITE" }),
-      ...campaignCatalogField,
+      request_id: campaignRequestId,                  // REQUIRED
       operation_status: "ENABLE",
-      // Upgraded Smart+ — every Sales / Lead Gen / App Promo campaign
-      // routes through /smart_plus/campaign/create/ via the _endpoint
-      // hint above. The campaign object itself only carries the
-      // smart_plus_campaign marker; per-module Auto/Custom is gone
-      // because the upgraded UX exposes every field directly.
-      ...(smartPlusEnabled && {
-        smart_plus_campaign: true,
+      campaign_type: "REGULAR_CAMPAIGN",
+      open_api_partner: SALLA_PARTNER_ID,
+      ...(budget.amount > 0 && { budget: budget.budgetMode === "BUDGET_MODE_TOTAL" ? budget.lifetimeAmount : budget.amount }),
+      ...(budget.amount > 0 && { budget_mode: budget.budgetMode }),
+      ...(objective.budgetOptimizeOn && { budget_optimize_on: true }),
+      // Smart+ uses `sales_destination` (WEBSITE / APP / TIKTOK_SHOP_STORE)
+      // instead of the classic `promotion_type`. For Sales, WEBSITE covers
+      // both Salla store and Salla-catalog cases — catalog routing is
+      // signaled separately via catalog_enabled + catalog_type.
+      ...(isSales && { sales_destination: "WEBSITE" }),
+      // Catalog routing: campaign body gets catalog_enabled + catalog_type
+      // only. The actual catalog_id lives on the ad-group body.
+      ...(isSales && objective.catalogEnabled && {
+        catalog_enabled: true,
+        catalog_type: "ECOMMERCE",
       }),
+      // App Promo specifics (mirror what we set at ad-group level).
+      ...(isAppPromo && {
+        app_id: objective.appSettings.appId || "<APP_ID>",
+        app_promotion_type: objective.appSettings.appPromotionType,
+      }),
+    } : {
+      // ── Classic CampaignCreateBody (Sales / Search Ads / Reach / etc.) ─
+      advertiser_id: advertiserId,
+      campaign_name: objective.campaignName,
+      objective_type: objective.objective,
+      request_id: campaignRequestId,                  // REQUIRED for all bodies
+      operation_status: "ENABLE",
+      // Classic Sales still uses promotion_type + campaign-level catalog_id.
+      ...(isSales && { promotion_type: objective.catalogEnabled ? "CATALOG" : "WEBSITE" }),
+      ...(isSales && objective.catalogEnabled && { catalog_id: resolvedCatalogId }),
     },
     adgroup: {
       advertiser_id: advertiserId,
       campaign_id: campaignId,
       adgroup_name: `${objective.campaignName} - Ad Group`,
+      request_id: adgroupRequestId,                  // REQUIRED per spec
       ...(isSales && { promotion_type: objective.catalogEnabled ? "CATALOG" : "WEBSITE" }),
       // PRODUCT_SALES only supports PLACEMENT_TIKTOK (Pangle/GlobalApp not available for sales).
       placement_type: isSales ? "PLACEMENT_TYPE_NORMAL" : creative.placementType,
@@ -358,6 +418,7 @@ export function buildTikTokApiPayload(
           return [{
             advertiser_id: advertiserId,
             adgroup_id: adgroupId,
+            request_id: generateRequestId(reqIdSeed && `ad_cla_${reqIdSeed}`),
             creatives: [{
               ad_name: claAd.name,
               // CATALOG_LISTING_ADS is the ad_format marker for CLA creatives.
@@ -396,6 +457,7 @@ export function buildTikTokApiPayload(
         return {
           advertiser_id: advertiserId,
           adgroup_id: adgroupId,
+          request_id: generateRequestId(reqIdSeed && `ad_${ad.id}_${reqIdSeed}`),
           creatives: [{
             ad_name: ad.name,
             ad_format: adFormat,
