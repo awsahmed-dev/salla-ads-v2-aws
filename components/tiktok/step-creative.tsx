@@ -3193,29 +3193,36 @@ export function TikTokStepCreative() {
   const isVideoViews = campaign.objective.objective === "VIDEO_VIEWS";
   const isLeadGen = campaign.objective.objective === "LEAD_GENERATION";
   const isAppPromo = campaign.objective.objective === "APP_PROMOTION";
-  // Narrow allowed formats. Three rules in priority order:
+  // Narrow allowed formats. Four rules in priority order:
   //   1) VSA + dynamic_format → Single Video + Spark only (TikTok auto-
   //      rotates the format presentations from the merchant video).
-  //   2) Search Ads → Spark + Carousel Image (per Search Ads docs).
-  //   3) Smart+ Sales (non-Search, non-VSA-dynamic) → Single Video + Spark
-  //      only. Smart+ Web Campaigns docs don't list Single Image or
-  //      Carousel as supported creative formats.
+  //   2) Search Ads → Spark + Carousel only (per Search Ads docs).
+  //   3) Smart+ Sales WITHOUT catalog → Single Video + Spark only. The
+  //      Smart+ Web Campaigns docs don't list Single Image or Carousel.
+  //   4) Smart+ Sales WITH catalog VSA non-dynamic → all 4 formats. TikTok
+  //      catalog ads explicitly support Single Video, Single Image, and
+  //      Carousel as base creatives (with product cards attached). This is
+  //      the case that was previously being over-narrowed.
+  //   5) CLA → no picker (rendered separately, never hits this list).
   // Otherwise: full set from apiConfig.allowedAdFormats.
   const rawAllowedFormats = apiConfig.allowedAdFormats;
   const isVsaDynamic = campaign.objective.catalogEnabled
     && campaign.objective.shoppingAdsType === "VIDEO_SHOPPING_ADS"
     && campaign.objective.dynamicFormat;
+  const isCatalogVsa = campaign.objective.catalogEnabled
+    && campaign.objective.shoppingAdsType === "VIDEO_SHOPPING_ADS";
   const searchAdsOn = campaign.objective.searchAdsEnabled === true
     && campaign.objective.objective === "PRODUCT_SALES";
-  const smartPlusSalesActive = campaign.objective.smartPlus.enabled
+  const smartPlusSalesNoCatalog = campaign.objective.smartPlus.enabled
     && campaign.objective.objective === "PRODUCT_SALES"
-    && !searchAdsOn;
+    && !searchAdsOn
+    && !isCatalogVsa;
   const allowedFormats: TikTokAdFormat[] =
     isVsaDynamic
       ? rawAllowedFormats.filter((f) => f === "SINGLE_VIDEO" || f === "SPARK_AD")
     : searchAdsOn
       ? rawAllowedFormats.filter((f) => f === "SPARK_AD" || f === "CAROUSEL")
-    : smartPlusSalesActive
+    : smartPlusSalesNoCatalog
       ? rawAllowedFormats.filter((f) => f === "SINGLE_VIDEO" || f === "SPARK_AD")
       : rawAllowedFormats;
   const [activeAdIdx, setActiveAdIdx] = useState(0);
