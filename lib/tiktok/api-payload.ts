@@ -333,6 +333,11 @@ export function buildTikTokApiPayload(
       bid_type: budget.bidType,
       ...(budget.bidType === "BID_TYPE_CUSTOM" && budget.optimizationGoal === "CONVERSION" && { conversion_bid_price: budget.bidAmount }),
       ...(budget.bidType === "BID_TYPE_CUSTOM" && (budget.optimizationGoal === "VIDEO_VIEW" || budget.optimizationGoal === "FOCUSED_VIEW") && { bid_price: budget.bidAmount }),
+      // REACH custom bid → CPM cap goes on bid_price (matches docs).
+      // Today the UI restricts REACH to LOWEST_COST so this branch is
+      // dormant, but keeping it makes the payload safe if a future
+      // change unlocks manual CPM for awareness campaigns.
+      ...(budget.bidType === "BID_TYPE_CUSTOM" && isReach && { bid_price: budget.bidAmount }),
       // Phase 3 fix: Traffic + CLICK + custom bid had no branch — campaigns
       // shipped with no bid field at all. Use bid_price (CPC bidding).
       ...(budget.bidType === "BID_TYPE_CUSTOM" && isTraffic && budget.optimizationGoal === "CLICK" && { bid_price: budget.bidAmount }),
@@ -444,6 +449,24 @@ export function buildTikTokApiPayload(
       // API scope per TikTok docs). Available in classic / non-Sales.
       ...(!(smartPlusEnabled && isSales) && audience.operatingSystems.length > 0
         && { operating_systems: audience.operatingSystems }),
+      // ── Audience expansion (auto_targeting_enabled) ────────────────
+      // Reach API audit fix: the merchant's expansion toggle was wired
+      // to the UI Switch but never reached TikTok in the classic adgroup
+      // payload. Highest-leverage knob for Reach (and useful for
+      // Traffic / Video Views too). Smart+ already has its own broader
+      // smart_audience_enabled / smart_interest_behavior_enabled fields
+      // on targeting_spec, so we only emit on the classic path.
+      ...(!smartPlusEnabled && audience.autoTargetingEnabled === true
+        && { auto_targeting_enabled: true }),
+      // ── Custom Audiences (include + exclude) ───────────────────────
+      // Reach API audit fix: classic payload silently dropped these.
+      // Smart+ writes them to targeting_spec.audience_ids /
+      // excluded_audience_ids; classic uses the same top-level keys on
+      // the adgroup body per TikTok docs.
+      ...(!smartPlusEnabled && audience.customAudienceIds?.length > 0
+        && { audience_ids: audience.customAudienceIds }),
+      ...(!smartPlusEnabled && audience.excludedAudienceIds?.length > 0
+        && { excluded_audience_ids: audience.excludedAudienceIds }),
       // ── Scenario C: classic Search Ads keywords ───────────────────
       // Per TikTok docs the search ad-group body splits keyword targeting
       // into two arrays:

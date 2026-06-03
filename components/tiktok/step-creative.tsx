@@ -3686,6 +3686,23 @@ export function TikTokStepCreative() {
             </div>
           )}
 
+          {/* Reach awareness banner — creative-step playbook. Short
+              video + clear logo + one message work best for awareness;
+              avoid heavy CTAs since the user is top-of-funnel. */}
+          {isReach && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 p-3">
+              <Sparkles className="mt-0.5 size-4 shrink-0 text-blue-600" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-blue-900">
+                  Awareness mode — keep creative punchy
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-blue-800/90">
+                  Reach campaigns deliver against a CPM auction, so every impression should land your brand fast. <strong>6–15 second videos, brand logo in the first 2 seconds, one core message</strong>. CTA buttons are optional — most users won&apos;t click on awareness; they&apos;ll just remember you.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ---- TikTok Identity ---- */}
           <div className="rounded-xl border border-border bg-card">
             <div className="flex items-center justify-between px-6 py-5">

@@ -489,6 +489,28 @@ export function TikTokStepBudget() {
               both on (TikTok refuses to deliver this combination). */}
           <ScenarioDBlocker />
 
+          {/* Reach awareness banner — parallels the Smart+ banner used
+              for Sales. Surfaces the playbook: CPM bidding, frequency
+              cap controls fatigue, no pixel needed. */}
+          {isReach && (
+            <SectionCard>
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-600">
+                  <Sparkles className="size-4 text-blue-100" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="text-sm font-bold text-foreground">Budget &amp; schedule</p>
+                    <Badge className="rounded-full bg-blue-50 px-2 py-0 text-[10px] font-bold text-blue-700 hover:bg-blue-50">Reach · CPM</Badge>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    Reach campaigns bill by <strong>CPM</strong> (cost per 1,000 impressions). Salla best practice: <strong>start with SAR 100/day for 14 days</strong>, frequency cap at 3 impressions / 7 days. No pixel or conversion tracking needed.
+                  </p>
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
           {/* ---- Smart+ Budget status note ──
               No Auto/Manual toggle. All budget fields show by default with
               AI-recommended defaults. The merchant picks Campaign-level
@@ -670,6 +692,73 @@ export function TikTokStepBudget() {
             )}
           </OptimizationGoalCard>
 
+
+          {/* ======================================================= */}
+          {/* REACH: Primary Frequency Cap card                        */}
+          {/* Promoted out of "Advanced Settings" — frequency + freq_  */}
+          {/* schedule are REQUIRED API fields for Reach (per TikTok   */}
+          {/* Marketing API v1.3) and the single defining knob of the  */}
+          {/* objective. Burying it inside a collapsible was a UX bug. */}
+          {/* The shared FrequencyCapCard component is reused as-is.   */}
+          {/* ======================================================= */}
+          {isReach && (
+            <FrequencyCapCard
+              enabled={true}
+              onEnabledChange={() => {}}
+              hideToggle={true}
+              learnMoreTrigger={<LearnMoreTrigger {...frequencyCapLearnMore.triggerProps} />}
+              maxImpressions={budget.frequencyCap?.frequency ?? 3}
+              onMaxImpressionsChange={(v) =>
+                updateNested("budget", {
+                  frequencyCap: {
+                    frequency: v,
+                    schedule: budget.frequencyCap?.schedule ?? 7,
+                  },
+                })
+              }
+              minImpressions={1}
+              maxImpressionsMax={20}
+              timeWindowValue={String(budget.frequencyCap?.schedule ?? 7)}
+              timeWindowOptions={[
+                { value: "1", label: "1 day" },
+                { value: "7", label: "7 days" },
+                { value: "14", label: "14 days" },
+                { value: "30", label: "30 days" },
+              ]}
+              onTimeWindowChange={(v) =>
+                updateNested("budget", {
+                  frequencyCap: {
+                    frequency: budget.frequencyCap?.frequency ?? 3,
+                    schedule: Number(v) as FrequencySchedule,
+                  },
+                })
+              }
+              timeWindowSummaryLabel={
+                (budget.frequencyCap?.schedule ?? 7) === 1
+                  ? "1 day"
+                  : `${budget.frequencyCap?.schedule ?? 7} days`
+              }
+              accent="primary"
+              infoTipText="Controls how many times each unique user sees your ad. Maps to TikTok API fields frequency + frequency_schedule on the ad-group. REQUIRED for the Reach objective — without it the campaign rejects at submit."
+              summaryTip={
+                <>
+                  <p className="mb-2 text-[11px] text-muted-foreground">
+                    {(budget.frequencyCap?.frequency ?? 3) <= 2
+                      ? "Low frequency — maximizes unique reach but limits message reinforcement. Best for top-of-funnel brand awareness."
+                      : (budget.frequencyCap?.frequency ?? 3) <= 5
+                        ? "Balanced frequency — good mix of reach and message reinforcement. Recommended for most product launches."
+                        : "High frequency — strong message reinforcement but real risk of ad fatigue. Use only for short tactical flights."}
+                  </p>
+                  <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-3 py-2">
+                    <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
+                    <p className="text-xs leading-relaxed text-[#004956]/80">
+                      <span className="font-semibold text-[#004956]">Salla Tip:</span> For product launches in KSA, use <span className="font-semibold">3 times per 7 days</span>. For ongoing brand awareness, drop to <span className="font-semibold">2 times per 7 days</span> to maximize unique reach across your audience.
+                    </p>
+                  </div>
+                </>
+              }
+            />
+          )}
 
           {/* ======================================================= */}
           {/* Phase 5: In-App Event (AEO + App VBO)                   */}
@@ -939,68 +1028,9 @@ export function TikTokStepBudget() {
 
             <CollapsibleContent className={cn("flex flex-col gap-4 rounded-b-2xl px-2 pb-2", showAdvanced && "bg-muted/50")}>
 
-              {/* -- Frequency Capping (Reach only) -- */}
-          {/* ======================================================= */}
-          {/* SECTION 2a: Frequency Cap (Reach objective only; API: frequency + frequency_schedule) */}
-          {/* ======================================================= */}
-          {isReach && (
-            <FrequencyCapCard
-              enabled={true}
-              onEnabledChange={() => {}}
-              hideToggle={true}
-              learnMoreTrigger={<LearnMoreTrigger {...frequencyCapLearnMore.triggerProps} />}
-              maxImpressions={budget.frequencyCap?.frequency ?? 3}
-              onMaxImpressionsChange={(v) =>
-                updateNested("budget", {
-                  frequencyCap: {
-                    frequency: v,
-                    schedule: budget.frequencyCap?.schedule ?? 7,
-                  },
-                })
-              }
-              minImpressions={1}
-              maxImpressionsMax={20}
-              timeWindowValue={String(budget.frequencyCap?.schedule ?? 7)}
-              timeWindowOptions={[
-                { value: "1", label: "1 day" },
-                { value: "7", label: "7 days" },
-                { value: "14", label: "14 days" },
-                { value: "30", label: "30 days" },
-              ]}
-              onTimeWindowChange={(v) =>
-                updateNested("budget", {
-                  frequencyCap: {
-                    frequency: budget.frequencyCap?.frequency ?? 3,
-                    schedule: Number(v) as FrequencySchedule,
-                  },
-                })
-              }
-              timeWindowSummaryLabel={
-                (budget.frequencyCap?.schedule ?? 7) === 1
-                  ? "1 day"
-                  : `${budget.frequencyCap?.schedule ?? 7} days`
-              }
-              accent="primary"
-              infoTipText="Controls how many times each unique user sees your ad. Maps to API fields frequency and frequency_schedule. Prevents ad fatigue and maximizes unique reach."
-              summaryTip={
-                <>
-                  <p className="mb-2 text-[11px] text-muted-foreground">
-                    {(budget.frequencyCap?.frequency ?? 3) <= 2
-                      ? "Low frequency — maximizes unique reach but limits reinforcement. Good for broad awareness."
-                      : (budget.frequencyCap?.frequency ?? 3) <= 5
-                        ? "Balanced frequency — good mix of reach and message reinforcement. Recommended for most campaigns."
-                        : "High frequency — strong message reinforcement but may cause ad fatigue. Best for short campaigns."}
-                  </p>
-                  <div className="flex items-start gap-2 rounded-lg border border-[#a4ffe5] bg-[#e6fff9] px-3 py-2">
-                    <Sparkles className="mt-0.5 size-3.5 shrink-0 text-[#004956]" />
-                    <p className="text-xs leading-relaxed text-[#004956]/80">
-                      <span className="font-semibold text-[#004956]">Salla Tip:</span> For product launches, use <span className="font-semibold">3 times per 7 days</span>. For ongoing brand awareness, use <span className="font-semibold">2 times per 7 days</span> to maximize unique reach.
-                    </p>
-                  </div>
-                </>
-              }
-            />
-          )}
+              {/* Frequency Cap moved out — for Reach it's a REQUIRED API
+                  field and now lives as a primary card above the
+                  Bid Strategy section. No other objective uses it. */}
 
               {/* -- Attribution Window -- */}
               {!isReach && budget.optimizationGoal !== "CLICK" && (
@@ -1192,6 +1222,19 @@ export function TikTokStepBudget() {
                 ...(!budget.endDateOptional ? [{ text: "Ongoing campaigns perform up to 40% better. Switch to Ongoing for the best results." }] : []),
                 ...(dailyAmount < suggestedDaily ? [{ text: `Increasing your budget to SAR ${suggestedDaily}/day could significantly improve delivery and reach.` }] : []),
                 ...(budget.bidType !== "BID_TYPE_NO_BID" ? [{ text: "Maximum Delivery (auto-bid) is recommended for most advertisers — it lets TikTok optimize for the best results." }] : []),
+                // Reach playbook — Salla-tuned awareness tactics.
+                ...(isReach && (budget.frequencyCap?.frequency ?? 3) > 5
+                  ? [{ text: "Frequency above 5× / 7 days risks ad fatigue. Drop to 2–3× to stretch your budget further across unique users." }]
+                  : []),
+                ...(isReach && durationDays < 14 && !budget.endDateOptional
+                  ? [{ text: "Awareness flights below 14 days leave money on the table — TikTok needs ~7 days to optimize reach delivery. Extend or switch to Ongoing." }]
+                  : []),
+                ...(isReach && !campaign.audience.autoTargetingEnabled
+                  ? [{ text: "Audience Expansion is off. Reach campaigns get ~2× more unique users when expansion is on — flip it in the Audience step." }]
+                  : []),
+                ...(isReach && campaign.audience.languages.length === 0 && campaign.audience.locationIds.length > 1
+                  ? [{ text: "Multi-country reach without a language filter often wastes impressions on the wrong dialect. Add Arabic (and English if you sell globally) in the Audience step." }]
+                  : []),
               ]}
             />
 

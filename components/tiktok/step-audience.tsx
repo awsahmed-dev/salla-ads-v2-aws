@@ -301,6 +301,29 @@ export function TikTokStepAudience() {
             </SectionCard>
           )}
 
+          {/* Reach context banner — awareness mode, CPM bidding, no
+              pixel needed. Surfaces the playbook upfront so merchants
+              don't have to infer it from buried tooltips. Visually
+              mirrors the Smart+ Sales banner pattern for consistency. */}
+          {isReach && (
+            <SectionCard>
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-600">
+                  <Sparkles className="size-4 text-blue-100" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="text-sm font-bold text-foreground">Awareness mode</p>
+                    <Badge className="rounded-full bg-blue-50 px-2 py-0 text-[10px] font-bold text-blue-700 hover:bg-blue-50">Reach</Badge>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    Reach campaigns optimize for the maximum number of unique users. Bid model is CPM, no pixel required. Pair a broad audience with a frequency cap (in the Budget step) to prevent ad fatigue.
+                  </p>
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
           {/* Classic mode (non-Smart+ Sales or other objectives): full demographics */}
           {!searchAdsOn && !smartPlusSalesActive && (
           <DemographicsCard
@@ -373,6 +396,38 @@ export function TikTokStepAudience() {
             showExcludePurchasers={!isReach && !isVideoViews && !isLeadGen && !isAppPromo}
           />
 
+          {/* ── Reach: Audience Expansion (primary) ───────────────────
+              For Reach this is the single highest-leverage knob — it
+              widens delivery beyond the demographic + interest signals
+              the merchant typed in. Previously buried inside the
+              Advanced Settings collapsible, where merchants never found
+              it. Promoted to a primary card with a Recommended badge.
+              The Advanced collapsible below now hides this for Reach
+              to avoid the duplicate switch. */}
+          {isReach && (
+            <SectionCard>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <Label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Sparkles className="size-4 text-blue-600" />
+                    Audience Expansion
+                    <Badge className="rounded-full bg-emerald-100 px-1.5 py-0 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">
+                      Recommended
+                    </Badge>
+                    <InfoTip text="Maps to TikTok adgroup.auto_targeting_enabled. Tells TikTok it can deliver beyond your typed-in age/gender/interest signals to find users with similar behavior — the single biggest reach multiplier on the platform." />
+                  </Label>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    Let TikTok deliver beyond your typed targeting to similar users. <strong className="text-foreground">Doubles average unique reach</strong> on awareness campaigns and almost always lowers CPM.
+                  </p>
+                </div>
+                <Switch
+                  checked={aud.autoTargetingEnabled}
+                  onCheckedChange={(v) => updateNested("audience", { autoTargetingEnabled: v })}
+                />
+              </div>
+            </SectionCard>
+          )}
+
           {/* ---- 5. Advanced Targeting (collapsible) ---- */}
           {/* Advanced (Custom Audiences + Device Targeting) — hidden in Smart+
               Sales. Neither field is in the Smart+ Web API scope: custom_
@@ -432,7 +487,9 @@ export function TikTokStepAudience() {
                   }
                 />
 
-                {/* Audience Expansion */}
+                {/* Audience Expansion — hidden for Reach (now a primary
+                    card above) to prevent duplicate switches. */}
+                {!isReach && (
                 <SectionCard>
                   <div className="flex flex-col gap-4">
                     <div>
@@ -471,6 +528,7 @@ export function TikTokStepAudience() {
                     </div>
                   </div>
                 </SectionCard>
+                )}
             </CollapsibleContent>
           </Collapsible>
           )}
