@@ -1136,6 +1136,13 @@ export interface GoogleCreativeSettings {
   appAds: GoogleAppAd[];
   /** Product group listing tree root (Shopping). Maps to AdGroupListingGroupFilter tree */
   productGroupRoot: ProductGroupNode | null;
+  /** Salla Product Set selected via the unified product-set picker
+   *  (Snapchat-parity flow). When set, this is the merchant's primary
+   *  intent — productGroupRoot is derived from it at persist time.
+   *  Kept alongside the listing_group tree so the review step can show
+   *  the merchant-friendly set name instead of dimension jargon. */
+  shoppingProductSetId?: string;
+  shoppingProductSetName?: string;
   /** Retail PMax listing group mode */
   retailListingMode?: RetailListingMode;
   /** Selected values for retail listing groups (categories/brands/labels) */

@@ -617,8 +617,18 @@ export interface TikTokAd {
    * CTA and landing_page_url are optional overrides.
    */
   sparkAdEnabled: boolean;
-  /** TikTok post auth code (used to get tiktok_item_id). Maps to API tiktok_item_id. */
+  /** TikTok post auth code (primary, classic single-Spark flow). Maps to API
+   *  tiktok_item_id. Kept for backwards-compat with non-Smart+ paths and as
+   *  the seed value of `sparkAuthCodes[0]` in Smart+ Sales. */
   sparkAdAuthCode: string;
+  /** Smart+ Sales multi-Spark: array of auth codes, one per linked TikTok
+   *  post. Each code becomes its own creative_list[] entry on the Smart+
+   *  ad body, so TikTok can A/B rotate across multiple organic posts inside
+   *  one ad. Empty in classic flows. */
+  sparkAuthCodes: string[];
+  /** UI-only flag: when true, the Spark editor renders a bulk-paste textarea
+   *  (one code per line); when false, the per-row inputs. Not sent to TikTok. */
+  sparkBulkInputMode?: boolean;
   /** Allow duet on Spark Ad post. Maps to API item_duet_status. ENABLE | DISABLE */
   sparkDuetStatus?: "ENABLE" | "DISABLE";
   /** Allow stitch on Spark Ad post. Maps to API item_stitch_status. ENABLE | DISABLE */

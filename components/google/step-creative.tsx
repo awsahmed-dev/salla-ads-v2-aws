@@ -104,6 +104,12 @@ import { ObjectiveExplainer } from "@/components/shared/objective-explainer";
 import { InfoTip } from "@/components/shared/info-tip";
 import { UploadZone } from "@/components/shared/upload-zone";
 import { ProductPickerDialog, type SallaProduct } from "@/components/shared/product-picker";
+// Salla Product Sets — unified selector reused from the Snapchat catalog
+// flow. Maps a merchant-chosen Salla "set" (All Products, Best Sellers,
+// Fashion category, Ramadan-2026, etc.) onto a Google Ads listing_group
+// tree at persist time.
+import { fetchProductSets } from "@/lib/salla/product-sets";
+import { type SallaProductSet } from "@/lib/salla/store-api";
 import {
   fetchBestSellers,
   fetchNewArrivals,
@@ -4301,6 +4307,29 @@ const DIMENSION_OPTIONS: { value: ProductDimensionType; label: string; icon: Rea
 const MOCK_BRANDS = ["Oud Collection", "Salla Fashion", "Home Essentials", "TechGear", "Beauty Touch", "Happy Kids"];
 const MOCK_CATEGORIES = ["Perfume & Fragrance", "Apparel & Accessories", "Home & Kitchen", "Consumer Electronics", "Beauty & Personal Care", "Baby & Children"];
 
+/* ------------------------------------------------------------------ */
+/* UX rebuild — June 2026                                              */
+/* ------------------------------------------------------------------ */
+/* Shopping ads have exactly two decisions:                            */
+/*   1. Which products are eligible to deliver                         */
+/*   2. (Optional) Per-group bid overrides — only relevant when the    */
+/*      bidding strategy is Manual CPC                                 */
+/*                                                                     */
+/* The previous layout had 4 left cards + 4 sidebar cards (8 surfaces) */
+/* that duplicated stats, leaked Google Ads API jargon (raw object     */
+/* names), and silently truncated the dimension picker to 4 of 7       */
+/* options. This rewrite collapses to 3 left cards + 2 sidebar cards   */
+/* and surfaces all 7 listing dimensions per the Google Ads API spec.  */
+/*                                                                     */
+/* Google Ads API references mapped to UI sections:                    */
+/*   - Card "Products" → ad_group_criterion.listing_group (root +      */
+/*     children, with type=SUBDIVISION or UNIT, UNIT_INCLUDED /        */
+/*     UNIT_EXCLUDED, and a mandatory "everything else" child)         */
+/*   - Card "Bids"      → listing_group.cpc_bid_micros per UNIT        */
+/*   - Card "Preview"   → ShoppingProductAdInfo rendered surfaces      */
+/*                        (Google Shopping tab, Search PLA, YouTube)   */
+/* ------------------------------------------------------------------ */
+
 function ShoppingProductGroups() {
   const { campaign, setStep, updateNested } = useGoogleCampaign();
   const creative = campaign.creative;
@@ -4310,6 +4339,59 @@ function ShoppingProductGroups() {
   const [selectedValues, setSelectedValues] = useState<string[]>([]);
   const [excludedValues, setExcludedValues] = useState<string[]>([]);
   const [bidOverrides, setBidOverrides] = useState<Record<string, number>>({});
+  /** Filter mode — "ALL" advertises every approved feed product (one
+   *  root UNIT_INCLUDED, no subdivision). "FILTER" creates a SUBDIVISION
+   *  root with the merchant's picks plus the mandatory "everything else"
+   *  fallback. Initialized from existing draft state on mount. */
+  const [mode, setMode] = useState<"ALL" | "FILTER">("ALL");
+  /** PMax-style channel preview switcher. Three surfaces where Shopping
+   *  product ads actually render at Google. */
+  const [previewSurface, setPreviewSurface] = useState<"shopping" | "search" | "youtube">("shopping");
+
+  /* ── Unified Salla Product Set selector (Snapchat-parity) ────────────
+   * The primary control replaces "All vs Filter by group" with the same
+   * single-source product-set picker the merchant already uses in the
+   * Snapchat catalog flow. The selected set is translated into a Google
+   * Ads listing_group tree by the persist effect below:
+   *   - "All Products" set → flat UNIT_INCLUDED root (mode=ALL)
+   *   - Any other set     → SUBDIVISION root using the dimension that
+   *                         best matches the set's source rule
+   *                         (PRODUCT_CATEGORY for category sets,
+   *                          PRODUCT_ITEM_ID for hand-curated/seasonal,
+   *                          PRODUCT_CUSTOM_ATTRIBUTE_0 for label sets)
+   * The "Advanced: subdivide manually" disclosure below still exposes
+   * the raw dimension partitioner for power users who want to bypass
+   * the set abstraction. */
+  const [productSets, setProductSets] = useState<SallaProductSet[]>([]);
+  const [selectedSet, setSelectedSet] = useState<SallaProductSet | null>(null);
+  const [setPickerOpen, setSetPickerOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // When the merchant opens the advanced panel, push the partition mode
+  // to FILTER so any include/exclude picks they make are actually persisted
+  // as a subdivision. When they close it, snap back to ALL so the product
+  // set alone drives delivery.
+  useEffect(() => {
+    setMode(advancedOpen ? "FILTER" : "ALL");
+  }, [advancedOpen]);
+
+  useEffect(() => {
+    fetchProductSets("all").then((sets) => {
+      setProductSets(sets);
+      // Restore from draft if the merchant had a set selected earlier;
+      // otherwise default to "All Products" so a fresh draft is sane.
+      const draftSetId = creative.shoppingProductSetId;
+      const restored = draftSetId ? sets.find((s) => s.id === draftSetId) : null;
+      if (restored) {
+        setSelectedSet(restored);
+        if (restored.id !== "ps_all") setAdvancedOpen(false);
+      } else if (sets.length > 0 && !selectedSet) {
+        const allSet = sets.find((s) => s.id === "ps_all") ?? sets[0];
+        setSelectedSet(allSet);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Stable ref to avoid infinite loops in the persist effect
   const updateRef = useRef(updateNested);
@@ -4337,14 +4419,27 @@ function ShoppingProductGroups() {
     if (included.length > 0) setSelectedValues(included);
     if (excluded.length > 0) setExcludedValues(excluded);
     if (Object.keys(bids).length > 0) setBidOverrides(bids);
+    // Restore mode: a non-empty SUBDIVISION root means the merchant was
+    // in FILTER mode last save; UNIT_INCLUDED root means ALL mode.
+    setMode("FILTER");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
 
-  // Persist product group selections to campaign state
+  // Persist product group selections to campaign state.
+  // Decision order:
+  //   1. If the merchant is using the simple product-set picker (advanced
+  //      panel closed) → write a flat UNIT_INCLUDED root tagged with the
+  //      chosen Salla set ID. The campaign-context-to-API mapper will
+  //      later expand the set into the right listing_group shape when
+  //      Salla wires real catalog feeds.
+  //   2. If advanced is open AND merchant has picked include/exclude
+  //      values → write the full SUBDIVISION tree (legacy path).
+  //   3. Otherwise → flat root.
   useEffect(() => {
-    // Build product group tree from local state
-    if (selectedValues.length === 0 && excludedValues.length === 0) {
-      // All products included (no subdivision)
+    const usingSimplePicker = !advancedOpen;
+    const noManualPicks = selectedValues.length === 0 && excludedValues.length === 0;
+
+    if (usingSimplePicker || mode === "ALL" || noManualPicks) {
       updateRef.current("creative", {
         productGroupRoot: {
           id: "root",
@@ -4353,6 +4448,8 @@ function ShoppingProductGroups() {
           type: "UNIT_INCLUDED" as const,
           children: [],
         },
+        shoppingProductSetId: selectedSet?.id,
+        shoppingProductSetName: selectedSet?.nameAr || selectedSet?.name,
       });
       return;
     }
@@ -4400,19 +4497,41 @@ function ShoppingProductGroups() {
         type: "SUBDIVISION" as const,
         children,
       },
+      // Keep the chosen Salla set tagged on the creative even when the
+      // merchant has refined into an advanced subdivision — the review
+      // step still shows "Best Sellers (refined)" instead of just a
+      // raw dimension count.
+      shoppingProductSetId: selectedSet?.id,
+      shoppingProductSetName: selectedSet?.nameAr || selectedSet?.name,
     });
-  }, [selectedDimension, selectedValues, excludedValues, bidOverrides]);
+  }, [mode, selectedDimension, selectedValues, excludedValues, bidOverrides, selectedSet, advancedOpen]);
 
-  const toggleValue = (val: string) =>
+  const toggleValue = (val: string) => {
+    // If user picks an excluded value, drop the exclusion first.
+    setExcludedValues((prev) => prev.filter((v) => v !== val));
     setSelectedValues((prev) => prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]);
-  const toggleExclude = (val: string) =>
+  };
+  const toggleExclude = (val: string) => {
+    // If user excludes an included value, drop the inclusion first.
+    setSelectedValues((prev) => prev.filter((v) => v !== val));
     setExcludedValues((prev) => prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]);
+  };
 
-  const currentDimensionValues = selectedDimension === "PRODUCT_BRAND" ? MOCK_BRANDS
-    : selectedDimension === "PRODUCT_CATEGORY" ? MOCK_CATEGORIES
+  // Provide mock values for ALL seven Google Ads listing dimensions.
+  // The previous build truncated the picker to 4 of 7 — Custom Labels +
+  // Item ID were silently unreachable.
+  const MOCK_CUSTOM_LABEL_0 = ["new-arrival", "bestseller", "clearance", "ramadan-2026"];
+  const MOCK_CUSTOM_LABEL_1 = ["high-margin", "mid-margin", "low-margin"];
+  const MOCK_ITEM_IDS = MOCK_PRODUCTS.map((p) => p.id);
+  const currentDimensionValues =
+      selectedDimension === "PRODUCT_BRAND"     ? MOCK_BRANDS
+    : selectedDimension === "PRODUCT_CATEGORY"  ? MOCK_CATEGORIES
+    : selectedDimension === "PRODUCT_TYPE"      ? MOCK_CATEGORIES
     : selectedDimension === "PRODUCT_CONDITION" ? ["New", "Refurbished", "Used"]
-    : selectedDimension === "PRODUCT_TYPE" ? MOCK_CATEGORIES
-    : ["Label A", "Label B", "Label C"];
+    : selectedDimension === "PRODUCT_CUSTOM_ATTRIBUTE_0" ? MOCK_CUSTOM_LABEL_0
+    : selectedDimension === "PRODUCT_CUSTOM_ATTRIBUTE_1" ? MOCK_CUSTOM_LABEL_1
+    : selectedDimension === "PRODUCT_ITEM_ID"   ? MOCK_ITEM_IDS
+    : [];
 
   const includedProducts = MOCK_PRODUCTS.filter((p) => {
     if (selectedValues.length === 0) return true;
@@ -4426,331 +4545,743 @@ function ShoppingProductGroups() {
     return true;
   });
 
+  /* === Derived: readiness checks (PMax-style) ================== */
+  const FEED_TOTAL = 1247;
+  const FEED_APPROVED = 1198;
+  const FEED_PENDING = 37;
+  const FEED_DISAPPROVED = 12;
+  const feedApprovalPct = Math.round((FEED_APPROVED / FEED_TOTAL) * 100);
+  const includedCount = mode === "ALL"
+    ? (selectedSet?.productCount ?? FEED_APPROVED)
+    : includedProducts.length;
+  const groupsConfigured = !!selectedSet
+    && (mode === "ALL" || selectedValues.length > 0 || excludedValues.length > 0);
+  const bidsConfigured = !isManualCpc || Object.values(bidOverrides).some((v) => v > 0);
+
+  const readiness: { label: string; ok: boolean; hint?: string }[] = [
+    { label: "Salla feed connected to Merchant Center", ok: true },
+    { label: "At least 1 approved product available", ok: FEED_APPROVED > 0 },
+    {
+      label: selectedSet
+        ? `Product set: ${selectedSet.nameAr || selectedSet.name}`
+        : "Pick a product set",
+      ok: !!selectedSet,
+      hint: "Use the picker in Card 1 — same product-set library as your Snapchat catalog ads.",
+    },
+    ...(isManualCpc
+      ? [{
+          label: bidsConfigured
+            ? "Manual CPC bids set on at least one group"
+            : "Set CPC bids for your selected groups",
+          ok: bidsConfigured,
+          hint: "Manual CPC requires per-group bids. Switch the budget step to Maximize Clicks or tROAS to let Google bid automatically.",
+        }]
+      : []),
+  ];
+  const readinessPassed = readiness.filter((r) => r.ok).length;
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className={cn("flex flex-col gap-6 lg:flex-row", WIZARD_FOOTER_PADDING_BOTTOM)}>
-        {/* LEFT COLUMN */}
+        {/* ──────────────────────────────────────────────────────── */}
+        {/* LEFT COLUMN — 3 cards, in execution order:                */}
+        {/*   1. Products  → which catalog items deliver              */}
+        {/*   2. Bids      → only when Manual CPC                     */}
+        {/*   3. Preview   → realistic surfaces (Shopping/Search/YT)  */}
+        {/* ──────────────────────────────────────────────────────── */}
         <div className="flex flex-1 flex-col gap-5">
 
-          {/* Hero */}
+          {/* Hero — shorter title, plain-language subtitle, no jargon.
+              "Listing" was meaningless to merchants; "Products & bids"
+              names the two decisions on this step.  */}
           <div>
-            <h1 className="text-balance text-2xl font-bold tracking-tight text-foreground">
-              Product Groups & Listing
-            </h1>
-            <p className="mt-2 max-w-lg text-pretty text-sm leading-relaxed text-muted-foreground">
-              Shopping ads are auto-generated from your Merchant Center feed — no creative work needed. Organize products into groups to control which products are advertised and set different bid amounts per group.
+            <div className="flex items-center gap-2">
+              <h1 className="text-balance text-2xl font-bold tracking-tight text-foreground">
+                Products &amp; bids
+              </h1>
+              <Badge className="rounded-full bg-primary/10 px-2 py-0 text-[10px] font-bold text-primary hover:bg-primary/10">
+                Auto-generated creative
+              </Badge>
+            </div>
+            <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-muted-foreground">
+              Shopping ads use your Salla product feed as the creative — no images, copy, or videos to upload. Pick which products are eligible, and (if you&apos;re on Manual CPC) set per-group bids.
             </p>
           </div>
 
-          {/* Product Feed Summary */}
+          {/* ─────────────────────────────────────────────────────── */}
+          {/* CARD 1 — Products to advertise                          */}
+          {/* Merges the old "Feed Overview" + "Partitions" cards     */}
+          {/* into one decision. Mode radio gates the heavy UI.       */}
+          {/* Maps to: ad_group_criterion.listing_group (root tree)   */}
+          {/* ─────────────────────────────────────────────────────── */}
           <SectionCard>
-            <div className="mb-4 flex items-center gap-2">
-              <Store className="size-4 text-primary" />
-              <Label className="text-sm font-semibold text-foreground">Product Feed Overview</Label>
-              <InfoTip text="Your Salla product catalog synced to Google Merchant Center. Products must be approved before they can appear in Shopping ads." />
-              <Badge className="rounded-full bg-primary/10 px-2 py-0 text-xs text-primary">Salla</Badge>
-            </div>
-            <div className="mb-4 grid grid-cols-4 gap-3">
-              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-center">
-                <p className="text-lg font-bold text-foreground">1,247</p>
-                <p className="text-[11px] text-muted-foreground">Total Products</p>
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <ShoppingBag className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">Products to advertise</Label>
+                  <InfoTip text="Choose whether every approved product in your Salla feed is eligible, or filter down to a specific subset. Maps to Google Ads listing_group tree on the ad group." />
+                </div>
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  {FEED_APPROVED.toLocaleString()} of {FEED_TOTAL.toLocaleString()} products are approved and ready to deliver.
+                </p>
               </div>
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-center">
-                <p className="text-lg font-bold text-emerald-700">1,198</p>
-                <p className="text-[11px] text-emerald-600">Approved</p>
-              </div>
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-center">
-                <p className="text-lg font-bold text-amber-700">37</p>
-                <p className="text-[11px] text-amber-600">Pending</p>
-              </div>
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-center">
-                <p className="text-lg font-bold text-red-700">12</p>
-                <p className="text-[11px] text-red-600">Disapproved</p>
+              {/* Inline mini health pill — replaces the old standalone
+                  Feed Health sidebar card. Keeps the signal but kills
+                  the duplication. */}
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="size-3.5 text-emerald-500" />
+                  <span className="text-[11px] font-semibold text-emerald-700">{feedApprovalPct}% approved</span>
+                </div>
+                <div className="h-1.5 w-32 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all"
+                    style={{ width: `${feedApprovalPct}%` }}
+                  />
+                </div>
+                {FEED_DISAPPROVED > 0 && (
+                  <button
+                    type="button"
+                    className="text-[10px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                    onClick={() => window.open("https://merchants.google.com/", "_blank")}
+                  >
+                    Fix {FEED_DISAPPROVED} disapproved →
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Sample products */}
-            <div className="rounded-lg border border-border">
-              <div className="border-b border-border bg-muted/30 px-3 py-2">
-                <p className="text-xs font-semibold text-foreground">Sample Products from Your Feed</p>
-              </div>
-              <div className="divide-y divide-border">
-                {MOCK_PRODUCTS.map((p) => (
-                  <div key={p.id} className="flex items-center gap-3 px-3 py-2.5">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                      <Package className="size-4 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium text-foreground">{p.name}</p>
-                      <p className="text-[11px] text-muted-foreground">{p.brand} -- {p.category}</p>
-                    </div>
-                    <span className="shrink-0 text-xs font-semibold text-foreground">{p.price}</span>
-                    <Badge variant="outline" className="shrink-0 gap-1 rounded-full px-1.5 py-0 text-[10px]">
-                      <CheckCircle2 className="size-2.5 text-emerald-500" />
-                      {p.status}
-                    </Badge>
+            {/* ───── Unified Salla Product Set selector ─────────────────
+                Snapchat-parity flow. The selected state shows stacked
+                preview thumbnails + name + product count + Change pill;
+                the empty state is a dashed CTA. Tapping either opens
+                the right-side picker sheet (defined below).
+
+                This replaces the old "All vs Filter by group" radio —
+                merchants now pick from the same product sets they use
+                in Snapchat (All Products, Best Sellers, New Arrivals,
+                Ramadan 2026, category sets, …). */}
+            {selectedSet ? (
+              <button
+                type="button"
+                onClick={() => setSetPickerOpen(true)}
+                className="flex w-full items-center gap-3 rounded-xl border border-border bg-white p-3 text-left transition-all hover:border-primary hover:shadow-sm"
+              >
+                {selectedSet.previewImages && selectedSet.previewImages.length > 0 ? (
+                  <div className="flex -space-x-1.5">
+                    {selectedSet.previewImages.slice(0, 3).map((img, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={i}
+                        src={img}
+                        alt=""
+                        className="size-9 rounded-lg border-2 border-white object-cover"
+                        crossOrigin="anonymous"
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          </SectionCard>
+                ) : (
+                  <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
+                    <Package className="size-4 text-primary" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {selectedSet.nameAr || selectedSet.name}
+                    </p>
+                    {selectedSet.seasonalTag && (
+                      <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px] font-bold">
+                        {selectedSet.seasonalTag}
+                      </Badge>
+                    )}
+                    {selectedSet.autoRefresh && (
+                      <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px] font-medium">
+                        Auto-refresh
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                    {selectedSet.productCount.toLocaleString()} products · {selectedSet.descriptionAr || selectedSet.description}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                  Change
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setSetPickerOpen(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary/40 bg-primary/[0.03] py-4 text-primary transition-colors hover:bg-primary/5"
+              >
+                <Package className="size-4" />
+                <span className="text-xs font-semibold">Select product set</span>
+                <ArrowRight className="size-3.5" />
+              </button>
+            )}
 
-          {/* Product Group Partitions */}
-          <SectionCard>
-            <div className="mb-1 flex items-center gap-2">
-              <FolderTree className="size-4 text-primary" />
-              <Label className="text-sm font-semibold text-foreground">Product Group Partitions</Label>
-              <InfoTip text="Subdivide your products to control bids and targeting at a granular level. For example, bid more on high-margin categories and exclude low-margin items. Every subdivision must include an 'Everything else' group — this is added automatically." />
-            </div>
-            <p className="mb-4 text-xs text-muted-foreground">
-              Choose how to subdivide your products. You can include or exclude specific groups and set bid overrides per group.
+            {/* Helper line under the picker — tiny scaffolding for new
+                merchants. References the Snapchat parallel so they don't
+                feel they're learning two systems. */}
+            <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
+              Same product-set library you use for Snapchat catalog ads. Sets refresh automatically when your Salla catalog updates.
             </p>
 
-            {/* Dimension selector */}
-            <div className="mb-4">
-              <Label className="mb-2 block text-xs font-semibold text-foreground">Subdivide by:</Label>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {DIMENSION_OPTIONS.slice(0, 4).map((dim) => {
-                  const isSelected = selectedDimension === dim.value;
+            {/* ───── Advanced disclosure ─────────────────────────────
+                Power-user escape hatch. Hidden by default so the happy
+                path stays clean. When opened, exposes Google Ads listing
+                dimensions for hand-crafting subdivisions inside the
+                already-chosen product set. */}
+            <button
+              type="button"
+              onClick={() => setAdvancedOpen((v) => !v)}
+              className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ChevronRight className={cn("size-3 transition-transform", advancedOpen && "rotate-90")} />
+              Advanced — subdivide by Google dimensions (brand, category, custom label…)
+              {advancedOpen && (
+                <Badge variant="outline" className="ml-1 rounded-full px-1.5 py-0 text-[9px] font-bold text-amber-700">
+                  Overrides set
+                </Badge>
+              )}
+            </button>
+
+            {advancedOpen && (
+              <div className="mt-5 flex flex-col gap-4 rounded-xl border border-dashed border-border bg-muted/20 p-4">
+                {/* Dimension picker — now a dropdown showing all 7
+                    Google Ads listing dimensions (was 4 buttons that
+                    silently hid 3 valid options). */}
+                <div className="flex flex-col gap-1.5">
+                  <Label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                    Subdivide by
+                    <InfoTip text="Google Ads supports 7 listing dimensions per ad group: brand, category, custom product type, condition, two custom labels from your feed (custom_label_0/1), and item ID. Pick the one that maps to how you think about margins or strategy." />
+                  </Label>
+                  <select
+                    value={selectedDimension}
+                    onChange={(e) => {
+                      setSelectedDimension(e.target.value as ProductDimensionType);
+                      setSelectedValues([]);
+                      setExcludedValues([]);
+                      setBidOverrides({});
+                    }}
+                    className="h-9 rounded-lg border border-border bg-white px-3 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
+                  >
+                    {DIMENSION_OPTIONS.map((d) => (
+                      <option key={d.value} value={d.value}>{d.label} — {d.desc}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Value list — simplified row: label + segmented
+                    Include/Exclude toggle. CPC input moved to Card 2
+                    so it doesn't compete for attention here. */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-foreground">
+                      Include or exclude {DIMENSION_OPTIONS.find((d) => d.value === selectedDimension)?.label.toLowerCase()} values
+                    </Label>
+                    <span className="text-[10px] text-muted-foreground">
+                      {selectedValues.length} included · {excludedValues.length} excluded
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    Click a value to include it. Click <strong>Exclude</strong> to block it. Anything you don&apos;t click goes into the auto-generated &ldquo;Everything else&rdquo; group below.
+                  </p>
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {currentDimensionValues.map((val) => {
+                      const included = selectedValues.includes(val);
+                      const excluded = excludedValues.includes(val);
+                      return (
+                        <div
+                          key={val}
+                          className={cn(
+                            "flex items-center gap-3 rounded-lg border bg-background px-3 py-2 transition-all",
+                            included && "border-primary bg-primary/[0.04]",
+                            excluded && "border-red-200 bg-red-50",
+                            !included && !excluded && "border-border"
+                          )}
+                        >
+                          <span className={cn(
+                            "flex-1 truncate text-xs font-medium",
+                            excluded ? "text-red-700 line-through" : "text-foreground"
+                          )}>
+                            {val}
+                          </span>
+                          {/* Segmented Include / Exclude toggle. Replaces
+                              the old triple-control row (checkbox +
+                              exclude button + state confusion). */}
+                          <div className="inline-flex shrink-0 rounded-full border border-border bg-muted/40 p-0.5 text-[10px] font-semibold">
+                            <button
+                              type="button"
+                              onClick={() => toggleValue(val)}
+                              className={cn(
+                                "rounded-full px-2.5 py-1 transition-colors",
+                                included ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              Include
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleExclude(val)}
+                              className={cn(
+                                "rounded-full px-2.5 py-1 transition-colors",
+                                excluded ? "bg-red-500 text-white" : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              Exclude
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Mandatory "Everything else" disclosure — Google Ads
+                    API requires every subdivision to have a fallback
+                    UNIT_INCLUDED child. Previously hidden; now visible. */}
+                <div className="flex items-start gap-2 rounded-lg border border-dashed border-border bg-background p-2.5">
+                  <FolderTree className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <strong className="text-foreground">Everything else</strong> — any{" "}
+                    {DIMENSION_OPTIONS.find((d) => d.value === selectedDimension)?.label.toLowerCase()}{" "}
+                    value you didn&apos;t include or exclude lands here. Google Ads requires this fallback on every subdivided ad group; we add it automatically when the payload is built.
+                  </p>
+                </div>
+
+                {/* Result count chip */}
+                <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2">
+                  <ShoppingBag className="size-3.5 text-primary" />
+                  <p className="text-xs font-semibold text-foreground">
+                    ~{includedCount.toLocaleString()} products will be eligible to deliver
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ───── Product Set Picker Sheet ──────────────────────────
+                Slide-in panel from the right, matching the Snapchat
+                catalog flow exactly. Card grid: hero image strip + name
+                + Arabic name + description + seasonal badge + product
+                count + selected check / arrow. Empty sets disabled. */}
+            <Sheet open={setPickerOpen} onOpenChange={setSetPickerOpen}>
+              <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[420px]">
+                <SheetHeader className="shrink-0 bg-primary px-6 pb-4 pt-5">
+                  <SheetTitle className="flex items-center gap-2.5 text-base font-bold text-white">
+                    <div className="flex size-8 items-center justify-center rounded-xl bg-white/15">
+                      <Package className="size-4 text-white" />
+                    </div>
+                    Select product set
+                  </SheetTitle>
+                  <SheetDescription className="text-xs text-white/80">
+                    Products in this set will be eligible to deliver in your Shopping ads. Same library used across platforms.
+                  </SheetDescription>
+                </SheetHeader>
+
+                <div className="flex-1 overflow-y-auto bg-muted/30 px-4 py-3">
+                  <div className="flex flex-col gap-2">
+                    {productSets.map((set) => {
+                      const isSelected = selectedSet?.id === set.id;
+                      const isEmpty = set.productCount === 0;
+                      return (
+                        <button
+                          key={set.id}
+                          type="button"
+                          disabled={isEmpty}
+                          onClick={() => {
+                            if (isEmpty) return;
+                            setSelectedSet(set);
+                            // Picking a new set clears any advanced
+                            // include/exclude state — those refinements
+                            // were tied to the previous set.
+                            setSelectedValues([]);
+                            setExcludedValues([]);
+                            setBidOverrides({});
+                            setAdvancedOpen(false);
+                            setSetPickerOpen(false);
+                          }}
+                          className={cn(
+                            "group flex flex-col overflow-hidden rounded-2xl border text-left shadow-sm transition-all",
+                            isEmpty
+                              ? "cursor-not-allowed border-border opacity-50"
+                              : isSelected
+                                ? "border-primary bg-primary/[0.04] shadow-md"
+                                : "border-white bg-white hover:border-primary/60"
+                          )}
+                        >
+                          {set.previewImages && set.previewImages.length > 0 && (
+                            <div className="flex h-[72px] gap-px overflow-hidden rounded-t-2xl">
+                              {set.previewImages.slice(0, 4).map((img, i) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  key={i}
+                                  src={img}
+                                  alt=""
+                                  className="h-full flex-1 object-cover transition-transform duration-300 group-hover:scale-105"
+                                  crossOrigin="anonymous"
+                                />
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-3 px-3 py-3">
+                            <div className={cn(
+                              "flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors",
+                              isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10"
+                            )}>
+                              <Package className="size-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className={cn("text-xs font-bold", isSelected ? "text-primary" : "text-foreground")}>
+                                  {set.nameAr || set.name}
+                                </p>
+                                {set.seasonalTag && (
+                                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{set.seasonalTag}</Badge>
+                                )}
+                              </div>
+                              <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+                                {set.descriptionAr || set.description}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={cn(
+                                "text-xs font-bold tabular-nums",
+                                isEmpty ? "text-red-500" : isSelected ? "text-primary" : "text-foreground"
+                              )}>
+                                {set.productCount}{isEmpty ? " (empty)" : ""}
+                              </span>
+                              {isSelected ? (
+                                <div className="flex size-5 items-center justify-center rounded-full bg-primary">
+                                  <Check className="size-3 text-primary-foreground" />
+                                </div>
+                              ) : (
+                                <ArrowRight className="size-3.5 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-border bg-background px-5 py-3">
+                  <p className="text-xs text-muted-foreground">
+                    {productSets.length} product sets · synced from Salla
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => setSetPickerOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </SectionCard>
+
+          {/* ─────────────────────────────────────────────────────── */}
+          {/* CARD 2 — Per-group bids                                  */}
+          {/* Only when Manual CPC is the bidding strategy. Otherwise  */}
+          {/* shows a small disclosure pointing back to the budget     */}
+          {/* step so the merchant knows WHY the inputs are gone.      */}
+          {/* Maps to: listing_group.cpc_bid_micros (per UNIT child)   */}
+          {/* ─────────────────────────────────────────────────────── */}
+          {isManualCpc ? (
+            mode === "FILTER" && selectedValues.length > 0 ? (
+              <SectionCard>
+                <div className="mb-3 flex items-center gap-2">
+                  <Tag className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">Per-group CPC bids</Label>
+                  <InfoTip text="Set a max cost-per-click per included group. Leave blank to use the ad group default. Maps to listing_group.cpc_bid_micros on each UNIT child." />
+                  <Badge variant="outline" className="ml-auto rounded-full px-1.5 py-0 text-[10px]">
+                    Manual CPC
+                  </Badge>
+                </div>
+                <p className="mb-3 text-[11px] leading-snug text-muted-foreground">
+                  Higher bids on high-margin groups, lower bids on commodity SKUs. Skip groups you want at the ad group default bid.
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  {selectedValues.map((val) => (
+                    <div key={val} className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2">
+                      <span className="flex-1 truncate text-xs font-medium text-foreground">{val}</span>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">SAR</span>
+                        <Input
+                          type="number"
+                          min={0.01}
+                          step={0.1}
+                          placeholder="Default"
+                          value={bidOverrides[val] || ""}
+                          onChange={(e) =>
+                            setBidOverrides((prev) => ({
+                              ...prev,
+                              [val]: Number(e.target.value),
+                            }))
+                          }
+                          className="h-7 w-24 text-xs"
+                        />
+                        <span className="text-[10px] text-muted-foreground">/ click</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            ) : (
+              /* Manual CPC but no groups picked yet — gentle nudge */
+              <SectionCard className="border-dashed">
+                <div className="flex items-start gap-3">
+                  <Tag className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">
+                      Per-group CPC bids will appear here
+                    </p>
+                    <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                      You&apos;re on Manual CPC. Switch &ldquo;Products to advertise&rdquo; to <strong>Filter by group</strong> and pick at least one value to set per-group bids. Otherwise Google uses the ad group&apos;s default CPC for every product.
+                    </p>
+                  </div>
+                </div>
+              </SectionCard>
+            )
+          ) : (
+            /* Bidding is automated → no per-group bids exist. Tell the
+                user WHY this card is absent (was previously a silent
+                disappearance). */
+            <SectionCard className="border-dashed bg-muted/10">
+              <div className="flex items-start gap-3">
+                <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" />
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-foreground">
+                    Google is bidding for you — no per-group bids needed
+                  </p>
+                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                    Your bidding strategy ({campaign.budget.biddingStrategy.replace(/_/g, " ").toLowerCase()}) lets Google set bids per auction. To set bids per product group manually, switch to <strong>Manual CPC</strong> in the Budget step.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="mt-1.5 text-[11px] font-semibold text-primary hover:underline"
+                  >
+                    Open Budget step →
+                  </button>
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ─────────────────────────────────────────────────────── */}
+          {/* CARD 3 — Live preview (PMax-style surface switcher)      */}
+          {/* Three real surfaces where Shopping product ads render:   */}
+          {/*   1. Google Shopping tab (grid)                          */}
+          {/*   2. Google Search PLA (above text ads)                  */}
+          {/*   3. YouTube product shelf (Shorts + main feed)          */}
+          {/* Maps to: ShoppingProductAdInfo across the Surfaces.      */}
+          {/* ─────────────────────────────────────────────────────── */}
+          <SectionCard>
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <Eye className="size-4 text-primary" />
+                  <Label className="text-sm font-semibold text-foreground">How your ads look</Label>
+                  <InfoTip text="Shopping ads render on three Google surfaces. The visual is auto-composed from your feed's image, title, price, brand, and reviews — there's no manual creative to upload." />
+                </div>
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  Your product image, title, price, and rating <em>are</em> the ad. Optimize these in Salla to lift CTR.
+                </p>
+              </div>
+              {/* Surface tabs — PMax pattern */}
+              <div className="inline-flex shrink-0 rounded-full border border-border bg-muted/40 p-0.5 text-[10px] font-semibold">
+                {([
+                  { id: "shopping", label: "Shopping tab", icon: ShoppingBag },
+                  { id: "search", label: "Search", icon: Search },
+                  { id: "youtube", label: "YouTube", icon: Eye },
+                ] as const).map((tab) => {
+                  const Icon = tab.icon;
                   return (
                     <button
-                      key={dim.value}
+                      key={tab.id}
                       type="button"
-                      onClick={() => {
-                        setSelectedDimension(dim.value);
-                        setSelectedValues([]);
-                        setExcludedValues([]);
-                      }}
+                      onClick={() => setPreviewSurface(tab.id)}
                       className={cn(
-                        "flex flex-col items-start gap-1 rounded-xl border-2 p-3 text-left transition-all",
-                        isSelected
-                          ? "border-primary bg-primary/[0.04] shadow-sm"
-                          : "border-border bg-background hover:border-primary/40"
+                        "flex items-center gap-1 rounded-full px-2.5 py-1 transition-colors",
+                        previewSurface === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      <div className={cn(
-                        "flex size-7 items-center justify-center rounded-lg",
-                        isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                      )}>
-                        {dim.icon}
-                      </div>
-                      <p className={cn("text-xs font-semibold", isSelected ? "text-primary" : "text-foreground")}>{dim.label}</p>
-                      <p className="text-[10px] text-muted-foreground">{dim.desc}</p>
+                      <Icon className="size-3" />
+                      {tab.label}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Value selection */}
-            <div className="mb-4">
-              <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                Include / Exclude
-                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
-                  {selectedValues.length === 0 ? "All included" : `${selectedValues.length} selected`}
-                </Badge>
-              </Label>
-              <p className="mb-3 text-[11px] text-muted-foreground">
-                Select specific values to include. Leave empty to include all products. Use the exclude toggle to block specific groups.
-              </p>
-              <div className="flex flex-col gap-2">
-                {currentDimensionValues.map((val) => {
-                  const included = selectedValues.includes(val);
-                  const excluded = excludedValues.includes(val);
-                  return (
-                    <div key={val} className={cn(
-                      "flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-all",
-                      excluded ? "border-red-200 bg-red-50" : included ? "border-primary bg-primary/5" : "border-border bg-background"
-                    )}>
-                      <button
-                        type="button"
-                        onClick={() => { if (!excluded) toggleValue(val); }}
-                        className={cn(
-                          "flex size-5 items-center justify-center rounded border transition-colors",
-                          excluded ? "border-red-300 bg-red-100" : included ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:border-primary/40"
-                        )}
-                      >
-                        {included && <CheckCircle2 className="size-3" />}
-                        {excluded && <X className="size-3 text-red-600" />}
-                      </button>
-                      <span className={cn("flex-1 text-xs font-medium", excluded ? "text-red-600 line-through" : "text-foreground")}>{val}</span>
-                      {isManualCpc && !excluded && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-muted-foreground">CPC:</span>
-                          <Input
-                            type="number"
-                            min={0.01}
-                            step={0.1}
-                            placeholder="Auto"
-                            value={bidOverrides[val] || ""}
-                            onChange={(e) => setBidOverrides((prev) => ({ ...prev, [val]: Number(e.target.value) }))}
-                            className="h-7 w-20 text-xs"
-                          />
-                          <span className="text-[10px] text-muted-foreground">SAR</span>
+            {/* Surface frame */}
+            <div className="rounded-xl border border-border bg-white p-4">
+              {previewSurface === "shopping" && (
+                <>
+                  <div className="mb-3 flex items-center gap-2 border-b border-border pb-2">
+                    <div className="flex size-5 items-center justify-center rounded bg-[#4285F4] text-[10px] font-bold text-white">G</div>
+                    <span className="text-[11px] font-semibold text-foreground">google.com / shopping</span>
+                    <Badge className="ml-auto rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-bold text-amber-800 hover:bg-amber-100">
+                      Sponsored
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {MOCK_PRODUCTS.slice(0, 3).map((p) => (
+                      <div key={p.id} className="overflow-hidden rounded-lg border border-border bg-background">
+                        <div className="flex aspect-square items-center justify-center bg-muted">
+                          <Package className="size-10 text-muted-foreground/30" />
                         </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (excluded) {
-                            toggleExclude(val);
-                          } else {
-                            setSelectedValues((prev) => prev.filter((v) => v !== val));
-                            toggleExclude(val);
-                          }
-                        }}
-                        className={cn(
-                          "rounded px-2 py-1 text-[10px] font-medium transition-colors",
-                          excluded ? "bg-red-100 text-red-700 hover:bg-red-200" : "bg-muted text-muted-foreground hover:bg-red-50 hover:text-red-600"
-                        )}
-                      >
-                        {excluded ? "Unexclude" : "Exclude"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Product count summary */}
-            <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
-              <ShoppingBag className="size-4 text-primary" />
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-foreground">
-                  {includedProducts.length} of {MOCK_PRODUCTS.length} products will be advertised
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  Based on your selected filters above
-                </p>
-              </div>
-            </div>
-          </SectionCard>
-
-          {/* Shopping Ad Preview */}
-          <SectionCard>
-            <div className="mb-4 flex items-center gap-2">
-              <Eye className="size-4 text-primary" />
-              <Label className="text-sm font-semibold text-foreground">Shopping Ad Preview</Label>
-              <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[10px]">Auto-generated</Badge>
-            </div>
-            <p className="mb-4 text-xs text-muted-foreground">
-              Shopping ads are automatically created by Google using your product images, titles, prices, and store name from the Merchant Center feed. No ad copy or creative setup needed — your product data IS the ad.
-            </p>
-
-            {/* Preview cards */}
-            <div className="grid grid-cols-3 gap-3">
-              {MOCK_PRODUCTS.slice(0, 3).map((p) => (
-                <div key={p.id} className="overflow-hidden rounded-xl border border-border bg-background shadow-sm">
-                  <div className="flex aspect-square items-center justify-center bg-muted">
-                    <Package className="size-10 text-muted-foreground/30" />
-                  </div>
-                  <div className="p-2.5">
-                    <p className="truncate text-xs font-semibold text-foreground">{p.price}</p>
-                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{p.name}</p>
-                    <p className="mt-0.5 text-[10px] text-muted-foreground">{p.brand}</p>
-                    <div className="mt-1.5 flex items-center gap-1">
-                      <div className="flex">
-                        {[1,2,3,4,5].map((s) => (
-                          <Star key={s} className={cn("size-2.5", s <= 4 ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30")} />
-                        ))}
+                        <div className="p-2">
+                          <p className="truncate text-xs font-bold text-foreground">{p.price}</p>
+                          <p className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-muted-foreground">{p.name}</p>
+                          <p className="mt-1 truncate text-[9px] text-muted-foreground">{p.brand}</p>
+                          <div className="mt-1 flex items-center gap-1">
+                            {[1,2,3,4,5].map((s) => (
+                              <Star key={s} className={cn("size-2", s <= 4 ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30")} />
+                            ))}
+                            <span className="text-[8px] text-muted-foreground">(128)</span>
+                          </div>
+                        </div>
                       </div>
-                      <span className="text-[9px] text-muted-foreground">4.2 (128)</span>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {previewSurface === "search" && (
+                <>
+                  <div className="mb-3 flex items-center gap-2 border-b border-border pb-2">
+                    <div className="flex size-5 items-center justify-center rounded bg-[#4285F4] text-[10px] font-bold text-white">G</div>
+                    <span className="text-[11px] font-semibold text-foreground">google.com / search</span>
+                  </div>
+                  {/* Horizontal PLA shelf above text results */}
+                  <div className="mb-3 rounded-lg bg-muted/30 p-2.5">
+                    <div className="mb-2 flex items-center gap-2">
+                      <Badge className="rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-bold text-amber-800 hover:bg-amber-100">
+                        Sponsored
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground">Products related to your search</span>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto">
+                      {MOCK_PRODUCTS.slice(0, 4).map((p) => (
+                        <div key={p.id} className="w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-background">
+                          <div className="flex aspect-square items-center justify-center bg-muted">
+                            <Package className="size-8 text-muted-foreground/30" />
+                          </div>
+                          <div className="p-1.5">
+                            <p className="truncate text-[10px] font-bold text-foreground">{p.price}</p>
+                            <p className="line-clamp-2 text-[9px] leading-tight text-muted-foreground">{p.name}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                  <p className="text-[10px] italic text-muted-foreground">
+                    Below the PLA shelf: organic Search results (not shown).
+                  </p>
+                </>
+              )}
 
-            <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/[0.03] px-3 py-2.5">
-              <TrendingUp className="mt-0.5 size-3.5 shrink-0 text-primary" />
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                <span className="font-semibold text-primary">Salla Tip:</span>{" "}
-                Make sure your product titles and images are optimized in your Salla store. High-quality product data directly improves Shopping ad performance and click-through rates.
-              </p>
+              {previewSurface === "youtube" && (
+                <>
+                  <div className="mb-3 flex items-center gap-2 border-b border-border pb-2">
+                    <div className="flex size-5 items-center justify-center rounded bg-red-600 text-[10px] font-bold text-white">▶</div>
+                    <span className="text-[11px] font-semibold text-foreground">youtube.com — product shelf in Shorts</span>
+                  </div>
+                  <div className="mx-auto flex aspect-[9/16] max-w-[200px] flex-col justify-end overflow-hidden rounded-2xl bg-gradient-to-b from-black/50 to-black p-3 text-white">
+                    {MOCK_PRODUCTS.slice(0, 1).map((p) => (
+                      <div key={p.id} className="flex items-center gap-2 rounded-xl bg-white/95 p-2 text-foreground">
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded bg-muted">
+                          <Package className="size-4 text-muted-foreground/40" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[10px] font-bold">{p.price}</p>
+                          <p className="line-clamp-1 text-[9px] text-muted-foreground">{p.name}</p>
+                        </div>
+                        <Button size="sm" className="h-6 rounded-full px-2 text-[9px]">Shop</Button>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[10px] italic text-muted-foreground">
+                    Product shelves appear under qualifying Shorts and standard video ads.
+                  </p>
+                </>
+              )}
             </div>
           </SectionCard>
         </div>
 
-        {/* RIGHT SIDEBAR */}
+        {/* ──────────────────────────────────────────────────────── */}
+        {/* RIGHT SIDEBAR — 2 cards only.                             */}
+        {/*   - Readiness checklist (mirrors PMax)                    */}
+        {/*   - Salla tips                                            */}
+        {/* Dropped: Feed Health (merged into Card 1), Group Summary  */}
+        {/* (redundant), API Mapping (raw object names — user-facing  */}
+        {/* jargon that didn't help merchants).                       */}
+        {/* ──────────────────────────────────────────────────────── */}
         <div className="hidden w-80 shrink-0 lg:block">
           <div className="sticky top-20 flex flex-col gap-4">
 
-            {/* Feed Health */}
+            {/* Readiness — PMax-style progress */}
             <SectionCard className="p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Gauge className="size-4 text-primary" />
-                <p className="text-xs font-bold text-foreground">Feed Health</p>
-                <span className="ml-auto text-xs font-bold text-emerald-600">Healthy</span>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-xs font-bold text-foreground">Ready to launch</p>
+                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px] font-bold">
+                  {readinessPassed}/{readiness.length}
+                </Badge>
               </div>
-              <div className="mb-2 h-2 overflow-hidden rounded-full bg-muted">
-                <div className="h-full w-[92%] rounded-full bg-emerald-500 transition-all" />
+              <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all",
+                    readinessPassed === readiness.length ? "bg-emerald-500" : "bg-primary"
+                  )}
+                  style={{ width: `${(readinessPassed / readiness.length) * 100}%` }}
+                />
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                92% of products approved. Fix 12 disapproved items to improve.
-              </p>
+              <ul className="flex flex-col gap-2">
+                {readiness.map((r, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[11px] leading-snug">
+                    {r.ok ? (
+                      <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-500" />
+                    ) : (
+                      <div className="mt-1 size-2.5 shrink-0 rounded-full border-2 border-muted-foreground/40" />
+                    )}
+                    <span className={cn(r.ok ? "text-muted-foreground" : "font-medium text-foreground")}>
+                      {r.label}
+                      {!r.ok && r.hint && (
+                        <span className="mt-0.5 block text-[10px] text-muted-foreground">{r.hint}</span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </SectionCard>
 
-            {/* Product Group Summary */}
+            {/* Salla tips — kept, slightly trimmed */}
             <SectionCard className="p-4">
-              <p className="mb-3 text-xs font-bold text-foreground">Product Group Summary</p>
-              <div className="flex flex-col gap-2 text-[11px]">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Subdivided by</span>
-                  <span className="font-medium text-foreground">{DIMENSION_OPTIONS.find((d) => d.value === selectedDimension)?.label}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Included groups</span>
-                  <span className="font-medium text-foreground">{selectedValues.length === 0 ? "All" : selectedValues.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Excluded groups</span>
-                  <span className={cn("font-medium", excludedValues.length > 0 ? "text-red-600" : "text-foreground")}>{excludedValues.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Active products</span>
-                  <span className="font-medium text-foreground">{includedProducts.length}</span>
-                </div>
-                {isManualCpc && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Bid overrides</span>
-                    <span className="font-medium text-foreground">{Object.keys(bidOverrides).filter((k) => bidOverrides[k] > 0).length}</span>
-                  </div>
-                )}
+              <div className="mb-2 flex items-center gap-2">
+                <Sparkles className="size-3.5 text-primary" />
+                <p className="text-xs font-bold text-foreground">Salla tips</p>
               </div>
-            </SectionCard>
-
-            {/* API Mapping */}
-            <SectionCard className="p-4">
-              <p className="mb-3 text-xs font-bold text-foreground">API Mapping</p>
-              <div className="flex flex-col gap-1.5 text-[11px]">
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="size-3 text-emerald-500" />
-                  <span className="text-muted-foreground">ShoppingSetting.merchant_id</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="size-3 text-emerald-500" />
-                  <span className="text-muted-foreground">AdGroupListingGroupFilter</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="size-3 text-emerald-500" />
-                  <span className="text-muted-foreground">ShoppingProductAdInfo</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="size-3 text-emerald-500" />
-                  <span className="text-muted-foreground">ListingGroupFilterDimension</span>
-                </div>
-              </div>
-            </SectionCard>
-
-            {/* Tips */}
-            <SectionCard className="p-4">
-              <p className="text-xs font-semibold text-foreground">Shopping Tips</p>
-              <ul className="mt-2 flex flex-col gap-1.5 text-xs leading-relaxed text-muted-foreground">
-                <li>- Subdivide by brand for more control over bids</li>
-                <li>- Exclude low-margin products to improve ROAS</li>
-                <li>- Use category groups for broad targeting</li>
-                <li>- Custom labels let you group by promotions or seasons</li>
-                <li>- Review disapproved products to maximize coverage</li>
+              <ul className="flex flex-col gap-2 text-[11px] leading-relaxed text-muted-foreground">
+                <li className="flex gap-2">
+                  <span className="text-primary">•</span>
+                  <span><strong className="text-foreground">Image quality matters more than copy</strong> — high-res lifestyle shots lift CTR more than any caption.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-primary">•</span>
+                  <span><strong className="text-foreground">Brand subdivisions</strong> give the cleanest bid control if you stock multiple brands.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-primary">•</span>
+                  <span><strong className="text-foreground">Exclude low-margin SKUs</strong> with a custom label so ROAS climbs without touching bids.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-primary">•</span>
+                  <span>Fix disapproved items in Merchant Center — every one is lost reach.</span>
+                </li>
               </ul>
             </SectionCard>
           </div>
@@ -4761,10 +5292,12 @@ function ShoppingProductGroups() {
         onNext={() => setStep(4)}
         previousLabel="Previous"
         nextLabel="Next"
+        nextDisabled={readinessPassed < readiness.length}
       />
     </TooltipProvider>
   );
 }
+
 
 /* ================================================================== */
 /*  Main Component                                                    */

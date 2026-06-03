@@ -90,6 +90,8 @@ import type {
 } from "@/lib/tiktok/campaign-types";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
 import { OBJECTIVE_CONFIGS } from "@/lib/tiktok/campaign-types";
+import { ScenarioDBlocker } from "@/components/tiktok/scenario-blocker";
+import { getSalesScenario } from "@/lib/tiktok/scenario";
 
 /* ================================================================== */
 /*  Static config                                                     */
@@ -345,7 +347,13 @@ export function TikTokStepBudget() {
   // Smart+ budget mode — when AUTO, one campaign budget that TikTok
   // distributes across ad groups (sets budget_optimize_on=true on the API).
   const sp = campaign.objective.smartPlus;
-  const smartBudgetEligible = sp.enabled && (isSales || isLeadGen || isAppPromo);
+  // Scenario C (Classic Search Ads) drops Smart+ entirely, so the slim
+  // Smart+ banner at the top of the budget step is hidden — the merchant
+  // is now in the manual classic auction mode (cost-per-keyword bidding).
+  const scenario = getSalesScenario(campaign);
+  const smartBudgetEligible = sp.enabled
+    && (isLeadGen || isAppPromo || (isSales && !scenario.isClassicSearch))
+    && !scenario.isBlocked;
 
 
   /* Auto-increase from campaign context (fallback for old drafts) */
@@ -476,6 +484,10 @@ export function TikTokStepBudget() {
       <div className={cn("flex flex-col gap-6 lg:flex-row", WIZARD_FOOTER_PADDING_BOTTOM)}>
         {/* ============= LEFT COLUMN ============= */}
         <div className="flex flex-1 flex-col gap-5">
+
+          {/* Scenario D blocker — disables Next when Catalog + Search are
+              both on (TikTok refuses to deliver this combination). */}
+          <ScenarioDBlocker />
 
           {/* ---- Smart+ Budget status note ──
               No Auto/Manual toggle. All budget fields show by default with
@@ -1385,7 +1397,7 @@ export function TikTokStepBudget() {
         onNext={() => setStep(3)}
         previousLabel="Previous"
         nextLabel="Next"
-        nextDisabled={isTraffic && budget.optimizationGoal === "LANDING_PAGE_VIEW" && !hasPixel}
+        nextDisabled={(isTraffic && budget.optimizationGoal === "LANDING_PAGE_VIEW" && !hasPixel) || scenario.isBlocked}
       />
     </TooltipProvider>
   );

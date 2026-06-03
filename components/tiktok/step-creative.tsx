@@ -2,6 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useTikTokCampaign } from "@/lib/tiktok/campaign-context";
+import { ScenarioDBlocker } from "@/components/tiktok/scenario-blocker";
+import { getSalesScenario } from "@/lib/tiktok/scenario";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -522,6 +524,8 @@ function makeDefaultAd(format: TikTokAdFormat, index: number, defaultCTA: TikTok
     landingPageUrl: "",
     sparkAdEnabled: format === "SPARK_AD",
     sparkAdAuthCode: "",
+    sparkAuthCodes: [],
+    sparkBulkInputMode: false,
     promotionalMusicDisabled: format !== "CAROUSEL",
     instantProductPageUsed: false,
   };
@@ -1010,6 +1014,7 @@ function AdPanel({
   isLeadGen,
   isVideoViews,
   isAppPromo,
+  multiVideoEnabled,
 }: {
   ad: TikTokAd;
   allowedFormats: TikTokAdFormat[];
@@ -1023,6 +1028,11 @@ function AdPanel({
   isLeadGen: boolean;
   isVideoViews: boolean;
   isAppPromo: boolean;
+  /** Smart+ Sales multi-video upload: when true the SINGLE_VIDEO section
+   *  allows uploading multiple videos (up to 10) — each becomes its own
+   *  entry in creative_list[] on the Smart+ ad body so TikTok can A/B
+   *  rotate across them. */
+  multiVideoEnabled: boolean;
 }) {
   const [editingName, setEditingName] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -1088,12 +1098,27 @@ function AdPanel({
         return;
       }
       const asset: CreativeAsset = {
-        id: `asset_${Date.now()}`,
+        id: `asset_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         type: type as "VIDEO" | "IMAGE",
         url: URL.createObjectURL(file),
         file,
       };
-      onUpdate({ ...ad, assets: [asset] });
+      // Smart+ multi-video: append to creative_list[] (up to 10 videos per
+      // ad). Otherwise classic single-asset slot — replace.
+      if (multiVideoEnabled && ad.adFormat === "SINGLE_VIDEO") {
+        const next = [...ad.assets, asset].slice(0, 10);
+        onUpdate({ ...ad, assets: next });
+      } else {
+        onUpdate({ ...ad, assets: [asset] });
+      }
+    },
+    [ad, onUpdate, multiVideoEnabled]
+  );
+
+  /** Smart+ multi-video: remove a single asset by id. */
+  const removeAsset = useCallback(
+    (assetId: string) => {
+      onUpdate({ ...ad, assets: ad.assets.filter((a) => a.id !== assetId) });
     },
     [ad, onUpdate]
   );
@@ -1120,6 +1145,7 @@ function AdPanel({
       ...ad,
       adFormat: val,
       sparkAdEnabled: val === "SPARK_AD",
+      sparkAuthCodes: val === "SPARK_AD" ? (ad.sparkAuthCodes ?? []) : [],
       assets: val !== ad.adFormat ? [] : ad.assets,
       carouselCards: val === "CAROUSEL" ? ad.carouselCards : [],
       sparkAdAuthCode: val === "SPARK_AD" ? ad.sparkAdAuthCode : "",
@@ -1280,52 +1306,185 @@ function AdPanel({
                 />
               </div>
 
-              {/* ── Section 2: Authorization Code ── */}
+              {/* ── Section 2: Authorization Code ──
+                  Smart+ Sales (multiVideoEnabled=true): merchant can attach
+                  multiple Spark posts to a single ad. Each code becomes its
+                  own creative_list[] entry on the Smart+ ad body, so TikTok
+                  rotates across organic posts inside one ad. UI offers two
+                  input modes (rows / bulk paste) per user spec.
+                  Classic (multiVideoEnabled=false): single auth code only. */}
               <div className="flex flex-col gap-4 border-t border-border px-6 py-5">
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="size-3 text-primary" />
-                    <Label className="text-sm font-medium text-foreground">Spark Ad Code</Label>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="size-3 text-primary" />
+                      <Label className="text-sm font-medium text-foreground">Spark Ad Code{multiVideoEnabled ? "s" : ""}</Label>
+                      {multiVideoEnabled && (
+                        <Badge className="rounded-full bg-[#e6fff9] px-1.5 py-0 text-[10px] font-bold text-[#004956] hover:bg-[#e6fff9]">
+                          up to 10
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {multiVideoEnabled
+                        ? "Promote one or more existing TikTok posts. Each code links a separate organic video — TikTok rotates across them for the best result."
+                        : "Promote an existing TikTok post. Paste the authorization code from the post owner below."}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Promote an existing TikTok post. Paste the authorization code from the post owner below.
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Paste authorization code or post URL..."
-                      value={ad.sparkAdAuthCode}
-                      onChange={(e) => onUpdate({ ...ad, sparkAdAuthCode: e.target.value })}
-                      className="h-10 flex-1 font-mono text-sm"
-                    />
-                  </div>
-                  {!ad.sparkAdAuthCode && (
-                    <p className="text-[10px] text-muted-foreground">The creator shares this code from their TikTok app. Private posts become public during promotion.</p>
+                  {multiVideoEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => onUpdate({ ...ad, sparkBulkInputMode: !(ad.sparkBulkInputMode ?? false) })}
+                      className={cn(
+                        "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors",
+                        ad.sparkBulkInputMode
+                          ? "border-[#004956] bg-[#004956] text-white"
+                          : "border-border bg-white text-muted-foreground hover:border-[#a4ffe5]"
+                      )}
+                    >
+                      {ad.sparkBulkInputMode ? "Switch to rows" : "Bulk paste"}
+                    </button>
                   )}
                 </div>
 
-                {/* Warning: not yet entered */}
-                {!ad.sparkAdAuthCode && (
-                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5">
-                    <AlertCircle className="size-3 shrink-0 text-amber-600" />
-                    <span className="text-xs text-amber-700">Enter the authorization code to link this Spark Ad to a TikTok post</span>
+                {multiVideoEnabled ? (
+                  /* Smart+ multi-Spark — two interchangeable input modes. */
+                  (ad.sparkBulkInputMode ?? false) ? (
+                    /* Bulk paste mode: one code per line. Split + dedupe + cap at 10 on blur. */
+                    <div className="flex flex-col gap-1">
+                      <textarea
+                        rows={6}
+                        placeholder={"Paste one auth code per line…\n#TT0OFhYO...\nhttps://www.tiktok.com/@creator/video/7234567890123456789"}
+                        defaultValue={(ad.sparkAuthCodes ?? []).join("\n")}
+                        onBlur={(e) => {
+                          const codes = e.target.value
+                            .split(/\r?\n/)
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                          const unique = Array.from(new Set(codes)).slice(0, 10);
+                          onUpdate({ ...ad, sparkAuthCodes: unique, sparkAdAuthCode: unique[0] ?? "" });
+                        }}
+                        className="w-full resize-y rounded-lg border border-border bg-white px-3 py-2 font-mono text-xs leading-relaxed text-foreground focus:border-primary focus:outline-none"
+                      />
+                      <p className="text-[10px] text-muted-foreground">
+                        {(ad.sparkAuthCodes?.length ?? 0)}/10 codes · auto-deduped, trimmed, capped at 10. Click outside to save.
+                      </p>
+                    </div>
+                  ) : (
+                    /* Rows mode: per-row input, add/remove buttons. */
+                    <div className="flex flex-col gap-2">
+                      {((ad.sparkAuthCodes?.length ?? 0) === 0
+                        ? [""]
+                        : ad.sparkAuthCodes
+                      ).map((code, idx) => (
+                        <div key={`spark-row-${idx}`} className="flex items-center gap-2">
+                          <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted/60 text-[10px] font-bold text-muted-foreground">
+                            {idx + 1}
+                          </div>
+                          <Input
+                            placeholder="Paste authorization code or post URL..."
+                            value={code}
+                            onChange={(e) => {
+                              const list = [...(ad.sparkAuthCodes ?? [])];
+                              while (list.length <= idx) list.push("");
+                              list[idx] = e.target.value;
+                              onUpdate({
+                                ...ad,
+                                sparkAuthCodes: list,
+                                sparkAdAuthCode: list[0] ?? "",
+                              });
+                            }}
+                            className="h-9 flex-1 font-mono text-xs"
+                          />
+                          {(ad.sparkAuthCodes?.length ?? 0) > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const list = (ad.sparkAuthCodes ?? []).filter((_, i) => i !== idx);
+                                onUpdate({
+                                  ...ad,
+                                  sparkAuthCodes: list,
+                                  sparkAdAuthCode: list[0] ?? "",
+                                });
+                              }}
+                              className="shrink-0 rounded-md p-1.5 text-destructive/60 hover:bg-destructive/10 hover:text-destructive"
+                              title="Remove code"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {(ad.sparkAuthCodes?.length ?? 0) < 10 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const list = [...(ad.sparkAuthCodes ?? []), ""];
+                            onUpdate({ ...ad, sparkAuthCodes: list });
+                          }}
+                          className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-white px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-[#a4ffe5] hover:text-foreground"
+                        >
+                          <Plus className="size-3.5" />
+                          Add another Spark code
+                        </button>
+                      )}
+                      <p className="text-[10px] text-muted-foreground">
+                        Each code links one TikTok post. Private posts become public during promotion.
+                      </p>
+                    </div>
+                  )
+                ) : (
+                  /* Classic single-Spark input. */
+                  <div className="flex flex-col gap-1">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Paste authorization code or post URL..."
+                        value={ad.sparkAdAuthCode}
+                        onChange={(e) => onUpdate({ ...ad, sparkAdAuthCode: e.target.value })}
+                        className="h-10 flex-1 font-mono text-sm"
+                      />
+                    </div>
+                    {!ad.sparkAdAuthCode && (
+                      <p className="text-[10px] text-muted-foreground">The creator shares this code from their TikTok app. Private posts become public during promotion.</p>
+                    )}
                   </div>
                 )}
 
-                {/* Success: code entered */}
-                {ad.sparkAdAuthCode && (
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
-                      <p className="text-xs font-medium text-emerald-800">Authorization code linked</p>
+                {/* Warning / Success banner — driven by total code count. */}
+                {(() => {
+                  const codeCount = multiVideoEnabled
+                    ? (ad.sparkAuthCodes ?? []).filter((c) => c.trim()).length
+                    : (ad.sparkAdAuthCode.trim() ? 1 : 0);
+                  if (codeCount === 0) {
+                    return (
+                      <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5">
+                        <AlertCircle className="size-3 shrink-0 text-amber-600" />
+                        <span className="text-xs text-amber-700">
+                          {multiVideoEnabled
+                            ? "Add at least one Spark code to link this ad to a TikTok post."
+                            : "Enter the authorization code to link this Spark Ad to a TikTok post"}
+                        </span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
+                        <p className="text-xs font-medium text-emerald-800">
+                          {codeCount === 1
+                            ? "Authorization code linked"
+                            : `${codeCount} Spark posts linked — TikTok will rotate across them`}
+                        </p>
+                      </div>
+                      <p className="mt-1 pl-5.5 text-[10px] text-emerald-600">
+                        {codeCount === 1
+                          ? "The post's video, caption, profile, and music will be used in your ad."
+                          : "Each post brings its own video, caption, and music — Smart+ A/B-tests them in flight."}
+                      </p>
                     </div>
-                    <p className="mt-1 pl-5.5 text-[10px] text-emerald-600">
-                      The post&apos;s video, caption, profile, and music will be used in your ad.
-                    </p>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
 
               {/* ── Advanced Options ── */}
@@ -1617,20 +1776,74 @@ function AdPanel({
                   <p className="text-[11px] text-muted-foreground">
                     MP4/MOV · 9:16 recommended · 5-60s · max 500MB · H.264
                   </p>
-                  <span className="ml-auto shrink-0 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">Best Format</span>
+                  {multiVideoEnabled ? (
+                    <span className="ml-auto shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                      Smart+ · up to 10 videos
+                    </span>
+                  ) : (
+                    <span className="ml-auto shrink-0 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">Best Format</span>
+                  )}
                 </div>
 
-                <UploadZone
-                  accept="video/mp4,video/quicktime"
-                  label="Drop video here"
-                  sublabel="MP4/MOV, 9:16 recommended, 5-60s, max 500MB"
-                  preview={ad.assets[0]?.url || undefined}
-                  previewMediaType={ad.assets[0]?.type}
-                  previewFile={ad.assets[0]?.file}
-                  onFile={handleFile}
-                  onClear={() => onUpdate({ ...ad, assets: [] })}
-                  libraryContext="VIDEO"
-                />
+                {multiVideoEnabled ? (
+                  /* Smart+ multi-video grid — every uploaded asset becomes
+                     a creative_list[] entry, and TikTok auto-rotates across
+                     them for in-flight A/B testing. */
+                  <div className="flex flex-col gap-3">
+                    {ad.assets.length > 0 && (
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {ad.assets.map((asset, idx) => (
+                          <div
+                            key={asset.id}
+                            className="group relative aspect-[9/16] overflow-hidden rounded-lg border border-border bg-black"
+                          >
+                            {asset.type === "VIDEO" ? (
+                              <video src={asset.url} muted autoPlay loop playsInline className="size-full object-cover" />
+                            ) : (
+                              <img src={asset.url} alt={`Asset ${idx + 1}`} className="size-full object-cover" />
+                            )}
+                            <div className="pointer-events-none absolute left-1.5 top-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                              V{idx + 1}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeAsset(asset.id)}
+                              className="absolute right-1.5 top-1.5 rounded-md bg-black/70 p-1 text-white opacity-0 transition-opacity hover:bg-destructive group-hover:opacity-100"
+                              title="Remove video"
+                            >
+                              <Trash2 className="size-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {ad.assets.length < 10 && (
+                      <UploadZone
+                        accept="video/mp4,video/quicktime"
+                        label={ad.assets.length === 0 ? "Drop video here" : "Add another video"}
+                        sublabel={
+                          ad.assets.length === 0
+                            ? "MP4/MOV, 9:16 recommended, 5-60s, max 500MB"
+                            : `${ad.assets.length}/10 uploaded · TikTok rotates across all videos`
+                        }
+                        onFile={handleFile}
+                        libraryContext="VIDEO"
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <UploadZone
+                    accept="video/mp4,video/quicktime"
+                    label="Drop video here"
+                    sublabel="MP4/MOV, 9:16 recommended, 5-60s, max 500MB"
+                    preview={ad.assets[0]?.url || undefined}
+                    previewMediaType={ad.assets[0]?.type}
+                    previewFile={ad.assets[0]?.file}
+                    onFile={handleFile}
+                    onClear={() => onUpdate({ ...ad, assets: [] })}
+                    libraryContext="VIDEO"
+                  />
+                )}
               </div>
 
               {/* ── Section 2b: Background Music ── */}
@@ -3217,12 +3430,32 @@ export function TikTokStepCreative() {
     && campaign.objective.objective === "PRODUCT_SALES"
     && !searchAdsOn
     && !isCatalogVsa;
+  // Scenario matrix — drives format narrowing.
+  //   A (Smart+ default, no catalog/search) → Single Video + Spark only
+  //   B (Smart+ Catalog)                     → Carousel ONLY. Standard
+  //                                            videos drop — visuals are
+  //                                            generated from the product
+  //                                            feed at delivery time.
+  //   C (Classic Search Ads)                 → Spark + Carousel
+  //   D (BLOCKED)                            → blocker banner; formats
+  //                                            still computed for layout
+  //                                            but Next is disabled.
+  const scenario = getSalesScenario(campaign);
   const allowedFormats: TikTokAdFormat[] =
-    isVsaDynamic
+    scenario.isSmartPlusCatalog
+      // Scenario B — TikTok auto-renders the carousel from the feed.
+      // Single Video / Single Image would be ignored. Spark is meaningless
+      // because the creative is feed-driven, not post-driven.
+      ? rawAllowedFormats.filter((f) => f === "CAROUSEL")
+    : isVsaDynamic
       ? rawAllowedFormats.filter((f) => f === "SINGLE_VIDEO" || f === "SPARK_AD")
     : searchAdsOn
+      // Scenario C — Search inventory accepts the merchant's own video
+      // post (Spark) or a 2-slide carousel for product highlights.
       ? rawAllowedFormats.filter((f) => f === "SPARK_AD" || f === "CAROUSEL")
     : smartPlusSalesNoCatalog
+      // Scenario A — Smart+ Web non-catalog narrows to Video + Spark per
+      // TikTok docs (no Single Image, no manual Carousel).
       ? rawAllowedFormats.filter((f) => f === "SINGLE_VIDEO" || f === "SPARK_AD")
       : rawAllowedFormats;
   const [activeAdIdx, setActiveAdIdx] = useState(0);
@@ -3302,13 +3535,39 @@ export function TikTokStepCreative() {
     }
     if (!needsAutoAd && prevNeedsAutoAd.current) {
       // Remove ads that are empty placeholders (no assets, no ad text, no auth code)
-      const cleaned = ads.filter((a) => a.assets.length > 0 || a.adText.trim().length > 0 || a.sparkAdAuthCode.trim().length > 0 || a.carouselCards.length > 0);
+      const cleaned = ads.filter((a) =>
+        a.assets.length > 0
+        || a.adText.trim().length > 0
+        || a.sparkAdAuthCode.trim().length > 0
+        || (a.sparkAuthCodes ?? []).some((c) => c.trim().length > 0)
+        || a.carouselCards.length > 0
+      );
       if (cleaned.length !== ads.length) {
         updateNested("creative", { ads: cleaned });
       }
     }
     prevNeedsAutoAd.current = needsAutoAd;
   }, [needsAutoAd]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scenario B (Smart+ Catalog) sync: when the merchant flips the catalog
+  // toggle ON mid-flow, any existing SINGLE_VIDEO / SINGLE_IMAGE / SPARK_AD
+  // ads need to be reshaped to CAROUSEL — that's the only valid creative
+  // surface in catalog mode (the visual is feed-driven). We rewrite the
+  // adFormat in place; merchant assets are preserved for safekeeping but
+  // ignored by the catalog payload at submit time.
+  useEffect(() => {
+    if (!scenario.isSmartPlusCatalog) return;
+    const needsReshape = ads.some((a) => a.adFormat !== "CAROUSEL");
+    if (!needsReshape) return;
+    updateNested("creative", {
+      ads: ads.map((a) =>
+        a.adFormat === "CAROUSEL"
+          ? a
+          : { ...a, adFormat: "CAROUSEL" as TikTokAdFormat, sparkAdEnabled: false }
+      ),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenario.isSmartPlusCatalog]);
 
   /* Validation */
   const allChecks: { label: string; ok: boolean }[] = [];
@@ -3337,7 +3596,11 @@ export function TikTokStepCreative() {
       }
       allChecks.push({ label: `Ad ${i + 1}: has name`, ok: !!ad.name.trim() });
       if (ad.adFormat === "SPARK_AD") {
-        allChecks.push({ label: `Ad ${i + 1}: auth code`, ok: !!ad.sparkAdAuthCode.trim() });
+        // Multi-Spark valid when ANY code (legacy or array) is filled.
+        const hasAnySparkCode =
+          !!ad.sparkAdAuthCode.trim()
+          || (ad.sparkAuthCodes ?? []).some((c) => c.trim().length > 0);
+        allChecks.push({ label: `Ad ${i + 1}: auth code`, ok: hasAnySparkCode });
       } else if (ad.adFormat === "CAROUSEL") {
         allChecks.push({ label: `Ad ${i + 1}: min 2 cards`, ok: ad.carouselCards.length >= 2 });
         allChecks.push({ label: `Ad ${i + 1}: ad text`, ok: ad.adText.length > 0 });
@@ -3382,6 +3645,46 @@ export function TikTokStepCreative() {
       <div className={cn("flex flex-col gap-6 lg:flex-row", WIZARD_FOOTER_PADDING_BOTTOM)}>
         {/* ============ LEFT COLUMN ============ */}
         <div className="flex flex-1 flex-col gap-5">
+
+          {/* Scenario D blocker — Catalog + Search Ads combination is
+              unbuildable. Renders only when both toggles are on. */}
+          <ScenarioDBlocker />
+
+          {/* Scenario B (Smart+ Catalog) — surface the creative-step
+              implications: standard videos are dropped, the visual is
+              auto-rendered from the merchant's product feed as a dynamic
+              carousel. This is a one-liner note since the format picker
+              has already been narrowed to Carousel only. */}
+          {scenario.isSmartPlusCatalog && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-[#a4ffe5] bg-[#e6fff9]/60 p-3">
+              <Sparkles className="mt-0.5 size-4 shrink-0 text-[#004956]" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-[#004956]">
+                  Catalog mode — creative is auto-generated from your feed
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-[#004956]/80">
+                  TikTok renders a dynamic carousel per impression from your linked product set. Standard video uploads are skipped in this mode — focus on caption, CTA, and the product set selection below.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Scenario C (Classic Search Ads) — surface the inventory
+              switch. Spark + Carousel are the only valid creative shapes
+              for the Search Result Page. */}
+          {scenario.isClassicSearch && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3">
+              <AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-700" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-900">
+                  Search Ads mode — Classic schema active
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-amber-800/90">
+                  Search inventory accepts only Spark posts or 2-slide product carousels. Your campaign now uses TikTok&apos;s classic ad-group endpoint with <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">placement_type=&quot;PLACEMENT_SEARCH&quot;</code> and the keywords you defined in the Audience step.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* ---- TikTok Identity ---- */}
           <div className="rounded-xl border border-border bg-card">
@@ -3997,6 +4300,11 @@ export function TikTokStepCreative() {
                         isLeadGen={isLeadGen}
                         isVideoViews={isVideoViews}
                         isAppPromo={isAppPromo}
+                        multiVideoEnabled={
+                          campaign.objective.smartPlus.enabled
+                          && campaign.objective.objective === "PRODUCT_SALES"
+                          && !searchAdsOn
+                        }
                       />
                     ))}
 
@@ -4241,7 +4549,7 @@ export function TikTokStepCreative() {
         onNext={() => setStep(4)}
         previousLabel="Previous"
         nextLabel="Next"
-        nextDisabled={passingChecks < allChecks.length}
+        nextDisabled={passingChecks < allChecks.length || scenario.isBlocked}
       />
     </TooltipProvider>
   );

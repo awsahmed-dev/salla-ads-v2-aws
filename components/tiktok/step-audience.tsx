@@ -42,6 +42,8 @@ import { DeviceTargetingCard } from "@/components/shared/device-targeting-card";
 import { LegacyInterestTargetingCard as InterestTargetingCard } from "@/components/shared/interest-targeting-card";
 import { AudienceSignalsPicker } from "@/components/tiktok/audience-signals-picker";
 import { SearchKeywordsTable } from "@/components/tiktok/search-keywords-table";
+import { ScenarioDBlocker } from "@/components/tiktok/scenario-blocker";
+import { getSalesScenario } from "@/lib/tiktok/scenario";
 import { TargetingSummaryCard } from "@/components/shared/targeting-summary-card";
 import { AudienceReadinessChecklist } from "@/components/shared/audience-readiness-checklist";
 import { WizardStepFooter, WIZARD_FOOTER_PADDING_BOTTOM } from "@/components/shared/wizard-step-footer";
@@ -97,6 +99,12 @@ export function TikTokStepAudience() {
   const customAudiencesLearnMore = useLearnMore();
   const keywordsLearnMore = useLearnMore();
   const isSales = campaign.objective.objective === "PRODUCT_SALES";
+  // Scenario matrix — drives the entire targeting UX in this step.
+  //   A → Smart+ default              → Smart+ banner + slim L&G card
+  //   B → Smart+ Catalog              → same as A, plus catalog Note
+  //   C → Classic Search Ads          → keyword tables, NO Smart+ banner
+  //   D → BLOCKED                     → render only the blocker
+  const scenario = getSalesScenario(campaign);
   // Smart+ targeting mode — when AUTO, hide everything except Location and
   // Language. TikTok's upgraded Smart+ uses your conversion signal + the
   // baseline location/language as the only inputs and finds the audience
@@ -134,6 +142,12 @@ export function TikTokStepAudience() {
         {/* LEFT COLUMN                                                   */}
         {/* ============================================================ */}
         <div className="flex flex-1 flex-col gap-5">
+          {/* Scenario D blocker — Catalog + Search Ads is unbuildable.
+              When active, all other targeting cards still render
+              underneath (so the merchant can see what they had set), but
+              Next is disabled below. */}
+          <ScenarioDBlocker />
+
           {/* Smart+ status note — implicit ON for Sales / Lead Gen / App Promo.
               No toggle. Every field below shows by default with AI-recommended
               chips inline. This mirrors TikTok's 2026 unified experience. */}
@@ -619,7 +633,7 @@ export function TikTokStepAudience() {
         onPrevious={() => setStep(0)}
         onNext={() => setStep(2)}
         nextLabel="Next"
-        nextDisabled={readinessPassed < readinessChecks.length}
+        nextDisabled={readinessPassed < readinessChecks.length || scenario.isBlocked}
         accent="primary"
       />
     </TooltipProvider>
