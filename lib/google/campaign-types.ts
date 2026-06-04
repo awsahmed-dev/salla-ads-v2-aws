@@ -1140,9 +1140,31 @@ export interface GoogleCreativeSettings {
    *  (Snapchat-parity flow). When set, this is the merchant's primary
    *  intent — productGroupRoot is derived from it at persist time.
    *  Kept alongside the listing_group tree so the review step can show
-   *  the merchant-friendly set name instead of dimension jargon. */
+   *  the merchant-friendly set name instead of dimension jargon.
+   *
+   *  IMPORTANT for the integration dev:
+   *  Google Merchant Center has NO native "product set" concept. At feed
+   *  sync time the Salla→MC adapter must translate the selected set into
+   *  a `custom_label_0` (or any free custom_label_n) tag on each affected
+   *  Merchant Center product. The Google Ads listing_group tree then
+   *  partitions on `PRODUCT_CUSTOM_ATTRIBUTE_0` with `value =
+   *  shoppingProductSetId` to deliver only the in-set products. */
   shoppingProductSetId?: string;
   shoppingProductSetName?: string;
+
+  /** Refinement mode applied INSIDE the chosen product set:
+   *   - "ALL"      → flat UNIT_INCLUDED root (every in-set product eligible)
+   *   - "SKU"      → SUBDIVISION on PRODUCT_ITEM_ID, one UNIT_INCLUDED per
+   *                  selected SKU + a UNIT_EXCLUDED "everything else"
+   *   - "DIMENSION"→ SUBDIVISION on the chosen Google Ads listing dimension
+   *                  (brand / category / type / condition / custom label /
+   *                  item ID) — intersection narrowing inside the set */
+  shoppingRefineMode?: "ALL" | "SKU" | "DIMENSION";
+  /** When refineMode === "SKU": the Salla product IDs (Salla product.id,
+   *  which the Salla→MC adapter maps to MC offer_id at sync time) the
+   *  merchant ticked. Each one becomes a `PRODUCT_ITEM_ID`
+   *  UNIT_INCLUDED leaf in the listing_group tree. */
+  shoppingSpecificProductIds?: string[];
   /** Retail PMax listing group mode */
   retailListingMode?: RetailListingMode;
   /** Selected values for retail listing groups (categories/brands/labels) */

@@ -4365,15 +4365,41 @@ function ShoppingProductGroups() {
   const [productSets, setProductSets] = useState<SallaProductSet[]>([]);
   const [selectedSet, setSelectedSet] = useState<SallaProductSet | null>(null);
   const [setPickerOpen, setSetPickerOpen] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  // When the merchant opens the advanced panel, push the partition mode
-  // to FILTER so any include/exclude picks they make are actually persisted
-  // as a subdivision. When they close it, snap back to ALL so the product
-  // set alone drives delivery.
+  /* ── Three refinement modes inside the chosen product set ──────────
+   * Replaces the old binary "advancedOpen" toggle, which was confusing
+   * because it lived in parallel with the product-set picker (two
+   * narrowings stacked on top of each other with no clear relationship).
+   *
+   * Now refinement is explicitly framed as "what to do INSIDE the
+   * chosen set," with three honest options:
+   *   - "ALL"      → advertise every product in the set (default)
+   *   - "SKU"      → keep only specific products (SKU picker)
+   *   - "DIMENSION"→ refine by brand / category / etc.
+   *
+   * Each mode maps cleanly to one shape of Google Ads listing_group
+   * tree at persist time. */
+  const [refineMode, setRefineMode] = useState<"ALL" | "SKU" | "DIMENSION">("ALL");
+  /** Specific Salla product IDs chosen via the ProductPickerDialog when
+   *  refineMode === "SKU". These map 1:1 to PRODUCT_ITEM_ID
+   *  UNIT_INCLUDED leaves in the Google Ads listing_group tree. The
+   *  Salla→Merchant Center adapter must ensure each Salla product.id
+   *  is set as offer_id when the product is pushed to MC. */
+  const [specificProductIds, setSpecificProductIds] = useState<string[]>([]);
+  const [specificProducts, setSpecificProducts] = useState<SallaProduct[]>([]);
+  const [skuPickerOpen, setSkuPickerOpen] = useState(false);
+  /** Dev audit panel — collapsed by default, exposes the exact
+   *  Merchant Center + Google Ads API shape the current selection
+   *  translates to. Helps the integration dev verify mapping without
+   *  having to run the campaign through review. */
+  const [devPanelOpen, setDevPanelOpen] = useState(false);
+
+  // Mirror refineMode → legacy `mode` flag used by the include/exclude
+  // partition state. SKU and DIMENSION both produce a subdivided tree;
+  // ALL produces a flat UNIT_INCLUDED root.
   useEffect(() => {
-    setMode(advancedOpen ? "FILTER" : "ALL");
-  }, [advancedOpen]);
+    setMode(refineMode === "ALL" ? "ALL" : "FILTER");
+  }, [refineMode]);
 
   useEffect(() => {
     fetchProductSets("all").then((sets) => {
@@ -4384,11 +4410,15 @@ function ShoppingProductGroups() {
       const restored = draftSetId ? sets.find((s) => s.id === draftSetId) : null;
       if (restored) {
         setSelectedSet(restored);
-        if (restored.id !== "ps_all") setAdvancedOpen(false);
       } else if (sets.length > 0 && !selectedSet) {
         const allSet = sets.find((s) => s.id === "ps_all") ?? sets[0];
         setSelectedSet(allSet);
       }
+      // Restore refine mode + specific products from draft.
+      const draftRefine = creative.shoppingRefineMode;
+      if (draftRefine) setRefineMode(draftRefine);
+      const draftSpecific = creative.shoppingSpecificProductIds;
+      if (draftSpecific && draftSpecific.length > 0) setSpecificProductIds(draftSpecific);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -4426,20 +4456,26 @@ function ShoppingProductGroups() {
   }, []); // Only run on mount
 
   // Persist product group selections to campaign state.
-  // Decision order:
-  //   1. If the merchant is using the simple product-set picker (advanced
-  //      panel closed) → write a flat UNIT_INCLUDED root tagged with the
-  //      chosen Salla set ID. The campaign-context-to-API mapper will
-  //      later expand the set into the right listing_group shape when
-  //      Salla wires real catalog feeds.
-  //   2. If advanced is open AND merchant has picked include/exclude
-  //      values → write the full SUBDIVISION tree (legacy path).
-  //   3. Otherwise → flat root.
+  //
+  // Mapping table — refineMode → Google Ads listing_group tree:
+  //
+  //   "ALL"       → flat UNIT_INCLUDED root (no subdivision). The
+  //                  Salla→MC sync handles set membership via
+  //                  custom_label_0 on each MC product; this campaign
+  //                  delivers every in-set product.
+  //
+  //   "SKU"       → SUBDIVISION root on PRODUCT_ITEM_ID with one
+  //                  UNIT_INCLUDED child per merchant-picked SKU plus
+  //                  the mandatory "everything else" UNIT_EXCLUDED
+  //                  fallback (Google Ads API enforces it).
+  //
+  //   "DIMENSION" → SUBDIVISION root on selectedDimension with
+  //                  UNIT_INCLUDED + UNIT_EXCLUDED children built from
+  //                  selectedValues / excludedValues, plus the
+  //                  mandatory "everything else" fallback.
   useEffect(() => {
-    const usingSimplePicker = !advancedOpen;
-    const noManualPicks = selectedValues.length === 0 && excludedValues.length === 0;
-
-    if (usingSimplePicker || mode === "ALL" || noManualPicks) {
+    // Mode ALL → flat UNIT_INCLUDED root (intent: every in-set product).
+    if (refineMode === "ALL") {
       updateRef.current("creative", {
         productGroupRoot: {
           id: "root",
@@ -4450,6 +4486,82 @@ function ShoppingProductGroups() {
         },
         shoppingProductSetId: selectedSet?.id,
         shoppingProductSetName: selectedSet?.nameAr || selectedSet?.name,
+        shoppingRefineMode: "ALL",
+        shoppingSpecificProductIds: [],
+      });
+      return;
+    }
+
+    // Mode SKU → SUBDIVISION on PRODUCT_ITEM_ID with one UNIT_INCLUDED
+    // per picked product + everything-else UNIT_EXCLUDED. When the
+    // merchant hasn't picked any SKUs yet, fall back to a flat root so
+    // the campaign is still valid (avoids "subdivision must have ≥1
+    // included" API reject at submit).
+    if (refineMode === "SKU") {
+      if (specificProductIds.length === 0) {
+        updateRef.current("creative", {
+          productGroupRoot: {
+            id: "root",
+            dimensionType: "PRODUCT_ITEM_ID",
+            dimensionValue: "",
+            type: "UNIT_INCLUDED" as const,
+            children: [],
+          },
+          shoppingProductSetId: selectedSet?.id,
+          shoppingProductSetName: selectedSet?.nameAr || selectedSet?.name,
+          shoppingRefineMode: "SKU",
+          shoppingSpecificProductIds: [],
+        });
+        return;
+      }
+      const skuChildren: ProductGroupNode[] = specificProductIds.map((pid) => ({
+        id: `sku-${pid}`,
+        dimensionType: "PRODUCT_ITEM_ID" as const,
+        dimensionValue: pid,
+        type: "UNIT_INCLUDED" as const,
+        children: [],
+      }));
+      // Everything else → UNIT_EXCLUDED so only the picked SKUs deliver.
+      skuChildren.push({
+        id: "other",
+        dimensionType: "PRODUCT_ITEM_ID" as const,
+        dimensionValue: "",
+        type: "UNIT_EXCLUDED" as const,
+        children: [],
+      });
+      updateRef.current("creative", {
+        productGroupRoot: {
+          id: "root",
+          dimensionType: "PRODUCT_ITEM_ID",
+          dimensionValue: "",
+          type: "SUBDIVISION" as const,
+          children: skuChildren,
+        },
+        shoppingProductSetId: selectedSet?.id,
+        shoppingProductSetName: selectedSet?.nameAr || selectedSet?.name,
+        shoppingRefineMode: "SKU",
+        shoppingSpecificProductIds: specificProductIds,
+      });
+      return;
+    }
+
+    // Mode DIMENSION — fall through to the existing dimension-based
+    // SUBDIVISION code below, but if the merchant hasn't picked any
+    // values yet, write a flat root so the campaign is still valid.
+    const noManualPicks = selectedValues.length === 0 && excludedValues.length === 0;
+    if (noManualPicks) {
+      updateRef.current("creative", {
+        productGroupRoot: {
+          id: "root",
+          dimensionType: selectedDimension,
+          dimensionValue: "",
+          type: "UNIT_INCLUDED" as const,
+          children: [],
+        },
+        shoppingProductSetId: selectedSet?.id,
+        shoppingProductSetName: selectedSet?.nameAr || selectedSet?.name,
+        shoppingRefineMode: "DIMENSION",
+        shoppingSpecificProductIds: [],
       });
       return;
     }
@@ -4498,13 +4610,14 @@ function ShoppingProductGroups() {
         children,
       },
       // Keep the chosen Salla set tagged on the creative even when the
-      // merchant has refined into an advanced subdivision — the review
-      // step still shows "Best Sellers (refined)" instead of just a
-      // raw dimension count.
+      // merchant has refined further — the review step still shows
+      // "Best Sellers (refined)" instead of a raw dimension count.
       shoppingProductSetId: selectedSet?.id,
       shoppingProductSetName: selectedSet?.nameAr || selectedSet?.name,
+      shoppingRefineMode: "DIMENSION",
+      shoppingSpecificProductIds: [],
     });
-  }, [mode, selectedDimension, selectedValues, excludedValues, bidOverrides, selectedSet, advancedOpen]);
+  }, [mode, refineMode, selectedDimension, selectedValues, excludedValues, bidOverrides, selectedSet, specificProductIds]);
 
   const toggleValue = (val: string) => {
     // If user picks an excluded value, drop the exclusion first.
@@ -4729,26 +4842,146 @@ function ShoppingProductGroups() {
               Same product-set library you use for Snapchat catalog ads. Sets refresh automatically when your Salla catalog updates.
             </p>
 
-            {/* ───── Advanced disclosure ─────────────────────────────
-                Power-user escape hatch. Hidden by default so the happy
-                path stays clean. When opened, exposes Google Ads listing
-                dimensions for hand-crafting subdivisions inside the
-                already-chosen product set. */}
-            <button
-              type="button"
-              onClick={() => setAdvancedOpen((v) => !v)}
-              className="mt-4 flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ChevronRight className={cn("size-3 transition-transform", advancedOpen && "rotate-90")} />
-              Advanced — subdivide by Google dimensions (brand, category, custom label…)
-              {advancedOpen && (
-                <Badge variant="outline" className="ml-1 rounded-full px-1.5 py-0 text-[9px] font-bold text-amber-700">
-                  Overrides set
-                </Badge>
-              )}
-            </button>
+            {/* ───── Refinement modes ────────────────────────────────
+                Three honest options for what to do INSIDE the chosen
+                product set:
+                  ALL       → advertise every product in the set
+                  SKU       → keep only specific products (opens picker)
+                  DIMENSION → refine by brand / category / etc.
 
-            {advancedOpen && (
+                Replaces the old "Advanced disclosure" toggle, which
+                created two parallel narrowing systems (the set picker
+                AND the dimension picker) with no clear relationship.
+                Now every refinement is explicitly framed as "applied
+                inside the chosen set." */}
+            <div className="mt-5 flex flex-col gap-2.5">
+              <Label className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                Refine which products from this set actually deliver
+                <InfoTip text="Defaults to all products in your chosen set. Pick a refinement only if you want to narrow further. Maps to AdGroupListingGroupFilter tree on the Google Ads ad group." />
+              </Label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {([
+                  {
+                    value: "ALL" as const,
+                    title: "All products in set",
+                    desc: "Every product tagged in this set is eligible to deliver.",
+                    icon: <Sparkles className="size-3.5" />,
+                    apiHint: "listing_group_filter = UNIT_INCLUDED (flat root)",
+                  },
+                  {
+                    value: "SKU" as const,
+                    title: "Keep only specific products",
+                    desc: "Pick individual products from this set by name or SKU.",
+                    icon: <Package className="size-3.5" />,
+                    apiHint: "SUBDIVISION on PRODUCT_ITEM_ID, one UNIT per offer_id",
+                  },
+                  {
+                    value: "DIMENSION" as const,
+                    title: "Refine by brand or category",
+                    desc: "Subdivide the set further by Google Ads listing dimensions.",
+                    icon: <Filter className="size-3.5" />,
+                    apiHint: "SUBDIVISION on chosen ListingDimensionInfo type",
+                  },
+                ]).map((opt) => {
+                  const selected = refineMode === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setRefineMode(opt.value)}
+                      className={cn(
+                        "flex items-start gap-2 rounded-xl border-2 p-3 text-left transition-all",
+                        selected
+                          ? "border-primary bg-primary/[0.04] shadow-sm"
+                          : "border-border bg-background hover:border-primary/40"
+                      )}
+                    >
+                      <div className={cn(
+                        "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",
+                        selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                      )}>
+                        {opt.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className={cn("text-xs font-semibold", selected ? "text-primary" : "text-foreground")}>
+                            {opt.title}
+                          </p>
+                          {opt.value === "ALL" && (
+                            <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px] font-bold">
+                              Default
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{opt.desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ───── Mode SKU — specific product picker ──────────────
+                Wires the already-imported ProductPickerDialog to let the
+                merchant tick individual SKUs from their Salla store.
+                Each pick → one PRODUCT_ITEM_ID UNIT_INCLUDED leaf. */}
+            {refineMode === "SKU" && (
+              <div className="mt-4 flex flex-col gap-2.5 rounded-xl border border-dashed border-border bg-muted/20 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">
+                      Specific products{specificProductIds.length > 0 ? ` · ${specificProductIds.length} picked` : ""}
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                      Each picked product becomes a <code className="rounded bg-muted px-1 py-0.5 text-[10px]">PRODUCT_ITEM_ID</code> partition. Anything else in your set is excluded.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={specificProductIds.length > 0 ? "outline" : "default"}
+                    onClick={() => setSkuPickerOpen(true)}
+                  >
+                    {specificProductIds.length > 0 ? "Edit picks" : "Pick products"}
+                  </Button>
+                </div>
+                {specificProducts.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {specificProducts.slice(0, 8).map((p) => (
+                      <span
+                        key={p.id}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-white px-2 py-0.5 text-[10px] font-medium text-foreground"
+                      >
+                        <span className="truncate max-w-[140px]">{p.nameAr || p.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSpecificProductIds((prev) => prev.filter((id) => id !== p.id));
+                            setSpecificProducts((prev) => prev.filter((x) => x.id !== p.id));
+                          }}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="size-2.5" />
+                        </button>
+                      </span>
+                    ))}
+                    {specificProducts.length > 8 && (
+                      <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        +{specificProducts.length - 8} more
+                      </span>
+                    )}
+                  </div>
+                )}
+                {specificProductIds.length === 0 && (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5">
+                    <AlertCircle className="size-3 shrink-0 text-amber-600" />
+                    <span className="text-[11px] text-amber-700">No products picked yet — campaign will deliver every product in the set until you pick at least one.</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {refineMode === "DIMENSION" && (
               <div className="mt-5 flex flex-col gap-4 rounded-xl border border-dashed border-border bg-muted/20 p-4">
                 {/* Dimension picker — now a dropdown showing all 7
                     Google Ads listing dimensions (was 4 buttons that
@@ -4862,6 +5095,169 @@ function ShoppingProductGroups() {
               </div>
             )}
 
+            {/* ───── Listing-group tree preview ───────────────────────
+                Renders the exact AdGroupListingGroupFilter shape we'll
+                emit to Google Ads. Was previously invisible — merchants
+                couldn't see what they'd configured. Shows the root, the
+                subdivision dimension (if any), each UNIT branch, and
+                the mandatory "everything else" fallback that Google's
+                API requires on every SUBDIVISION node. */}
+            {selectedSet && (refineMode !== "ALL") && (
+              <div className="mt-4 rounded-xl border border-border bg-muted/10 p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <FolderTree className="size-3.5 text-primary" />
+                  <p className="text-xs font-semibold text-foreground">Listing group structure</p>
+                  <InfoTip text="The tree Google Ads will build for this ad group. Each leaf is a UNIT — either INCLUDED (delivers) or EXCLUDED (suppressed). Subdivisions must have an 'everything else' UNIT child per Google Ads API." />
+                </div>
+                <div className="flex flex-col gap-1 font-mono text-[11px] leading-tight">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground">└─</span>
+                    <Badge variant="outline" className="rounded px-1.5 py-0 text-[9px] font-bold">SUBDIVISION</Badge>
+                    <span className="text-foreground">
+                      {refineMode === "SKU"
+                        ? "PRODUCT_ITEM_ID"
+                        : DIMENSION_OPTIONS.find((d) => d.value === selectedDimension)?.label.toUpperCase().replace(/\s+/g, "_")}
+                    </span>
+                  </div>
+                  {refineMode === "SKU" && specificProductIds.slice(0, 5).map((pid) => (
+                    <div key={pid} className="ml-4 flex items-center gap-1.5">
+                      <span className="text-muted-foreground">├─</span>
+                      <Badge className="rounded bg-emerald-100 px-1.5 py-0 text-[9px] font-bold text-emerald-800 hover:bg-emerald-100">UNIT_INCLUDED</Badge>
+                      <span className="truncate text-foreground">{pid}</span>
+                    </div>
+                  ))}
+                  {refineMode === "SKU" && specificProductIds.length > 5 && (
+                    <div className="ml-4 text-[10px] text-muted-foreground">… +{specificProductIds.length - 5} more UNIT_INCLUDED</div>
+                  )}
+                  {refineMode === "DIMENSION" && selectedValues.slice(0, 5).map((val) => (
+                    <div key={`inc-${val}`} className="ml-4 flex items-center gap-1.5">
+                      <span className="text-muted-foreground">├─</span>
+                      <Badge className="rounded bg-emerald-100 px-1.5 py-0 text-[9px] font-bold text-emerald-800 hover:bg-emerald-100">UNIT_INCLUDED</Badge>
+                      <span className="truncate text-foreground">{val}</span>
+                    </div>
+                  ))}
+                  {refineMode === "DIMENSION" && excludedValues.slice(0, 5).map((val) => (
+                    <div key={`exc-${val}`} className="ml-4 flex items-center gap-1.5">
+                      <span className="text-muted-foreground">├─</span>
+                      <Badge className="rounded bg-red-100 px-1.5 py-0 text-[9px] font-bold text-red-700 hover:bg-red-100">UNIT_EXCLUDED</Badge>
+                      <span className="truncate text-foreground">{val}</span>
+                    </div>
+                  ))}
+                  {/* Mandatory fallback — Google Ads rejects any
+                      SUBDIVISION without an "everything else" child. */}
+                  <div className="ml-4 flex items-center gap-1.5">
+                    <span className="text-muted-foreground">└─</span>
+                    <Badge className={cn(
+                      "rounded px-1.5 py-0 text-[9px] font-bold",
+                      refineMode === "SKU"
+                        ? "bg-red-100 text-red-700 hover:bg-red-100"
+                        : "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
+                    )}>
+                      {refineMode === "SKU" ? "UNIT_EXCLUDED" : "UNIT_INCLUDED"}
+                    </Badge>
+                    <span className="text-muted-foreground italic">everything else</span>
+                    <span className="text-[10px] text-muted-foreground">(auto-added)</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ───── Dev audit panel ──────────────────────────────────
+                Collapsed by default. Shows the integration dev exactly
+                which Google Ads + Merchant Center API objects the
+                current selection translates to. Catches mapping bugs
+                before they ship to the campaign-payload layer. */}
+            <button
+              type="button"
+              onClick={() => setDevPanelOpen((v) => !v)}
+              className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ChevronRight className={cn("size-3 transition-transform", devPanelOpen && "rotate-90")} />
+              For your developer — Salla → Merchant Center → Google Ads mapping
+            </button>
+            {devPanelOpen && (
+              <div className="mt-2 rounded-xl border border-dashed border-border bg-muted/10 p-4 text-[11px] leading-relaxed text-foreground">
+                <p className="mb-2 text-xs font-bold text-foreground">What gets sent where</p>
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      1. Salla → Merchant Center (catalog sync)
+                    </p>
+                    <ul className="ml-3 flex list-disc flex-col gap-1 text-muted-foreground">
+                      <li>Every Salla product is pushed to MC as a feed item; <code className="rounded bg-muted px-1 py-0.5 text-[10px]">offer_id = salla_product.id</code>.</li>
+                      <li>
+                        Set membership becomes <code className="rounded bg-muted px-1 py-0.5 text-[10px]">custom_label_0</code> on each MC product. Selected set: <code className="rounded bg-primary/10 px-1 py-0.5 text-[10px] text-primary">{selectedSet?.id ?? "—"}</code>
+                      </li>
+                      <li>Sets refresh automatically when Salla store inventory changes; MC feed re-pushes within ~15 min.</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      2. Campaign-level (Google Ads ShoppingSetting)
+                    </p>
+                    <ul className="ml-3 flex list-disc flex-col gap-1 text-muted-foreground">
+                      <li><code className="rounded bg-muted px-1 py-0.5 text-[10px]">merchant_id</code> — from connected Salla→MC account</li>
+                      <li><code className="rounded bg-muted px-1 py-0.5 text-[10px]">feed_label</code> — currently fixed to <code>SA</code> for KSA merchants</li>
+                      <li><code className="rounded bg-muted px-1 py-0.5 text-[10px]">campaign_priority</code> — default 0 (Standard Shopping)</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      3. Ad-group-level (AdGroupListingGroupFilter tree)
+                    </p>
+                    <ul className="ml-3 flex list-disc flex-col gap-1 text-muted-foreground">
+                      <li>
+                        Refine mode: <code className="rounded bg-primary/10 px-1 py-0.5 text-[10px] text-primary">{refineMode}</code>
+                      </li>
+                      <li>
+                        {refineMode === "ALL" && (
+                          <>Flat <code className="rounded bg-muted px-1 py-0.5 text-[10px]">UNIT_INCLUDED</code> root — delivers all products where <code className="rounded bg-muted px-1 py-0.5 text-[10px]">custom_label_0 == {selectedSet?.id ?? "—"}</code></>
+                        )}
+                        {refineMode === "SKU" && (
+                          <>SUBDIVISION on <code className="rounded bg-muted px-1 py-0.5 text-[10px]">PRODUCT_ITEM_ID</code> · {specificProductIds.length} UNIT_INCLUDED children + 1 UNIT_EXCLUDED "everything else"</>
+                        )}
+                        {refineMode === "DIMENSION" && (
+                          <>SUBDIVISION on <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{selectedDimension}</code> · {selectedValues.length} UNIT_INCLUDED + {excludedValues.length} UNIT_EXCLUDED + 1 "everything else"</>
+                        )}
+                      </li>
+                      <li>Per-group bids → <code className="rounded bg-muted px-1 py-0.5 text-[10px]">listing_group.cpc_bid_micros</code> on each UNIT (Manual CPC only)</li>
+                    </ul>
+                  </div>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                    <p className="text-[10px] font-bold text-amber-900">⚠ For the dev to verify</p>
+                    <ul className="ml-3 mt-0.5 flex list-disc flex-col gap-0.5 text-[10px] text-amber-800">
+                      <li>Merchant Center has NO native "product set" concept — the sync MUST tag products with <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">custom_label_0</code> for set membership.</li>
+                      <li>Every <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">SUBDIVISION</code> requires exactly one child with a null dimension value (the "everything else" UNIT) or the listing_group.create call fails.</li>
+                      <li>Salla product IDs must round-trip cleanly to MC <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">offer_id</code> for the SKU mode to work.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ───── Specific-product (SKU) picker dialog ─────────────
+                Reuses the shared ProductPickerDialog component. Each
+                ticked product → one PRODUCT_ITEM_ID UNIT_INCLUDED leaf
+                in the listing_group tree. Max 100 SKUs per ad group is
+                a soft cap (Google API allows more but listing trees get
+                unwieldy past that). */}
+            <ProductPickerDialog
+              open={skuPickerOpen}
+              onOpenChange={setSkuPickerOpen}
+              existingProductNames={specificProducts.map((p) => p.name)}
+              maxProducts={100}
+              onAddProducts={(picked) => {
+                // Merge into existing list, dedupe by id, cap at 100.
+                const merged = [...specificProducts];
+                for (const p of picked) {
+                  if (!merged.find((x) => x.id === p.id)) merged.push(p);
+                }
+                const capped = merged.slice(0, 100);
+                setSpecificProducts(capped);
+                setSpecificProductIds(capped.map((p) => p.id));
+              }}
+            />
+
             {/* ───── Product Set Picker Sheet ──────────────────────────
                 Slide-in panel from the right, matching the Snapchat
                 catalog flow exactly. Card grid: hero image strip + name
@@ -4894,13 +5290,15 @@ function ShoppingProductGroups() {
                           onClick={() => {
                             if (isEmpty) return;
                             setSelectedSet(set);
-                            // Picking a new set clears any advanced
-                            // include/exclude state — those refinements
-                            // were tied to the previous set.
+                            // Picking a new set clears any in-set
+                            // refinements — they were tied to the
+                            // previous set's contents.
                             setSelectedValues([]);
                             setExcludedValues([]);
                             setBidOverrides({});
-                            setAdvancedOpen(false);
+                            setSpecificProductIds([]);
+                            setSpecificProducts([]);
+                            setRefineMode("ALL");
                             setSetPickerOpen(false);
                           }}
                           className={cn(
