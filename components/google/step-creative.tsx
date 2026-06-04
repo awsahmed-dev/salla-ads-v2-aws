@@ -104,12 +104,15 @@ import { ObjectiveExplainer } from "@/components/shared/objective-explainer";
 import { InfoTip } from "@/components/shared/info-tip";
 import { UploadZone } from "@/components/shared/upload-zone";
 import { ProductPickerDialog, type SallaProduct } from "@/components/shared/product-picker";
-// Salla Product Sets — unified selector reused from the Snapchat catalog
-// flow. Maps a merchant-chosen Salla "set" (All Products, Best Sellers,
-// Fashion category, Ramadan-2026, etc.) onto a Google Ads listing_group
-// tree at persist time.
-import { fetchProductSets } from "@/lib/salla/product-sets";
-import { type SallaProductSet } from "@/lib/salla/store-api";
+// Merchant Center datafeeds — real grouping surface Google exposes.
+// Replaced the previous Salla-set mock library (which had ~21 seasonal /
+// best-seller / margin sets with no native MC equivalent). MC's actual
+// API returns 1–2 datafeeds per typical Salla-connected account: a
+// primary feed (whole catalog) and optionally a supplemental feed.
+import {
+  fetchMerchantCenterDatafeeds,
+  type MerchantCenterFeed,
+} from "@/lib/google/merchant-center-feeds";
 import {
   fetchBestSellers,
   fetchNewArrivals,
@@ -4348,23 +4351,21 @@ function ShoppingProductGroups() {
    *  product ads actually render at Google. */
   const [previewSurface, setPreviewSurface] = useState<"shopping" | "search" | "youtube">("shopping");
 
-  /* ── Unified Salla Product Set selector (Snapchat-parity) ────────────
-   * The primary control replaces "All vs Filter by group" with the same
-   * single-source product-set picker the merchant already uses in the
-   * Snapchat catalog flow. The selected set is translated into a Google
-   * Ads listing_group tree by the persist effect below:
-   *   - "All Products" set → flat UNIT_INCLUDED root (mode=ALL)
-   *   - Any other set     → SUBDIVISION root using the dimension that
-   *                         best matches the set's source rule
-   *                         (PRODUCT_CATEGORY for category sets,
-   *                          PRODUCT_ITEM_ID for hand-curated/seasonal,
-   *                          PRODUCT_CUSTOM_ATTRIBUTE_0 for label sets)
-   * The "Advanced: subdivide manually" disclosure below still exposes
-   * the raw dimension partitioner for power users who want to bypass
-   * the set abstraction. */
-  const [productSets, setProductSets] = useState<SallaProductSet[]>([]);
-  const [selectedSet, setSelectedSet] = useState<SallaProductSet | null>(null);
-  const [setPickerOpen, setSetPickerOpen] = useState(false);
+  /* ── Merchant Center datafeed selector ────────────────────────────
+   * Lists real MC datafeeds attached to the connected merchant
+   * account (typically 1 primary + 0–1 supplemental). The picked feed
+   * scopes the campaign via `ShoppingSetting.feed_label` at payload
+   * time. Granular product selection — by brand / category / specific
+   * SKU — happens in the refinement modes below (real Google Ads
+   * listing_group dimensions, no mock data).
+   *
+   * Previous "Salla product set" mock library (Best Sellers, Ramadan,
+   * etc.) was deleted — those concepts have no native API surface in
+   * either Merchant Center or Google Ads. They would have required
+   * Salla backend aggregates that don't exist yet. */
+  const [mcFeeds, setMcFeeds] = useState<MerchantCenterFeed[]>([]);
+  const [selectedFeed, setSelectedFeed] = useState<MerchantCenterFeed | null>(null);
+  const [feedPickerOpen, setFeedPickerOpen] = useState(false);
 
   /* ── Three refinement modes inside the chosen product set ──────────
    * Replaces the old binary "advancedOpen" toggle, which was confusing
@@ -4402,17 +4403,17 @@ function ShoppingProductGroups() {
   }, [refineMode]);
 
   useEffect(() => {
-    fetchProductSets("all").then((sets) => {
-      setProductSets(sets);
-      // Restore from draft if the merchant had a set selected earlier;
-      // otherwise default to "All Products" so a fresh draft is sane.
-      const draftSetId = creative.shoppingProductSetId;
-      const restored = draftSetId ? sets.find((s) => s.id === draftSetId) : null;
+    fetchMerchantCenterDatafeeds().then((feeds) => {
+      setMcFeeds(feeds);
+      // Restore from draft if the merchant had a feed selected earlier;
+      // otherwise default to the primary feed (full catalog).
+      const draftLabel = creative.shoppingFeedLabel;
+      const restored = draftLabel ? feeds.find((f) => f.id === draftLabel || f.name === draftLabel) : null;
       if (restored) {
-        setSelectedSet(restored);
-      } else if (sets.length > 0 && !selectedSet) {
-        const allSet = sets.find((s) => s.id === "ps_all") ?? sets[0];
-        setSelectedSet(allSet);
+        setSelectedFeed(restored);
+      } else if (feeds.length > 0 && !selectedFeed) {
+        const primary = feeds.find((f) => f.kind === "primary") ?? feeds[0];
+        setSelectedFeed(primary);
       }
       // Restore refine mode + specific products from draft.
       const draftRefine = creative.shoppingRefineMode;
@@ -4484,8 +4485,8 @@ function ShoppingProductGroups() {
           type: "UNIT_INCLUDED" as const,
           children: [],
         },
-        shoppingProductSetId: selectedSet?.id,
-        shoppingProductSetName: selectedSet?.nameAr || selectedSet?.name,
+        shoppingFeedLabel: selectedFeed?.id,
+        shoppingFeedName: selectedFeed?.nameAr || selectedFeed?.name,
         shoppingRefineMode: "ALL",
         shoppingSpecificProductIds: [],
       });
@@ -4507,8 +4508,8 @@ function ShoppingProductGroups() {
             type: "UNIT_INCLUDED" as const,
             children: [],
           },
-          shoppingProductSetId: selectedSet?.id,
-          shoppingProductSetName: selectedSet?.nameAr || selectedSet?.name,
+          shoppingFeedLabel: selectedFeed?.id,
+          shoppingFeedName: selectedFeed?.nameAr || selectedFeed?.name,
           shoppingRefineMode: "SKU",
           shoppingSpecificProductIds: [],
         });
@@ -4537,8 +4538,8 @@ function ShoppingProductGroups() {
           type: "SUBDIVISION" as const,
           children: skuChildren,
         },
-        shoppingProductSetId: selectedSet?.id,
-        shoppingProductSetName: selectedSet?.nameAr || selectedSet?.name,
+        shoppingFeedLabel: selectedFeed?.id,
+        shoppingFeedName: selectedFeed?.nameAr || selectedFeed?.name,
         shoppingRefineMode: "SKU",
         shoppingSpecificProductIds: specificProductIds,
       });
@@ -4558,8 +4559,8 @@ function ShoppingProductGroups() {
           type: "UNIT_INCLUDED" as const,
           children: [],
         },
-        shoppingProductSetId: selectedSet?.id,
-        shoppingProductSetName: selectedSet?.nameAr || selectedSet?.name,
+        shoppingFeedLabel: selectedFeed?.id,
+        shoppingFeedName: selectedFeed?.nameAr || selectedFeed?.name,
         shoppingRefineMode: "DIMENSION",
         shoppingSpecificProductIds: [],
       });
@@ -4612,12 +4613,12 @@ function ShoppingProductGroups() {
       // Keep the chosen Salla set tagged on the creative even when the
       // merchant has refined further — the review step still shows
       // "Best Sellers (refined)" instead of a raw dimension count.
-      shoppingProductSetId: selectedSet?.id,
-      shoppingProductSetName: selectedSet?.nameAr || selectedSet?.name,
+      shoppingFeedLabel: selectedFeed?.id,
+      shoppingFeedName: selectedFeed?.nameAr || selectedFeed?.name,
       shoppingRefineMode: "DIMENSION",
       shoppingSpecificProductIds: [],
     });
-  }, [mode, refineMode, selectedDimension, selectedValues, excludedValues, bidOverrides, selectedSet, specificProductIds]);
+  }, [mode, refineMode, selectedDimension, selectedValues, excludedValues, bidOverrides, selectedFeed, specificProductIds]);
 
   const toggleValue = (val: string) => {
     // If user picks an excluded value, drop the exclusion first.
@@ -4665,9 +4666,9 @@ function ShoppingProductGroups() {
   const FEED_DISAPPROVED = 12;
   const feedApprovalPct = Math.round((FEED_APPROVED / FEED_TOTAL) * 100);
   const includedCount = mode === "ALL"
-    ? (selectedSet?.productCount ?? FEED_APPROVED)
+    ? (selectedFeed?.productCount ?? FEED_APPROVED)
     : includedProducts.length;
-  const groupsConfigured = !!selectedSet
+  const groupsConfigured = !!selectedFeed
     && (mode === "ALL" || selectedValues.length > 0 || excludedValues.length > 0);
   const bidsConfigured = !isManualCpc || Object.values(bidOverrides).some((v) => v > 0);
 
@@ -4675,11 +4676,11 @@ function ShoppingProductGroups() {
     { label: "Salla feed connected to Merchant Center", ok: true },
     { label: "At least 1 approved product available", ok: FEED_APPROVED > 0 },
     {
-      label: selectedSet
-        ? `Product set: ${selectedSet.nameAr || selectedSet.name}`
-        : "Pick a product set",
-      ok: !!selectedSet,
-      hint: "Use the picker in Card 1 — same product-set library as your Snapchat catalog ads.",
+      label: selectedFeed
+        ? `Merchant Center feed: ${selectedFeed.nameAr || selectedFeed.name}`
+        : "Pick a Merchant Center feed",
+      ok: !!selectedFeed,
+      hint: "Pick the datafeed (primary or supplemental) that this campaign should deliver products from. Loaded via the Merchant Center datafeeds endpoint.",
     },
     ...(isManualCpc
       ? [{
@@ -4771,52 +4772,46 @@ function ShoppingProductGroups() {
                 the empty state is a dashed CTA. Tapping either opens
                 the right-side picker sheet (defined below).
 
-                This replaces the old "All vs Filter by group" radio —
-                merchants now pick from the same product sets they use
-                in Snapchat (All Products, Best Sellers, New Arrivals,
-                Ramadan 2026, category sets, …). */}
-            {selectedSet ? (
+                This is the REAL Merchant Center surface — the picker
+                lists whatever datafeeds are actually attached to the
+                merchant's MC account via the Salla→MC connector.
+                Typically 1 primary + 0–1 supplemental. */}
+            {selectedFeed ? (
               <button
                 type="button"
-                onClick={() => setSetPickerOpen(true)}
+                onClick={() => setFeedPickerOpen(true)}
                 className="flex w-full items-center gap-3 rounded-xl border border-border bg-white p-3 text-left transition-all hover:border-primary hover:shadow-sm"
               >
-                {selectedSet.previewImages && selectedSet.previewImages.length > 0 ? (
-                  <div className="flex -space-x-1.5">
-                    {selectedSet.previewImages.slice(0, 3).map((img, i) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={i}
-                        src={img}
-                        alt=""
-                        className="size-9 rounded-lg border-2 border-white object-cover"
-                        crossOrigin="anonymous"
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
-                    <Package className="size-4 text-primary" />
-                  </div>
-                )}
+                <div className={cn(
+                  "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                  selectedFeed.kind === "primary" ? "bg-primary/10" : "bg-amber-100"
+                )}>
+                  {selectedFeed.kind === "primary" ? (
+                    <Store className="size-4 text-primary" />
+                  ) : (
+                    <Package className="size-4 text-amber-700" />
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <p className="truncate text-sm font-semibold text-foreground">
-                      {selectedSet.nameAr || selectedSet.name}
+                      {selectedFeed.nameAr || selectedFeed.name}
                     </p>
-                    {selectedSet.seasonalTag && (
-                      <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px] font-bold">
-                        {selectedSet.seasonalTag}
-                      </Badge>
-                    )}
-                    {selectedSet.autoRefresh && (
-                      <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px] font-medium">
-                        Auto-refresh
-                      </Badge>
-                    )}
+                    <Badge className={cn(
+                      "rounded-full px-1.5 py-0 text-[9px] font-bold",
+                      selectedFeed.kind === "primary"
+                        ? "bg-primary/10 text-primary hover:bg-primary/10"
+                        : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                    )}>
+                      {selectedFeed.kind === "primary" ? "Primary feed" : "Supplemental"}
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px] font-medium">
+                      {selectedFeed.targetCountry}
+                    </Badge>
                   </div>
                   <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                    {selectedSet.productCount.toLocaleString()} products · {selectedSet.descriptionAr || selectedSet.description}
+                    {selectedFeed.productCount.toLocaleString()} products
+                    {selectedFeed.lastRefresh && ` · last refresh ${new Date(selectedFeed.lastRefresh).toLocaleString()}`}
                   </p>
                 </div>
                 <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
@@ -4826,11 +4821,11 @@ function ShoppingProductGroups() {
             ) : (
               <button
                 type="button"
-                onClick={() => setSetPickerOpen(true)}
+                onClick={() => setFeedPickerOpen(true)}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary/40 bg-primary/[0.03] py-4 text-primary transition-colors hover:bg-primary/5"
               >
                 <Package className="size-4" />
-                <span className="text-xs font-semibold">Select product set</span>
+                <span className="text-xs font-semibold">Select Merchant Center feed</span>
                 <ArrowRight className="size-3.5" />
               </button>
             )}
@@ -4839,7 +4834,7 @@ function ShoppingProductGroups() {
                 merchants. References the Snapchat parallel so they don't
                 feel they're learning two systems. */}
             <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
-              Same product-set library you use for Snapchat catalog ads. Sets refresh automatically when your Salla catalog updates.
+              These are the real datafeeds in your linked Merchant Center account ({mcFeeds.length} {mcFeeds.length === 1 ? "feed" : "feeds"} found). The Salla → Merchant Center connector keeps them in sync automatically.
             </p>
 
             {/* ───── Refinement modes ────────────────────────────────
@@ -5102,7 +5097,7 @@ function ShoppingProductGroups() {
                 subdivision dimension (if any), each UNIT branch, and
                 the mandatory "everything else" fallback that Google's
                 API requires on every SUBDIVISION node. */}
-            {selectedSet && (refineMode !== "ALL") && (
+            {selectedFeed && (refineMode !== "ALL") && (
               <div className="mt-4 rounded-xl border border-border bg-muted/10 p-4">
                 <div className="mb-2 flex items-center gap-2">
                   <FolderTree className="size-3.5 text-primary" />
@@ -5181,29 +5176,31 @@ function ShoppingProductGroups() {
                 <div className="flex flex-col gap-3">
                   <div>
                     <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                      1. Salla → Merchant Center (catalog sync)
+                      1. Salla → Merchant Center (catalog sync, runs server-side)
                     </p>
                     <ul className="ml-3 flex list-disc flex-col gap-1 text-muted-foreground">
-                      <li>Every Salla product is pushed to MC as a feed item; <code className="rounded bg-muted px-1 py-0.5 text-[10px]">offer_id = salla_product.id</code>.</li>
-                      <li>
-                        Set membership becomes <code className="rounded bg-muted px-1 py-0.5 text-[10px]">custom_label_0</code> on each MC product. Selected set: <code className="rounded bg-primary/10 px-1 py-0.5 text-[10px] text-primary">{selectedSet?.id ?? "—"}</code>
-                      </li>
-                      <li>Sets refresh automatically when Salla store inventory changes; MC feed re-pushes within ~15 min.</li>
+                      <li>Each Salla product → one MC product (<code className="rounded bg-muted px-1 py-0.5 text-[10px]">offer_id = salla_product.id</code>).</li>
+                      <li>Primary feed auto-pushed by the connector. Supplemental feeds optional — typically used for delta updates (e.g., "recently added"). Both surface on the Content API <code className="rounded bg-muted px-1 py-0.5 text-[10px]">content/v2.1/{`{merchantId}`}/datafeeds</code> endpoint and populate the picker above.</li>
+                      <li>Refresh cadence: ~15 min after Salla store inventory changes.</li>
                     </ul>
                   </div>
                   <div>
                     <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                      2. Campaign-level (Google Ads ShoppingSetting)
+                      2. Picker → Google Ads campaign (ShoppingSetting)
                     </p>
                     <ul className="ml-3 flex list-disc flex-col gap-1 text-muted-foreground">
-                      <li><code className="rounded bg-muted px-1 py-0.5 text-[10px]">merchant_id</code> — from connected Salla→MC account</li>
-                      <li><code className="rounded bg-muted px-1 py-0.5 text-[10px]">feed_label</code> — currently fixed to <code>SA</code> for KSA merchants</li>
+                      <li><code className="rounded bg-muted px-1 py-0.5 text-[10px]">merchant_id</code> — from the linked MC account on the Salla side</li>
+                      <li>
+                        <code className="rounded bg-muted px-1 py-0.5 text-[10px]">feed_label</code> →
+                        <code className="ml-1 rounded bg-primary/10 px-1 py-0.5 text-[10px] text-primary">{selectedFeed?.id ?? "—"}</code>
+                        {selectedFeed && <> (feed: <strong>{selectedFeed.name}</strong>, target <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{selectedFeed.targetCountry}</code>)</>}
+                      </li>
                       <li><code className="rounded bg-muted px-1 py-0.5 text-[10px]">campaign_priority</code> — default 0 (Standard Shopping)</li>
                     </ul>
                   </div>
                   <div>
                     <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                      3. Ad-group-level (AdGroupListingGroupFilter tree)
+                      3. Refinement → ad-group listing_group tree
                     </p>
                     <ul className="ml-3 flex list-disc flex-col gap-1 text-muted-foreground">
                       <li>
@@ -5211,13 +5208,13 @@ function ShoppingProductGroups() {
                       </li>
                       <li>
                         {refineMode === "ALL" && (
-                          <>Flat <code className="rounded bg-muted px-1 py-0.5 text-[10px]">UNIT_INCLUDED</code> root — delivers all products where <code className="rounded bg-muted px-1 py-0.5 text-[10px]">custom_label_0 == {selectedSet?.id ?? "—"}</code></>
+                          <>Flat <code className="rounded bg-muted px-1 py-0.5 text-[10px]">UNIT_INCLUDED</code> root — delivers every product in the chosen feed.</>
                         )}
                         {refineMode === "SKU" && (
-                          <>SUBDIVISION on <code className="rounded bg-muted px-1 py-0.5 text-[10px]">PRODUCT_ITEM_ID</code> · {specificProductIds.length} UNIT_INCLUDED children + 1 UNIT_EXCLUDED "everything else"</>
+                          <>SUBDIVISION on <code className="rounded bg-muted px-1 py-0.5 text-[10px]">PRODUCT_ITEM_ID</code> · {specificProductIds.length} UNIT_INCLUDED children + 1 UNIT_EXCLUDED &quot;everything else&quot;</>
                         )}
                         {refineMode === "DIMENSION" && (
-                          <>SUBDIVISION on <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{selectedDimension}</code> · {selectedValues.length} UNIT_INCLUDED + {excludedValues.length} UNIT_EXCLUDED + 1 "everything else"</>
+                          <>SUBDIVISION on <code className="rounded bg-muted px-1 py-0.5 text-[10px]">{selectedDimension}</code> · {selectedValues.length} UNIT_INCLUDED + {excludedValues.length} UNIT_EXCLUDED + 1 &quot;everything else&quot;</>
                         )}
                       </li>
                       <li>Per-group bids → <code className="rounded bg-muted px-1 py-0.5 text-[10px]">listing_group.cpc_bid_micros</code> on each UNIT (Manual CPC only)</li>
@@ -5226,9 +5223,10 @@ function ShoppingProductGroups() {
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
                     <p className="text-[10px] font-bold text-amber-900">⚠ For the dev to verify</p>
                     <ul className="ml-3 mt-0.5 flex list-disc flex-col gap-0.5 text-[10px] text-amber-800">
-                      <li>Merchant Center has NO native "product set" concept — the sync MUST tag products with <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">custom_label_0</code> for set membership.</li>
-                      <li>Every <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">SUBDIVISION</code> requires exactly one child with a null dimension value (the "everything else" UNIT) or the listing_group.create call fails.</li>
-                      <li>Salla product IDs must round-trip cleanly to MC <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">offer_id</code> for the SKU mode to work.</li>
+                      <li>The picker calls <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">fetchMerchantCenterDatafeeds()</code> in <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">lib/google/merchant-center-feeds.ts</code> — currently returns mock data. Wire to <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">content/v2.1/{`{merchantId}`}/datafeeds.list</code> + aggregate product counts via <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">productstatuses.list</code> per datafeed.</li>
+                      <li>Merchant Center has NO "product set" object — datafeeds are the closest native concept. For sub-feed groupings (Best Sellers, seasonal, etc.) push them as <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">custom_label_0..4</code> on the MC product, then partition the listing_group on <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">PRODUCT_CUSTOM_ATTRIBUTE_0..4</code>.</li>
+                      <li>Every SUBDIVISION must have exactly one child with a null dimension value (the &quot;everything else&quot; UNIT) or <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">listing_group.create</code> fails.</li>
+                      <li>Salla product IDs must round-trip cleanly to MC <code className="rounded bg-amber-100 px-1 py-0.5 text-[10px]">offer_id</code> for the SKU mode to deliver.</li>
                     </ul>
                   </div>
                 </div>
@@ -5263,43 +5261,43 @@ function ShoppingProductGroups() {
                 catalog flow exactly. Card grid: hero image strip + name
                 + Arabic name + description + seasonal badge + product
                 count + selected check / arrow. Empty sets disabled. */}
-            <Sheet open={setPickerOpen} onOpenChange={setSetPickerOpen}>
+            <Sheet open={feedPickerOpen} onOpenChange={setFeedPickerOpen}>
               <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-[420px]">
                 <SheetHeader className="shrink-0 bg-primary px-6 pb-4 pt-5">
                   <SheetTitle className="flex items-center gap-2.5 text-base font-bold text-white">
                     <div className="flex size-8 items-center justify-center rounded-xl bg-white/15">
                       <Package className="size-4 text-white" />
                     </div>
-                    Select product set
+                    Select Merchant Center feed
                   </SheetTitle>
                   <SheetDescription className="text-xs text-white/80">
-                    Products in this set will be eligible to deliver in your Shopping ads. Same library used across platforms.
+                    Pick the datafeed this Shopping campaign will deliver products from. Loaded live from your linked Merchant Center account.
                   </SheetDescription>
                 </SheetHeader>
 
                 <div className="flex-1 overflow-y-auto bg-muted/30 px-4 py-3">
                   <div className="flex flex-col gap-2">
-                    {productSets.map((set) => {
-                      const isSelected = selectedSet?.id === set.id;
-                      const isEmpty = set.productCount === 0;
+                    {mcFeeds.map((feed) => {
+                      const isSelected = selectedFeed?.id === feed.id;
+                      const isEmpty = feed.productCount === 0;
                       return (
                         <button
-                          key={set.id}
+                          key={feed.id}
                           type="button"
                           disabled={isEmpty}
                           onClick={() => {
                             if (isEmpty) return;
-                            setSelectedSet(set);
-                            // Picking a new set clears any in-set
+                            setSelectedFeed(feed);
+                            // Picking a new feed clears any in-feed
                             // refinements — they were tied to the
-                            // previous set's contents.
+                            // previous feed's product set.
                             setSelectedValues([]);
                             setExcludedValues([]);
                             setBidOverrides({});
                             setSpecificProductIds([]);
                             setSpecificProducts([]);
                             setRefineMode("ALL");
-                            setSetPickerOpen(false);
+                            setFeedPickerOpen(false);
                           }}
                           className={cn(
                             "group flex flex-col overflow-hidden rounded-2xl border text-left shadow-sm transition-all",
@@ -5310,53 +5308,66 @@ function ShoppingProductGroups() {
                                 : "border-white bg-white hover:border-primary/60"
                           )}
                         >
-                          {set.previewImages && set.previewImages.length > 0 && (
-                            <div className="flex h-[72px] gap-px overflow-hidden rounded-t-2xl">
-                              {set.previewImages.slice(0, 4).map((img, i) => (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  key={i}
-                                  src={img}
-                                  alt=""
-                                  className="h-full flex-1 object-cover transition-transform duration-300 group-hover:scale-105"
-                                  crossOrigin="anonymous"
-                                />
-                              ))}
-                            </div>
-                          )}
-                          <div className="flex items-center gap-3 px-3 py-3">
+                          <div className="flex items-start gap-3 px-3 py-3">
                             <div className={cn(
                               "flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors",
-                              isSelected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10"
+                              isSelected
+                                ? "bg-primary text-primary-foreground"
+                                : feed.kind === "primary"
+                                  ? "bg-primary/10 text-primary group-hover:bg-primary/20"
+                                  : "bg-amber-100 text-amber-700 group-hover:bg-amber-200"
                             )}>
-                              <Package className="size-4" />
+                              {feed.kind === "primary" ? (
+                                <Store className="size-4" />
+                              ) : (
+                                <Package className="size-4" />
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center gap-1.5">
                                 <p className={cn("text-xs font-bold", isSelected ? "text-primary" : "text-foreground")}>
-                                  {set.nameAr || set.name}
+                                  {feed.nameAr || feed.name}
                                 </p>
-                                {set.seasonalTag && (
-                                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{set.seasonalTag}</Badge>
+                                <Badge className={cn(
+                                  "rounded-full px-1.5 py-0 text-[9px] font-bold",
+                                  feed.kind === "primary"
+                                    ? "bg-primary/10 text-primary hover:bg-primary/10"
+                                    : "bg-amber-100 text-amber-800 hover:bg-amber-100"
+                                )}>
+                                  {feed.kind === "primary" ? "Primary" : "Supplemental"}
+                                </Badge>
+                                <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px] font-medium">
+                                  {feed.targetCountry} · {feed.contentLanguage}
+                                </Badge>
+                                {feed.hasErrors && (
+                                  <Badge className="rounded-full bg-red-100 px-1.5 py-0 text-[9px] font-bold text-red-700 hover:bg-red-100">
+                                    Errors
+                                  </Badge>
                                 )}
                               </div>
                               <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
-                                {set.descriptionAr || set.description}
+                                {feed.descriptionAr || feed.description}
                               </p>
+                              {feed.lastRefresh && (
+                                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                  Last refresh: {new Date(feed.lastRefresh).toLocaleString()}
+                                </p>
+                              )}
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-col items-end gap-1">
                               <span className={cn(
                                 "text-xs font-bold tabular-nums",
                                 isEmpty ? "text-red-500" : isSelected ? "text-primary" : "text-foreground"
                               )}>
-                                {set.productCount}{isEmpty ? " (empty)" : ""}
+                                {feed.productCount.toLocaleString()}{isEmpty ? " (empty)" : ""}
                               </span>
+                              <span className="text-[9px] text-muted-foreground">products</span>
                               {isSelected ? (
-                                <div className="flex size-5 items-center justify-center rounded-full bg-primary">
+                                <div className="mt-1 flex size-5 items-center justify-center rounded-full bg-primary">
                                   <Check className="size-3 text-primary-foreground" />
                                 </div>
                               ) : (
-                                <ArrowRight className="size-3.5 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
+                                <ArrowRight className="mt-1 size-3.5 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
                               )}
                             </div>
                           </div>
@@ -5366,13 +5377,18 @@ function ShoppingProductGroups() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-border bg-background px-5 py-3">
-                  <p className="text-xs text-muted-foreground">
-                    {productSets.length} product sets · synced from Salla
+                <div className="flex flex-col gap-2 border-t border-border bg-background px-5 py-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      {mcFeeds.length} {mcFeeds.length === 1 ? "feed" : "feeds"} from <code className="rounded bg-muted px-1 py-0.5 text-[10px]">content/v2.1/datafeeds</code>
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => setFeedPickerOpen(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                  <p className="text-[10px] leading-snug text-muted-foreground">
+                    More feeds need to be created in Merchant Center directly. To group products by Best Sellers / Seasonal / etc. without making new feeds, use the <strong>Refine by brand or category</strong> mode below.
                   </p>
-                  <Button variant="outline" size="sm" onClick={() => setSetPickerOpen(false)}>
-                    Cancel
-                  </Button>
                 </div>
               </SheetContent>
             </Sheet>

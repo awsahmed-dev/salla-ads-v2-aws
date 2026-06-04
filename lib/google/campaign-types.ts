@@ -1136,21 +1136,23 @@ export interface GoogleCreativeSettings {
   appAds: GoogleAppAd[];
   /** Product group listing tree root (Shopping). Maps to AdGroupListingGroupFilter tree */
   productGroupRoot: ProductGroupNode | null;
-  /** Salla Product Set selected via the unified product-set picker
-   *  (Snapchat-parity flow). When set, this is the merchant's primary
-   *  intent — productGroupRoot is derived from it at persist time.
-   *  Kept alongside the listing_group tree so the review step can show
-   *  the merchant-friendly set name instead of dimension jargon.
+  /** Merchant Center datafeed selected via the catalog picker.
+   *  At payload time this drives two Google Ads fields:
+   *    - Campaign-level: `ShoppingSetting.feed_label = shoppingFeedLabel`
+   *      → scopes the campaign to deliver products from the chosen feed
+   *    - Ad-group-level: the listing_group tree below (productGroupRoot)
+   *      narrows further within that feed
    *
    *  IMPORTANT for the integration dev:
-   *  Google Merchant Center has NO native "product set" concept. At feed
-   *  sync time the Salla→MC adapter must translate the selected set into
-   *  a `custom_label_0` (or any free custom_label_n) tag on each affected
-   *  Merchant Center product. The Google Ads listing_group tree then
-   *  partitions on `PRODUCT_CUSTOM_ATTRIBUTE_0` with `value =
-   *  shoppingProductSetId` to deliver only the in-set products. */
-  shoppingProductSetId?: string;
-  shoppingProductSetName?: string;
+   *  Merchant Center has NO native "product set" concept. The closest
+   *  thing exposed by Content API is `content/v2.1/{merchantId}/datafeeds`
+   *  which returns primary + supplemental feeds (typically 1–2 per
+   *  Salla-connected account). This picker lists those real feeds.
+   *  Anything more granular (Best Sellers, seasonal, etc.) lives in
+   *  the listing_group tree via PRODUCT_CUSTOM_ATTRIBUTE_n dimensions
+   *  set by the Salla→MC sync at product-tag time. */
+  shoppingFeedLabel?: string;
+  shoppingFeedName?: string;
 
   /** Refinement mode applied INSIDE the chosen product set:
    *   - "ALL"      → flat UNIT_INCLUDED root (every in-set product eligible)
