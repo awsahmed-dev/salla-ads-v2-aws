@@ -543,8 +543,15 @@ export interface DemandGenAd {
   carouselHeadline: string;
   /** Carousel: single description. Max display width 90. */
   carouselDescription: string;
-  /** Carousel cards (2-10). Each card is an asset with its own image, headline, and final URL. */
+  /** Carousel cards (2-10 per Google Ads API). Each card has its own
+   *  image, headline, final URL, AND its own CTA (per dev audit:
+   *  CTA lives on the card, not the ad). */
   carouselCards: { id: string; headline: string; imageUrl: string; finalUrl: string; callToAction: string }[];
+
+  /* ---- VIDEO RESPONSIVE — sitelinks (per dev audit) ---- */
+  /** Sitelink assets for DG Video Responsive ads. Maps to AdGroupAsset
+   *  with SitelinkAsset, field_type=SITELINK. Up to 8 sitelinks. */
+  sitelinks?: { id: string; linkText: string; finalUrl: string; description1?: string; description2?: string }[];
 
   /** Ad-level asset automation for Demand Gen. Maps to Ad.asset_automation_settings.
    *  Controls AI-powered creative generation per ad. */
@@ -594,6 +601,7 @@ export function createDemandGenAd(index: number): DemandGenAd {
       GENERATE_VERTICAL_YOUTUBE_VIDEOS: "OPTED_IN",
       GENERATE_VIDEOS_FROM_OTHER_ASSETS: "OPTED_IN",
     },
+    sitelinks: [],
   };
 }
 

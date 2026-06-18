@@ -148,9 +148,13 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
   const needsConversionTag = config.conversionTrackingRequired;
   const needsMerchantCenter = config.merchantCenterRequired;
   const isPMax = obj.objective === "PERFORMANCE_MAX";
-  const supportsCatalogMode = isPMax;
+  const isDemandGen = obj.objective === "DEMAND_GEN";
+  // Per dev audit: Demand Gen retail mode is supported by Google Ads API
+  // (DemandGenProductAdInfo, v17+). The catalog toggle now appears for
+  // both PMax and DG. Shopping always requires catalog (no toggle).
+  const supportsCatalogMode = isPMax || isDemandGen;
   const requiresCatalogConnection =
-    obj.objective === "SHOPPING" || (isPMax && obj.feedEnabled);
+    obj.objective === "SHOPPING" || ((isPMax || isDemandGen) && obj.feedEnabled);
 
   // Auto-fill campaign name from store data on mount (skip if draft recovery)
   useEffect(() => {
@@ -172,7 +176,9 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
     const newConfig = OBJECTIVE_CONFIGS[value];
     if (!newConfig) return;
 
-    const supportsCatalogOnNextObjective = value === "PERFORMANCE_MAX" || value === "SHOPPING";
+    // DEMAND_GEN added to the catalog-eligible list per dev audit.
+    const supportsCatalogOnNextObjective =
+      value === "PERFORMANCE_MAX" || value === "SHOPPING" || value === "DEMAND_GEN";
     updateNested("objective", {
       objective: value as typeof obj.objective,
       // Reset tag for non-tracking objectives, auto-enable for tracking objectives
@@ -626,7 +632,11 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                 </div>
               )}
 
-              {/* ---- PMax Retail Catalog Mode (optional) ---- */}
+              {/* ---- Retail Catalog Mode (PMax / Demand Gen — optional) ----
+                  Per dev audit: Demand Gen retail mode is supported by
+                  Google Ads API (DemandGenProductAdInfo, v17+). The
+                  catalog toggle is shared between PMax and DG with
+                  format-specific copy. */}
               {supportsCatalogMode && (
                 <div className="border-t border-border px-4 sm:px-8 py-5">
                   <div className="flex items-start justify-between gap-4">
@@ -637,14 +647,16 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-semibold text-foreground">
-                            Retail catalog mode (PMax)
+                            {isDemandGen ? "Retail catalog mode (Demand Gen)" : "Retail catalog mode (PMax)"}
                           </p>
                           <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
                             Optional
                           </Badge>
                         </div>
                         <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                          Enable this to run feed-driven Retail Performance Max using Merchant Center products (similar to catalog sales flows).
+                          {isDemandGen
+                            ? "Enable this to run feed-driven Demand Gen using Merchant Center products. Ads auto-render from your product catalog across YouTube, Discover, and Gmail."
+                            : "Enable this to run feed-driven Retail Performance Max using Merchant Center products (similar to catalog sales flows)."}
                         </p>
                       </div>
                     </div>
@@ -663,7 +675,9 @@ export function GoogleStepObjective({ onCancel }: { onCancel?: () => void }) {
                     />
                   </div>
                   <p className="mt-3 text-[11px] text-muted-foreground">
-                    Off: standard PMax. On: Retail PMax with product feed signals.
+                    {isDemandGen
+                      ? "Off: standard Demand Gen (you upload creative). On: Retail Demand Gen — ads auto-built from your Merchant Center feed."
+                      : "Off: standard PMax. On: Retail PMax with product feed signals."}
                   </p>
                 </div>
               )}

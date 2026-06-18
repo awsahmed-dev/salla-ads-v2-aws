@@ -90,6 +90,7 @@ import {
   Search,
   Pin,
   ExternalLink,
+  Link,
   Hash,
   Megaphone,
   ListChecks,
@@ -375,8 +376,13 @@ const DG_LIMITS = {
     longHeadlines: { min: 1, max: 5, charLimit: 90 },
     descriptions: { min: 1, max: 5, charLimit: 90 },
     businessName: { charLimit: 25 },
-    logos: { min: 1, max: 5 },
+    // Per dev audit + Google Ads API docs:
+    // DemandGenVideoResponsiveAdInfo allows exactly 1 logo image,
+    // unlike Multi-Asset which allows up to 5.
+    logos: { min: 1, max: 1 },
     videos: { min: 1, max: 5 },
+    // DG Video supports sitelinks (Google Ads API v17+).
+    sitelinks: { min: 0, max: 8 },
   },
   /* ---- Image specs (applies to Multi-Asset) ---- */
   imageSpecs: [
@@ -427,7 +433,11 @@ function calcDgAdStrength(ad: DemandGenAd): { score: number; label: string; colo
   } else if (ad.adType === "CAROUSEL") {
     if (ad.carouselHeadline.trim()) pts += 15;
     if (ad.carouselDescription.trim()) pts += 15;
-    const filledCards = ad.carouselCards.filter((c) => c.headline.trim() && c.finalUrl.trim()).length;
+    // Per dev audit: image is MANDATORY on every carousel card. Cards
+    // without imageUrl don't count toward the filled-cards score.
+    const filledCards = ad.carouselCards.filter((c) =>
+      c.headline.trim() && c.finalUrl.trim() && c.imageUrl.trim()
+    ).length;
     if (filledCards >= 2) pts += 15; if (filledCards >= 4) pts += 10; if (filledCards >= 7) pts += 5;
     if (ad.logos.length >= 1) pts += 15;
   } else {
@@ -846,15 +856,29 @@ function DgAdEditor({
                   </div>
                 </div>
                 <div className="flex flex-col gap-2.5">
-                  {ad.carouselCards.map((card, ci) => (
-                    <div key={card.id} className="flex gap-3 rounded-lg border border-border bg-background p-3">
-                      {/* Image preview or upload */}
-                      <div className="relative size-16 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                  {ad.carouselCards.map((card, ci) => {
+                    // Per dev audit: image is MANDATORY on every card.
+                    // Surface a red border + required hint when missing.
+                    const imageMissing = !card.imageUrl.trim();
+                    return (
+                    <div
+                      key={card.id}
+                      className={cn(
+                        "flex gap-3 rounded-lg border bg-background p-3",
+                        imageMissing ? "border-red-200" : "border-border"
+                      )}
+                    >
+                      {/* Image preview or required indicator */}
+                      <div className={cn(
+                        "relative size-16 shrink-0 overflow-hidden rounded-lg border",
+                        imageMissing ? "border-red-300 bg-red-50" : "border-border bg-muted"
+                      )}>
                         {card.imageUrl ? (
                           <img src={card.imageUrl} alt={card.headline} className="size-full object-cover" />
                         ) : (
-                          <div className="flex size-full items-center justify-center">
-                            <ImageIcon className="size-5 text-muted-foreground/30" />
+                          <div className="flex size-full flex-col items-center justify-center gap-0.5 p-1">
+                            <ImageIcon className="size-4 text-red-400" />
+                            <span className="text-[8px] font-bold uppercase text-red-500">Required</span>
                           </div>
                         )}
                         <span className="absolute left-1 top-1 flex size-5 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-white">{ci + 1}</span>
@@ -884,6 +908,25 @@ function DgAdEditor({
                           placeholder="https://store.salla.sa/product/..."
                           className="h-7 text-[10px] text-muted-foreground"
                         />
+                        {/* Per-card CTA selector — per dev audit, CTA lives
+                            on the card, not the ad. Maps to
+                            DemandGenCarouselCardAsset.call_to_action_text. */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="shrink-0 text-[9px] font-semibold uppercase text-muted-foreground">CTA</span>
+                          <select
+                            value={card.callToAction}
+                            onChange={(e) => {
+                              const cards = [...ad.carouselCards];
+                              cards[ci] = { ...card, callToAction: e.target.value };
+                              onUpdate({ carouselCards: cards });
+                            }}
+                            className="h-6 flex-1 rounded border border-border bg-background px-1 text-[10px] font-medium text-foreground focus:border-primary focus:outline-none"
+                          >
+                            {CTA_OPTIONS.map((c) => (
+                              <option key={c.value} value={c.value}>{c.label}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                       {/* Delete button */}
                       {ad.carouselCards.length > DG_LIMITS.carousel.cards.min && (
@@ -893,7 +936,8 @@ function DgAdEditor({
                         </button>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </>
@@ -975,18 +1019,93 @@ function DgAdEditor({
                 </div>
               </div>
 
-              {/* Logo */}
+              {/* Logo — Video Responsive allows EXACTLY 1 logo per Google Ads
+                  API (DemandGenVideoResponsiveAdInfo.logo_image), unlike
+                  Multi-Asset which allows up to 5. Per dev audit. */}
               <div className="mb-4">
                 <div className="mb-2 flex items-center gap-2">
                   <Building2 className="size-3.5 text-primary" />
                   <Label className="text-xs font-semibold text-foreground">Logo</Label>
-                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">{ad.logos.length}/{DG_LIMITS.videoResponsive.logos.max}</Badge>
+                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">
+                    {ad.logos.length}/{DG_LIMITS.videoResponsive.logos.max}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">Single logo only</Badge>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex size-14 items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/20 transition-colors hover:border-primary/40">
                     <Plus className="size-4 text-muted-foreground/30" />
                   </div>
-                  <p className="text-[11px] text-muted-foreground">1:1 aspect, min {DG_LIMITS.logo.minSize}</p>
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-[11px] text-muted-foreground">1:1 aspect, min {DG_LIMITS.logo.minSize}</p>
+                    <p className="text-[10px] italic text-muted-foreground">Video ads accept one logo per Google Ads API. Multi-Asset allows up to 5.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sitelinks (Video Responsive only) — per dev audit.
+                  DG Video supports sitelink assets that show as clickable
+                  links underneath the video. Maps to AdGroupAsset with
+                  SitelinkAsset, field_type=SITELINK. Up to 8 per ad. */}
+              <div className="mb-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <Link className="size-3.5 text-primary" />
+                  <Label className="text-xs font-semibold text-foreground">Sitelinks</Label>
+                  <Badge variant="secondary" className="rounded-full px-1.5 py-0 text-[9px]">
+                    {(ad.sitelinks ?? []).length}/{DG_LIMITS.videoResponsive.sitelinks.max}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[9px]">Optional</Badge>
+                  <InfoTip text="Sitelinks are clickable shortcuts that appear with your video ad. Maps to AdGroupAsset with SitelinkAsset (field_type=SITELINK). Up to 8 per ad." />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {(ad.sitelinks ?? []).map((sl, sli) => (
+                    <div key={sl.id} className="flex items-center gap-2 rounded-lg border border-border bg-background p-2">
+                      <Input
+                        value={sl.linkText}
+                        onChange={(e) => {
+                          const next = [...(ad.sitelinks ?? [])];
+                          next[sli] = { ...sl, linkText: e.target.value.slice(0, 25) };
+                          onUpdate({ sitelinks: next });
+                        }}
+                        placeholder="Link text (e.g. Shop sale)"
+                        maxLength={25}
+                        className="h-7 w-40 text-[11px]"
+                      />
+                      <Input
+                        value={sl.finalUrl}
+                        onChange={(e) => {
+                          const next = [...(ad.sitelinks ?? [])];
+                          next[sli] = { ...sl, finalUrl: e.target.value };
+                          onUpdate({ sitelinks: next });
+                        }}
+                        placeholder="https://store.salla.sa/sale"
+                        className="h-7 flex-1 text-[11px]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => onUpdate({ sitelinks: (ad.sitelinks ?? []).filter((_, j) => j !== sli) })}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {(ad.sitelinks ?? []).length < DG_LIMITS.videoResponsive.sitelinks.max && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1 self-start text-[11px]"
+                      onClick={() =>
+                        onUpdate({
+                          sitelinks: [
+                            ...(ad.sitelinks ?? []),
+                            { id: `sl-${Date.now()}`, linkText: "", finalUrl: "" },
+                          ],
+                        })
+                      }
+                    >
+                      <Plus className="size-3" /> Add sitelink
+                    </Button>
+                  )}
                 </div>
               </div>
             </>
@@ -1010,19 +1129,32 @@ function DgAdEditor({
                 <Input value={ad.finalUrl} onChange={(e) => onUpdate({ finalUrl: e.target.value })} placeholder="https://store.salla.sa" className="h-8 text-xs" />
               </div>
             </div>
-            <div className="mt-3">
-              <Label className="mb-1.5 text-[11px] font-semibold text-foreground">Call to Action</Label>
-              <div className="flex flex-wrap gap-1">
-                {CTA_OPTIONS.map((c) => (
-                  <button key={c.value} type="button" onClick={() => onUpdate({ callToAction: c.value })}
-                    className={cn("rounded-md border px-2 py-1 text-[10px] font-medium transition-colors",
-                      ad.callToAction === c.value ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
-                    )}>
-                    {c.label}
-                  </button>
-                ))}
+            {/* Per dev audit: hide ad-level CTA for Carousel format —
+                each card has its own CTA below, ad-level CTA is unused
+                by DemandGenCarouselAdInfo. */}
+            {ad.adType !== "CAROUSEL" && (
+              <div className="mt-3">
+                <Label className="mb-1.5 text-[11px] font-semibold text-foreground">Call to Action</Label>
+                <div className="flex flex-wrap gap-1">
+                  {CTA_OPTIONS.map((c) => (
+                    <button key={c.value} type="button" onClick={() => onUpdate({ callToAction: c.value })}
+                      className={cn("rounded-md border px-2 py-1 text-[10px] font-medium transition-colors",
+                        ad.callToAction === c.value ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+                      )}>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+            {ad.adType === "CAROUSEL" && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-dashed border-border bg-muted/30 p-2.5">
+                <Info className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+                <p className="text-[10px] leading-snug text-muted-foreground">
+                  In carousel ads, each card gets its own CTA below. Maps to <code className="rounded bg-muted px-1 py-0.5 text-[10px]">DemandGenCarouselCardAsset.call_to_action_text</code> per card.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -3882,6 +4014,17 @@ function DemandGenCreativeEditor() {
   const [activeGroupIdx, setActiveGroupIdx] = useState(0);
   const [previewChannel, setPreviewChannel] = useState<string>("youtube_feed");
 
+  // Per dev audit: when feedEnabled is on at the objective step, DG
+  // runs in retail catalog mode (DemandGenProductAdInfo). The creative
+  // editor surfaces a slim catalog status banner — the full
+  // datafeed/refine picker lives in the Shopping flow which this banner
+  // points to.
+  const isCatalogMode = campaign.objective.feedEnabled === true;
+  const catalogFeedName =
+    campaign.creative.shoppingFeedName ||
+    campaign.creative.shoppingFeedLabel ||
+    "(not yet configured)";
+
   const activeGroup = adGroups[activeGroupIdx] ?? adGroups[0];
   const activeAd = activeGroup?.ads[0];
 
@@ -3941,11 +4084,53 @@ function DemandGenCreativeEditor() {
           <div>
             <h1 className="text-balance text-2xl font-bold tracking-tight text-foreground">
               Demand Gen Creative
+              {isCatalogMode && (
+                <Badge className="ml-2 rounded-full bg-amber-100 px-2 py-0 text-[10px] font-bold text-amber-800 align-middle hover:bg-amber-100">
+                  Retail catalog mode
+                </Badge>
+              )}
             </h1>
             <p className="mt-1.5 max-w-lg text-pretty text-sm leading-relaxed text-muted-foreground">
-              Build ad groups with multiple ads. Each ad group gets its own channel placements. Google optimizes ad combinations within each group.
+              {isCatalogMode
+                ? "Retail Demand Gen — ads auto-render from your Merchant Center product feed. Upload creative assets per ad group; Google composes them with your products at delivery time."
+                : "Build ad groups with multiple ads. Each ad group gets its own channel placements. Google optimizes ad combinations within each group."}
             </p>
           </div>
+
+          {/* Catalog mode banner — per dev audit. Surfaces the feed
+              picked at Step 0 + offers a jump-back to fine-tune. The
+              full datafeed + listing_group refinement UI lives on the
+              Shopping objective so we don't duplicate ~700 lines here. */}
+          {isCatalogMode && (
+            <SectionCard>
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-100">
+                  <Store className="size-4 text-amber-700" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="text-sm font-bold text-foreground">Product catalog connected</p>
+                    <Badge variant="outline" className="rounded-full px-1.5 py-0 text-[10px]">
+                      Merchant Center
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    Feed: <code className="rounded bg-muted px-1 py-0.5 text-[10px] font-semibold text-foreground">{catalogFeedName}</code>
+                    {" "}— maps to <code className="rounded bg-muted px-1 py-0.5 text-[10px]">DemandGenProductAdInfo</code> on submit. Refine which products deliver (by SKU, brand, category) using the same flow the Shopping objective uses.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setStep(0)}
+                    className="mt-2 h-7 text-[11px]"
+                  >
+                    Back to Step 0 — configure catalog
+                  </Button>
+                </div>
+              </div>
+            </SectionCard>
+          )}
 
           {/* ---- Ad Group Header (single group) ---- */}
           <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
@@ -4015,6 +4200,17 @@ function DemandGenCreativeEditor() {
                     <p className="text-[11px] text-red-700">Enable at least one channel.</p>
                   </div>
                 )}
+                {/* Dev-facing clarifier: Maps is a Search Network surface,
+                    not a Demand Gen surface. Google Ads API
+                    `DemandGenAdGroupSettings.channel_controls.selected_channels`
+                    does NOT include Maps. This note prevents the dev
+                    from re-flagging it in the next review cycle. */}
+                <div className="mt-2 flex items-start gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2">
+                  <Info className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+                  <p className="text-[10px] leading-snug text-muted-foreground">
+                    <strong>For the dev:</strong> Maps placement is not part of Google Ads API <code className="rounded bg-muted px-1 py-0.5 text-[10px]">DemandGenAdGroupSettings.channel_controls</code>. Maps inventory is reachable via Search Network campaigns, not Demand Gen. The 6 channels above are the complete supported set.
+                  </p>
+                </div>
               </SectionCard>
 
               {/* Ads within this Ad Group */}
@@ -4056,14 +4252,56 @@ function DemandGenCreativeEditor() {
             </div>
           )}
 
-          {/* Google AI Settings */}
+          {/* Google AI Settings.
+              Per dev audit + Google Ads API restrictions, asset
+              automation types are format-specific:
+                • Video Responsive → GENERATE_SHORTER_YOUTUBE_VIDEOS +
+                                     GENERATE_VERTICAL_YOUTUBE_VIDEOS
+                • Multi-Asset       → GENERATE_DESIGN_VERSIONS_FOR_IMAGES +
+                                     GENERATE_VIDEOS_FROM_OTHER_ASSETS
+                • Carousel          → none of these automations apply (the
+                                     creative is card-locked) */}
           {activeAd && (() => {
-            const DG_AUTOMATION_ITEMS: { type: DemandGenAdAutomationType; label: string; desc: string; icon: React.ReactNode }[] = [
-              { type: "GENERATE_DESIGN_VERSIONS_FOR_IMAGES", label: "Image Design Versions", desc: "Auto-create cropped, resized, and reformatted image variations for each placement.", icon: <ImageIcon className="size-3.5" /> },
-              { type: "GENERATE_SHORTER_YOUTUBE_VIDEOS", label: "Shorter Video Cuts", desc: "Generate shorter video edits from your uploaded videos for better engagement.", icon: <PlayCircle className="size-3.5" /> },
-              { type: "GENERATE_VERTICAL_YOUTUBE_VIDEOS", label: "Vertical Video Versions", desc: "Auto-create vertical (9:16) videos from horizontal uploads for YouTube Shorts and mobile feeds.", icon: <PlayCircle className="size-3.5" /> },
-              { type: "GENERATE_VIDEOS_FROM_OTHER_ASSETS", label: "Videos from Images", desc: "Turn your uploaded images and text into short animated video ads.", icon: <PlayCircle className="size-3.5" /> },
+            const ALL_DG_AUTOMATION_ITEMS: {
+              type: DemandGenAdAutomationType;
+              label: string;
+              desc: string;
+              icon: React.ReactNode;
+              availableFor: DemandGenAd["adType"][];
+            }[] = [
+              {
+                type: "GENERATE_DESIGN_VERSIONS_FOR_IMAGES",
+                label: "Image Design Versions",
+                desc: "Auto-create cropped, resized, and reformatted image variations for each placement.",
+                icon: <ImageIcon className="size-3.5" />,
+                availableFor: ["MULTI_ASSET"],
+              },
+              {
+                type: "GENERATE_VIDEOS_FROM_OTHER_ASSETS",
+                label: "Videos from Images",
+                desc: "Turn your uploaded images and text into short animated video ads.",
+                icon: <PlayCircle className="size-3.5" />,
+                availableFor: ["MULTI_ASSET"],
+              },
+              {
+                type: "GENERATE_SHORTER_YOUTUBE_VIDEOS",
+                label: "Shorter Video Cuts",
+                desc: "Generate shorter video edits from your uploaded videos for better engagement.",
+                icon: <PlayCircle className="size-3.5" />,
+                availableFor: ["VIDEO_RESPONSIVE"],
+              },
+              {
+                type: "GENERATE_VERTICAL_YOUTUBE_VIDEOS",
+                label: "Vertical Video Versions",
+                desc: "Auto-create vertical (9:16) videos from horizontal uploads for YouTube Shorts and mobile feeds.",
+                icon: <PlayCircle className="size-3.5" />,
+                availableFor: ["VIDEO_RESPONSIVE"],
+              },
             ];
+            // Filter by current ad format.
+            const DG_AUTOMATION_ITEMS = ALL_DG_AUTOMATION_ITEMS.filter((item) =>
+              item.availableFor.includes(activeAd.adType)
+            );
             const automation = activeAd.adAssetAutomation ?? {
               GENERATE_DESIGN_VERSIONS_FOR_IMAGES: "OPTED_IN" as AssetAutomationStatus,
               GENERATE_SHORTER_YOUTUBE_VIDEOS: "OPTED_IN" as AssetAutomationStatus,
@@ -4079,6 +4317,10 @@ function DemandGenCreativeEditor() {
               updateGroup(activeGroupIdx, { ads: updatedAds });
             };
 
+            const formatLabel = activeAd.adType === "VIDEO_RESPONSIVE"
+              ? "Video Responsive"
+              : activeAd.adType === "MULTI_ASSET" ? "Multi-Asset" : "Carousel";
+
             return (
               <div className="mt-4 rounded-xl border border-primary/20 bg-primary/[0.02] p-4">
                 <div className="mb-3 flex items-center gap-2.5">
@@ -4087,29 +4329,54 @@ function DemandGenCreativeEditor() {
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-foreground">Google AI Settings</p>
-                    <p className="text-[10px] text-muted-foreground">Google AI creates variations of your creative assets to find the best performers.</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Google AI creates creative variations for {formatLabel} ads.
+                    </p>
                   </div>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  {DG_AUTOMATION_ITEMS.map((item) => {
-                    const isOn = (automation[item.type] ?? "OPTED_IN") === "OPTED_IN";
-                    return (
-                      <div key={item.type} className={cn("flex items-center gap-2.5 rounded-lg border px-3 py-2 transition-all", isOn ? "border-primary/20 bg-primary/[0.03]" : "border-border bg-background")}>
-                        <div className={cn("flex size-6 shrink-0 items-center justify-center rounded", isOn ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-                          {item.icon}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[11px] font-semibold text-foreground">{item.label}</p>
-                          <p className="text-[9px] text-muted-foreground">{item.desc}</p>
-                        </div>
-                        <Switch checked={isOn} onCheckedChange={() => toggleDgAutomation(item.type)} className="scale-90" />
-                      </div>
-                    );
-                  })}
+
+                {/* Format-gating info banner — per dev audit, surface
+                    that AI options depend on the chosen ad format. */}
+                <div className="mb-3 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2">
+                  <Info className="mt-0.5 size-3 shrink-0 text-blue-600" />
+                  <p className="text-[10px] leading-snug text-blue-800">
+                    AI automation options vary by ad format. <strong>Video</strong> ads can generate shorter cuts + vertical versions. <strong>Multi-Asset</strong> ads can generate image variations + videos from your images. <strong>Carousel</strong> ads have no AI automation — the card layout is fixed.
+                  </p>
                 </div>
-                <p className="mt-2 text-[9px] text-muted-foreground">
-                  <span className="font-semibold text-primary">Tip:</span> Keep all automation enabled. Google tests AI-generated creative variations to find the best performers for your audience.
-                </p>
+
+                {DG_AUTOMATION_ITEMS.length > 0 ? (
+                  <>
+                    <div className="flex flex-col gap-1.5">
+                      {DG_AUTOMATION_ITEMS.map((item) => {
+                        const isOn = (automation[item.type] ?? "OPTED_IN") === "OPTED_IN";
+                        return (
+                          <div key={item.type} className={cn("flex items-center gap-2.5 rounded-lg border px-3 py-2 transition-all", isOn ? "border-primary/20 bg-primary/[0.03]" : "border-border bg-background")}>
+                            <div className={cn("flex size-6 shrink-0 items-center justify-center rounded", isOn ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                              {item.icon}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] font-semibold text-foreground">{item.label}</p>
+                              <p className="text-[9px] text-muted-foreground">{item.desc}</p>
+                            </div>
+                            <Switch checked={isOn} onCheckedChange={() => toggleDgAutomation(item.type)} className="scale-90" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-[9px] text-muted-foreground">
+                      <span className="font-semibold text-primary">Tip:</span> Keep all automation enabled. Google tests AI-generated creative variations to find the best performers for your audience.
+                    </p>
+                  </>
+                ) : (
+                  /* Carousel — no automation options. Show an honest note
+                      so merchants know it's not a bug. */
+                  <div className="flex items-start gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2.5">
+                    <Info className="mt-0.5 size-3 shrink-0 text-muted-foreground" />
+                    <p className="text-[11px] leading-snug text-muted-foreground">
+                      Carousel ads don&apos;t use AI asset automation — the card images, headlines, and CTAs you set above are what Google delivers. Switch to <strong>Video Responsive</strong> or <strong>Multi-Asset</strong> if you want Google AI to generate creative variations.
+                    </p>
+                  </div>
+                )}
               </div>
             );
           })()}

@@ -1762,26 +1762,47 @@ export function GoogleStepAudience() {
                   </SectionCard>
                 ) : !isPMax ? (
                   /* Non-Search: OS-level Device Targeting (unified) */
-                  <DeviceTargetingCard
-                    value={aud.operatingSystems ?? []}
-                    onChange={(ids) =>
-                      updateNested("audience", { operatingSystems: ids })
-                    }
-                    accent="primary"
-                    infoTipText="Choose which devices to target. Both selected is recommended."
-                  />
+                  <>
+                    <DeviceTargetingCard
+                      value={aud.operatingSystems ?? []}
+                      onChange={(ids) =>
+                        updateNested("audience", { operatingSystems: ids })
+                      }
+                      accent="primary"
+                      infoTipText={isDemandGen
+                        ? "Demand Gen supports OS-level targeting (iOS / Android) at the ad-group level. Per-device-type bid adjustments (Desktop / Mobile / Tablet) like Search are not exposed by the DG API."
+                        : "Choose which devices to target. Both selected is recommended."}
+                    />
+                    {isDemandGen && (
+                      <div className="-mt-2 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                        <Info className="mt-0.5 size-3 shrink-0 text-blue-600" />
+                        <p className="text-[11px] leading-snug text-blue-800">
+                          <strong>Demand Gen device note:</strong> Google Ads API exposes OS-level targeting (iOS / Android) for DG ad groups via <code className="rounded bg-blue-100 px-1 py-0.5 text-[10px]">operating_system_version_info</code>. Search-style per-device bid adjustments aren&apos;t available — the algorithm handles device distribution automatically.
+                        </p>
+                      </div>
+                    )}
+                  </>
                 ) : null}
 
-                {/* Household Income & Parental Status (Search) */}
-                {isSearch && (
+                {/* Household Income & Parental Status — Search + Demand Gen.
+                    Per dev audit: Google Ads API supports parental_status
+                    criterion on Demand Gen ad groups, not just Search.
+                    Household income remains Search-only (DG ad-group
+                    doesn't support income_range criterion). */}
+                {(isSearch || isDemandGen) && (
                   <SectionCard>
                     <div className="mb-3 flex items-center gap-2">
                       <Users className="size-4 text-primary" />
                       <Label className="text-sm font-semibold text-foreground">Advanced Demographics</Label>
-                      <InfoTip text="Optional filters for Search only. Use after baseline performance is stable to avoid over-restricting reach." />
+                      <InfoTip text={isDemandGen
+                        ? "Demand Gen supports parental status targeting at the ad-group level. Household income is Search-only (Google Ads API doesn't expose income_range criterion for DG)."
+                        : "Optional filters for Search only. Use after baseline performance is stable to avoid over-restricting reach."}
+                      />
                     </div>
 
-                    {/* Household Income */}
+                    {/* Household Income — Search only. DG doesn't expose
+                        the income_range criterion via Google Ads API. */}
+                    {isSearch && (
                     <div className="mb-4">
                       <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground">
                         <DollarSign className="size-3 text-primary" />
@@ -1812,6 +1833,7 @@ export function GoogleStepAudience() {
                         <p className="mt-1 text-[10px] text-muted-foreground">None selected. All income levels are targeted.</p>
                       )}
                     </div>
+                    )}
 
                     {/* Parental Status */}
                     <div>
