@@ -33,6 +33,7 @@ import {
 import { getCountryByCode, getCityById } from "@/lib/locations";
 import { LocationSelector } from "@/components/shared/location-selector";
 import { LocationReachCard } from "@/components/shared/location-reach-card";
+import { AudienceSizeEstimateCard } from "@/components/shared/audience-size-estimate-card";
 import { LocationMapPreview } from "@/components/shared/location-map-preview";
 import { DeliveryCheckCard } from "@/components/shared/delivery-check-card";
 import { DemographicsCard } from "@/components/shared/demographics-card";
@@ -173,6 +174,33 @@ export function TikTokStepAudience() {
                 </div>
               </div>
             </SectionCard>
+          )}
+
+          {/* ── Custom Audiences (primary — biggest lever) ──────────
+              Per the audience UX audit: custom lists are the highest-
+              impact filter. Every platform's API intersects them with
+              base filters, so putting them at the TOP of the page
+              matches the compounding math and lets the merchant see
+              the delivery pool from the estimate card in the sidebar
+              shrink as they add lists. Was buried inside the Advanced
+              collapsible; now visible-by-default with include + exclude.
+              Hidden in Smart+ Sales because Smart+ Web only accepts
+              excluded_audience_ids (which the Salla Smart Features
+              card already handles below), and hidden in Search-Ads
+              mode which uses keywords instead of audiences. */}
+          {!smartPlusSalesActive && !searchAdsOn && (
+            <CustomAudiencesCard
+              includeIds={aud.customAudienceIds}
+              onIncludeIdsChange={(ids) =>
+                updateNested("audience", { customAudienceIds: ids })
+              }
+              excludeIds={aud.excludedAudienceIds}
+              onExcludeIdsChange={(ids) =>
+                updateNested("audience", { excludedAudienceIds: ids })
+              }
+              accent="primary"
+              learnMoreTrigger={<LearnMoreTrigger {...customAudiencesLearnMore.triggerProps} />}
+            />
           )}
 
           {/* ---- 1. Location (shared component — same UX as all platforms; maps to locationIds + cities) ---- */}
@@ -454,19 +482,9 @@ export function TikTokStepAudience() {
 
             <CollapsibleContent className={cn("flex flex-col gap-4 rounded-b-2xl px-2 pb-2", showAdvanced && "bg-muted/50")}>
 
-                {/* Custom Audiences (unified) */}
-                <CustomAudiencesCard
-                  includeIds={aud.customAudienceIds}
-                  onIncludeIdsChange={(ids) =>
-                    updateNested("audience", { customAudienceIds: ids })
-                  }
-                  excludeIds={aud.excludedAudienceIds}
-                  onExcludeIdsChange={(ids) =>
-                    updateNested("audience", { excludedAudienceIds: ids })
-                  }
-                  accent="primary"
-                  learnMoreTrigger={<LearnMoreTrigger {...customAudiencesLearnMore.triggerProps} />}
-                />
+                {/* Custom Audiences promoted to primary card at the top
+                    of the page — see the render above. Advanced now
+                    holds only OS-level device targeting + expansion. */}
 
                 {/* Device Targeting (unified) */}
                 <DeviceTargetingCard
@@ -542,6 +560,34 @@ export function TikTokStepAudience() {
         {/* ============================================================ */}
         <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
           <div className="sticky top-20 flex flex-col gap-4">
+
+            {/* ── Live audience-size estimate ─────────────────────────
+                First thing the merchant sees in the sidebar — the pool
+                shrinks in real time as they add filters, with a
+                breakdown of which filter is doing the most narrowing.
+                Fixes the "compounding is invisible" complaint from the
+                audit — every filter (location, age, gender, language,
+                interests, custom audiences) always intersects, so
+                showing the running number makes the math visible. */}
+            <AudienceSizeEstimateCard
+              input={{
+                countryCount: aud.locationIds.length,
+                cityCount: (aud.cities ?? []).length,
+                ageBandCount: minMaxToAgeBands(aud.ageMin, aud.ageMax).length,
+                genderAll: aud.gender === "GENDER_UNLIMITED",
+                languageCount: aud.languages.length,
+                interestCount: (aud.interests?.length ?? 0)
+                  + (aud.interestKeywordIds?.length ?? 0)
+                  + (aud.purchaseIntentKeywordIds?.length ?? 0),
+                customAudienceIncludeCount: aud.customAudienceIds?.length ?? 0,
+                // No live custom-audience size lookup yet — this
+                // heuristic assumes 10K per included list until the
+                // audience-catalog API is wired in. Directional only.
+                smallestIncludedListSize:
+                  (aud.customAudienceIds?.length ?? 0) > 0 ? 10_000 : undefined,
+                customAudienceExcludeCount: aud.excludedAudienceIds?.length ?? 0,
+              }}
+            />
 
             {/* ---- Map + Audience Estimate (merged) ---- */}
             <LocationReachCard
