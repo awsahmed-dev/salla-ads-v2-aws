@@ -118,6 +118,9 @@ export function GlobalHeader() {
   const { active, setActive } = useApp();
   const pathname = usePathname();
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Salla Engage is a standalone product with its own header/chrome.
+  const isEngage = pathname?.startsWith("/engage");
   const pickerRef = useRef<HTMLDivElement>(null);
 
   // Close picker when clicking outside
@@ -146,6 +149,8 @@ export function GlobalHeader() {
     setPickerOpen(false);
     setActive({ platform });
   }
+
+  if (isEngage) return null;
 
   return (
     <header className="shrink-0">
