@@ -417,6 +417,23 @@ export default function AudienceManagerPage() {
     // router.push(`/ad-management?audience=${audience.id}`);
   }
 
+  /**
+   * Wired to SegmentMarimekko's hover-card "Create campaign" button.
+   * Merchant hovers a segment → clicks the button in the popover →
+   * we look up the corresponding Audience by rfdmKey and route into
+   * the campaign builder with it pre-selected. Bypasses the side
+   * panel entirely, saving two clicks vs. the old flow.
+   */
+  function handleCreateCampaignFromSegment(segment: string, _count: number) {
+    const aud = audiences.find((a) => a.rfdmKey === segment);
+    if (aud) {
+      handleCreateCampaignFromAudience(aud);
+    } else {
+      // eslint-disable-next-line no-console
+      console.log("[audience-manager] create-campaign for segment (no matching audience yet):", segment);
+    }
+  }
+
   function handleExclusionToggled(audienceId: string, enabled: boolean) {
     setAudiences((prev) =>
       prev.map((a) =>
@@ -554,6 +571,7 @@ export default function AudienceManagerPage() {
                 aiChat={aiChat}
                 onSelectAudience={setDetail}
                 onOpenChat={() => setChatOpen(true)}
+                onCreateCampaign={handleCreateCampaignFromSegment}
               />
             );
           })()
@@ -574,6 +592,7 @@ export default function AudienceManagerPage() {
             }
             onSelectAudience={setDetail}
             onOpenChat={() => setChatOpen(true)}
+            onCreateCampaign={handleCreateCampaignFromSegment}
           />
         ) : (
         <>
@@ -799,6 +818,7 @@ export default function AudienceManagerPage() {
                 const aud = audiences.find((a) => a.rfdmKey === segment);
                 if (aud) setDetail(aud);
               }}
+              onCreateCampaign={handleCreateCampaignFromSegment}
             />
 
             {/* Schema explainer + competitor delta */}

@@ -60,6 +60,8 @@ interface Props {
   aiChat: Audience[];
   onSelectAudience: (a: Audience) => void;
   onOpenChat: () => void;
+  /** One-click "Create campaign" from the RFM segment hover-card. */
+  onCreateCampaign?: (segment: string, count: number) => void;
 }
 
 /* ────────────────────────────────────────────────────────── */
@@ -159,6 +161,7 @@ export function FigmaAudienceManager({
   aiChat,
   onSelectAudience,
   onOpenChat,
+  onCreateCampaign,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>("library");
   const top3 = insights.slice(0, 3);
@@ -319,6 +322,7 @@ export function FigmaAudienceManager({
                   const aud = audiences.find((a) => a.rfdmKey === segment);
                   if (aud) onSelectAudience(aud);
                 }}
+                onCreateCampaign={onCreateCampaign}
               />
               <SallaTip>
                 <strong>Salla teal palette</strong> — darker shades are the most valuable / most urgent segments. The leftmost

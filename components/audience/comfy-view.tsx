@@ -83,6 +83,10 @@ interface Props {
   topOpportunity: { name: string; sublabel: string } | null;
   onSelectAudience: (a: Audience) => void;
   onOpenChat: () => void;
+  /** One-click "Create campaign" from the segment hover-card action.
+   *  Bypasses the side panel and jumps straight into campaign creation
+   *  with the segment pre-selected. */
+  onCreateCampaign?: (segment: string, count: number) => void;
 }
 
 /* ────────────────────────────────────────────────────────── */
@@ -249,6 +253,7 @@ export function ComfyAudienceManager({
   topOpportunity,
   onSelectAudience,
   onOpenChat,
+  onCreateCampaign,
 }: Props) {
   const rfdmAudiences = audiences.filter((a) => a.source === "rfdm");
   const otherCount = audiences.length - rfdmAudiences.length;
@@ -299,6 +304,7 @@ export function ComfyAudienceManager({
           const aud = audiences.find((a) => a.rfdmKey === segment);
           if (aud) onSelectAudience(aud);
         }}
+        onCreateCampaign={onCreateCampaign}
       />
 
       {/* Segments grid — 12 RFDM segments, simple cards */}
