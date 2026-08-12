@@ -38,9 +38,7 @@ import {
   type Channel,
 } from "./data";
 import { EngageView } from "./engage-view";
-import { Onboarding } from "./onboarding";
-
-const ONBOARD_KEY = "engage_onboarded_v1";
+import { GuidedActivation, loadActivation, ACTIVATION_KEY, type ActivationState } from "./activation";
 
 /* ── Palette (Salla design system tokens) ─────────────────────── */
 const TEAL = "#004a57"; // --primary: brand text, logo, active nav, agent bubble
@@ -112,7 +110,8 @@ export default function EngagePage() {
   const [query, setQuery] = useState("");
   const [autoDemo, setAutoDemo] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showActivation, setShowActivation] = useState(false);
+  const [activation, setActivation] = useState<ActivationState | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -120,22 +119,31 @@ export default function EngagePage() {
     const t = Date.now();
     setNow(t);
     setConversations(seedConversations(t));
-    // First-run onboarding
-    try {
-      if (!localStorage.getItem(ONBOARD_KEY)) setShowOnboarding(true);
-    } catch {
-      setShowOnboarding(true);
-    }
+    // Guided activation launches automatically on first open
+    const a = loadActivation();
+    setActivation(a);
+    setShowActivation(!a.done);
   }, []);
 
-  function finishOnboarding() {
+  function exitActivation() {
+    setActivation(loadActivation());
+    setShowActivation(false);
+  }
+
+  function finishActivation() {
+    setActivation(loadActivation());
+    setShowActivation(false);
+    setActiveNav("Inbox");
+  }
+
+  function restartActivation() {
     try {
-      localStorage.setItem(ONBOARD_KEY, "1");
+      localStorage.removeItem(ACTIVATION_KEY);
     } catch {
       /* ignore */
     }
-    setShowOnboarding(false);
-    setActiveNav("Inbox");
+    setActivation(null);
+    setShowActivation(true);
   }
 
   useEffect(() => {
@@ -316,9 +324,34 @@ export default function EngagePage() {
         </nav>
       </header>
 
+      {/* ── Persistent "finish setup" banner (PRD) ──────────────── */}
+      {activation && !activation.done && !showActivation && (
+        <div
+          className="flex shrink-0 items-center gap-3 border-b px-6 py-2.5"
+          style={{ borderColor: "#f0e0c4", background: "#fff6eb" }}
+        >
+          <Sparkles className="size-[17px] shrink-0" style={{ color: "#d28f37" }} />
+          <p className="text-[13px]" style={{ color: "#8a5a1c" }}>
+            <strong>Finish setting up Engage.</strong>{" "}
+            {activation.submitted && !activation.live
+              ? "Your template is with Meta — we'll bring you back the moment it's approved."
+              : "You're a few steps away from your first live automation."}
+          </p>
+          <button
+            onClick={() => setShowActivation(true)}
+            className="ml-auto h-8 shrink-0 rounded-lg px-4 text-[12.5px] font-bold text-white"
+            style={{ background: "#d28f37" }}
+          >
+            Resume setup
+          </button>
+        </div>
+      )}
+
       {/* ── Body ────────────────────────────────────────────────── */}
       {activeNav === "Engage" && <EngageView onOpenInbox={() => setActiveNav("Inbox")} />}
-      {activeNav !== "Inbox" && activeNav !== "Engage" && <ComingSoon label={activeNav} />}
+      {activeNav !== "Inbox" && activeNav !== "Engage" && (
+        <TabIntro label={activeNav} onResume={() => setShowActivation(true)} showResume={!!activation && !activation.done} />
+      )}
       <div className={`min-h-0 flex-1 ${activeNav === "Inbox" ? "flex" : "hidden"}`}>
         {/* Conversation list */}
         <aside className="flex w-[312px] shrink-0 flex-col border-r" style={{ borderColor: HAIR }}>
@@ -628,7 +661,8 @@ export default function EngagePage() {
                 {autoDemo ? "● Live stream: ON" : "▶ Start live stream"}
               </button>
               <div className="my-1 h-px" style={{ background: HAIR }} />
-              <DemoRow onClick={() => setShowOnboarding(true)}>▶ Replay onboarding</DemoRow>
+              <DemoRow onClick={() => setShowActivation(true)}>▶ Resume activation</DemoRow>
+              <DemoRow onClick={restartActivation}>↻ Restart activation</DemoRow>
               <DemoRow onClick={resetInbox}>↺ Reset inbox</DemoRow>
               <DemoRow onClick={clearInbox}>Empty inbox</DemoRow>
             </div>
@@ -646,25 +680,121 @@ export default function EngagePage() {
       </>
       )}
 
-      {/* First-run onboarding carousel */}
-      {showOnboarding && <Onboarding onClose={finishOnboarding} />}
+      {/* Guided activation (PRD: launches on first open, resumable) */}
+      {showActivation && <GuidedActivation onExit={exitActivation} onFinish={finishActivation} />}
     </div>
   );
 }
 
-/* Placeholder for the not-yet-built tabs */
-function ComingSoon({ label }: { label: string }) {
+/* Per-tab intro landing — explains what the section does before there's data */
+const TAB_INTRO: Record<
+  string,
+  { icon: typeof Inbox; title: string; sub: string; points: string[] }
+> = {
+  Templates: {
+    icon: FileText,
+    title: "Message Templates",
+    sub: "Approved messages you can send to customers who haven't messaged you first.",
+    points: [
+      "Ready-made Arabic & English templates for orders, shipping, and marketing",
+      "Meta reviews each template — usually within 24 hours",
+      "Reuse an approved template across every automation and broadcast",
+    ],
+  },
+  Contacts: {
+    icon: Users,
+    title: "Contacts",
+    sub: "Everyone who can receive your WhatsApp messages, synced from your Salla store.",
+    points: [
+      "Customers appear automatically the first time they message you",
+      "Import your existing list or pull in abandoned-cart shoppers",
+      "Label and segment them to target the right broadcast",
+    ],
+  },
+  Analytics: {
+    icon: BarChart3,
+    title: "Analytics",
+    sub: "See what your messaging is actually earning you.",
+    points: [
+      "Delivery, read, and reply rates for every message you send",
+      "Revenue attributed to your automations and campaigns",
+      "Inbox health — open, unattended, and pending conversations",
+    ],
+  },
+  Wallet: {
+    icon: Wallet,
+    title: "Wallet",
+    sub: "Your prepaid balance for sending WhatsApp messages.",
+    points: [
+      "You're charged per conversation, at Meta's rates — no markup",
+      "Top up any time; automations pause if the balance runs out",
+      "Estimate costs before you launch a broadcast",
+    ],
+  },
+  Settings: {
+    icon: Settings,
+    title: "Settings",
+    sub: "Your channels, automations rules, and quality controls.",
+    points: [
+      "Connect WhatsApp, Email, Instagram, and more",
+      "Quick replies, auto-reply bot, and OTP authentication",
+      "SLA policies and CSAT surveys to keep quality high",
+    ],
+  },
+};
+
+function TabIntro({
+  label,
+  onResume,
+  showResume,
+}: {
+  label: string;
+  onResume: () => void;
+  showResume: boolean;
+}) {
+  const info = TAB_INTRO[label];
+  if (!info) return null;
+  const Icon = info.icon;
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-white text-center">
-      <div className="flex size-20 items-center justify-center rounded-2xl" style={{ background: MINT_SOFT }}>
-        <Sparkles className="size-9" style={{ color: TEAL }} strokeWidth={1.9} />
+    <div className="min-h-0 flex-1 overflow-y-auto bg-white">
+      <div className="mx-auto max-w-[620px] px-6 py-16 text-center">
+        <div
+          className="mx-auto flex size-16 items-center justify-center rounded-2xl"
+          style={{ background: MINT_SOFT }}
+        >
+          <Icon className="size-8" style={{ color: TEAL }} />
+        </div>
+        <h2 className="mt-5 text-[22px] font-extrabold" style={{ color: TEAL_DEEP }}>
+          {info.title}
+        </h2>
+        <p className="mx-auto mt-2 max-w-[440px] text-[14px] leading-7 text-[#737373]">{info.sub}</p>
+
+        <div className="mt-7 space-y-3 text-left">
+          {info.points.map((p) => (
+            <div
+              key={p}
+              className="flex items-start gap-3 rounded-xl border px-4 py-3.5"
+              style={{ borderColor: HAIR }}
+            >
+              <Check className="mt-0.5 size-[15px] shrink-0" style={{ color: ACCENT }} />
+              <p className="text-[13.5px] leading-6 text-[#4a5c5f]">{p}</p>
+            </div>
+          ))}
+        </div>
+
+        {showResume && (
+          <div className="mt-7">
+            <button
+              onClick={onResume}
+              className="h-11 rounded-xl px-6 text-[14px] font-bold text-white"
+              style={{ background: TEAL }}
+            >
+              Finish setup to unlock this
+            </button>
+            <p className="mt-2.5 text-[12px] text-[#999999]">Your progress is saved.</p>
+          </div>
+        )}
       </div>
-      <p className="mt-4 text-xl font-bold" style={{ color: TEAL_DEEP }}>
-        {label}
-      </p>
-      <p className="mt-1 max-w-xs text-sm text-[#999999]">
-        This section is part of the prototype and isn&apos;t built out yet.
-      </p>
     </div>
   );
 }

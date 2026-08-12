@@ -104,6 +104,23 @@ export const Eye = makeIcon("view");
 /* ── Journey / getting-started ── */
 export const Rocket = makeIcon("rocket-01");
 export const Whatsapp = makeIcon("whatsapp-business");
+export const WhatsappPlain = makeIcon("whatsapp");
 export const UserAdd = makeIcon("user-add-01");
 export const CheckCircle = makeIcon("checkmark-circle-02");
 export const ArrowRight = makeIcon("arrow-right-01");
+
+/* ── Guided activation ── */
+export const ArrowLeft = makeIcon("arrow-left-01");
+export const ExternalLink = makeIcon("link-square-02");
+export const Unlink = makeIcon("unlink-01");
+export const Lock = makeIcon("lock");
+export const AlertCircle = makeIcon("alert-circle");
+export const PlayCircle = makeIcon("play-circle");
+export const Video = makeIcon("video-01");
+export const Clock = makeIcon("clock-01");
+export const Hourglass = makeIcon("hourglass");
+export const MagicWand = makeIcon("magic-wand-01");
+export const Idea = makeIcon("idea-01");
+export const CancelCircle = makeIcon("cancel-circle");
+export const Badge = makeIcon("checkmark-badge-01");
+export const PenEdit = makeIcon("pencil-edit-01");
